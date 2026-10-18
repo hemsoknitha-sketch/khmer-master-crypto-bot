@@ -124,7 +124,7 @@ class FlashCrashLiquidationHunterEngine:
 
             qty = round((amount_usdt / target_price), 3)
 
-            is_real = not getattr(trading_engine, "PAPER_TRADING", True)
+            is_real = not getattr(trading_engine, "PAPER_TRADING", False)
             res = {}
 
             if is_real and api_key and api_secret:

@@ -638,8 +638,8 @@ def _build_security_view(is_admin: bool, lang: str, mode_badge: str) -> Tuple[st
             "🔒 **7. Security 2FA PIN & Recovery:**\n"
             "• `/set_pin <PIN>` - Configure your 4-6 digit security PIN for critical executions.\n"
             "• `/reset_pin` - Emergency 2FA security PIN recovery protocol.\n\n"
-            "🧪 **8. Simulation vs Live Real Trading Mode:**\n"
-            "• `/paper_trading` - Toggle seamlessly between Paper Trading Simulation and Real Live Capital.\n\n"
+            "🧪 **8. Simulation vs Live Real Trading Mode (Admin Only):**\n"
+            "• `/paper_trading` - Toggle between Paper Simulation and Real Live Capital (Super Admin Only).\n\n"
             "📜 **9. Terms, Legal Agreement & Risk Waiver:**\n"
             "• `/about` | `/agreement` - Review client agreements, terms of service, and risk disclosures.\n"
         )
@@ -670,8 +670,8 @@ def _build_security_view(is_admin: bool, lang: str, mode_badge: str) -> Tuple[st
             "🔒 **7. 2FA 安全 PIN 码与重置:**\n"
             "• `/set_pin <PIN>` - 设置 4-6 位敏感操作安全确认密码。\n"
             "• `/reset_pin` - 申请重置安全验证 PIN 码。\n\n"
-            "🧪 **8. 模拟盘与实盘切换 (Paper Trading):**\n"
-            "• `/paper_trading` - 在无风险模拟沙盒与真实本金实盘之间自由切换。\n\n"
+            "🧪 **8. 模拟盘与实盘切换 (仅限超级管理员):**\n"
+            "• `/paper_trading` - 在无风险模拟沙盒与真实本金实盘之间切换（仅限 Super Admin）。\n\n"
             "📜 **9. 服务条款、法律协议与风险披露:**\n"
             "• `/about` | `/agreement` - 查看客户服务协议、责任免除与合规声明。\n"
         )
@@ -702,8 +702,8 @@ def _build_security_view(is_admin: bool, lang: str, mode_badge: str) -> Tuple[st
             "🔒 **៧. លេខកូដសម្ងាត់ 2FA Security PIN ៖**\n"
             "• `/set_pin <PIN>` - កំណត់លេខកូដសម្ងាត់ ៤-៦ ខ្ទង់មុនពេលបញ្ជាជួញដូរធំៗ។\n"
             "• `/reset_pin` - ផ្លាស់ប្តូរ ឬកំណត់លេខកូដសម្ងាត់ឡើងវិញពេលភ្លេច។\n\n"
-            "🧪 **៨. ផ្លាស់ប្តូរ Paper Trading vs Real Live ៖**\n"
-            "• `/paper_trading` - ប្តូររវាងការរៀន Trade សាកល្បង (Paper) និងការជួញដូរលុយពិត (Real Live)។\n\n"
+            "🧪 **៨. ផ្លាស់ប្តូរ Paper Trading vs Real Live (Admin Only) ៖**\n"
+            "• `/paper_trading` - ប្តូររវាង Simulation និង Real Live (សម្រាប់ Super Admin តែប៉ុណ្ណោះ)។\n\n"
             "📜 **៩. កិច្ចសន្យា និងលក្ខខណ្ឌច្បាប់ (Legal & Agreement) ៖**\n"
             "• `/about` | `/agreement` - ពិនិត្យកិច្ចព្រមព្រៀងសេវាកម្ម និងការប្រកាសហានិភ័យច្បាប់។\n"
         )

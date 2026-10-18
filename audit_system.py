@@ -3050,9 +3050,9 @@ def run_audit():
         log_fail(str(e))
 
     # -------------------------------------------------------------------------
-    # [CHECK 61/61] In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76)
+    # [CHECK 61/62] In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76)
     # -------------------------------------------------------------------------
-    print("\n[CHECK 61/61] Verifying In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76)...")
+    print("\n[CHECK 61/62] Verifying In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76)...")
     try:
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_md = f.read()
@@ -3102,6 +3102,58 @@ def run_audit():
             log_fail("Invariant 76 check failed!")
     except Exception as e:
         failures.append(f"Invariant 76 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 62/62] Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF) (Invariant 78)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 62/62] Verifying Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF) (Invariant 78)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv78 = "Invariant 78: Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF)" in agents_md
+
+        import trading_engine as te
+        has_paper_attr = hasattr(te, "PAPER_TRADING")
+        has_set_func = hasattr(te, "set_paper_trading") and callable(te.set_paper_trading)
+        has_is_func = hasattr(te, "is_paper_trading") and callable(te.is_paper_trading)
+
+        # Baseline Verification: Always False by default
+        baseline_is_off = (te.PAPER_TRADING is False) and (te.is_paper_trading() is False)
+
+        # Dynamic Unit Test: Test switching to ON and reverting to OFF
+        te.set_paper_trading(True)
+        dynamic_on_ok = (te.PAPER_TRADING is True) and (te.is_paper_trading() is True)
+        te.set_paper_trading(False)
+        dynamic_off_ok = (te.PAPER_TRADING is False) and (te.is_paper_trading() is False)
+
+        with open("bot_thread.py", "r", encoding="utf-8") as btf:
+            bot_thread_code = btf.read()
+        has_admin_only_guard = "is_super_admin = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))" in bot_thread_code
+        has_paper_callbacks = "btn_paper_on_1234" in bot_thread_code and "btn_paper_off_1234" in bot_thread_code and "btn_paper_refresh" in bot_thread_code
+
+        with open("bot_commands_registry.py", "r", encoding="utf-8") as bcrf:
+            bcr_code = bcrf.read()
+        has_registry_admin = 'BotCommand("paper_trading", "🧪 Angkor Paper vs Live Mode (Admin Only)")' in bcr_code
+
+        with open("smart_bot_guide.py", "r", encoding="utf-8") as sbgf:
+            sbg_code = sbgf.read()
+        has_guide_admin = "Simulation vs Live Real Trading Mode (Admin Only)" in sbg_code
+
+        all_inv78_passed = (
+            has_inv78 and has_paper_attr and has_set_func and has_is_func and
+            baseline_is_off and dynamic_on_ok and dynamic_off_ok and
+            has_admin_only_guard and has_paper_callbacks and
+            has_registry_admin and has_guide_admin
+        )
+
+        if all_inv78_passed:
+            log_pass("Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF) (Invariant 78) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 78 check failed: inv78={has_inv78}, attr={has_paper_attr}, set={has_set_func}, is={has_is_func}, baseline_off={baseline_is_off}, dyn_on={dynamic_on_ok}, dyn_off={dynamic_off_ok}, admin_guard={has_admin_only_guard}, callbacks={has_paper_callbacks}, registry={has_registry_admin}, guide={has_guide_admin}")
+            log_fail("Invariant 78 check failed!")
+    except Exception as e:
+        failures.append(f"Invariant 78 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

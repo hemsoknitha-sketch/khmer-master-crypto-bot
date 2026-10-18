@@ -81,7 +81,7 @@ def execute_arbitrage_harvest(api_key: str, api_secret: str, arb_data: dict, amo
             return {"status": "error", "message": "Invalid price"}
 
         # Super Smart MIN_NOTIONAL Safeguard: Binance Spot requires >= $10.00 USDT
-        if not getattr(trading_engine, "PAPER_TRADING", True):
+        if not getattr(trading_engine, "PAPER_TRADING", False):
             if amount_usdt < 10.01:
                 spot_bal = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
                 if spot_bal >= 10.01:

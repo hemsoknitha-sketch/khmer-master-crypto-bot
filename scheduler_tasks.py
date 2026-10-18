@@ -6117,7 +6117,7 @@ async def auto_arb_monitor(app: Application):
                 yield_usdt = amount * (yield_pct / 100.0)
                 await asyncio.to_thread(db.update_strategy_pnl, chat_id, "DELTA_NEUTRAL_ARBITRAGE", yield_usdt, True)
                 import trading_engine
-                is_real = not getattr(trading_engine, "PAPER_TRADING", True)
+                is_real = not getattr(trading_engine, "PAPER_TRADING", False)
                 tag = "REAL BINANCE ARB HARVEST" if is_real else "DELTA-NEUTRAL ARB HARVESTED SILENTLY"
                 print(f"⚡ [{tag}] +${yield_usdt:.4f} USDT (+{yield_pct:.3f}%) for Chat ID {chat_id}")
     except asyncio.CancelledError:

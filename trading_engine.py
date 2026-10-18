@@ -15,6 +15,10 @@ def set_paper_trading(enabled: bool):
     PAPER_TRADING = enabled
     os.environ["PAPER_TRADING"] = str(enabled)
 
+def is_paper_trading() -> bool:
+    """Returns True if paper simulation is active, False if real live trading (Always OFF by default)."""
+    return bool(PAPER_TRADING)
+
 # TIME SYNC
 TIME_OFFSET = 0
 

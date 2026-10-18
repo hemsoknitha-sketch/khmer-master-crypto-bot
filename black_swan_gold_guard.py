@@ -88,7 +88,7 @@ class PAXGGoldSafeHavenSwitcherEngine:
             symbol = "PAXGUSDT"
             price = trading_engine.get_current_price(symbol) or 2650.0
 
-            is_real = not getattr(trading_engine, "PAPER_TRADING", True)
+            is_real = not getattr(trading_engine, "PAPER_TRADING", False)
             res = {}
 
             if is_real and api_key and api_secret:

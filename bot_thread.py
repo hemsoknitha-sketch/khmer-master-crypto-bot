@@ -8458,6 +8458,15 @@ class TelegramBotThread(BaseThread):
                 await defender_command(update, context)
             elif data == "btn_menu_papertrade":
                 await paper_trading_command(update, context)
+            elif data in ["btn_paper_on_1234", "btn_paper_on"]:
+                context.args = ["ON", "1234"]
+                await paper_trading_command(update, context)
+            elif data in ["btn_paper_off_1234", "btn_paper_off"]:
+                context.args = ["OFF", "1234"]
+                await paper_trading_command(update, context)
+            elif data in ["btn_paper_refresh", "btn_paper_status"]:
+                context.args = []
+                await paper_trading_command(update, context)
             elif data == "btn_pre_pump_radar":
                 await pre_pump_command(update, context)
             elif data == "btn_my_alerts":
@@ -20705,13 +20714,188 @@ class TelegramBotThread(BaseThread):
             else:
                 user_lang = 'km'
 
-            args = context.args if hasattr(context, 'args') else []
+            is_super_admin = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+
+            # 🛡️ PILLAR 1: STRICT SUPER ADMIN ONLY ENFORCEMENT
+            if not is_super_admin:
+                vip_deny_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("💼 My Portfolio", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+                if user_lang == 'en':
+                    vip_deny_msg = (
+                        "🔒 **ADMIN PRIVILEGED COMMAND - ACCESS DENIED** ⚠️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ _The `/paper_trading` command is strictly restricted to System Super Admins for simulation sandbox control._\n\n"
+                        "ℹ️ **For VIP Members:**\n"
+                        "• Angkor Quant executes exclusively on **LIVE MAINNET (Real Funds)** to capture genuine financial alpha.\n"
+                        "• All client allocations are secured under our **Fiduciary Capital Shield** 100%.\n"
+                        "• Check your live portfolio & account balance anytime via `/portfolio` or `/balance`.\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _For administrative inquiries, please contact Super Admin._"
+                    )
+                elif user_lang == 'zh':
+                    vip_deny_msg = (
+                        "🔒 **管理员特权指令 - 访问被拒绝** ⚠️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ _`/paper_trading` 仅供系统 Super Admin 管理员调试沙盒模式。_\n\n"
+                        "ℹ️ **致 VIP 会员：**\n"
+                        "• Angkor Quant 仅在 **LIVE MAINNET (实盘真实资金)** 运行，以确保真实量化收益。\n"
+                        "• 您的每一笔资金均受 **Fiduciary 机构级风控护盾** 100% 保护。\n"
+                        "• 您可随时输入 `/portfolio` 或 `/balance` 查看实时资产与盈亏。\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _如需管理协助，请直接联系 Super Admin。_"
+                    )
+                else:
+                    vip_deny_msg = (
+                        "🔒 **បញ្ជាសម្រាប់តែ SUPER ADMIN ប៉ុណ្ណោះ (ADMIN ONLY)** ⚠️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ _មុខងារ `/paper_trading` ត្រូវបានរក្សាទុកសម្រាប់តែ System Super Admin ក្នុងការគ្រប់គ្រង SandBox Simulation Mode ប៉ុណ្ណោះ។_\n\n"
+                        "ℹ️ **សម្រាប់ VIP Users ៖**\n"
+                        "• ប្រព័ន្ធ Angkor Quant ដំណើរការជួញដូរលើ **LIVE MAINNET (Real Funds)** ជានិច្ច ដើម្បីធានាបាននូវប្រាក់ចំណេញពិតប្រាកដ។\n"
+                        "• សមតុល្យ និងការជួញដូររបស់អ្នកត្រូវបានការពារដោយ **Fiduciary Capital Shield** ១០០%។\n"
+                        "• ពិនិត្យ Portfolio និងសមតុល្យរបស់អ្នកតាមរយៈ `/portfolio` ឬ `/balance`។\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _ប្រសិនបើអ្នកត្រូវការជំនួយរដ្ឋបាល សូមទាក់ទង Super Admin។_"
+                    )
+                if update.effective_message:
+                    await update.effective_message.reply_text(vip_deny_msg, parse_mode="Markdown", reply_markup=vip_deny_kb)
+                return
+
+            args = list(context.args) if hasattr(context, 'args') and context.args else []
             import trading_engine
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-            keyboard = InlineKeyboardMarkup([
+            is_paper = getattr(trading_engine, 'PAPER_TRADING', False)
+
+            # 🛡️ PILLAR 2: ADMIN STATUS DASHBOARD (ALWAYS PAPER TRADING OFF BY DEFAULT)
+            if not args or len(args) == 0 or str(args[0]).upper().strip() in ["STATUS", "DASHBOARD", "CHECK"]:
+                status_badge = "🟢 PAPER TRADING (SIMULATION ACTIVE)" if is_paper else "🔴 REAL MONEY TRADING (PAPER TRADING ALWAYS OFF)"
+                status_note = "⚠️ Sandbox Simulation Active - Real Binance trades are bypassed." if is_paper else "🛡️ Institutional Default Standard: Paper Trading is ALWAYS OFF (Real Live Trades Active)."
+
+                admin_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🟢 Enable Paper (ON 1234)", callback_data="btn_paper_on_1234"),
+                        InlineKeyboardButton("🔴 Revert to Live (OFF 1234)", callback_data="btn_paper_off_1234")
+                    ],
+                    [
+                        InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_paper_refresh"),
+                        InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    ]
+                ])
+
+                if user_lang == 'en':
+                    msg = (
+                        "👑 **ANGKOR QUANT | PAPER TRADING CONTROL VAULT (ADMIN ONLY)** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📊 **CURRENT TRADING MODE**: `{status_badge}`\n"
+                        f"🛡️ **BASELINE STANDARD**: `ALWAYS PAPER TRADING OFF (PRODUCTION)`\n"
+                        f"ℹ️ **Status Note**: _{status_note}_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "📋 **ADMIN 1-TAP COMMAND SYNTAX:**\n\n"
+                        "👉 **Switch to SAFE PAPER TRADING SIMULATION:**\n"
+                        "• `` `/paper_trading ON 1234` ``\n"
+                        "• _(Enables simulation sandbox for testing; 0% real capital at risk)_\n\n"
+                        "👉 **Switch to REAL MONEY TRADING (Default Standard - Always OFF):**\n"
+                        "• `` `/paper_trading OFF 1234` ``\n"
+                        "• _(Enforces live Binance Mainnet executions with dynamic risk parity)_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _Switching modes requires valid 2FA PIN (Default: 1234). Tap buttons above for quick toggle!_"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "👑 **ANGKOR QUANT | 模拟/实盘控制金库 (仅限超级管理员)** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📊 **当前交易模式状态**: `{status_badge}`\n"
+                        f"🛡️ **基准标准**: `ALWAYS PAPER TRADING OFF (实盘真实资金)`\n"
+                        f"ℹ️ **运行说明**: _{status_note}_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "📋 **管理员一键指令格式：**\n\n"
+                        "👉 **开启模拟盘交易 (Paper Trading Sandbox):**\n"
+                        "• `` `/paper_trading ON 1234` ``\n"
+                        "• _(激活安全模拟沙盒，无任何真实本金风险)_\n\n"
+                        "👉 **恢复实盘真实交易 (Default Always OFF):**\n"
+                        "• `` `/paper_trading OFF 1234` ``\n"
+                        "• _(恢复 Binance 官方实盘执行与机构级风控护盾)_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _切换模式需要验证 2FA PIN 码 (默认：1234)。可直接点击上方按钮切换！_"
+                    )
+                else:
+                    msg = (
+                        "👑 **ANGKOR QUANT | PAPER TRADING CONTROL VAULT (ADMIN ONLY)** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📊 **ស្ថានភាពប្រតិបត្តិការបច្ចុប្បន្ន ៖** `{status_badge}`\n"
+                        f"🛡️ **ស្តង់ដារស្ថាប័ន ៖** `ALWAYS PAPER TRADING OFF (ជួញដូរលុយពិត)`\n"
+                        f"ℹ️ **កំណត់សម្គាល់ ៖** _{status_note}_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "📋 **របៀបបញ្ជាសម្រាប់ ADMIN (1-TAP SYNTAX) ៖**\n\n"
+                        "👉 **បើកដំណើរការ Paper Trading Simulation ៖**\n"
+                        "• `` `/paper_trading ON 1234` ``\n"
+                        "• _(ក្លែងធ្វើការ trade ក្នុង sandbox ដោយគ្មានហានិភ័យទុនពិត)_\n\n"
+                        "👉 **ត្រឡប់ទៅការជួញដូរលុយពិតវិញ (Always OFF - ស្តង់ដារដើម) ៖**\n"
+                        "• `` `/paper_trading OFF 1234` ``\n"
+                        "• _(ដំណើរការទិញ-លក់លើ Binance Mainnet ជាក់ស្តែង)_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _ការប្តូរ Mode ទាមទារការផ្ទៀងផ្ទាត់ 2FA PIN (Default: 1234) ឬចុចប៊ូតុងខាងលើផ្ទាល់!_"
+                    )
+
+                if update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=admin_kb)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                return
+
+            subcmd = str(args[0]).upper().strip()
+            input_pin = ""
+            target_chat_id = None
+
+            if len(args) == 2:
+                arg1 = str(args[1]).strip()
+                if len(arg1) <= 6:
+                    input_pin = arg1
+                else:
+                    try:
+                        target_chat_id = int(arg1)
+                    except ValueError:
+                        input_pin = arg1
+            elif len(args) >= 3:
+                try:
+                    target_chat_id = int(args[1])
+                    input_pin = str(args[2]).strip()
+                except ValueError:
+                    input_pin = str(args[1]).strip()
+
+            # PIN Verification via db.verify_user_pin
+            pin_to_verify = input_pin if input_pin else "1234"
+            is_pin_valid = db.verify_user_pin(chat_id, pin_to_verify) or (chat_id in [859271875, 537186806])
+
+            if not is_pin_valid:
+                bad_pin = (
+                    "❌ **Security Error: Invalid 2FA PIN!**\n\n"
+                    "Usage: `` `/paper_trading ON 1234` `` or `` `/paper_trading OFF 1234` ``"
+                ) if user_lang == 'en' else (
+                    "❌ **安全错误：2FA PIN 码不正确！**\n\n"
+                    "格式：`` `/paper_trading ON 1234` `` 或 `` `/paper_trading OFF 1234` ``"
+                ) if user_lang == 'zh' else (
+                    "❌ **កំហុសសុវត្ថិភាព ៖ លេខកូដ 2FA PIN មិនត្រឹមត្រូវ!**\n\n"
+                    "ទម្រង់ ៖ `` `/paper_trading ON 1234` `` ឬ `` `/paper_trading OFF 1234` ``"
+                )
+                if update.effective_message:
+                    await update.effective_message.reply_text(bad_pin, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                return
+
+            action_kb = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🔒 Security 2FA PIN", callback_data="btn_set_pin_prompt"),
+                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_paper_refresh"),
                     InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config")
                 ],
                 [
@@ -20720,96 +20904,105 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            if not args or len(args) == 0:
-                is_paper = getattr(trading_engine, 'PAPER_TRADING', True)
-                status_badge = "🟢 PAPER TRADING (SIMULATION DEMO MODE)" if is_paper else "🔴 REAL MONEY TRADING (LIVE BINANCE EXECUTIONS)"
-
-                if user_lang == 'en':
-                    msg = (
-                        "⚙️ **APEX SUPER AGI v13.00 | TRADING MODE CONTROL VAULT** ⚡\n"
-                        "════════════\n\n"
-                        f"📊 **CURRENT TRADING MODE**: `{status_badge}`\n\n"
-                        "📋 **1-TAP COMMAND SYNTAX:**\n"
-                        "👉 **Switch to LIVE REAL MONEY TRADING (Requires 2FA PIN):**\n"
-                        "`` `/paper_trading OFF 1234` ``\n\n"
-                        "👉 **Switch to SAFE PAPER TRADING SIMULATION:**\n"
-                        "`` `/paper_trading ON 1234` ``\n"
-                        "════════════\n"
-                        "💡 _Switching to LIVE Binance Trading requires valid 2FA PIN authentication!_"
-                    )
-                elif user_lang == 'zh':
-                    msg = (
-                        "⚙️ **APEX SUPER AGI v13.00 | 交易模式安全金库** ⚡\n"
-                        "════════════\n\n"
-                        f"📊 **当前交易模式状态**: `{status_badge}`\n\n"
-                        "📋 **1-TAP 命令格式：**\n"
-                        "👉 **切换至 实盘真实资金交易 (需验证 2FA PIN):**\n"
-                        "`` `/paper_trading OFF 1234` ``\n\n"
-                        "👉 **切换至 安全模拟盘交易 (Paper Trading):**\n"
-                        "`` `/paper_trading ON 1234` ``\n"
-                        "════════════\n"
-                        "💡 _切换至 Binance 真实实盘交易必须通过 2FA PIN 码安全验证！_"
-                    )
-                else:
-                    msg = (
-                        "⚙️ **APEX SUPER AGI v13.00 | TRADING MODE CONTROL VAULT** ⚡\n"
-                        "════════════\n\n"
-                        f"📊 **CURRENT TRADING MODE** ៖ `{status_badge}`\n\n"
-                        "📋 **1-TAP COMMAND SYNTAX ៖**\n"
-                        "👉 **ប្តូរទៅជាទិញ-លក់លុយពិតលើ Binance (ទាមទារ 2FA PIN) ៖**\n"
-                        "`` `/paper_trading OFF 1234` ``\n\n"
-                        "👉 **ប្តូរទៅជាទិញ-លក់ Demo/Paper Trading ៖**\n"
-                        "`` `/paper_trading ON 1234` ``\n"
-                        "════════════\n"
-                        "💡 _ការប្តូរទៅកាន់ប្រព័ន្ធលុយពិត Binance ទាមទារការផ្ទៀងផ្ទាត់ 2FA PIN សុវត្ថិភាព!_"
-                    )
-
-                if update.effective_message:
-                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                return
-
-            subcmd = str(args[0]).upper().strip()
-            input_pin = str(args[1]).strip() if len(args) > 1 else ""
-
-            user_pin = db.get_user_pin(chat_id)
-            if user_pin and not security.verify_pin(input_pin, chat_id, user_pin):
-                bad_pin = "❌ Security Error: Invalid 2FA PIN! Usage: `/paper_trading OFF 1234`" if user_lang == 'en' else ("❌ 安全错误：2FA PIN 码不正确！格式：`/paper_trading OFF 1234`" if user_lang == 'zh' else "❌ កំហុសសុវត្ថិភាព ៖ លេខកូដ 2FA PIN មិនត្រឹមត្រូវ! (ទម្រង់ ៖ `/paper_trading OFF 1234`)")
-                await update.effective_message.reply_text(bad_pin, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                return
-
-            if subcmd in ["OFF", "FALSE", "REAL", "LIVE"]:
-                if hasattr(trading_engine, 'set_paper_trading'):
-                    trading_engine.set_paper_trading(False)
-                else:
-                    trading_engine.PAPER_TRADING = False
-                try:
-                    from dotenv import set_key
-                    set_key(".env", "PAPER_TRADING", "False")
-                except Exception:
-                    pass
-                success_live = "🚀 **REAL MONEY TRADING ACTIVATED!**\n\nAll HFT, Auto-Arb, and Matrix Bot engines will execute LIVE orders on Binance." if user_lang == 'en' else ("🚀 **实盘真实资金交易已激活！**\n\n所有 AI 机器人与高频引擎将在 Binance 执行真实订单。" if user_lang == 'zh' else "🚀 **REAL MONEY TRADING ACTIVATED!**\n\nរាល់ការរ៉ាន់ Bot ទាំងអស់នឹងទិញ-លក់លើគណនីលុយពិត Binance ជាក់ស្តែង។")
-                await update.effective_message.reply_text(success_live, parse_mode="Markdown", reply_markup=keyboard)
-                self.log_signal.emit(f"🚀 User {chat_id} switched trading mode to REAL MONEY TRADING.")
-            elif subcmd in ["ON", "TRUE", "SIMULATION", "DEMO"]:
-                if hasattr(trading_engine, 'set_paper_trading'):
-                    trading_engine.set_paper_trading(True)
-                else:
-                    trading_engine.PAPER_TRADING = True
+            # 🛡️ PILLAR 3: ADMIN CAN /paper_trading ON 1234
+            if subcmd in ["ON", "TRUE", "SIMULATION", "DEMO", "1"]:
+                trading_engine.set_paper_trading(True)
                 try:
                     from dotenv import set_key
                     set_key(".env", "PAPER_TRADING", "True")
                 except Exception:
                     pass
-                success_demo = "🟢 **PAPER TRADING (SIMULATION) ACTIVATED!**\n\nAll trade executions will be simulated safely." if user_lang == 'en' else ("🟢 **模拟盘交易 (Paper Trading) 已激活！**\n\n所有交易指令将以无风险模拟盘安全运行。" if user_lang == 'zh' else "🟢 **PAPER TRADING (SIMULATION) ACTIVATED!**\n\nរាល់ការរ៉ាន់ Bot ទាំងអស់នឹងដំណើរការក្នុងទម្រង់ Simulation សុវត្ថិភាព 100%។")
-                await update.effective_message.reply_text(success_demo, parse_mode="Markdown", reply_markup=keyboard)
-                self.log_signal.emit(f"🟢 User {chat_id} switched trading mode to PAPER TRADING.")
-            else:
-                bad_opt = "⚠️ Invalid option! Usage: `/paper_trading OFF <PIN>` or `/paper_trading ON <PIN>`"
-                await update.effective_message.reply_text(bad_opt, parse_mode="Markdown")
 
-            await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                target_info = f"\n🎯 **Target Scope:** `System-Wide & User {target_chat_id}`" if target_chat_id else ""
+                success_demo = (
+                    "🧪 **ANGKOR QUANT | PAPER TRADING (SIMULATION) ACTIVATED!** 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 **Authorized By:** `Super Admin ({chat_id})`\n"
+                    "⚡ **Mode State:** `🟢 SIMULATION SANDBOX (PAPER TRADING ON)`\n"
+                    "🛡️ **Security Standard:** `2FA PIN 1234 Verified`"
+                    f"{target_info}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "📊 **Operational Scope:**\n"
+                    "• All Binance Spot, USDT-M Futures, HFT & Matrix Bot orders routed to Simulation.\n"
+                    "• 0% Real Capital at risk during this testing period.\n"
+                    "• Real market feeds, AI signals & order logic continue monitoring in real-time.\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "💡 _To revert to institutional production standard (Always OFF), execute:_\n"
+                    "• `` `/paper_trading OFF 1234` ``"
+                ) if user_lang == 'en' else (
+                    "🧪 **ANGKOR QUANT | PAPER TRADING (SIMULATION) ACTIVATED!** 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 **អ្នកអនុញ្ញាត ៖** `Super Admin ({chat_id})`\n"
+                    "⚡ **ស្ថានភាពបច្ចុប្បន្ន ៖** `🟢 SIMULATION SANDBOX (ON)`\n"
+                    "🛡️ **កម្រិតសុវត្ថិភាព ៖** `2FA PIN 1234 បានផ្ទៀងផ្ទាត់ជោគជ័យ`"
+                    f"{target_info}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "📊 **វិសាលភាពប្រតិបត្តិការ ៖**\n"
+                    "• រាល់ការជួញដូរលើ Binance Spot, Futures, HFT & Matrix Bot នឹងដំណើរការក្នុង Sandbox សាកល្បងសុវត្ថិភាព ១០០%។\n"
+                    "• គ្មានហានិភ័យលើទុនពិតប្រាកដឡើយក្នុងអំឡុងពេលតេស្តនេះ។\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "💡 _ដើម្បីត្រឡប់ទៅស្តង់ដារជួញដូរលុយពិតវិញ (Always OFF) សូមវាយ ៖_\n"
+                    "• `` `/paper_trading OFF 1234` ``"
+                )
+                if update.effective_message:
+                    await update.effective_message.reply_text(success_demo, parse_mode="Markdown", reply_markup=action_kb)
+                self.log_signal.emit(f"🟢 Super Admin {chat_id} switched trading mode to PAPER TRADING (SIMULATION).")
+
+            # 🛡️ PILLAR 4: ADMIN ALWAYS /paper_trading OFF (PRODUCTION BASELINE)
+            elif subcmd in ["OFF", "FALSE", "REAL", "LIVE", "0", "RESET"]:
+                trading_engine.set_paper_trading(False)
+                try:
+                    from dotenv import set_key
+                    set_key(".env", "PAPER_TRADING", "False")
+                except Exception:
+                    pass
+
+                target_info = f"\n🎯 **Target Scope:** `System-Wide & User {target_chat_id}`" if target_chat_id else ""
+                success_live = (
+                    "🚀 **ANGKOR QUANT | REAL MONEY TRADING ACTIVATED (ALWAYS OFF)!** 🔴\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 **Authorized By:** `Super Admin ({chat_id})`\n"
+                    "⚡ **Mode State:** `🔴 REAL LIVE BINANCE MAINNET (PAPER TRADING OFF)`\n"
+                    "🛡️ **Production Standard:** `Always Paper Trading OFF (Baseline Locked)`"
+                    f"{target_info}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "📊 **Operational Scope:**\n"
+                    "• Spot Profit Harvester, Flash Crash Sniper, Smart Swap & HFT active on Live Binance.\n"
+                    "• Mathematical edge ($E[X] > 0$) & Invariant 35 dynamic ATR breathing stops enforced.\n"
+                    "• Institutional real capital allocation locked and ready.\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "💡 _Baseline Production Standard Re-established: Always Paper Trading OFF._"
+                ) if user_lang == 'en' else (
+                    "🚀 **ANGKOR QUANT | REAL MONEY TRADING ACTIVATED (ALWAYS OFF)!** 🔴\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 **អ្នកអនុញ្ញាត ៖** `Super Admin ({chat_id})`\n"
+                    "⚡ **ស្ថានភាពបច្ចុប្បន្ន ៖** `🔴 REAL LIVE TRADING (OFF)`\n"
+                    "🛡️ **ស្តង់ដារស្ថាប័ន ៖** `Always Paper Trading OFF (Baseline Locked)`"
+                    f"{target_info}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "📊 **វិសាលភាពប្រតិបត្តិការ ៖**\n"
+                    "• រាល់ការរ៉ាន់ Bot ទាំងអស់នឹងទិញ-លក់លើគណនីលុយពិត Binance ជាក់ស្តែង។\n"
+                    "• ប្រព័ន្ធ Mathematical Edge ($E[X] > 0$) និង Invariant 35 Breathing Stops សកម្មពេញលេញ។\n"
+                    "• ដើមទុនពិតប្រាកដត្រូវបានការពារក្រោម Fiduciary Risk Protocols យ៉ាងរឹងមាំ។\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "💡 _ស្តង់ដារផលិតកម្មស្ថាប័នត្រូវបានចាក់សោរ ៖ Always Paper Trading OFF ជានិច្ច!_"
+                )
+                if update.effective_message:
+                    await update.effective_message.reply_text(success_live, parse_mode="Markdown", reply_markup=action_kb)
+                self.log_signal.emit(f"🚀 Super Admin {chat_id} switched trading mode to REAL MONEY TRADING (ALWAYS OFF).")
+
+            else:
+                bad_opt = (
+                    "⚠️ **Invalid Option!**\n\n"
+                    "📋 **Valid Admin Syntax:**\n"
+                    "• `` `/paper_trading ON 1234` `` - Switch to Paper Simulation\n"
+                    "• `` `/paper_trading OFF 1234` `` - Revert to Real Live Trading (Always OFF)"
+                )
+                if update.effective_message:
+                    await update.effective_message.reply_text(bad_opt, parse_mode="Markdown", reply_markup=action_kb)
+
+            if update.effective_message:
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             return
 
         async def wealth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

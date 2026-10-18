@@ -76,7 +76,8 @@ The system is engineered upon two non-negotiable axioms:
    - Every entry must be vetted by Institutional 360° Citadel Trap Clearance with $ADX \ge 25.0$ and multi-timeframe structural confluence.
    - Strictly enforces Anti-Oversold Short Guard (15m RSI $\le 36.0$ blocks Shorts) and Anti-Overbought Peak Guard (RSI $\ge 70.0$ blocks Longs).
    - Economic Calendar Red Folder Blackout Guard (Pillar 1 TradFi News Shield): Strictly freezes new TradFi entries 30 minutes prior to US High-Impact releases (CPI, NFP, FOMC, Core PCE, Powell Speeches) with `PRE_EVENT_FREEZE`, and enforces 15-minute post-event spread normalization & 150-second toxic execution zone clearance before permitting entries.
-   - H4 Top-Down Structural Directional Anchor Guard (Wall Street Institutional Macro Tide Lock): Strictly locks directional bias based on H4 200 EMA and swing structure (BOS/CHOCH/HH-HL vs LH-LL). If H4 is Bullish (Price above H4 200 EMA with Bullish Stack / HH-HL), all 15m Short/Sell signals are strictly VETOED (`H4_TOP_DOWN_TREND_VETO`, allowing only Long pullbacks/breakouts). If H4 is Bearish (Price below H4 200 EMA with Bearish Stack / LH-LL), all 15m Long/Buy signals are strictly VETOED (eliminating falling knife traps 100%).
+   - H4 Top-Down Structural Directional Anchor Guard (Wall Street Institutional Macro Tide Lock): Strictly locks directional bias based on H4 200 EMA and swing structure (BOS/CHOCH/HH-HL vs LH-LL). If H4 is Bullish (Price above H4 200 EMA with Bullish Stack / HH-HL), all 15m Short/Sell signals are strictly VETOED (`H4_TOP_DOWN_TREND_VETO`, allowing only Long pullbacks/breakouts). If H4 is Bearish (Price below H4 200 EMA with Bearish Stack / LH-LL), all 15m Long/Buy signals are strictly VETOED (eliminating falling knife traps 100%).
+
        11. Interbank Session Kill Zone Dynamic Asset Routing & Overnight Flat Cash Protocol (Invariant 77): Asian Session (07:00-13:30 ICT) strictly vetoes US Equities/Indices (SESSION_KILL_ZONE_ASIAN_US_EQUITIES_CLOSED) and focuses on GOLD/Commodities/Crypto. London Open Kill Zone (14:00-18:30 ICT) focuses strictly on GOLD & DE40 (DAX). NY Open Kill Zone (20:30-01:30 ICT) focuses on US100, US500, NVDA, TSLA, META, GOOGL, AAPL, MSFT, AMZN, GOLD, OIL. Overnight window (03:30-07:00 ICT) flattens intraday TradFi positions to Flat Cash (OVERNIGHT_FLAT_CASH_EXIT) before 21:00 UTC rollover to eliminate financing fees and spread blowout.
 5. **Pillar 5: Rollover Swap Shield & Wednesday Triple-Swap Lockout (Invariant 53 - របាំងការពារកម្រៃ Swap ឆ្លងយប់ & 3x Swap):**
    - Strictly blocks new TradFi entries during the overnight lull between 03:45 AM and 07:00 AM ICT (20:45 to 23:59 UTC), avoiding spread blowout and overnight financing interest.
@@ -1369,7 +1370,22 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - A stop-out event enforces a mandatory 45-minute quarantine on that asset across all engines, prohibiting revenge re-entries.
   6. **Institutional 15M Fair Value Gap (FVG) & Golden Pocket (0.618) Retest Radar (Path C, $R:R \ge 1:4.0$):**
      - Price retracements into 15m FVG boxes overlapping the 61.8% Golden Pocket and 70.5% ICT OTE zone trigger zero-footprint in-memory retest orders (`FVG_GOLDEN_POCKET_RETEST_BOUNCE` / `FVG_GOLDEN_POCKET_RETEST_REJECTION`) with structural invalidation SL behind the FVG boundary and asymmetric targets TP1 at +2.5R and TP2 at +4.5R to +6.0R ($R:R \ge 1:4.0$).
-- **Enforcement:** Verified by `audit_system.py` [CHECK 61/61].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 61/62].
+
+---
+
+### Invariant 78: Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF) (AQ78)
+- **Location:** `trading_engine.py` (`PAPER_TRADING`, `set_paper_trading`, `is_paper_trading`), `bot_thread.py` (`paper_trading_command`, `button_callback_handler`), `bot_commands_registry.py`, `smart_bot_guide.py`, `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **Strict Admin-Only Authorization (លុបបំបាត់ការប្តូរ Mode ដោយគ្មានសិទ្ធិ ១០០%):**
+     - The `/paper_trading` command is permanently locked exclusively to Super Admin (`859271875`, `537186806` or `db.is_admin(chat_id)`).
+     - Regular VIP members attempting to invoke it receive an informative security denial explaining that Angkor Quant operates exclusively on LIVE MAINNET to extract genuine alpha under the Fiduciary Capital Shield.
+  2. **Production Baseline Default Standard (Always Paper Trading OFF ជានិច្ច):**
+     - Institutional production standard dictates that `PAPER_TRADING` is ALWAYS `False` (`0` / `OFF`) by default upon system startup. Real capital allocation on Binance Spot and Futures is actively engaged with dynamic risk sizing, breakeven armor, and breathing stop loss guards.
+  3. **Super Admin 1-Tap Toggle with 2FA PIN (ON 1234 / OFF 1234):**
+     - Super Admin holds sole authority to toggle simulation mode via `/paper_trading ON 1234` (enabling zero-risk testing sandbox) or revert to institutional standard via `/paper_trading OFF 1234` (enforcing live real money executions).
+     - Status requests `/paper_trading` or `/paper_trading status` display a comprehensive, bilingual operational dashboard with current status badge, baseline rules, and 1-tap inline action buttons.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 62/62].
 
 ---
 

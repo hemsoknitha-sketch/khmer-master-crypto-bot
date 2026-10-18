@@ -90,7 +90,7 @@ def get_public_bot_commands():
         BotCommand("report", "📊 Angkor Multi-Timeframe Engine Audit"),
         BotCommand("audit", "👑 APEX VIP 24H Daily Audit & Fleet Telemetry"),
         BotCommand("daily_audit", "⏰ 24H Daily Institutional Audit"),
-        BotCommand("paper_trading", "🧪 Angkor Paper vs Live Trading Mode"),
+        BotCommand("paper_trading", "🧪 Angkor Paper vs Live Mode (Admin Only)"),
         BotCommand("alert", "🔔 Angkor Real-Time Price Alert"),
         BotCommand("stop", "🛑 Angkor Emergency Stop Trading"),
         BotCommand("set_pin", "🔒 Angkor Configure 2FA Security PIN"),
