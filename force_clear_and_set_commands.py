@@ -53,10 +53,11 @@ async def force_reset_menu():
     try:
         await bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
         await bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())
-        try:
-            await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
-        except Exception:
-            pass
+        for admin_id in [859271875, 537186806]:
+            try:
+                await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+            except Exception:
+                pass
         print("  └─ Registered for Default and All Private Chats scopes + Super Admin Scope!")
     except Exception as e_set:
         print(f"  └─ Error setting commands: {e_set}")

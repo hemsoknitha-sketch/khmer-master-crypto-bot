@@ -50,6 +50,7 @@ import ui_standards
 import spot_profit_harvester
 import web_gui_server
 import hf_storage_engine
+import smart_bot_guide
 
 logger = logging.getLogger("KhmerMasterCryptoBot")
 
@@ -2618,6 +2619,11 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     await msg_target.reply_text(succ_msg.replace("*", "").replace("`", ""), reply_markup=keyboard)
 
+        async def smart_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            import smart_bot_guide
+            await smart_bot_guide.handle_smart_bot_command(update, context)
+
         async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -2797,6 +2803,10 @@ class TelegramBotThread(BaseThread):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             
             keyboard = [
+                [
+                    InlineKeyboardButton("🧠 Super Smart Command Hub", callback_data="smart_hub_home"),
+                    InlineKeyboardButton("💡 Zero-Confusion Guide", callback_data="smart_cat_guide")
+                ],
                 [
                     InlineKeyboardButton("📊 24H Executive Report", callback_data="btn_executive_report"),
                     InlineKeyboardButton("📓 Trading Journal", callback_data="btn_journal")
@@ -2987,6 +2997,10 @@ class TelegramBotThread(BaseThread):
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
+                [
+                    InlineKeyboardButton("🧠 Super Smart Command Hub", callback_data="smart_hub_home"),
+                    InlineKeyboardButton("👑 Fleet Operations", callback_data="smart_cat_admin")
+                ],
                 [
                     InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
                     InlineKeyboardButton("💼 VIP Portfolios", callback_data="btn_admin_users_refresh")
@@ -4929,69 +4943,11 @@ class TelegramBotThread(BaseThread):
 
         async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id) or 'km'
-            
-            import trading_engine
-            is_paper = getattr(trading_engine, "PAPER_TRADING", False)
-            mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
-            
-            help_card = (
-                "🤖 **ANGKOR QUANT / APEX AGI ENGINE v13.00 | USER MANUAL** 🤖\n"
-                "════════════\n"
-                "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE v13.00)**\n"
-                f"🛡️ **TRADING ENGINE**: `{mode_badge}` | `ISOLATED MARGIN`\n"
-                "════════════\n\n"
-                "💼 **1. គ្រប់គ្រងគណនី និងទុន (ACCOUNT & PORTFOLIO)**\n"
-                "👉 `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
-                "👉 `/balance` - ឆែកសមតុល្យលុយក្នុងកាបូប Binance Spot & Futures\n"
-                "👉 `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time\n"
-                "👉 `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft Stop / Hard Stop)\n\n"
-                "🚀 **2. មុខងារជួញដូរស្វ័យប្រវត្តស្នូល (FLAGSHIP AUTONOMOUS ENGINES)**\n"
-                "👉 `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>` - 🟢 HFT Auto-Scanner 24/7\n"
-                "👉 `/pre_pump` - 🐋 Pre-Pump Accumulation & Listing Engine (33 AI Models)\n"
-                "👉 `/funding_harvester` - 🌾 8-Hour Funding Yield Harvester\n"
-                "👉 `/infinity_grid` - 📐 Unified Smart Grid Matrix Engine\n\n"
-                "🔮 **3. AI វិភាគទីផ្សារ & RADAR (AI INTELLIGENCE & ADVISORY)**\n"
-                "👉 `/analyze <COIN>` - AI វិភាគទិន្នន័យបច្ចេកទេស 360° Real-Time\n"
-                "👉 `/predict <COIN>` - ទស្សន៍ទាយ K-Line Trend & Win Rate 24h\n"
-                "👉 `/news` - ព័ត៌មាន Crypto Real-Time វិភាគដោយ Gemini AI\n"
-                "👉 `/whales` - តាមដានចលនា Whale ធំៗក្នុងទីផ្សារ Real-Time\n"
-                "👉 `/top` - មើលបញ្ជីកាក់ឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ\n"
-                "👉 `/alert <COIN> <PRICE> ABOVE/BELOW` - កំណត់ការជូនដំណឹងតម្លៃ\n\n"
-                "🥇 **4. GOLD & MACRO RISK SHIELD**\n"
-                "👉 `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Central Bank Radar\n\n"
-                "⚙️ **5. SYSTEM SECURITY & API SETTINGS**\n"
-                "👉 `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
-                "👉 `/set_pin <PIN>` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
-                "👉 `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n\n"
-                "💡 *របៀបប្រើប្រាស់ ៖ ចុចលើពាក្យបញ្ជាខាងលើ ឬចុចប៊ូតុងខាងក្រោម ដើម្បីបើក Master Navigation Menu!*"
-            )
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                ],
-                [
-                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch")
-                ],
-                [
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("🔄 Refresh Manual", callback_data="btn_menu_help")
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await context.bot.send_message(
-                chat_id=chat_id, 
-                text=help_card, 
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
-            self.log_signal.emit(f"📘 Sent Super Smart AGI Help Guide to {chat_id}")
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            import smart_bot_guide
+            await smart_bot_guide.handle_smart_bot_command(update, context)
+            if chat_id:
+                self.log_signal.emit(f"📘 Sent Super Smart AGI Zero-Confusion Guide to {chat_id}")
 
         async def my_alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -5811,6 +5767,10 @@ class TelegramBotThread(BaseThread):
 
             if data == "btn_menu_refresh":
                 await menu_command(update, context)
+            elif data.startswith("smart_cat_") or data.startswith("smart_hub_"):
+                import smart_bot_guide
+                await smart_bot_guide.handle_smart_callback(update, context)
+                return
             elif data.startswith("csx_"):
                 import csx_engine
                 engine = csx_engine.get_csx_engine()
@@ -28480,6 +28440,20 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("aq_mt5", admin_mt5_command))
         self.app.add_handler(CommandHandler("aq_emergency", admin_nuke_command))
 
+        # --- SUPER SMART BOT COMMAND & ZERO-CONFUSION NAVIGATOR (ADMIN & VIP) ---
+        self.app.add_handler(CommandHandler("smart", smart_bot_command))
+        self.app.add_handler(CommandHandler("smart_bot", smart_bot_command))
+        self.app.add_handler(CommandHandler("smartbot", smart_bot_command))
+        self.app.add_handler(CommandHandler("commands", smart_bot_command))
+        self.app.add_handler(CommandHandler("command_list", smart_bot_command))
+        self.app.add_handler(CommandHandler("vip", smart_bot_command))
+        self.app.add_handler(CommandHandler("vip_commands", smart_bot_command))
+        self.app.add_handler(CommandHandler("super_smart", smart_bot_command))
+        self.app.add_handler(CommandHandler("supersmart", smart_bot_command))
+        self.app.add_handler(CommandHandler("guide", smart_bot_command))
+        self.app.add_handler(CommandHandler("admin_guide", smart_bot_command))
+        self.app.add_handler(CommandHandler("admin_commands", smart_bot_command))
+
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(admin_license_callback, pattern="^lic_"))
@@ -28512,9 +28486,10 @@ class TelegramBotThread(BaseThread):
 
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())
-                try:
-                    await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
-                except Exception: pass
+                for admin_id in [859271875, 537186806]:
+                    try:
+                        await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+                    except Exception: pass
                 try:
                     from telegram import MenuButtonCommands
                     await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())

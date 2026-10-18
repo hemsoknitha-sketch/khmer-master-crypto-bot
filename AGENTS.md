@@ -329,6 +329,10 @@ Any modification that breaks any of the following 55 invariants is considered an
   3. **Bottom Placement for Admin Commands:** Super Admin exclusive commands (`/admin`, `/admin_users`, `/admin_license`, `/admin_broadcast`, `/admin_stats`, `/admin_config`, `/admin_nuke`, `/health`, `/sync_brain`) must strictly be appended at the BOTTOM of the Admin menu, never at the top, ensuring user-facing investment engines remain prominent.
   4. **Zero Phantom / Obsolete Commands:** Deprecated, replaced, or ghost commands (e.g. `/snipe`) must be 100% expunged from all menu registries so they never linger in Telegram user clients.
   5. **Permanent Core Inclusion:** All core trading, investment, intelligence, and safety commands must permanently remain in the Bot Menu unless the Admin explicitly requests removal.
+  6. **Super Smart Zero-Confusion Command Hub Standard (`smart_bot_guide.py`, `/smart`, `/commands`, `/help`, `/vip`):**
+     - Dynamically segregates interface, permissions, and command guidance based on caller privilege (`👑 SUPER ADMIN / SUPREME FLEET COMMANDER` vs `💎 VERIFIED VIP QUANT INVESTOR`).
+     - Strictly organizes all tools into 6 non-confusing pillars: (1) Spot Investment Engines (100% Spot, 0% Liquidation Risk), (2) Futures & Hedge Engines (10x Isolated, Breakeven Armor, 85% Golden Ratchet), (3) TradFi Global Markets & MT5 (Gold, US Indices, Oil, Stocks CFD, In-Memory Radar), (4) AI Intelligence & Radars (33 AI Swarm, ML 24h Predictions), (5) Portfolio, Risk & Account Security (Balance, PnL, 2FA PIN, Emergency Stop), and (6) Super Admin Master Fleet Operations (Users, Licenses, Broadcast, Emergency Nuke, System Diagnostics).
+     - Incorporates an interactive decision matrix and FAQ answering "Which engine should I use?" with instant one-tap navigation, eliminating 100% of interface and command confusion across all user and admin tiers.
 
 ### Invariant 24: The Golden 85% Profit Ratchet & Breakeven Armor Standard
 - **Location:** `turbo_hedge_engine.py` (`monitor_turbo_hedge_pnl`), `bot_thread.py`

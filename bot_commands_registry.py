@@ -29,6 +29,9 @@ def get_public_bot_commands():
         # --- [1] INITIATION & MASTER NAVIGATION ---
         BotCommand("start", "🚀 Start Angkor Quant & Language"),
         BotCommand("menu", "🎛️ Angkor Quant Control Panel"),
+        BotCommand("smart", "🧠 Super Smart Bot & Zero-Confusion Guide"),
+        BotCommand("commands", "📋 Institutional Command Directory"),
+        BotCommand("help", "📘 Institutional User & Command Manual"),
         BotCommand("webapp", "📱 Angkor Quant Mini App Web GUI"),
         BotCommand("academy", "🎓 Angkor Buffett Academy (12 Books)"),
 

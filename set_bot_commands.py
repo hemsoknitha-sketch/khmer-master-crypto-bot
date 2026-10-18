@@ -30,10 +30,11 @@ async def set_menu_commands():
         await bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats())
         await bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
         await bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())
-        try:
-            await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
-        except Exception:
-            pass
+        for admin_id in [859271875, 537186806]:
+            try:
+                await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+            except Exception:
+                pass
         print("[SUCCESS] Telegram Bot Menu updated to Angkor Quant v4.0 (AQ47) Public VIP & Super Admin Scopes!")
     except Exception as e:
         print(f"[ERROR] Error setting commands: {e}")
