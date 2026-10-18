@@ -5938,6 +5938,10 @@ class TelegramBotThread(BaseThread):
                 context.args = ["OFF"]
                 await wealth_command(update, context)
             elif data in ["btn_capital", "btn_capital_menu", "btn_capital_overview", "btn_cap_menu", "btn_cap_refresh"]:
+                try:
+                    await update.callback_query.answer("🏛️ កំពុងដំណើរការ Capital.com TradFi Telemetry...")
+                except Exception:
+                    pass
                 context.args = []
                 await capital_command(update, context)
             elif data in ["btn_mt5", "btn_mt5_refresh", "btn_mt5_status", "btn_mt5_menu"]:
@@ -26277,11 +26281,21 @@ class TelegramBotThread(BaseThread):
 
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
+            if update and update.callback_query:
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
-            user_lang = db.get_user_language(chat_id)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'khmer'
+            else:
+                user_lang = 'english'
             args = list(context.args) if context and context.args else []
-            is_super_admin = (chat_id == 859271875 or db.is_admin(chat_id))
+            is_super_admin = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import capital_engine
@@ -27481,22 +27495,25 @@ class TelegramBotThread(BaseThread):
             if is_super_admin:
                 env_mode_kh = "🟢 Master Locomotive (Super Admin)" if not data.get("is_demo") else "🟡 Master Demo Mirror ($10,000 Virtual)"
                 env_mode_en = "🟢 Master Locomotive (Super Admin)" if not data.get("is_demo") else "🟡 Master Demo Mirror ($10,000 Virtual)"
-                acc_id_kh = f"`{data.get('account_id')}` (Master Vault)"
-                acc_id_en = f"`{data.get('account_id')}` (Master Vault)"
+                clean_acc = str(data.get('account_id') or 'Master').replace('_', '\\_')
+                acc_id_kh = f"`{clean_acc}` (Master Vault)"
+                acc_id_en = f"`{clean_acc}` (Master Vault)"
                 vault_status_kh = "🟢 ភ្ជាប់រួចរាល់ (Master Locomotive)"
                 vault_status_en = "🟢 CONNECTED (Master Locomotive)"
             elif has_custom_api:
                 env_mode_kh = "🟢 Live Personal Vault (Real Funds)" if not data.get("is_demo") else "🟡 Demo Personal Vault ($10,000 Virtual)"
                 env_mode_en = "🟢 Live Personal Vault (Real Funds)" if not data.get("is_demo") else "🟡 Demo Personal Vault ($10,000 Virtual)"
-                acc_id_kh = f"`{data.get('account_id')}` (Personal Vault)"
-                acc_id_en = f"`{data.get('account_id')}` (Personal Vault)"
-                vault_status_kh = f"🟢 ភ្ជាប់រួចរាល់ ({data.get('masked_identifier', 'Personal Vault')})"
-                vault_status_en = f"🟢 CONNECTED ({data.get('masked_identifier', 'Personal Vault')})"
+                clean_acc = str(data.get('account_id') or 'Personal').replace('_', '\\_')
+                acc_id_kh = f"`{clean_acc}` (Personal Vault)"
+                acc_id_en = f"`{clean_acc}` (Personal Vault)"
+                clean_mask = str(data.get('masked_identifier', 'Personal Vault')).replace('_', '\\_')
+                vault_status_kh = f"🟢 ភ្ជាប់រួចរាល់ ({clean_mask})"
+                vault_status_en = f"🟢 CONNECTED ({clean_mask})"
             else:
                 env_mode_kh = "⚪ VIP Sandbox (Awaiting Personal API)"
                 env_mode_en = "⚪ VIP Sandbox (Awaiting Personal API)"
-                acc_id_kh = "⚪ `មិនទាន់ភ្ជាប់` (ប្រើ `/capital API...`)"
-                acc_id_en = "⚪ `Not Connected` (Use `/capital API...`)"
+                acc_id_kh = "⚪ មិនទាន់ភ្ជាប់ (ប្រើ `/capital API...`)"
+                acc_id_en = "⚪ Not Connected (Use `/capital API...`)"
                 vault_status_kh = "🟡 មិនទាន់ភ្ជាប់ API (ចុចប៊ូតុង 🔑 Personal Vault ខាងក្រោម)"
                 vault_status_en = "🟡 Awaiting API (Tap 🔑 Personal Vault below)"
 
@@ -27601,7 +27618,7 @@ class TelegramBotThread(BaseThread):
 
             try:
                 import google_macro_satellite
-                sat_data = google_macro_satellite.fetch_google_macro_satellite_data()
+                sat_data = await asyncio.wait_for(asyncio.to_thread(google_macro_satellite.fetch_google_macro_satellite_data), timeout=2.5)
                 ry_bias = sat_data.get("gold_real_yield_bias", "NEUTRAL")
                 if ry_bias == "STRONG_BULLISH":
                     ry_badge = "+20% Gold BUY Boost 🟢"
@@ -27678,15 +27695,15 @@ class TelegramBotThread(BaseThread):
                 guest_guide_kh = (
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"💡 **របៀបភ្ជាប់គណនី Capital.com ផ្ទាល់ខ្លួន ៖**\n"
-                    f"• ចុចប៊ូតុង `` 🔑 ភ្ជាប់ API ផ្ទាល់ខ្លួន `` ខាងក្រោម ឬផ្ញើសារ ៖\n"
-                    f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
+                    f"• ចុចប៊ូតុង `🔑 ភ្ជាប់ API ផ្ទាល់ខ្លួន` ខាងក្រោម ឬផ្ញើសារ ៖\n"
+                    f"• `/capital API <API_KEY> <EMAIL> <PASSWORD> live`\n"
                     f"• _(សម្រាប់ Demo: វាយពាក្យ `demo` នៅចុងក្រោយ)_\n"
                 )
                 guest_guide_en = (
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"💡 **How to Connect Your Personal Account:**\n"
-                    f"• Tap `` 🔑 Personal Vault `` below or send command:\n"
-                    f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
+                    f"• Tap `🔑 Personal Vault` below or send command:\n"
+                    f"• `/capital API <API_KEY> <EMAIL> <PASSWORD> live`\n"
                     f"• _(For Demo: append `demo` at the end)_\n"
                 )
             else:
@@ -27753,7 +27770,7 @@ class TelegramBotThread(BaseThread):
                     f"• **5. Swap Shield (Inv 53) ៖** `03:45-07:00 ICT & Wed 3x Swap Lockout`\n"
                     f"• **6. Daily Governor (Inv 52) ៖** `+5.0% Win Goal / -2.5% Loss Floor`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `/capital AUTO ON 50 5` | `/capital SMART_SESSION` | `/capital SCHEDULE` | `/capital RESET`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -27807,14 +27824,28 @@ class TelegramBotThread(BaseThread):
                     f"• **5. Swap Shield (Inv 53):** `03:45-07:00 ICT & Wed 3x Swap Lockout`\n"
                     f"• **6. Daily Governor (Inv 52):** `+5.0% Win Goal / -2.5% Loss Floor`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``\n"
+                    f"💡 **Auto Commands:** `/capital AUTO ON 50 5` | `/capital SMART_SESSION` | `/capital SCHEDULE` | `/capital RESET`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Risk Protection & Wealth Generation 24/7!"
                 )
 
-            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            try:
+                if update.callback_query and update.callback_query.message:
+                    await update.callback_query.message.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception as e:
+                logger.warning(f"Error sending Markdown capital dashboard: {e}")
+                try:
+                    clean_msg = msg.replace("**", "").replace("`", "").replace("_", "")
+                    if update.callback_query and update.callback_query.message:
+                        await update.callback_query.message.edit_text(clean_msg, reply_markup=keyboard)
+                    elif update.effective_message:
+                        await update.effective_message.reply_text(clean_msg, reply_markup=keyboard)
+                except Exception as ex2:
+                    logger.error(f"Fatal capital dashboard send failure: {ex2}")
 
         async def capital_ib_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
