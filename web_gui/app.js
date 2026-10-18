@@ -43,10 +43,15 @@ function resolveChatId() {
             if (parsedStored === 52135153 || parsedStored === 52133938) {
                 parsedStored = 537186806;
             }
+            // High Security Purge: If a client stored Super Admin ID in the past without explicit URL or Telegram WebApp proof, purge it!
+            if (parsedStored === 859271875 && !urlCid && !tgId) {
+                localStorage.removeItem('kmc_vip_chat_id');
+                return 0;
+            }
             return parsedStored;
         }
     } catch (e) { }
-    return 859271875; // Default to Super Admin ID for standalone browser access
+    return 0; // High Security Multi-Tenant Standard: Default to Guest (0), NEVER Super Admin!
 }
 
 // Global Application State
@@ -3006,7 +3011,10 @@ function renderCapitalCockpit(data) {
     }
 
     if (badgeAcc) {
-        if (tf.is_demo) {
+        if (tf.is_guest) {
+            badgeAcc.textContent = '⚪ VIP SANDBOX (Awaiting API)';
+            badgeAcc.className = 'badge badge-secondary';
+        } else if (tf.is_demo) {
             badgeAcc.textContent = '🟡 DEMO ($10,000)';
             badgeAcc.className = 'badge badge-warning';
         } else {

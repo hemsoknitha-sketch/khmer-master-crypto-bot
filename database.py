@@ -4389,15 +4389,22 @@ def set_capital_user_referral_status(
 ) -> bool:
     """
     Sets or updates the Capital.com referral verification status for a user.
+    Uses UPSERT to guarantee that approved users are tracked in user_capital_credentials
+    even before they add custom API keys, ensuring 100% visibility in /admin_capital.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            UPDATE user_capital_credentials
-            SET is_referral_verified = ?, referral_code = ?, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-            WHERE chat_id = ?
-        """, (1 if is_verified else 0, referral_code, chat_id))
+            INSERT INTO user_capital_credentials (
+                chat_id, api_key, identifier, password, is_referral_verified, referral_code, verified_at, updated_at
+            ) VALUES (?, '', '', '', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                is_referral_verified = excluded.is_referral_verified,
+                referral_code = CASE WHEN excluded.referral_code != '' THEN excluded.referral_code ELSE user_capital_credentials.referral_code END,
+                verified_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        """, (chat_id, 1 if is_verified else 0, referral_code))
 
         # Also ensure link in capital_user_referrals
         if is_verified:
@@ -4502,27 +4509,58 @@ def get_capital_user_by_account_id(account_id: str) -> Optional[Dict[str, Any]]:
 
 def get_all_capital_users_overview() -> List[Dict[str, Any]]:
     """
-    Returns an overview of all users with Capital.com credentials,
+    Returns an overview of all users with Capital.com credentials or approvals,
     including their verification status, account ID, and auto-trade configuration.
+    Unions user_capital_credentials, capital_user_referrals, and capital_auto_config
+    to guarantee zero missing users in administrative reviews.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username,
-                   a.is_enabled, a.budget, a.max_positions, a.is_demo as auto_is_demo
-            FROM user_capital_credentials c
-            LEFT JOIN users u ON c.chat_id = u.chat_id
-            LEFT JOIN capital_auto_config a ON c.chat_id = a.chat_id
-            ORDER BY c.chat_id ASC
+            WITH all_c_users AS (
+                SELECT chat_id FROM user_capital_credentials
+                UNION
+                SELECT client_chat_id AS chat_id FROM capital_user_referrals
+                UNION
+                SELECT chat_id FROM capital_auto_config
+            )
+            SELECT u_all.chat_id, 
+                   COALESCE(c.account_id, ''), 
+                   COALESCE(c.currency, 'USD'), 
+                   COALESCE(c.is_demo, 0), 
+                   CASE 
+                       WHEN c.is_referral_verified = 1 THEN 1
+                       WHEN ref.client_chat_id IS NOT NULL THEN 1
+                       ELSE 0 
+                   END as is_referral_verified,
+                   COALESCE(u.username, ''),
+                   COALESCE(a.is_enabled, 0), 
+                   COALESCE(a.budget, 50.0), 
+                   COALESCE(a.max_positions, 2), 
+                   COALESCE(a.is_demo, 0) as auto_is_demo,
+                   COALESCE(c.api_key, '') as api_key
+            FROM all_c_users u_all
+            LEFT JOIN user_capital_credentials c ON u_all.chat_id = c.chat_id
+            LEFT JOIN capital_user_referrals ref ON u_all.chat_id = ref.client_chat_id
+            LEFT JOIN users u ON u_all.chat_id = u.chat_id
+            LEFT JOIN capital_auto_config a ON u_all.chat_id = a.chat_id
+            ORDER BY u_all.chat_id ASC
         """)
         rows = cursor.fetchall()
         conn.close()
         results = []
         for r in rows:
+            acc_id = str(r[1] or "")
+            raw_key = str(r[10] or "")
+            if not acc_id:
+                if not raw_key:
+                    acc_id = "Awaiting API (🟡)"
+                else:
+                    acc_id = "Configured (Ready)"
             results.append({
                 "chat_id": r[0],
-                "account_id": str(r[1] or ""),
+                "account_id": acc_id,
                 "currency": str(r[2] or "USD"),
                 "is_demo": bool(r[3]),
                 "is_referral_verified": bool(r[4]) if r[4] is not None else False,
@@ -4539,7 +4577,7 @@ def get_all_capital_users_overview() -> List[Dict[str, Any]]:
         for u_item in results:
             if u_item["chat_id"] == 859271875:
                 sa_found = True
-                if u_item["account_id"] == "330894176088577220" or not u_item["account_id"]:
+                if u_item["account_id"] == "330894176088577220" or not u_item["account_id"] or u_item["account_id"] == "Awaiting API (🟡)":
                     u_item["account_id"] = sa_live_acc
                     u_item["is_demo"] = False
                     u_item["auto_is_demo"] = False

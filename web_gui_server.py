@@ -1025,7 +1025,7 @@ async def get_cached_capital_overview(chat_id: int = 0) -> dict:
     Background refreshes via thread pool if older than 1.5 seconds.
     """
     now = time.time()
-    cid = chat_id if chat_id and chat_id > 0 else DEFAULT_VIP_CHAT_ID
+    cid = chat_id if chat_id and chat_id > 0 else 0
     if "capital" not in _GUI_CACHE:
         _GUI_CACHE["capital"] = {}
     cached = _GUI_CACHE["capital"].get(cid)
@@ -2222,9 +2222,10 @@ async def handle_api_capital_overview(request: web.Request) -> web.Response:
     Returns live Capital.com TradFi dashboard, Session Kill Zones status,
     Sky Net 360° Governor risk metrics, SMC Citadel 9-Confluence signals,
     and IB Rebate progress for VIP WebApp in <0.01ms from RAM cache.
+    Guarantees strict multi-tenant isolation with zero data leakage.
     """
     try:
-        chat_id = _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        chat_id = _get_chat_id_from_req(request)
         data = await get_cached_capital_overview(chat_id)
         resp = web.json_response({"status": "success", "data": data})
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -2237,7 +2238,9 @@ async def handle_api_capital_schedule(request: web.Request) -> web.Response:
     """Updates Capital.com schedule mode (SMART_SESSION_TIMED, SCHEDULE_MON_FRI, 24/7)."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "Telegram User ID required"}, status=400)
         mode = str(data.get("mode", "SMART_SESSION_TIMED")).upper().strip()
         if mode not in ["SMART_SESSION_TIMED", "SCHEDULE_MON_FRI", "24/7"]:
             return web.json_response({"status": "error", "message": f"Invalid mode: {mode}"}, status=400)
@@ -2264,7 +2267,9 @@ async def handle_api_capital_toggle(request: web.Request) -> web.Response:
     """Toggles Capital.com Auto Trading on/off."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "Telegram User ID required"}, status=400)
         enable = bool(data.get("enable", True))
         db.set_capital_auto_config(chat_id, enabled=enable)
         return web.json_response({
@@ -2280,7 +2285,9 @@ async def handle_api_capital_close_pos(request: web.Request) -> web.Response:
     """Closes an open Capital.com position."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "Telegram User ID required"}, status=400)
         deal_id = data.get("deal_id")
         if not deal_id:
             return web.json_response({"status": "error", "message": "deal_id required"}, status=400)

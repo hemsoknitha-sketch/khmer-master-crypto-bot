@@ -201,9 +201,16 @@ class CapitalComEngine:
         is_demo: Optional[bool] = None,
         custom_chat_id: Optional[int] = None
     ):
-        self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip() or DEFAULT_CAPITAL_API_KEY
-        self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip() or DEFAULT_CAPITAL_IDENTIFIER
-        self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip() or DEFAULT_CAPITAL_PASSWORD
+        if api_key == "UNAUTHENTICATED_GUEST":
+            self.api_key = "UNAUTHENTICATED_GUEST"
+            self.identifier = ""
+            self.password = ""
+            self.is_guest = True
+        else:
+            self.is_guest = False
+            self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip() or DEFAULT_CAPITAL_API_KEY
+            self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip() or DEFAULT_CAPITAL_IDENTIFIER
+            self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip() or DEFAULT_CAPITAL_PASSWORD
         self.last_auth_error: str = ""
         self._custom_chat_id: Optional[int] = custom_chat_id
         
@@ -372,6 +379,18 @@ class CapitalComEngine:
     # --------------------------------------------------------------------------
     def get_accounts(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Fetches full account information, equity, and margin balances with smart funded account selection."""
+        if getattr(self, "is_guest", False):
+            return {
+                "success": False,
+                "error": "User has not connected personal Capital.com API credentials",
+                "accounts": [],
+                "primary_account": {
+                    "accountId": "Not Connected",
+                    "accountName": "VIP Guest (Awaiting API)",
+                    "status": "NOT_CONNECTED",
+                    "balance": {"balance": 0.0, "available": 0.0, "pnl": 0.0, "equity": 0.0}
+                }
+            }
         now = time.time()
         if not force_refresh and self._accounts_cache and (now - self._accounts_cache_time) < 4.0:
             return self._accounts_cache
@@ -455,6 +474,21 @@ class CapitalComEngine:
         Returns a simplified, institutional balance breakdown with full schema fallback:
         {balance, available_cash, equity, pnl, currency, is_demo}
         """
+        if getattr(self, "is_guest", False):
+            return {
+                "success": True,
+                "is_guest": True,
+                "account_id": "AWAITING_API_CREDENTIALS",
+                "account_name": "VIP Guest (Awaiting API)",
+                "balance": 0.0,
+                "available": 0.0,
+                "equity": 0.0,
+                "pnl": 0.0,
+                "currency": "USD",
+                "is_demo": self.is_demo,
+                "status": "NOT_CONNECTED"
+            }
+
         acc_info = self.get_accounts()
         if not acc_info.get("success"):
             return {
@@ -697,6 +731,19 @@ class CapitalComEngine:
             except Exception:
                 pass
 
+        if getattr(self, "is_guest", False):
+            cached_mkt = _SHARED_PRICE_CACHE.get(resolved_epic, {}).get("data")
+            if cached_mkt and (now - cached_mkt.get("timestamp", 0)) < 30.0:
+                return cached_mkt
+            try:
+                g_eng = get_capital_engine(is_demo=False)
+                res_q = g_eng.get_market_details(resolved_epic)
+                if res_q and res_q.get("success"):
+                    return res_q
+            except Exception:
+                pass
+            return {"success": False, "epic": resolved_epic, "error": "Quote awaiting cache"}
+
         if not self.ensure_session():
             err_detail = self.last_auth_error or "Unable to establish valid session."
             return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
@@ -797,7 +844,7 @@ class CapitalComEngine:
     # --------------------------------------------------------------------------
     def get_open_positions(self) -> List[Dict[str, Any]]:
         """Retrieves all currently active open positions with automatic connection recovery."""
-        if not self.ensure_session():
+        if getattr(self, "is_guest", False) or not self.ensure_session():
             return []
 
         url = f"{self.base_url}/positions"
@@ -2002,6 +2049,12 @@ class CapitalComEngine:
         """
         # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
         user_cid = getattr(self, "_custom_chat_id", None)
+        if getattr(self, "is_guest", False):
+            return {
+                "success": False,
+                "error": "LOCKED: Please connect your personal Capital.com API key via /capital API <Key> <Email> <Password>."
+            }
+
         if not self.is_demo and user_cid and not db.is_capital_user_authorized(user_cid):
             return {
                 "success": False,
@@ -2010,6 +2063,16 @@ class CapitalComEngine:
 
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
         dir_u = direction.upper()
+
+        # Pillar 0.8 / Invariant 77: Interbank Session Kill Zone & TradFi Weekend Gap Shield
+        auto_cfg = db.get_capital_auto_config(user_cid or 0)
+        u_mode = auto_cfg.get("schedule_mode", "SMART_SESSION_TIMED")
+        is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(u_mode, epic=resolved_epic)
+        if not is_sched_active:
+            return {
+                "success": False,
+                "error": f"LOCKED: {sched_reason}"
+            }
 
         # Pillar 5: Global Portfolio Drawdown Circuit Breaker Guard (-2.5% Daily Loss Ceiling)
         try:
@@ -2329,6 +2392,7 @@ class CapitalComEngine:
 
         return {
             "success": True,
+            "is_guest": getattr(self, "is_guest", False),
             "is_demo": self.is_demo,
             "account_id": bal.get("account_id"),
             "account_name": bal.get("account_name"),
@@ -2397,7 +2461,7 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
             return _user_engine_pool[pool_key]
 
         creds = db.get_user_capital_credentials(chat_id)
-        if creds:
+        if creds and (creds.get("api_key") or "").strip():
             engine = CapitalComEngine(
                 api_key=creds.get("api_key"),
                 identifier=creds.get("identifier"),
@@ -2407,9 +2471,22 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
             )
             _user_engine_pool[pool_key] = engine
             return engine
-        else:
-            # Isolated dedicated engine for users utilizing .env credentials (e.g. Super Admin 859271875)
+        elif int(chat_id) in [SUPER_ADMIN_ID, 537186806]:
+            # Isolated dedicated engine for Super Admin utilizing .env credentials
             engine = CapitalComEngine(is_demo=is_demo, custom_chat_id=chat_id)
+            _user_engine_pool[pool_key] = engine
+            return engine
+        else:
+            # High-Security Multi-Tenant Isolation:
+            # VIP users who have not yet configured custom API keys receive a sandboxed guest engine.
+            # 100% strictly prevents leaking Super Admin's .env credentials, balances, and active positions!
+            engine = CapitalComEngine(
+                api_key="UNAUTHENTICATED_GUEST",
+                identifier="",
+                password="",
+                is_demo=True,
+                custom_chat_id=chat_id
+            )
             _user_engine_pool[pool_key] = engine
             return engine
 
@@ -2471,7 +2548,7 @@ def get_tradfi_dashboard(chat_id: Optional[int] = None, is_demo: Optional[bool] 
     if chat_id:
         engine = get_user_capital_engine(chat_id, is_demo=is_demo)
     else:
-        engine = get_capital_engine(is_demo=is_demo)
+        engine = get_user_capital_engine(0, is_demo=is_demo)
     
     # Auto-synchronize any broker-closed trades (SL/TP hit on Capital.com)
     try:
@@ -2482,6 +2559,7 @@ def get_tradfi_dashboard(chat_id: Optional[int] = None, is_demo: Optional[bool] 
     data = engine.get_tradfi_dashboard_data()
     if chat_id:
         import database as db
+        is_admin_user = (chat_id in [859271875, 537186806]) or db.is_admin(chat_id)
         creds = db.get_user_capital_credentials(chat_id)
         if creds:
             raw_key = creds.get("api_key", "")
@@ -2495,8 +2573,17 @@ def get_tradfi_dashboard(chat_id: Optional[int] = None, is_demo: Optional[bool] 
             data["has_custom_api"] = True
             data["masked_api_key"] = masked_key
             data["masked_identifier"] = masked_id
+            data["is_guest"] = False
+        elif is_admin_user:
+            data["has_custom_api"] = True
+            data["is_guest"] = False
+            data["is_super_admin"] = True
         else:
             data["has_custom_api"] = False
+            data["is_guest"] = True
+    else:
+        data["has_custom_api"] = False
+        data["is_guest"] = True
     return data
 
 def execute_tradfi_trade(

@@ -27084,7 +27084,11 @@ class TelegramBotThread(BaseThread):
                 is_user_demo = False
             env_btn_text = "🟢 Mode: LIVE MAINNET ✅" if not is_user_demo else "🟡 Mode: DEMO ($10,000) ✅"
 
-            is_super_admin = (chat_id == 859271875 or db.is_admin(chat_id))
+            is_super_admin = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+            user_creds = db.get_user_capital_credentials(chat_id)
+            has_user_api = bool(user_creds and user_creds.get("api_key"))
+            api_vault_btn_text = "🔑 Personal Vault 🟢" if has_user_api else "🔑 ភ្ជាប់ API ផ្ទាល់ខ្លួន 🟡"
+
             master_sync_on = db.get_capital_master_sync_enabled()
             master_sync_btn_text = "👑 Master Sync: ON 🟢" if master_sync_on else "👑 Master Sync: OFF ⚪"
 
@@ -27094,7 +27098,8 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton(mode_btn_text, callback_data="btn_cap_mode_toggle")
                 ],
                 [
-                    InlineKeyboardButton("⚙️ Custom Assets", callback_data="btn_cap_custom_assets")
+                    InlineKeyboardButton("⚙️ Custom Assets", callback_data="btn_cap_custom_assets"),
+                    InlineKeyboardButton(api_vault_btn_text, callback_data="btn_cap_api_vault")
                 ],
                 *([[
                     InlineKeyboardButton(master_sync_btn_text, callback_data="btn_cap_master_sync_toggle"),
@@ -27462,7 +27467,51 @@ class TelegramBotThread(BaseThread):
 
             # Default: Master Dashboard (Queries LIVE Mainnet Account by default)
             data = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id, False)
-            env_mode = "🟢 LIVE MAINNET (Real Funds)" if not data.get("is_demo") else "🟡 DEMO ($10,000 Virtual Funds)"
+
+            # Schedule Status & Kill Zone Audit
+            sched_mode = auto_cfg.get("schedule_mode", "SMART_SESSION_TIMED")
+            is_sched_active, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active(sched_mode)
+            is_weekend = sched_dict.get("is_tradfi_weekend", False)
+            is_swap_shield = sched_dict.get("is_swap_shield_active", False)
+
+            is_super_admin = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+            has_custom_api = data.get("has_custom_api", False)
+            is_guest = data.get("is_guest", False) or (not is_super_admin and not has_custom_api)
+
+            if is_super_admin:
+                env_mode_kh = "🟢 Master Locomotive (Super Admin)" if not data.get("is_demo") else "🟡 Master Demo Mirror ($10,000 Virtual)"
+                env_mode_en = "🟢 Master Locomotive (Super Admin)" if not data.get("is_demo") else "🟡 Master Demo Mirror ($10,000 Virtual)"
+                acc_id_kh = f"`{data.get('account_id')}` (Master Vault)"
+                acc_id_en = f"`{data.get('account_id')}` (Master Vault)"
+                vault_status_kh = "🟢 ភ្ជាប់រួចរាល់ (Master Locomotive)"
+                vault_status_en = "🟢 CONNECTED (Master Locomotive)"
+            elif has_custom_api:
+                env_mode_kh = "🟢 Live Personal Vault (Real Funds)" if not data.get("is_demo") else "🟡 Demo Personal Vault ($10,000 Virtual)"
+                env_mode_en = "🟢 Live Personal Vault (Real Funds)" if not data.get("is_demo") else "🟡 Demo Personal Vault ($10,000 Virtual)"
+                acc_id_kh = f"`{data.get('account_id')}` (Personal Vault)"
+                acc_id_en = f"`{data.get('account_id')}` (Personal Vault)"
+                vault_status_kh = f"🟢 ភ្ជាប់រួចរាល់ ({data.get('masked_identifier', 'Personal Vault')})"
+                vault_status_en = f"🟢 CONNECTED ({data.get('masked_identifier', 'Personal Vault')})"
+            else:
+                env_mode_kh = "⚪ VIP Sandbox (Awaiting Personal API)"
+                env_mode_en = "⚪ VIP Sandbox (Awaiting Personal API)"
+                acc_id_kh = "⚪ `មិនទាន់ភ្ជាប់` (ប្រើ `/capital API...`)"
+                acc_id_en = "⚪ `Not Connected` (Use `/capital API...`)"
+                vault_status_kh = "🟡 មិនទាន់ភ្ជាប់ API (ចុចប៊ូតុង 🔑 Personal Vault ខាងក្រោម)"
+                vault_status_en = "🟡 Awaiting API (Tap 🔑 Personal Vault below)"
+
+            if is_guest:
+                bal_display = "$0.00 USD (Awaiting API)"
+                avail_display = "$0.00 USD"
+                pos_count = 0
+                pnl_val = 0.0
+            else:
+                bal_display = f"${data.get('balance', 0.0):,.2f} {data.get('currency', 'USD')}"
+                avail_display = f"${data.get('available', 0.0):,.2f} {data.get('currency', 'USD')}"
+                pos_count = data.get("positions_count", 0)
+                pnl_val = data.get("active_pnl", 0.0)
+
+            pnl_badge = f"+${pnl_val:,.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):,.2f}"
 
             # Prop Firm status check
             prop_cfg = db.get_prop_firm_config(chat_id)
@@ -27478,28 +27527,35 @@ class TelegramBotThread(BaseThread):
             googl = quotes.get("GOOGL", {})
             btc = quotes.get("BTCUSD", {})
 
-            gold_p = f"${gold.get('ask', 0.0):,.2f}" if gold.get('success') else "N/A"
-            gold_sp = f"${gold.get('spread', 0.0):.2f}" if gold.get('success') else "N/A"
-            gold_st = "🟢 OPEN" if gold.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
+            gold_p = f"${gold.get('ask', 0.0):,.2f}" if gold.get('success') and gold.get('ask') else "N/A"
+            gold_sp = f"${gold.get('spread', 0.0):.2f}" if gold.get('success') and gold.get('spread') else "N/A"
+            if is_weekend:
+                gold_st = "🔴 CLOSED (បើកវិញ ចន្ទ 05:00 ICT)" if user_lang == 'khmer' else "🔴 CLOSED (Reopens Mon 05:00 ICT)"
+            else:
+                gold_st = "🟢 OPEN" if gold.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
 
             gas_p = f"${gas.get('ask', 0.0):.3f}" if gas.get('success') and gas.get('ask') else "N/A"
-            gas_st = "🟢 OPEN" if gas.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
+            gas_st = "🔴 CLOSED" if is_weekend else ("🟢 OPEN" if gas.get('market_status') == 'TRADEABLE' else "🔴 CLOSED")
 
-            sp_p = f"${sp500.get('ask', 0.0):,.2f}" if sp500.get('success') else "N/A"
-            sp_sp = f"${sp500.get('spread', 0.0):.2f}" if sp500.get('success') else "N/A"
-            sp_st = "🟢 OPEN" if sp500.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
+            sp_p = f"${sp500.get('ask', 0.0):,.2f}" if sp500.get('success') and sp500.get('ask') else "N/A"
+            sp_sp = f"${sp500.get('spread', 0.0):.2f}" if sp500.get('success') and sp500.get('spread') else "N/A"
+            if is_weekend:
+                sp_st = "🔴 CLOSED (បើកវិញ ចន្ទ 05:00 ICT)" if user_lang == 'khmer' else "🔴 CLOSED (Reopens Mon 05:00 ICT)"
+            else:
+                sp_st = "🟢 OPEN" if sp500.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
 
-            oil_p = f"${oil.get('ask', 0.0):,.2f}" if oil.get('success') else "N/A"
-            oil_sp = f"${oil.get('spread', 0.0):.2f}" if oil.get('success') else "N/A"
+            oil_p = f"${oil.get('ask', 0.0):,.2f}" if oil.get('success') and oil.get('ask') else "N/A"
+            oil_sp = f"${oil.get('spread', 0.0):.2f}" if oil.get('success') and oil.get('spread') else "N/A"
+            oil_st = "🔴 CLOSED" if is_weekend else ("🟢 OPEN" if oil.get('market_status') == 'TRADEABLE' else "🔴 CLOSED")
 
-            meta_p = f"${meta.get('ask', 0.0):,.2f}" if meta.get('success') and meta.get('ask') else "CLOSED"
-            googl_p = f"${googl.get('ask', 0.0):,.2f}" if googl.get('success') and googl.get('ask') else "CLOSED"
+            meta_p = f"${meta.get('ask', 0.0):,.2f}" if meta.get('success') and meta.get('ask') else "N/A"
+            meta_st = "🔴 CLOSED (Wall St)"
+            googl_p = f"${googl.get('ask', 0.0):,.2f}" if googl.get('success') and googl.get('ask') else "N/A"
+            googl_st = "🔴 CLOSED (Wall St)"
 
-            btc_p = f"${btc.get('ask', 0.0):,.2f}" if btc.get('success') else "N/A"
-            btc_sp = f"${btc.get('spread', 0.0):.2f}" if btc.get('success') else "N/A"
-
-            pnl_val = data.get("active_pnl", 0.0)
-            pnl_badge = f"+${pnl_val:,.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):,.2f}"
+            btc_p = f"${btc.get('ask', 0.0):,.2f}" if btc.get('success') and btc.get('ask') else "N/A"
+            btc_sp = f"${btc.get('spread', 0.0):.2f}" if btc.get('success') and btc.get('spread') else "N/A"
+            btc_st = "🟢 OPEN 24/7"
 
             pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
             if pnl_stat.get("total_trades", 0) > 0:
@@ -27571,8 +27627,6 @@ class TelegramBotThread(BaseThread):
                 pass
 
             # Schedule Status Badge
-            sched_mode = auto_cfg.get("schedule_mode", "SMART_SESSION_TIMED")
-            is_sched_active, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active(sched_mode)
             if sched_mode in ["24/7", "247", "RESET", "ALWAYS_ON"]:
                 sched_badge_kh = "🔄 24/7 Continuous (RESET Mode 🟢)"
                 sched_badge_en = "🔄 24/7 Continuous (RESET Mode 🟢)"
@@ -27586,21 +27640,80 @@ class TelegramBotThread(BaseThread):
                 sched_badge_kh = f"🛡️ SWAP SHIELD ({sched_dict.get('weekday_kh', '')} | ផ្អាកចូលថ្មី | Resumes 07:00 ICT)"
                 sched_badge_en = f"🛡️ SWAP SHIELD ({sched_dict.get('weekday', '')} | Entries Paused | Resumes 07:00 ICT)"
 
+            # Market & Weekend Schedule Status Banner
+            if is_weekend:
+                market_banner_kh = (
+                    f"🔴 **ស្ថានភាពទីផ្សារ TradFi ៖** `បិទសម្រាកចុងសប្តាហ៍ (Weekend Standby)`\n"
+                    f"⏰ **Gold, S&P 500, Equities បើកវិញ ៖** `ថ្ងៃចន្ទ ម៉ោង 05:00 ព្រឹក ICT (22:00 UTC)`\n"
+                    f"🪙 **Crypto CFDs (BTC, ETH, SOL) ៖** `🟢 សកម្ម ២៤/៧ គ្មានថ្ងៃឈប់សម្រាក!`"
+                )
+                market_banner_en = (
+                    f"🔴 **TradFi Market Status:** `Weekend Standby (Closed Worldwide)`\n"
+                    f"⏰ **Gold, S&P 500 & Equities Reopen:** `Monday 05:00 AM ICT (22:00 UTC)`\n"
+                    f"🪙 **Crypto CFDs (BTC, ETH, SOL):** `🟢 Active 24/7 Non-Stop!`"
+                )
+            elif is_swap_shield:
+                market_banner_kh = (
+                    f"🛡️ **ស្ថានភាពទីផ្សារ TradFi ៖** `Overnight Rollover Swap Shield (03:45 - 07:00 ICT)`\n"
+                    f"⏰ **ការចូល Trade ថ្មីនឹងបើកវិញ ៖** `ម៉ោង 07:00 ព្រឹក ICT (Tokyo Open)`\n"
+                    f"🪙 **Crypto CFDs ៖** `🟢 សកម្ម ២៤/៧ គ្មានកម្រៃ Swap!`"
+                )
+                market_banner_en = (
+                    f"🛡️ **TradFi Market Status:** `Overnight Rollover Swap Shield (03:45 - 07:00 ICT)`\n"
+                    f"⏰ **New Entries Resume:** `07:00 AM ICT (Tokyo Open)`\n"
+                    f"🪙 **Crypto CFDs:** `🟢 Active 24/7 Zero Swap Drag!`"
+                )
+            else:
+                market_banner_kh = (
+                    f"🟢 **ស្ថានភាពទីផ្សារ TradFi ៖** `បើកដំណើរការពេញលេញ ({sched_dict.get('session_name_kh', 'Global Session')})`\n"
+                    f"⚡ **ស្ថានភាព ៖** `ម៉ាស៊ីន AI ស្កេនចាប់សញ្ញា Breakout & FVG ២៤/៧!`"
+                )
+                market_banner_en = (
+                    f"🟢 **TradFi Market Status:** `OPEN & ACTIVE ({sched_dict.get('session_name_en', 'Global Session')})`\n"
+                    f"⚡ **Status:** `AI Engine actively scanning Breakout & FVG setups 24/7!`"
+                )
+
+            # Guest Setup Guidance
+            if is_guest:
+                guest_guide_kh = (
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"💡 **របៀបភ្ជាប់គណនី Capital.com ផ្ទាល់ខ្លួន ៖**\n"
+                    f"• ចុចប៊ូតុង `` 🔑 ភ្ជាប់ API ផ្ទាល់ខ្លួន `` ខាងក្រោម ឬផ្ញើសារ ៖\n"
+                    f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
+                    f"• _(សម្រាប់ Demo: វាយពាក្យ `demo` នៅចុងក្រោយ)_\n"
+                )
+                guest_guide_en = (
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"💡 **How to Connect Your Personal Account:**\n"
+                    f"• Tap `` 🔑 Personal Vault `` below or send command:\n"
+                    f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
+                    f"• _(For Demo: append `demo` at the end)_\n"
+                )
+            else:
+                guest_guide_kh = ""
+                guest_guide_en = ""
+
             u_sync_mode = db.get_capital_user_sync_mode(chat_id)
             c_assets = db.get_capital_user_custom_assets(chat_id)
-            if u_sync_mode == "AUTONOMOUS":
+            if is_super_admin:
+                sync_badge_kh = "👑 Master Fleet Locomotive (Fleet Commander)"
+                sync_badge_en = "👑 Master Fleet Locomotive (Fleet Commander)"
+            elif u_sync_mode == "AUTONOMOUS":
                 sync_badge_kh = f"🎯 Autonomous ({', '.join(c_assets)})"
                 sync_badge_en = f"🎯 Autonomous ({', '.join(c_assets)})"
             else:
-                sync_badge_kh = "🚂 Follow Master Syndicate (Super Admin 859271875)"
-                sync_badge_en = "🚂 Follow Master Syndicate (Super Admin 859271875)"
+                sync_badge_kh = "🚂 Follow Master Syndicate (Auto-Mirror)"
+                sync_badge_en = "🚂 Follow Master Syndicate (Auto-Mirror)"
 
             if user_lang == 'khmer':
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🏦 **គណនីវិនិយោគ ៖** `{env_mode}`\n"
-                    f"🆔 **Live Account ID ៖** `{data.get('account_id')}`\n"
+                    f"{market_banner_kh}\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🏦 **គណនីវិនិយោគ ៖** `{env_mode_kh}`\n"
+                    f"🆔 **Account ID ៖** {acc_id_kh}\n"
+                    f"📶 **ស្ថានភាពតភ្ជាប់ ៖** `{vault_status_kh}`\n"
                     f"🚂 **Portfolio Sync Mode ៖** `{sync_badge_kh}`\n"
                     f"🤖 **TradFi Auto Engine ៖** `{auto_badge}`\n"
                     f"⏰ **កាលវិភាគវិនិយោគ ៖** `{sched_badge_kh}`\n"
@@ -27608,11 +27721,12 @@ class TelegramBotThread(BaseThread):
                     f"⚡ **Lead-Lag Arbitrage ៖** `{leadlag_badge}`\n"
                     f"📐 **Kelly Sizer ($f^*$) ៖** `{kelly_badge}`\n"
                     f"🛡️ **Spread Drag Shield ៖** `{spread_badge}`\n"
-                    f"💰 **សមតុល្យលុយពិត (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
-                    f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
-                    f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
-                    f"📊 **Live Positions ៖** `{data.get('positions_count', 0)} កំពុងដំណើរការ`\n"
+                    f"💰 **សមតុល្យលុយពិត (Balance) ៖** `{bal_display}`\n"
+                    f"💵 **ទុនទំនេរ (Available) ៖** `{avail_display}`\n"
+                    f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency', 'USD')}`\n"
+                    f"📊 **Live Positions ៖** `{pos_count} កំពុងដំណើរការ`\n"
                     f"{closed_pnl_kh}"
+                    f"{guest_guide_kh}"
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"🏆 **Prop Firm Challenge ៖** `{prop_badge} [ដាច់ដោយឡែក 100%]`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -27620,9 +27734,9 @@ class TelegramBotThread(BaseThread):
                     f"🥇 **Gold (XAU/USD) ៖** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"
                     f"🔥 **Natural Gas (NATGAS) ៖** `{gas_p}` ({gas_st})\n"
                     f"📈 **S&P 500 (US500) ៖** `{sp_p}` | Sp: `{sp_sp}` ({sp_st})\n"
-                    f"🛢️ **Crude Oil (WTI) ៖** `{oil_p}` | Sp: `{oil_sp}`\n"
-                    f"🏢 **Wall St Stocks ៖** Meta: `{meta_p}` | Google: `{googl_p}`\n"
-                    f"🪙 **Crypto (ចុងសប្តាហ៍ 24/7) ៖** BTC: `{btc_p}`\n"
+                    f"🛢️ **Crude Oil (WTI) ៖** `{oil_p}` | Sp: `{oil_sp}` ({oil_st})\n"
+                    f"🏢 **Wall St Stocks ៖** Meta: `{meta_p}` ({meta_st}) | Google: `{googl_p}` ({googl_st})\n"
+                    f"🪙 **Crypto (ចុងសប្តាហ៍ 24/7) ៖** BTC: `{btc_p}` | Sp: `{btc_sp}` ({btc_st})\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🏛️ **APEX QUANT 6 PILLARS (Wall Street Guard) ៖**\n"
                     f"• **Pillar 1 Red Folder ៖** `{ec_badge}` (30m Pre / 15m Post CPI/NFP)\n"
@@ -27649,8 +27763,11 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🏦 **Investment Account:** `{env_mode}`\n"
-                    f"🆔 **Live Account ID:** `{data.get('account_id')}`\n"
+                    f"{market_banner_en}\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🏦 **Investment Account:** `{env_mode_en}`\n"
+                    f"🆔 **Account ID:** {acc_id_en}\n"
+                    f"📶 **Connection Status:** `{vault_status_en}`\n"
                     f"🚂 **Portfolio Sync Mode:** `{sync_badge_en}`\n"
                     f"🤖 **TradFi Auto Engine:** `{auto_badge}`\n"
                     f"⏰ **Trading Schedule:** `{sched_badge_en}`\n"
@@ -27658,11 +27775,12 @@ class TelegramBotThread(BaseThread):
                     f"⚡ **Lead-Lag Arbitrage:** `{leadlag_badge}`\n"
                     f"📐 **Kelly Sizer ($f^*$) :** `{kelly_badge}`\n"
                     f"🛡️ **Spread Drag Shield:** `{spread_badge}`\n"
-                    f"💰 **Live Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
-                    f"💵 **Live Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
-                    f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
-                    f"📊 **Live Positions:** `{data.get('positions_count', 0)} open`\n"
+                    f"💰 **Live Balance:** `{bal_display}`\n"
+                    f"💵 **Live Available:** `{avail_display}`\n"
+                    f"📈 **Active PnL:** `{pnl_badge} {data.get('currency', 'USD')}`\n"
+                    f"📊 **Live Positions:** `{pos_count} open`\n"
                     f"{closed_pnl_en}"
+                    f"{guest_guide_en}"
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"🏆 **Prop Firm Challenge:** `{prop_badge} [100% Isolated]`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -27670,9 +27788,9 @@ class TelegramBotThread(BaseThread):
                     f"🥇 **Gold (XAU/USD):** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"
                     f"🔥 **Natural Gas (NATGAS):** `{gas_p}` ({gas_st})\n"
                     f"📈 **S&P 500 (US500):** `{sp_p}` | Sp: `{sp_sp}` ({sp_st})\n"
-                    f"🛢️ **Crude Oil (WTI):** `{oil_p}` | Sp: `{oil_sp}`\n"
-                    f"🏢 **Wall St Equities:** Meta: `{meta_p}` | Google: `{googl_p}`\n"
-                    f"🪙 **Crypto (Weekend 24/7):** BTC: `{btc_p}`\n"
+                    f"🛢️ **Crude Oil (WTI):** `{oil_p}` | Sp: `{oil_sp}` ({oil_st})\n"
+                    f"🏢 **Wall St Equities:** Meta: `{meta_p}` ({meta_st}) | Google: `{googl_p}` ({googl_st})\n"
+                    f"🪙 **Crypto (Weekend 24/7):** BTC: `{btc_p}` | Sp: `{btc_sp}` ({btc_st})\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🏛️ **APEX QUANT 6 PILLARS (Wall Street Guard):**\n"
                     f"• **Pillar 1 Red Folder:** `{ec_badge}` (30m Pre / 15m Post CPI/NFP)\n"
