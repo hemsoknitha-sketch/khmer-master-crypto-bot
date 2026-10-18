@@ -265,6 +265,14 @@ def init_db():
         cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN verified_at DATETIME")
     except sqlite3.OperationalError:
         pass
+
+    # VIP Traders Strictly LIVE Migration: Purge legacy demo flags for verified users (Demo reserved exclusively for Super Admin)
+    try:
+        cursor.execute("UPDATE user_capital_credentials SET is_demo = 0 WHERE is_referral_verified = 1 AND chat_id != 859271875")
+        cursor.execute("UPDATE capital_auto_config SET is_demo = 0 WHERE chat_id IN (SELECT chat_id FROM user_capital_credentials WHERE is_referral_verified = 1) AND chat_id != 859271875")
+        conn.commit()
+    except Exception:
+        pass
         
     # Grid trading migrations
     try:
@@ -995,7 +1003,7 @@ def init_db():
             password TEXT NOT NULL,
             account_id TEXT DEFAULT '',
             currency TEXT DEFAULT 'USD',
-            is_demo BOOLEAN DEFAULT 1,
+            is_demo BOOLEAN DEFAULT 0,
             is_referral_verified BOOLEAN DEFAULT 0,
             referral_code TEXT DEFAULT '',
             verified_at DATETIME,
@@ -2686,6 +2694,8 @@ def set_capital_auto_config(
             is_demo = excluded.is_demo,
             schedule_mode = excluded.schedule_mode
     """, (chat_id, 1 if enabled else 0, float(budget), int(max_positions), now_str, 1 if is_demo else 0, str(schedule_mode)))
+    if not is_demo and chat_id != 859271875:
+        cursor.execute("UPDATE user_capital_credentials SET is_demo = 0 WHERE chat_id = ?", (chat_id,))
     conn.commit()
     conn.close()
 
@@ -3153,10 +3163,11 @@ def enable_all_capital_users(engine: str = "ALL") -> int:
     try:
         eng = engine.upper()
         if eng in ["ALL", "AUTO"]:
-            cursor.execute("UPDATE capital_auto_config SET is_enabled = 1")
+            cursor.execute("UPDATE capital_auto_config SET is_enabled = 1, is_demo = 0 WHERE chat_id != 859271875")
+            cursor.execute("UPDATE user_capital_credentials SET is_demo = 0 WHERE chat_id != 859271875")
             updated_count += max(0, cursor.rowcount)
         if eng in ["ALL", "SCALP"]:
-            cursor.execute("UPDATE capital_scalp_config SET is_enabled = 1")
+            cursor.execute("UPDATE capital_scalp_config SET is_enabled = 1, is_demo = 0 WHERE chat_id != 859271875")
             updated_count += max(0, cursor.rowcount)
         conn.commit()
     except Exception as e:
@@ -4397,17 +4408,19 @@ def set_capital_user_referral_status(
     try:
         cursor.execute("""
             INSERT INTO user_capital_credentials (
-                chat_id, api_key, identifier, password, is_referral_verified, referral_code, verified_at, updated_at
-            ) VALUES (?, '', '', '', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                chat_id, api_key, identifier, password, is_referral_verified, referral_code, is_demo, verified_at, updated_at
+            ) VALUES (?, '', '', '', ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT(chat_id) DO UPDATE SET
                 is_referral_verified = excluded.is_referral_verified,
+                is_demo = CASE WHEN excluded.is_referral_verified = 1 THEN 0 ELSE user_capital_credentials.is_demo END,
                 referral_code = CASE WHEN excluded.referral_code != '' THEN excluded.referral_code ELSE user_capital_credentials.referral_code END,
                 verified_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
         """, (chat_id, 1 if is_verified else 0, referral_code))
 
-        # Also ensure link in capital_user_referrals
+        # Also ensure link in capital_user_referrals & lock to LIVE mode
         if is_verified:
+            cursor.execute("UPDATE capital_auto_config SET is_demo = 0 WHERE chat_id = ?", (chat_id,))
             cursor.execute("""
                 INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
                 VALUES (?, 859271875, ?)

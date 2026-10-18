@@ -6378,6 +6378,13 @@ class TelegramBotThread(BaseThread):
                 context.args = []
                 await capital_command(update, context)
             elif data == "btn_cap_auto_demo":
+                is_sa = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("❌ មុខងារ Demo ត្រូវបានបិទសម្រាប់ VIP Users! Angkor Quant ដំណើរការផ្តាច់មុខលើ Live Mainnet (Real Funds) ប៉ុណ្ណោះ។", show_alert=True)
+                    except Exception:
+                        pass
+                    return
                 cfg = db.get_capital_auto_config(chat_id)
                 budget = cfg.get("budget", 10.0)
                 db.set_capital_auto_config(chat_id, enabled=True, budget=budget, is_demo=True)
@@ -6672,6 +6679,7 @@ class TelegramBotThread(BaseThread):
             elif data.startswith("btn_cap_appr_"):
                 target_uid = int(data.replace("btn_cap_appr_", "").strip())
                 db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
+                db.set_capital_auto_config(target_uid, enabled=True, is_demo=False)
                 try:
                     await update.callback_query.answer(f"✅ បានអនុម័តសិទ្ធិ Live Real Capital សម្រាប់ {target_uid}!", show_alert=True)
                 except Exception:
@@ -24731,6 +24739,10 @@ class TelegramBotThread(BaseThread):
                             pass
                     db.set_capital_scalp_config(chat_id, enabled=True, budget=b_val, is_demo=scalp_cfg.get("is_demo", False))
                 elif sub in ["DEMO"]:
+                    is_sa = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+                    if not is_sa:
+                        await update.effective_message.reply_text("❌ **គណនី DEMO ត្រូវបានបិទសម្រាប់ VIP Users!** ប្រព័ន្ធ Angkor Quant ដំណើរការផ្តាច់មុខលើ LIVE MAINNET (Real Funds) ប៉ុណ្ណោះ។", parse_mode="Markdown")
+                        return
                     b_val = scalp_cfg.get("budget", 30.0)
                     if len(args) > 1:
                         try:
@@ -25490,7 +25502,7 @@ class TelegramBotThread(BaseThread):
                     f"2️⃣ ភ្ជាប់ API Key របស់អ្នកតាមរយៈ `` `/capital API ...` ``\n"
                     f"3️⃣ ចុចប៊ូតុង **[ 🔗 ស្នើសុំផ្ទៀងផ្ទាត់គណនី ]** ខាងក្រោម ដើម្បីទទួលបានការអនុម័តភ្លាមៗ!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_(ចំណាំ៖ គណនី DEMO $10,000 នៅតែអាចសាកល្បងដោយឥតគិតថ្លៃ ១០០% គ្រប់ពេលវេលា)_"
+                    f"_(ចំណាំ៖ ប្រព័ន្ធ Angkor Quant VIP ដំណើរការផ្តាច់មុខលើ LIVE MAINNET សាច់ប្រាក់ពិតប្រាកដ ដើម្បីធានាបាននូវផលចំណេញពិតប្រាកដ)_\n"
                 )
             else:
                 gate_text = (
@@ -25507,17 +25519,16 @@ class TelegramBotThread(BaseThread):
                     f"2️⃣ Link your API Key via `` `/capital API ...` ``\n"
                     f"3️⃣ Click **[ 🔗 Request Verification ]** below for instant Super Admin approval!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_(Note: DEMO $10,000 mode is 100% free and open for exploration)_"
+                    f"_(Note: Angkor Quant VIP operates exclusively on LIVE MAINNET Real Funds)_\n"
                 )
 
             gate_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🌐 ចុះឈ្មោះគណនីដៃគូ (Official Pro Link)", url=pro_url)],
                 [InlineKeyboardButton("🔗 ស្នើសុំផ្ទៀងផ្ទាត់គណនី (Request Verification)", callback_data="btn_cap_req_verify")],
                 [
-                    InlineKeyboardButton("🟡 សាកល្បង Demo ($10,000)", callback_data="btn_cap_auto_demo"),
-                    InlineKeyboardButton("💬 ជំនួយការ Super Admin", url="https://t.me/hemsoknitha")
-                ],
-                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+                    InlineKeyboardButton("💬 ជំនួយការ Super Admin", url="https://t.me/hemsoknitha"),
+                    InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                ]
             ])
             return gate_text, gate_kb
 
@@ -25736,6 +25747,11 @@ class TelegramBotThread(BaseThread):
                         u_mode = "🟢 LIVE"
                     elif (u_cid in prop_uids) or ("PROP" in str(u_acc).upper()) or ("FTMO" in str(u_acc).upper()):
                         u_mode = "🏆 PROP"
+                    elif u.get("is_referral_verified", False) or not u.get("is_demo", False):
+                        # Verified VIP users are strictly LIVE - auto self-heal any legacy demo flags
+                        if u.get("is_demo", False) or u.get("auto_is_demo", False):
+                            db.set_capital_auto_config(u_cid, enabled=u.get("auto_enabled", False), budget=u.get("auto_budget", 50.0), is_demo=False)
+                        u_mode = "🟢 LIVE"
                     elif u.get("is_demo", False) or u.get("auto_is_demo", False):
                         u_mode = "🟡 DEMO"
                     else:
@@ -25893,6 +25909,7 @@ class TelegramBotThread(BaseThread):
                     return
 
                 db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
+                db.set_capital_auto_config(target_uid, enabled=True, is_demo=False)
                 await update.effective_message.reply_text(f"✅ បានអនុម័តសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}` រួចរាល់!", parse_mode="Markdown")
                 try:
                     await context.bot.send_message(
@@ -27417,6 +27434,29 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                         return
                     elif sub_opt in ["DEMO", "TEST"]:
+                        if not is_super_admin:
+                            demo_deny_kb = InlineKeyboardMarkup([
+                                [InlineKeyboardButton("🔑 ភ្ជាប់គណនីពិត (LIVE)", callback_data="btn_cap_api_vault")],
+                                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+                            ])
+                            demo_deny_msg = (
+                                f"❌ **គណនី DEMO មិនត្រូវបានអនុញ្ញាតសម្រាប់ VIP USERS ឡើយ!** ⚠️\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ _ប្រព័ន្ធ Angkor Quant សម្រាប់ VIP ដំណើរការផ្តាច់មុខលើ **LIVE MAINNET (Real Funds)** ប៉ុណ្ណោះ ដើម្បីធានាបាននូវប្រាក់ចំណេញពិតប្រាកដ។_\n\n"
+                                f"👉 **សូមដំណើរការលើគណនីពិតរបស់អ្នក ៖**\n"
+                                f"• `` `/capital AUTO ON 50 live` ``\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _(មុខងារ Demo និង Prop Firm Challenge ត្រូវបានរក្សាទុកសម្រាប់ Super Admin តែប៉ុណ្ណោះ)_"
+                            ) if user_lang == 'khmer' else (
+                                f"❌ **DEMO ACCOUNTS ARE NOT PERMITTED FOR VIP USERS!** ⚠️\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ _Angkor Quant for VIP operates exclusively on **LIVE MAINNET (Real Funds)** to ensure genuine profit._\n\n"
+                                f"👉 **Please run on Live account:**\n"
+                                f"• `` `/capital AUTO ON 50 live` ``"
+                            )
+                            await update.effective_message.reply_text(demo_deny_msg, parse_mode="Markdown", reply_markup=demo_deny_kb)
+                            return
+
                         target_is_demo = True
                         user_explicit_max = None
                         budget = float(args[2]) if len(args) >= 3 else 50.0
