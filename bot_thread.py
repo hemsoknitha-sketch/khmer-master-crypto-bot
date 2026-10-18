@@ -6585,10 +6585,16 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
             elif data == "btn_cap_env_toggle":
+                is_sa = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("🔒 VIP Users ដំណើរការផ្តាច់មុខលើ LIVE MAINNET (Real Funds) ប៉ុណ្ណោះ!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
                 cfg = db.get_capital_auto_config(chat_id)
                 curr_demo = bool(cfg.get("is_demo", False))
                 new_demo = not curr_demo
-                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
                 if not new_demo and not is_sa and not db.is_capital_user_authorized(chat_id):
                     try:
                         await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការដើម្បី Trade Live!", show_alert=True)
@@ -7758,8 +7764,13 @@ class TelegramBotThread(BaseThread):
                     await update.callback_query.answer("🔌 កំពុងធ្វើតេស្ត API Connection...")
                 except Exception:
                     pass
-                context.args = ["PROP", "TEST"]
-                await prop_firm_command(update, context)
+                is_sa = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+                if is_sa:
+                    context.args = ["PROP", "TEST"]
+                    await prop_firm_command(update, context)
+                else:
+                    context.args = []
+                    await capital_command(update, context)
             elif data in ["btn_cap_ib_menu", "btn_cap_ib_refresh", "btn_capital_ib"]:
                 try:
                     await update.callback_query.answer("🤝 កំពុងបើក IB Partner & Spread Rebate...")
@@ -21529,6 +21540,34 @@ class TelegramBotThread(BaseThread):
             import capital_engine
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+            is_super_admin = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+            if not is_super_admin:
+                vip_prop_kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔑 ភ្ជាប់ Capital Live Vault", callback_data="btn_cap_api_vault")],
+                    [InlineKeyboardButton("🏛️ ទៅកាន់ /capital Dashboard", callback_data="btn_cap_menu")]
+                ])
+                vip_prop_msg = (
+                    f"🔒 **មុខងារ PROP FIRM CHALLENGE ($10k-$200k) ត្រូវបានរក្សាទុកផ្តាច់មុខសម្រាប់ SUPER ADMIN!**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"ℹ️ _សម្រាប់ VIP Users ប្រព័ន្ធ Angkor Quant ដំណើរការផ្តាច់មុខលើគណនីពិត **LIVE MAINNET (Real Funds)** ផ្ទាល់ខ្លួនរបស់អ្នកប៉ុណ្ណោះ។_\n\n"
+                    f"👉 **ដើម្បីភ្ជាប់ និងដំណើរការគណនីពិតរបស់អ្នក ៖**\n"
+                    f"• ផ្ញើសារ ៖ `/capital API <APIKEY> <EMAIL> <PASSWORD> live`\n"
+                    f"• ឬចុចប៊ូតុងខាងក្រោមដើម្បីបើកផ្ទាំងគ្រប់គ្រង `/capital` ផ្ទាល់!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 _ប្រសិនបើលោកអ្នកមានបំណងចូលរួមកម្មវិធី Funded Trader សូមទាក់ទង Super Admin។_"
+                ) if user_lang == 'khmer' else (
+                    f"🔒 **PROP FIRM CHALLENGE ($10k-$200k) IS EXCLUSIVE TO SUPER ADMIN!**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"ℹ️ _For VIP Users, Angkor Quant operates exclusively on personal **LIVE MAINNET (Real Funds)** accounts._\n\n"
+                    f"👉 **To connect and trade your Live account:**\n"
+                    f"• Send: `/capital API <APIKEY> <EMAIL> <PASSWORD> live`\n"
+                    f"• Or use the buttons below to open the `/capital` dashboard directly!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 _If you wish to participate in Funded Trader programs, please contact Super Admin._"
+                )
+                await update.effective_message.reply_text(vip_prop_msg, parse_mode="Markdown", reply_markup=vip_prop_kb)
+                return
+
             args = list(context.args) if context and context.args else []
             if args:
                 sub_action = str(args[0]).upper().strip()
@@ -26631,6 +26670,32 @@ class TelegramBotThread(BaseThread):
                         in_pwd = str(sub_args[2]).strip()
                         in_mode_str = str(sub_args[3]).lower().strip() if len(sub_args) >= 4 else "live"
                         is_demo_mode = (in_mode_str in ["demo", "virtual", "test", "0", "false"])
+                        is_super_admin = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+
+                        if is_demo_mode and not is_super_admin:
+                            demo_deny_kb = InlineKeyboardMarkup([
+                                [InlineKeyboardButton("🔑 ភ្ជាប់គណនីពិត (LIVE)", callback_data="btn_cap_api_vault")],
+                                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+                            ])
+                            demo_deny_msg = (
+                                f"❌ **គណនី DEMO មិនត្រូវបានអនុញ្ញាតសម្រាប់ VIP USERS ឡើយ!** ⚠️\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ _ប្រព័ន្ធ Angkor Quant សម្រាប់ VIP ដំណើរការផ្តាច់មុខលើ **LIVE MAINNET (Real Funds)** ប៉ុណ្ណោះ ដើម្បីធានាបាននូវប្រាក់ចំណេញពិតប្រាកដ។_\n\n"
+                                f"👉 **សូមភ្ជាប់គណនីពិតរបស់អ្នកដោយវាយពាក្យ live នៅចុងក្រោយ ៖**\n"
+                                f"• `` `/capital API {in_key} {in_id} {in_pwd} live` ``\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _(មុខងារ Demo និង Prop Firm Challenge ត្រូវបានរក្សាទុកសម្រាប់ Super Admin តែប៉ុណ្ណោះ)_"
+                            ) if user_lang == 'khmer' else (
+                                f"❌ **DEMO ACCOUNTS ARE NOT PERMITTED FOR VIP USERS!** ⚠️\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ _Angkor Quant for VIP operates exclusively on **LIVE MAINNET (Real Funds)** to ensure genuine financial profit._\n\n"
+                                f"👉 **Please connect your Live account with 'live' at the end:**\n"
+                                f"• `` `/capital API {in_key} {in_id} {in_pwd} live` ``\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _(Demo & Prop Firm Challenge are reserved exclusively for Super Admin)_"
+                            )
+                            await update.effective_message.reply_text(demo_deny_msg, parse_mode="Markdown", reply_markup=demo_deny_kb)
+                            return
 
                         # Check for abstract angle brackets / placeholders
                         is_placeholder = (
@@ -26743,7 +26808,7 @@ class TelegramBotThread(BaseThread):
                                 f"💡 **ការណែនាំផ្ទៀងផ្ទាត់ ៖**\n"
                                 f"1. ពិនិត្យមើល `API_KEY` ដែលបានបង្កើតលើ Capital.com Web Platform\n"
                                 f"2. ពិនិត្យ `Email/Identifier` និង `Password` ឱ្យបានត្រឹមត្រូវ\n"
-                                f"3. ប្រសិនបើគណនីជា Demo សូមបញ្ជាក់ `demo` នៅចុងបញ្ចប់\n"
+                                f"3. សម្រាប់ VIP Users សូមបញ្ជាក់ `live` នៅចុងបញ្ចប់\n"
                                 f"• គំរូ ៖ `` `/capital API <KEY> <EMAIL> <PASSWORD> live` ``"
                             ) if user_lang == 'khmer' else (
                                 f"❌ **CAPITAL.COM AUTHENTICATION FAILED!** ⚠️\n"
@@ -26753,14 +26818,16 @@ class TelegramBotThread(BaseThread):
                                 f"💡 **Checklist:**\n"
                                 f"1. Verify API Key generated on Capital.com\n"
                                 f"2. Verify Email/Identifier & Password\n"
+                                f"3. For VIP Users, specify `live` at the end\n"
                                 f"• Syntax: `` `/capital API <KEY> <EMAIL> <PASSWORD> live` ``"
                             )
                             await update.effective_message.reply_text(fail_msg, parse_mode="Markdown", reply_markup=fail_kb)
                             return
 
                     # Default: API Vault Dashboard View
-                    status_badge = "🟢 CONNECTED (Personal Vault)" if has_creds else "⚪ NOT CONNECTED (Using Default Pool)"
-                    acc_num = user_creds.get("account_id", "N/A") if user_creds else "Global Master"
+                    is_sa = (chat_id in [859271875, 537186806] or db.is_admin(chat_id))
+                    status_badge = "🟢 CONNECTED (Personal Vault)" if has_creds else ("🟢 CONNECTED (Super Admin Master)" if is_sa else "⚪ NOT CONNECTED (Awaiting API)")
+                    acc_num = user_creds.get("account_id", "N/A") if user_creds else ("Master Fleet" if is_sa else "Awaiting Credentials")
                     mode_txt = "DEMO" if (user_creds and user_creds.get("is_demo")) else "LIVE"
 
                     v_kb = InlineKeyboardMarkup([
@@ -26789,7 +26856,6 @@ class TelegramBotThread(BaseThread):
                         f"2. ចុច **Generate API Key** (សិទ្ធិ Trade តែប៉ុណ្ណោះ គ្មានសិទ្ធិដកប្រាក់)\n"
                         f"3. ផ្ញើសារមកកាន់ Bot តាមទម្រង់ ៖\n"
                         f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
-                        f"• _(សម្រាប់ Demo: ដាក់ពាក្យ `demo` នៅចុងក្រោយ)_\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"💡 _ទិន្នន័យត្រូវបាន Encrypt ការពារ ១០០% គ្មានអ្នកណាអាចមើលឃើញ Password របស់អ្នកបានឡើយ!_"
                     ) if user_lang == 'khmer' else (
@@ -26805,7 +26871,6 @@ class TelegramBotThread(BaseThread):
                         f"2. Generate your API Key (Trading permissions only, 0% withdrawal risk)\n"
                         f"3. Send command to Bot:\n"
                         f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
-                        f"• _(For Demo: append `demo` at the end)_\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"💡 _All credentials are fully AES-256 encrypted._"
                     )
