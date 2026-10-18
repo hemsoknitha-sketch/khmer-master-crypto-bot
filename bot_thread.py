@@ -27629,8 +27629,8 @@ class TelegramBotThread(BaseThread):
                 vault_status_kh = f"🟢 ភ្ជាប់រួចរាល់ ({clean_mask})"
                 vault_status_en = f"🟢 CONNECTED ({clean_mask})"
             else:
-                env_mode_kh = "⚪ VIP Sandbox (Awaiting Personal API)"
-                env_mode_en = "⚪ VIP Sandbox (Awaiting Personal API)"
+                env_mode_kh = "⚪ VIP Live Account (Awaiting Personal API)"
+                env_mode_en = "⚪ VIP Live Account (Awaiting Personal API)"
                 acc_id_kh = "⚪ មិនទាន់ភ្ជាប់ (ប្រើ `/capital API...`)"
                 acc_id_en = "⚪ Not Connected (Use `/capital API...`)"
                 vault_status_kh = "🟡 មិនទាន់ភ្ជាប់ API (ចុចប៊ូតុង 🔑 Personal Vault ខាងក្រោម)"
@@ -27816,14 +27816,14 @@ class TelegramBotThread(BaseThread):
                     f"💡 **របៀបភ្ជាប់គណនី Capital.com ផ្ទាល់ខ្លួន ៖**\n"
                     f"• ចុចប៊ូតុង `🔑 ភ្ជាប់ API ផ្ទាល់ខ្លួន` ខាងក្រោម ឬផ្ញើសារ ៖\n"
                     f"• `/capital API <API_KEY> <EMAIL> <PASSWORD> live`\n"
-                    f"• _(សម្រាប់ Demo: វាយពាក្យ `demo` នៅចុងក្រោយ)_\n"
+                    f"• _(គណនី VIP ដំណើរការផ្តាច់មុខលើ LIVE MAINNET សាច់ប្រាក់ពិតប្រាកដ)_\n"
                 )
                 guest_guide_en = (
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"💡 **How to Connect Your Personal Account:**\n"
                     f"• Tap `🔑 Personal Vault` below or send command:\n"
                     f"• `/capital API <API_KEY> <EMAIL> <PASSWORD> live`\n"
-                    f"• _(For Demo: append `demo` at the end)_\n"
+                    f"• _(VIP accounts operate exclusively on LIVE MAINNET Real Funds)_\n"
                 )
             else:
                 guest_guide_kh = ""

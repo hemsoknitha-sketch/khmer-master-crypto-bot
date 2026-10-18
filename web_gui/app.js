@@ -3012,7 +3012,7 @@ function renderCapitalCockpit(data) {
 
     if (badgeAcc) {
         if (tf.is_guest) {
-            badgeAcc.textContent = '⚪ VIP SANDBOX (Awaiting API)';
+            badgeAcc.textContent = '⚪ VIP LIVE (Awaiting API)';
             badgeAcc.className = 'badge badge-secondary';
         } else if (tf.is_demo) {
             badgeAcc.textContent = '🟡 DEMO ($10,000)';
