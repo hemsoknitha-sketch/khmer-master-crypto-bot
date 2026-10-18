@@ -2485,7 +2485,7 @@ def run_audit():
 
         has_scalp_cmd = "async def capital_scalp_command(" in bot_code and "CommandHandler(\"capital_scalp\"" in bot_code
         has_scalp_callbacks = "btn_cap_scalp_toggle" in bot_code and "btn_cap_scalp_demo" in bot_code and "btn_cap_scalp_refresh" in bot_code
-        has_reg_scalp = any(cmd.command == "capital_scalp" for cmd in bot_commands_registry.get_public_bot_commands())
+        has_reg_scalp = any(cmd.command == "capital_scalp" for cmd in bot_commands_registry.get_registered_commands())
 
         # 5. Dynamic unit tests for scalp config and trades
         test_chat_id = 99999903
@@ -2726,8 +2726,8 @@ def run_audit():
         has_csx_scheduler = "id='csx_market_monitor'" in bt_code
 
         import bot_commands_registry
-        public_cmds = bot_commands_registry.get_public_bot_commands()
-        has_registry_cmd = any(c.command == "csx" for c in public_cmds)
+        reg_cmds = bot_commands_registry.get_registered_commands()
+        has_registry_cmd = any(c.command == "csx" for c in reg_cmds)
 
         all_inv69_passed = (
             has_inv69 and has_stocks and has_session and
@@ -2777,8 +2777,8 @@ def run_audit():
         has_mt5_smart_cb = "btn_mt5_smart" in bt_code
 
         import bot_commands_registry
-        public_cmds = bot_commands_registry.get_public_bot_commands()
-        has_registry_cmd = any(c.command == "mt5_smart" for c in public_cmds)
+        reg_cmds = bot_commands_registry.get_registered_commands()
+        has_registry_cmd = any(c.command == "mt5_smart" for c in reg_cmds)
 
         all_inv71_passed = (
             has_inv71 and has_cit_class and has_eval_trap and has_gatekeeper and
@@ -2847,8 +2847,8 @@ def run_audit():
         has_acad_callback = "elif data.startswith(\"acad_\"):" in bt_code
 
         import bot_commands_registry
-        public_cmds = bot_commands_registry.get_public_bot_commands()
-        has_acad_registry = any(c.command == "academy" for c in public_cmds)
+        reg_cmds = bot_commands_registry.get_registered_commands()
+        has_acad_registry = any(c.command == "academy" for c in reg_cmds)
 
         # 5. Web GUI Dashboard & REST API inspection
         with open("web_gui/index.html", "r", encoding="utf-8") as hf:
