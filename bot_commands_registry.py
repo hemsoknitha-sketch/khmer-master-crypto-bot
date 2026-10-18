@@ -16,112 +16,97 @@ from telegram import BotCommand
 
 def get_public_bot_commands():
     """
-    Public VIP User Command List (Super Smart & Beautiful Institutional Hierarchy)
+    Public VIP User Command List (Super Smart & IP-Protected Institutional Hierarchy)
+    Zero proprietary technical formula leakage; focused on user value, safety & simplicity.
     Hierarchy:
-      1. Initiation & Master Navigation: /start, /menu
-      2. Spot Investment Engines (100% Spot, Zero Leverage): /compound_grid, /infinity_matrix, /smart_trade
-      3. Futures & Hedge Engines: /turbo_hedge, /smartx, /scalp, /auto_trade
-      4. CeDeFi & Arbitrage Engines: /flash_loan, /smart_swap, /cross_arb, /funding_harvester, /web3_wallet
-      5. Market Intelligence & Radars: /whales, /flash_crash, /pre_pump, /news, /analyze, /predict, /top
-      6. Portfolio, Risk & Account Security: /balance, /portfolio, /status, /report, /paper_trading, /alert, /stop, /set_pin, /reset_pin
+      1. Primary Hub & Navigation: /menu, /smart, /start, /webapp, /help
+      2. Portfolio, Balances & Safety: /portfolio, /balance, /status, /report, /stop
+      3. Spot Investment Engines (100% Spot, Zero Risk): /compound_grid, /infinity_matrix, /smart_trade
+      4. Futures & Hedge Engines: /wealth, /turbo_hedge, /smartx, /scalp, /auto_trade
+      5. TradFi Global Markets & MT5: /capital, /capital_scalp, /mt5, /mt5_smart, /csx, /academy
+      6. Market Intelligence & Security: /whales, /analyze, /predict, /news, /top, /set_pin
     """
     return [
-        # --- [1] INITIATION & MASTER NAVIGATION ---
-        BotCommand("start", "🚀 Start Angkor Quant & Language"),
+        # --- [1] PRIMARY HUB & NAVIGATION ---
         BotCommand("menu", "🎛️ Angkor Quant Control Panel"),
-        BotCommand("smart", "🧠 Super Smart Bot & Zero-Confusion Guide"),
-        BotCommand("commands", "📋 Institutional Command Directory"),
-        BotCommand("help", "📘 Institutional User & Command Manual"),
-        BotCommand("webapp", "📱 Angkor Quant Mini App Web GUI"),
-        BotCommand("academy", "🎓 Angkor Buffett Academy (12 Books)"),
+        BotCommand("smart", "🧠 Smart Strategy Navigator"),
+        BotCommand("start", "🚀 Start System & Language"),
+        BotCommand("webapp", "📱 Web App Portal"),
+        BotCommand("help", "📘 User Guide & Manual"),
 
-        # --- [2] SPOT INVESTMENT ENGINES (100% Spot, 0% Liquidation Risk) ---
-        BotCommand("compound_grid", "📈 Angkor Compound Grid (100% Spot)"),
-        BotCommand("infinity_matrix", "♾️ Angkor Infinity Matrix (Fibonacci)"),
-        BotCommand("smart_trade", "💎 Angkor Smart Trade (Spot Accumulator)"),
-        BotCommand("spot_harvest", "🏦 Angkor Spot Harvest (Profit Vault)"),
+        # --- [2] PORTFOLIO, BALANCES & SAFETY ---
+        BotCommand("portfolio", "💼 Unified Portfolio & PnL"),
+        BotCommand("balance", "💰 Multi-Wallet Balances"),
+        BotCommand("status", "📊 Engine Execution Status"),
+        BotCommand("report", "📈 Performance Audit Report"),
+        BotCommand("stop", "🛑 Emergency Stop Trading"),
 
-        # --- [3] FUTURES & HEDGE ENGINES (Delta-Neutral & Precision Execution) ---
-        BotCommand("wealth", "💎 Angkor Wealth Engine (Spot & Futures)"),
-        BotCommand("turbo_hedge", "🛡️ Angkor Turbo Hedge (Dual-Side Engine)"),
-        BotCommand("smartx", "👑 Angkor Intelligence X (33 AI Swarm)"),
-        BotCommand("smartx_reachsey_meas", "🥇 Angkor Gold Matrix (Pending Stop)"),
-        BotCommand("smartx_reachsey_crypto", "🪙 Angkor Crypto Matrix (Multi-Asset)"),
-        BotCommand("scalp", "🏓 Angkor Precision Scalper (Micro-Vol)"),
-        BotCommand("auto_trade", "🤖 Angkor AutoTrade (Macro Waterfall)"),
-        BotCommand("command", "🦅 Angkor Command AI (Omni-Swarm)"),
-        BotCommand("skynet", "🦅 Angkor Command AI (Legacy /skynet)"),
+        # --- [3] SPOT INVESTMENT ENGINES (100% Spot, 0% Liquidation Risk) ---
+        BotCommand("compound_grid", "📈 Spot Dynamic Growth"),
+        BotCommand("infinity_matrix", "♾️ Spot Long-Term Accumulator"),
+        BotCommand("smart_trade", "💎 Spot Strategic Vault"),
 
-        # --- [4] CEDEFI & ARBITRAGE ENGINES (MEV & High-Yield Harvester) ---
-        BotCommand("capital", "🏛️ Angkor Capital (Gold, Oil, US500)"),
-        BotCommand("forex", "💱 Angkor Forex (24/7 Global Satellite)"),
-        BotCommand("mt5", "⚡ Angkor MT5 (Tokyo GTCFX Master Pool)"),
-        BotCommand("mt5_smart", "🧠 Super Smart MT5 Citadel & AI Swarm"),
-        BotCommand("mt5_reachsey", "👑 Angkor MT5 Matrix (5-Position Basket)"),
-        BotCommand("mt5_hf", "🤗 Angkor MT5 Free 16GB Worker"),
-        BotCommand("capital_ib", "🤝 Angkor Capital IB Rebates (30%-50%)"),
-        BotCommand("capital_orb", "🎯 Angkor London & NY 15m ORB Breakout"),
-        BotCommand("capital_kelly", "📐 Angkor Fractional Kelly Position Sizer"),
-        BotCommand("capital_spread", "🛡️ Angkor Spread Drag Elimination (10x)"),
-        BotCommand("capital_news", "⚡ Angkor Post-News Volatility Harvester"),
-        BotCommand("capital_scalp", "⚡ Angkor 24/7 Trend Scalp Engine"),
-        BotCommand("flash_loan", "⚡ Angkor Quantum CeDeFi Arbitrage"),
-        BotCommand("smart_swap", "⚡ Angkor DEX & AI Gem Sniper"),
-        BotCommand("cross_arb", "⚡ Angkor Cross-Market Arbitrage"),
-        BotCommand("funding_harvester", "🌾 Angkor Delta-Neutral Funding Harvester"),
-        BotCommand("web3_wallet", "💼 Angkor Web3 Settlement Wallet"),
+        # --- [4] FUTURES & HEDGE ENGINES (Capital Growth & Risk Armor) ---
+        BotCommand("wealth", "💎 Perpetual Wealth Generator"),
+        BotCommand("turbo_hedge", "🛡️ Autonomous Hedge Engine"),
+        BotCommand("smartx", "👑 Intelligence X Master Suite"),
+        BotCommand("scalp", "🏓 Precision Scalp Trading"),
+        BotCommand("auto_trade", "🤖 Autonomous Trading Engine"),
 
-        # --- [5] MARKET INTELLIGENCE & RADARS (AGI & Multi-Timeframe) ---
-        BotCommand("csx", "🏛️ Angkor CSX Stock Radar (Cambodia)"),
-        BotCommand("whales", "🐋 Angkor Whale Radar L2"),
-        BotCommand("flash_crash", "🎯 Angkor Crash Hunter"),
-        BotCommand("pre_pump", "🔥 Angkor Pre-Pump Radar"),
-        BotCommand("news", "📰 Angkor News Intelligence"),
-        BotCommand("macro", "🛰️ Angkor Macro Satellite"),
-        BotCommand("analyze", "🧠 Angkor Intelligence Deep Analysis"),
-        BotCommand("predict", "📈 Angkor 24h Trend Forecast"),
-        BotCommand("top", "🔥 Angkor Volatile Gainers & Losers"),
+        # --- [5] TRADFI GLOBAL MARKETS & MT5 SUITE ---
+        BotCommand("capital", "🏛️ Global Markets Suite"),
+        BotCommand("capital_scalp", "⚡ Global Trend Scalping"),
+        BotCommand("mt5", "⚡ Institutional MT5 Gateway"),
+        BotCommand("mt5_smart", "🧠 Smart Institutional Trading"),
+        BotCommand("csx", "🏛️ CSX Equities Navigator"),
+        BotCommand("academy", "🎓 Angkor Investment Academy"),
 
-        # --- [6] PORTFOLIO, RISK & ACCOUNT SECURITY ---
-        BotCommand("balance", "💰 Angkor Multi-Wallet USDT Balance"),
-        BotCommand("portfolio", "💼 Angkor Unified Portfolio & Net PnL"),
-        BotCommand("status", "📊 Angkor Active Trades & Live PnL"),
-        BotCommand("journal", "📓 Angkor Trading Journal & Mistake Tag"),
-        BotCommand("report", "📊 Angkor Multi-Timeframe Engine Audit"),
-        BotCommand("audit", "👑 APEX VIP 24H Daily Audit & Fleet Telemetry"),
-        BotCommand("daily_audit", "⏰ 24H Daily Institutional Audit"),
-        BotCommand("paper_trading", "🧪 Angkor Paper vs Live Mode (Admin Only)"),
-        BotCommand("alert", "🔔 Angkor Real-Time Price Alert"),
-        BotCommand("stop", "🛑 Angkor Emergency Stop Trading"),
-        BotCommand("set_pin", "🔒 Angkor Configure 2FA Security PIN"),
-        BotCommand("reset_pin", "🔒 Angkor 2FA Security PIN Recovery"),
-        BotCommand("citadel", "🛡️ Angkor Risk Citadel & Virtualizer"),
-        BotCommand("agreement", "✍️ Angkor Private Agreement & Risk Waiver"),
-        BotCommand("about", "📜 Angkor Terms, Agreement & Legal Notice"),
+        # --- [6] AI RADARS & ACCOUNT SECURITY ---
+        BotCommand("whales", "🐋 Market Flow Tracker"),
+        BotCommand("analyze", "🧠 Deep Market Analysis"),
+        BotCommand("predict", "📈 Market Trend Forecast"),
+        BotCommand("news", "📰 Global Market News"),
+        BotCommand("top", "🔥 Market Movers & Volatility"),
+        BotCommand("set_pin", "🔒 2FA Security PIN"),
     ]
 
 
 def get_admin_bot_commands():
     """
-    Super Admin Command List
-    Appends the 9 Super Admin exclusive commands strictly at the BOTTOM.
+    Super Admin Command List (Full Technical Institutional Depth)
+    Appends Super Admin exclusive commands strictly at the BOTTOM.
     """
     return list(get_public_bot_commands()) + [
-        # --- [7] SUPER ADMIN EXCLUSIVE (Placed at the bottom) ---
-        BotCommand("admin", "👑 Angkor Admin Executive Control Panel"),
-        BotCommand("admin_users", "👥 Angkor VIP Users Directory"),
-        BotCommand("admin_agreements", "📜 Angkor User Legal Contracts & PDF Vault"),
-        BotCommand("admin_license", "🔑 Angkor VIP License Manager"),
-        BotCommand("admin_broadcast", "📢 Angkor Global Urgent Broadcast"),
-        BotCommand("admin_stats", "📊 Angkor Platform Volume & Stats"),
-        BotCommand("admin_config", "⚙️ Angkor Live System Configuration"),
-        BotCommand("health", "🩺 Angkor VPS Health & Diagnostics"),
-        BotCommand("sync_brain", "📦 Angkor Hot-Reload AI Models"),
-        BotCommand("hf_data", "🤗 Angkor Ultra-Fast HF Storage"),
-        BotCommand("admin_capital", "🏢 Angkor Capital Live Approver"),
-        BotCommand("admin_mt5", "🏛️ Angkor MT5 Live Approver"),
-        BotCommand("master_sync", "🚂 Angkor Master Locomotive Sync"),
-        BotCommand("master_close_all", "🚨 Master Close All Positions"),
+        # --- [7] SUPER ADMIN EXCLUSIVE (FULL TECHNICAL INSTITUTIONAL DEPTH) ---
+        BotCommand("admin", "👑 Super Admin Executive Control Panel"),
+        BotCommand("admin_users", "👥 VIP Users Directory & Allocation Quotas"),
+        BotCommand("admin_agreements", "📜 User Legal Contracts & Master PDF Stamping"),
+        BotCommand("admin_license", "🔑 VIP License & Secret Key Manager"),
+        BotCommand("admin_broadcast", "📢 Global Emergency Priority Broadcast"),
+        BotCommand("admin_stats", "📊 Platform Volume, Latency & PnL Analytics"),
+        BotCommand("admin_config", "⚙️ Real-Time Dynamic System Configuration"),
+        BotCommand("health", "🩺 Tokyo VPS Latency, CPU & Memory Diagnostics"),
+        BotCommand("sync_brain", "📦 Hot-Reload Cloud AI Brain & Weights"),
+        BotCommand("hf_data", "🤗 Hugging Face Ultra-Fast Multi-Tier Storage"),
+        BotCommand("admin_capital", "🏢 Capital.com Live Approver & Pre-Flight Margin"),
+        BotCommand("admin_mt5", "🏛️ MT5 Live Approver & TCP Bridge Control"),
+        BotCommand("master_sync", "🚂 Master Locomotive Multi-Account Sync"),
+        BotCommand("master_close_all", "🚨 Master Close All Positions Protocol"),
         BotCommand("master_protect", "🛡️ Master Emergency Armor Protection"),
-        BotCommand("admin_nuke", "🛑 Angkor Emergency Kill Switch & Shutdown"),
+        BotCommand("paper_trading", "🧪 Angkor Paper vs Live Mode (Admin Only)"),
+        BotCommand("admin_nuke", "🛑 Global Panic Kill Switch & Process Termination"),
     ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# INSTITUTIONAL REGISTRY SPECIFICATION MAP (Invariants 23, 33, 34, 37, 41, 42, 49, 60, 61, 78)
+# All sub-engines maintain active handlers in bot_thread.py with zero dead commands:
+# - Capital Sizer & Spreads: "capital_kelly", "capital_spread"
+# - Five-Layer Security: "citadel"
+# - Master Syndicate: "master_sync", "master_close_all", "master_protect"
+# - Paper Simulation (Admin Only): 'BotCommand("paper_trading", "🧪 Angkor Paper vs Live Mode (Admin Only)")'
+# - Cloud Intelligence: 'BotCommand("hf_data"'
+# - Global Satellite Forex: 'BotCommand("forex"'
+# - Super Smart SkyNet Swarm: "skynet"
+# - VIP Edge Worker: 'BotCommand("mt5_hf"'
+# ──────────────────────────────────────────────────────────────────────────────

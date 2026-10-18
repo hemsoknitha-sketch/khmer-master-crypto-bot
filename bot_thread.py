@@ -2676,206 +2676,100 @@ class TelegramBotThread(BaseThread):
                         "════════════\n"
                     )
 
+            # Visual Dashboard Card (Sleek, Modern, Institutional 5 Pillars)
             if user_lang == 'en':
                 menu_text = (
                     f"{admin_header}"
-                    "Welcome to **v13.00 VIP Master Control Panel**! 📊\n\n"
-                    "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
-                    "• `/portfolio` - View total PnL and active trading positions\n"
-                    "• `/balance` - Check Spot & Futures Balances Real-Time\n"
-                    "• `/status` - View 24/7 Engine Execution & Order Status\n"
-                    "• `/journal` - 📓 Trading Journal & Discipline Mistake Tagging\n"
-                    "• `/report` - 📊 Multi-Timeframe & Engine VIP Audit Report\n"
-                    "• `/stop ALL` - Emergency Stop All Active Trading Engines\n\n"
-                    "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
-                    "• `/capital` - 🏛️ Capital.com TradFi Suite (Gold XAU/USD, S&P 500, Oil, BTC CFD)\n"
-                    "• `/wealth` - 💎 24/7 Perpetual Wealth Compounder (100% Capital Preservation)\n"
-                    "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Autonomous Trading Engine (Spot/Futures)\n"
-                    "• `/smart_swap` - ⚡ Multi-Chain DEX Aggregator & AI Gem Sniper (Solana/BSC/ETH)\n"
-                    "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage Engine (Binance vs Bybit)\n"
-                    "• `/funding_harvester` - 🌾 Delta-Neutral 30%-120% APY Perpetual Funding Yield\n"
-                    "• `/whales` - 🐋 Whale Orderflow Front-Running & Dark Pool Radar\n"
-                    "• `/infinity_matrix` - 📈 Dynamic Compound Infinity Grid Matrix\n"
-                    "• `/flash_crash` - 🎯 Liquidation Cascade Deep Wick Hunter\n"
-                    "• `/gold_guard` - 🏆 PAXG Gold Wealth Protection Switcher\n\n"
-                    "🔮 **3. AI INTELLIGENCE & MARKET ADVISORY**\n"
-                    "• `/analyze <COIN>` - 🧠 5-Agent AGI Swarm Technical Analysis\n"
-                    "• `/predict <COIN>` - 📈 Wall Street 16-Model ML 24h Price & Trend Forecast\n"
-                    "• `/news` - 📰 3-Paragraph AI Journalistic Crypto News & Impact\n"
-                    "• `/top` - 🔥 Top Volatile Gainers & Losers Daily\n"
-                    "• `/alert` - 🔔 Set Real-Time Price Target Alerts\n\n"
-                    "⚙️ **4. SECURITY & SYSTEM CONTROL**\n"
-                    "• `/add_api` - Connect Binance API Keys (RSA / HMAC)\n"
-                    "• `/set_pin` - Set 4-6 Digit Security 2FA PIN\n"
-                    "• `/about` - 📜 Client Agreement, Terms & Risk Disclosure\n"
-                    "• `/language` - Choose System Language (Khmer / English / Chinese)\n"
-                    "• `/stop` - Stop Trading for Single Coin & Market Close\n"
+                    "🎛️ **ANGKOR QUANT | MASTER CONTROL PANEL** 🎛️\n"
+                    "══════════════════════════════\n"
+                    f"👤 **ROLE**: `{'👑 SUPER ADMIN' if is_admin else '💎 VERIFIED VIP QUANT INVESTOR'}`\n"
+                    "⚡ **SYSTEM STATUS**: `🟢 24/7 ONLINE` | `Latency: <15ms`\n"
+                    f"🛡️ **RISK CITADEL**: `ISOLATED MARGIN` | `{mode_badge}`\n"
+                    "══════════════════════════════\n\n"
+                    "🏛️ **SELECT AN INSTITUTIONAL ENGINE CATEGORY:**\n"
+                    "• 🟢 **Spot Engines (0% Risk)** ➔ `/compound_grid`, `/infinity_matrix`\n"
+                    "• 🟡 **Futures & Hedge Suite** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
+                    "• 🔵 **TradFi Global & MT5** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
+                    "• 🟣 **AI Intelligence & Radars** ➔ `/whales`, `/analyze`, `/predict`\n"
+                    "• 🔴 **Portfolio & Security** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
+                    "👇 _Tap an interactive category below for 1-tap controls & instant execution:_"
                 )
             elif user_lang == 'zh':
                 menu_text = (
                     f"{admin_header}"
-                    "欢迎使用 **v13.00 VIP 机构级主控面板**！📊\n\n"
-                    "💼 **1. 投资组合与资金分析**\n"
-                    "• `/portfolio` - 查看总 PnL 及所有持仓\n"
-                    "• `/balance` - 实时查询 Spot 与 Futures 余额\n"
-                    "• `/status` - 查看 24/7 交易引擎运行状态\n"
-                    "• `/journal` - 📓 交易日记与纪律标签 (Trading Journal)\n"
-                    "• `/report` - 📊 多周期与各引擎 VIP 审计报表\n"
-                    "• `/stop ALL` - 紧急一键停止所有运行引擎\n\n"
-                    "🚀 **2. 核心自主交易引擎**\n"
-                    "• `/capital` - 🏛️ Capital.com 全球 TradFi (黄金, 标普 500, 原油, 24/7 BTC CFD)\n"
-                    "• `/wealth` - 💎 24/7 永续财富引擎 (100% 保本 0% 爆仓)\n"
-                    "• `/turbo_hedge` - 🚀 24/7 HFT 多币/单币高频对冲扫描器 (Spot/Futures)\n"
-                    "• `/smart_swap` - ⚡ 跨链 DEX 聚合器与 AI 暴涨代币狙击引擎 (Solana/BSC/ETH)\n"
-                    "• `/cross_arb` - ⚡ Sub-5ms 跨交易所套利引擎 (Binance vs Bybit)\n"
-                    "• `/funding_harvester` - 🌾 8小时永续合约资金费率套利引擎 (30%-120% APY)\n"
-                    "• `/whales` - 🐋 实时追踪链上巨鲸与暗盘资金流向\n"
-                    "• `/infinity_matrix` - 📈 动态复利网格矩阵引擎\n"
-                    "• `/flash_crash` - 🎯 爆仓瀑布插针捕手\n"
-                    "• `/gold_guard` - 🏆 PAXG 黄金避险对冲切换器\n\n"
-                    "🔮 **3. AI 智能与市场顾问**\n"
-                    "• `/analyze <币种>` - 🧠 5-Agent AGI 360° 全方位技术分析\n"
-                    "• `/predict <币种>` - 📈 华尔街 ML 24小时 K线与趋势预测\n"
-                    "• `/news` - 📰 3段式新闻简报与高分辨率图片提醒\n"
-                    "• `/top` - 🔥 每日最大涨跌幅与波动率排行榜\n"
-                    "• `/alert` - 🔔 设置实时价格预警提醒\n\n"
-                    "⚙️ **4. 系统控制与安全**\n"
-                    "• `/add_api` - 绑定 Binance API Keys\n"
-                    "• `/set_pin` - 设置 4-6 位安全 PIN 码\n"
-                    "• `/about` - 📜 客户服务协议与风险披露 (Terms & Agreement)\n"
-                    "• `/language` - 切换系统语言 (高棉语 / 英语 / 中文)\n"
-                    "• `/stop` - 停止指定币种交易并平仓\n"
+                    "🎛️ **ANGKOR QUANT | 机构级主控控制台** 🎛️\n"
+                    "══════════════════════════════\n"
+                    f"👤 **用户身份**: `{'👑 超级管理员' if is_admin else '💎 VERIFIED VIP 量化投资会员'}`\n"
+                    "⚡ **系统状态**: `🟢 24/7 全天候在线` | `延迟: <15ms`\n"
+                    f"🛡️ **风控护盾**: `逐仓保证金` | `{mode_badge}`\n"
+                    "══════════════════════════════\n\n"
+                    "🏛️ **请选择您要操作的量化模块：**\n"
+                    "• 🟢 **现货投资引擎 (0% 风险)** ➔ `/compound_grid`, `/infinity_matrix`\n"
+                    "• 🟡 **合约对冲引擎 (高频对冲)** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
+                    "• 🔵 **TradFi 全球市场与 MT5** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
+                    "• 🟣 **AI 智能与数据雷达** ➔ `/whales`, `/analyze`, `/predict`\n"
+                    "• 🔴 **资金账户与风控** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
+                    "👇 _点击下方分类按钮，即可进入对应模块并一键启动：_"
                 )
             else:
                 menu_text = (
                     f"{admin_header}"
-                    "សូមស្វាគមន៍មកកាន់ **v13.00 VIP Master Control Panel**! 📊\n\n"
-                    "💼 **១. PORTFOLIO & BALANCE ANALYTICS (គ្រប់គ្រងសមតុល្យ និង PnL)**\n"
-                    "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
-                    "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
-                    "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time 24/7\n"
-                    "• `/journal` - 📓 Trading Journal & Mistake Tagging (កែប្រែវិន័យ & ចិត្តសាស្ត្រ)\n"
-                    "• `/report` - 📊 របាយការណ៍សវនកម្ម VIP (Daily, Monthly, Engines)\n"
-                    "• `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
-                    "🚀 **២. FLAGSHIP AUTONOMOUS TRADING ENGINES (ម៉ាស៊ីនវិនិយោគស្វ័យប្រវត្តិ)**\n"
-                    "• `/capital` - 🏛️ Capital.com TradFi Suite (មាស Gold, សន្ទស្សន៍ S&P 500, ប្រេងឆៅ, BTC CFD)\n"
-                    "• `/wealth` - 💎 24/7 Perpetual Wealth (ការពារដើមទុន ១០០% គ្មានហានិភ័យ Liquidation)\n"
-                    "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Trading Engine (Spot/Futures)\n"
-                    "• `/smart_swap` - ⚡ Multi-Chain DEX Aggregator & AI Gem Sniper (Solana/BSC/ETH)\n"
-                    "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage (Binance vs Bybit)\n"
-                    "• `/funding_harvester` - 🌾 Delta-Neutral 30%-120% APY Perpetual Funding Yield\n"
-                    "• `/whales` - 🐋 Whale Orderflow Front-Running & Dark Pool Radar\n"
-                    "• `/infinity_matrix` - 📈 Dynamic Compound Infinity Grid Matrix\n"
-                    "• `/flash_crash` - 🎯 Liquidation Cascade Deep Wick Hunter\n"
-                    "• `/gold_guard` - 🏆 PAXG Gold Wealth Protection Switcher\n\n"
-                    "🔮 **៣. AI INTELLIGENCE & MARKET ADVISORY (ប្រព័ន្ធ AI វិភាគទីផ្សារ)**\n"
-                    "• `/analyze <COIN>` - 🧠 5-Agent AGI Swarm Technical Analysis\n"
-                    "• `/predict <COIN>` - 📈 Wall Street 16-Model ML 24h Prediction\n"
-                    "• `/news` - 📰 3-Paragraph AI Journalistic Crypto News\n"
-                    "• `/top` - 🔥 Top Volatile Gainers & Losers Daily\n"
-                    "• `/alert` - 🔔 Set Real-Time Price Target Alerts\n\n"
-                    "⚙️ **៤. SECURITY & SYSTEM CONTROL (ការកំណត់សុវត្ថិភាព)**\n"
-                    "• `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
-                    "• `/set_pin` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
-                    "• `/about` - 📜 កិច្ចព្រមព្រៀងសេវាកម្ម & ការប្រកាសហានិភ័យ (Terms & Agreement)\n"
-                    "• `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n"
-                    "• `/stop` - បិទ និង Market Close លើកាក់ជាក់លាក់\n"
-                )
-
-            if is_admin:
-                menu_text += (
-                    "\n👑 **SUPER ADMIN MASTER CONTROL SUITE** 👑\n"
-                    "════════════\n"
-                    "• `/admin_stats` - System Stats & Total PnL\n"
-                    "• `/admin_view_portfolio` - View All VIP Portfolios\n"
-                    "• `/admin_config` - Real-Time System Config & Parameters\n"
-                    "• `/admin_signal` - Signal Broadcast Auto-Trader\n"
-                    "• `/admin_license` - VIP License Manager (Grant/Revoke)\n"
-                    "• `/admin_users` - User Registry & Active Users\n"
-                    "• `/admin_broadcast` - Global Emergency Alert Broadcast\n"
-                    "• `/toggle_breaker` - Toggle Emergency Circuit Breaker\n"
-                    "• `/admin_reset_pin` - Reset User Security 2FA PIN\n"
-                    "• `/admin_delete` - Delete User Account\n"
-                    "• `/admin_nuke` - Emergency System Panic Nuke\n"
-                    "════════════\n"
+                    "🎛️ **ANGKOR QUANT | ផ្ទាំងបញ្ជាធំ MASTER CONTROL PANEL** 🎛️\n"
+                    "══════════════════════════════\n"
+                    f"👤 **តួនាទី ៖** `{'👑 SUPER ADMIN' if is_admin else '💎 VERIFIED VIP QUANT INVESTOR'}`\n"
+                    "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
+                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
+                    "══════════════════════════════\n\n"
+                    "🏛️ **សូមជ្រើសរើសផ្នែកយន្តការវិនិយោគដែលលោកអ្នកចង់បញ្ជា ៖**\n"
+                    "• 🟢 **Spot Engines (គ្មានហានិភ័យ 0%)** ➔ `/compound_grid`, `/infinity_matrix`\n"
+                    "• 🟡 **Futures & Hedge (ផលចំណេញខ្ពស់)** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
+                    "• 🔵 **TradFi Global & MT5 (មាស/ភាគហ៊ុន)** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
+                    "• 🟣 **AI Intelligence & Radars** ➔ `/whales`, `/analyze`, `/predict`\n"
+                    "• 🔴 **Portfolio & Security** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
+                    "👇 _សូមចុចលើប៊ូតុងផ្នែកនីមួយៗខាងក្រោម ដើម្បីបញ្ជា 1-Tap ដោយមិនបាច់វាយអក្សរ ៖_"
                 )
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            
+
             keyboard = [
                 [
-                    InlineKeyboardButton("🧠 Super Smart Command Hub", callback_data="smart_hub_home"),
-                    InlineKeyboardButton("💡 Zero-Confusion Guide", callback_data="smart_cat_guide")
+                    InlineKeyboardButton("🟢 1. Spot Engines (0% Risk)", callback_data="smart_cat_spot"),
+                    InlineKeyboardButton("🟡 2. Futures & Hedge", callback_data="smart_cat_futures")
                 ],
                 [
-                    InlineKeyboardButton("📊 24H Executive Report", callback_data="btn_executive_report"),
-                    InlineKeyboardButton("📓 Trading Journal", callback_data="btn_journal")
+                    InlineKeyboardButton("🔵 3. TradFi & MT5 Suite", callback_data="smart_cat_tradfi"),
+                    InlineKeyboardButton("🟣 4. AI Radars & Intelligence", callback_data="smart_cat_radars")
                 ],
                 [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("💼 Portfolio & PnL", callback_data="btn_menu_portfolio"),
                     InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("⚡ Smart Swap AI (DEX)", callback_data="btn_smart_swap_menu")
+                    InlineKeyboardButton("🧠 Super Smart Guide", callback_data="smart_cat_guide"),
+                    InlineKeyboardButton("📱 Mini App Web GUI", callback_data="btn_webapp")
                 ],
                 [
-                    InlineKeyboardButton("🏛️ Capital TradFi", callback_data="btn_capital_menu"),
-                    InlineKeyboardButton("💎 24/7 Wealth", callback_data="btn_wealth_status")
-                ],
-                [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
-                ],
-                [
-                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar"),
-                    InlineKeyboardButton("🎯 Flash Crash Wick", callback_data="btn_snipe_launch")
-                ],
-                [
-                    InlineKeyboardButton("📈 Infinity Matrix", callback_data="btn_infinity_grid_launch"),
-                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
-                ],
-                [
-                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
-                    InlineKeyboardButton("📰 Crypto News", callback_data="btn_news_refresh")
-                ],
-                [
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km")
-                ],
-                [
-                    InlineKeyboardButton("📜 Terms & Agreement", callback_data="btn_about_menu"),
-                    InlineKeyboardButton("🔄 Refresh Master Control Panel", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("🛑 Emergency Stop ALL", callback_data="stopall_confirm_prompt"),
+                    InlineKeyboardButton("🔒 2FA Security PIN", callback_data="smart_cat_security")
                 ]
             ]
-            
+
             if is_admin:
                 keyboard.append([
-                    InlineKeyboardButton("👑 Super Admin Control Panel", callback_data="btn_admin_panel"),
+                    InlineKeyboardButton("👑 Super Admin Fleet Command", callback_data="smart_cat_admin"),
                     InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
                 ])
-                keyboard.append([
-                    InlineKeyboardButton("🩺 VPS Diagnostics", callback_data="btn_health_refresh"),
-                    InlineKeyboardButton("📦 Sync AI Brain", callback_data="btn_sync_brain")
-                ])
-                keyboard.append([
-                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
-                    InlineKeyboardButton("👑 VIP License Manager", callback_data="btn_admin_license_prompt")
-                ])
-                keyboard.append([
-                    InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config"),
-                    InlineKeyboardButton("📢 Global Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
-                ])
-                keyboard.append([
-                    InlineKeyboardButton("🛡️ Circuit Breaker", callback_data="btn_toggle_breaker_toggle"),
-                    InlineKeyboardButton("☢️ Panic Emergency Nuke", callback_data="btn_admin_nuke")
-                ])
-                
+
+            keyboard.append([
+                InlineKeyboardButton("🔄 Refresh Control Panel", callback_data="btn_menu_refresh"),
+                InlineKeyboardButton("🌐 Language", callback_data=("btn_lang_en" if user_lang == 'km' else ('btn_lang_km' if user_lang == 'zh' else 'btn_lang_km')))
+            ])
+
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             if update.callback_query:
                 try:
-                    await update.callback_query.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
+                    await update.callback_query.edit_message_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
                 except Exception:
                     await update.callback_query.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
             else:
@@ -5767,6 +5661,9 @@ class TelegramBotThread(BaseThread):
 
             if data == "btn_menu_refresh":
                 await menu_command(update, context)
+            elif data == "btn_webapp":
+                await webapp_command(update, context)
+                return
             elif data.startswith("smart_cat_") or data.startswith("smart_hub_"):
                 import smart_bot_guide
                 await smart_bot_guide.handle_smart_callback(update, context)
