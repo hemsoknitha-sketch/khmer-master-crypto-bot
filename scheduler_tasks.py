@@ -8157,62 +8157,65 @@ async def csx_market_monitor(app: Application):
                 except Exception as e_eod:
                     logger.debug(f"CSX EOD record error: {e_eod}")
             
-            # Detect Volume Spikes and alert Super Admin / VIP users
-            now = time.time()
-            for sym, s in stocks.items():
-                rvol = s.get("rvol", 1.0)
-                if rvol >= 1.5 and s.get("turnover", 0.0) >= 5000000.0:  # RVOL >= 1.5x and turnover >= 5M KHR (~$1,250)
-                    last_alert = _csx_last_alert_ts.get(sym, 0.0)
-                    if (now - last_alert) > 7200.0:  # 2-hour debounce per stock
-                        _csx_last_alert_ts[sym] = now
-                        alert_msg_kh = (
-                            f"⚡ **[CSX ABNORMAL VOLUME SPIKE ALERT]** 🇰🇭\n"
-                            f"🏛️ **ភាគហ៊ុន ៖** `{sym}` ({s.get('name_kh')})\n"
-                            f"{ui_standards.DIVIDER_DOUBLE}\n"
-                            f"🔥 **កម្លាំង RVOL ៖** `{rvol:.2f}x` ធៀបនឹងមធ្យម ២០ ថ្ងៃ!\n"
-                            f"💵 **តម្លៃបច្ចុប្បន្ន ៖** `{s.get('close'):,.0f} KHR` ({'+' if s.get('change',0)>0 else ''}{s.get('pct_change',0):.2f}%)\n"
-                            f"📦 **Volume ថ្ងៃនេះ ៖** `{s.get('volume'):,.0f} ហ៊ុន` (មធ្យម: `{s.get('avg_vol_20'):,.0f}`)\n"
-                            f"💰 **ចរន្តទឹកប្រាក់ ៖** `{s.get('turnover'):,.0f} KHR` (~${s.get('turnover_usd'):,.0f})\n"
-                            f"🎯 **សញ្ញា AI ៖** `{s.get('ai_signal_kh')}`\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💡 _លំហូរទុនស្ថាប័នកំពុងចាក់ចូលភាគហ៊ុន {sym}!_"
-                        )
-                        alert_msg_en = (
-                            f"⚡ **[CSX INSTITUTIONAL VOLUME SPIKE ALERT]** 🇰🇭\n"
-                            f"🏛️ **Equity:** `{sym}` ({s.get('name_en')})\n"
-                            f"{ui_standards.DIVIDER_DOUBLE}\n"
-                            f"🔥 **RVOL Surge:** `{rvol:.2f}x` vs 20-Day Average!\n"
-                            f"💵 **Current Price:** `{s.get('close'):,.0f} KHR` ({'+' if s.get('change',0)>0 else ''}{s.get('pct_change',0):.2f}%)\n"
-                            f"📦 **Today Volume:** `{s.get('volume'):,.0f} shares` (Avg: `{s.get('avg_vol_20'):,.0f}`)\n"
-                            f"💰 **Turnover:** `{s.get('turnover'):,.0f} KHR` (~${s.get('turnover_usd'):,.0f})\n"
-                            f"🎯 **AI Signal:** `{s.get('ai_signal')}`\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💡 _Institutional smart money flow detected in {sym}!_"
-                        )
-                        db.record_csx_alert("VOLUME_SPIKE", sym, alert_msg_kh)
-                        if app and hasattr(app, "bot"):
-                            try:
-                                recipients, _ = get_alert_target_recipients("csx_spike")
-                                if not any(r[0] == ui_standards.SUPER_ADMIN_ID for r in recipients):
-                                    recipients.append((ui_standards.SUPER_ADMIN_ID, 'khmer'))
+            # Detect Volume Spikes and alert Super Admin / VIP users ONLY during Live Market Hours!
+            # When market is closed (15:00 - 08:00 ICT or Weekend), zero abnormal volume alerts are sent.
+            if session.get("is_open", False):
+                now = time.time()
+                for sym, s in stocks.items():
+                    rvol = s.get("rvol", 1.0)
+                    if rvol >= 1.5 and s.get("turnover", 0.0) >= 5000000.0:  # RVOL >= 1.5x and turnover >= 5M KHR (~$1,250)
+                        last_alert = _csx_last_alert_ts.get(sym, 0.0)
+                        # Dual-Layer Debounce: In-memory 2h debounce + Database 8-hour persistent debounce (Zero restart spam!)
+                        if (now - last_alert) > 7200.0 and not db.has_recent_csx_alert(sym, "VOLUME_SPIKE", within_seconds=28800.0):
+                            _csx_last_alert_ts[sym] = now
+                            alert_msg_kh = (
+                                f"⚡ **[CSX ABNORMAL VOLUME SPIKE ALERT]** 🇰🇭\n"
+                                f"🏛️ **ភាគហ៊ុន ៖** `{sym}` ({s.get('name_kh')})\n"
+                                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                                f"🔥 **កម្លាំង RVOL ៖** `{rvol:.2f}x` ធៀបនឹងមធ្យម ២០ ថ្ងៃ!\n"
+                                f"💵 **តម្លៃបច្ចុប្បន្ន ៖** `{s.get('close'):,.0f} KHR` ({'+' if s.get('change',0)>0 else ''}{s.get('pct_change',0):.2f}%)\n"
+                                f"📦 **Volume ថ្ងៃនេះ ៖** `{s.get('volume'):,.0f} ហ៊ុន` (មធ្យម: `{s.get('avg_vol_20'):,.0f}`)\n"
+                                f"💰 **ចរន្តទឹកប្រាក់ ៖** `{s.get('turnover'):,.0f} KHR` (~${s.get('turnover_usd'):,.0f})\n"
+                                f"🎯 **សញ្ញា AI ៖** `{s.get('ai_signal_kh')}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _លំហូរទុនស្ថាប័នកំពុងចាក់ចូលភាគហ៊ុន {sym}!_"
+                            )
+                            alert_msg_en = (
+                                f"⚡ **[CSX INSTITUTIONAL VOLUME SPIKE ALERT]** 🇰🇭\n"
+                                f"🏛️ **Equity:** `{sym}` ({s.get('name_en')})\n"
+                                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                                f"🔥 **RVOL Surge:** `{rvol:.2f}x` vs 20-Day Average!\n"
+                                f"💵 **Current Price:** `{s.get('close'):,.0f} KHR` ({'+' if s.get('change',0)>0 else ''}{s.get('pct_change',0):.2f}%)\n"
+                                f"📦 **Today Volume:** `{s.get('volume'):,.0f} shares` (Avg: `{s.get('avg_vol_20'):,.0f}`)\n"
+                                f"💰 **Turnover:** `{s.get('turnover'):,.0f} KHR` (~${s.get('turnover_usd'):,.0f})\n"
+                                f"🎯 **AI Signal:** `{s.get('ai_signal')}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _Institutional smart money flow detected in {sym}!_"
+                            )
+                            db.record_csx_alert("VOLUME_SPIKE", sym, alert_msg_kh)
+                            if app and hasattr(app, "bot"):
+                                try:
+                                    recipients, _ = get_alert_target_recipients("csx_spike")
+                                    if not any(r[0] == ui_standards.SUPER_ADMIN_ID for r in recipients):
+                                        recipients.append((ui_standards.SUPER_ADMIN_ID, 'khmer'))
 
-                                for cid, u_lang in recipients:
-                                    is_en = str(u_lang).lower() in ['en', 'english']
-                                    text_to_send = alert_msg_en if is_en else alert_msg_kh
-                                    try:
-                                        await app.bot.send_message(
-                                            chat_id=cid,
-                                            text=text_to_send,
-                                            parse_mode="Markdown"
-                                        )
-                                    except Exception:
-                                        clean_txt = text_to_send.replace('*', '').replace('`', '').replace('_', '')
+                                    for cid, u_lang in recipients:
+                                        is_en = str(u_lang).lower() in ['en', 'english']
+                                        text_to_send = alert_msg_en if is_en else alert_msg_kh
                                         try:
-                                            await app.bot.send_message(chat_id=cid, text=clean_txt)
+                                            await app.bot.send_message(
+                                                chat_id=cid,
+                                                text=text_to_send,
+                                                parse_mode="Markdown"
+                                            )
                                         except Exception:
-                                            pass
-                            except Exception as notif_e:
-                                logger.debug(f"CSX Telegram alert error: {notif_e}")
+                                            clean_txt = text_to_send.replace('*', '').replace('`', '').replace('_', '')
+                                            try:
+                                                await app.bot.send_message(chat_id=cid, text=clean_txt)
+                                            except Exception:
+                                                pass
+                                except Exception as notif_e:
+                                    logger.debug(f"CSX Telegram alert error: {notif_e}")
         except Exception as e:
             print(f"⚠️ [CSX MARKET MONITOR NOTICE]: {e}")
 

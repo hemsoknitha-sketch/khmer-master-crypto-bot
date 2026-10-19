@@ -11094,6 +11094,19 @@ def record_csx_alert(alert_type: str, symbol: str, message: str):
     conn.commit()
     conn.close()
 
+def has_recent_csx_alert(symbol: str, alert_type: str = "VOLUME_SPIKE", within_seconds: float = 28800.0) -> bool:
+    """Checks if a CSX alert was already sent for this symbol within the specified window (default 8 hours)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cutoff = time.time() - within_seconds
+    cursor.execute(
+        "SELECT 1 FROM csx_alerts WHERE symbol = ? AND alert_type = ? AND timestamp >= ? LIMIT 1",
+        (symbol, alert_type, cutoff)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return bool(row)
+
 def get_latest_csx_eod() -> list:
     """Retrieves latest CSX EOD records."""
     conn = get_db_connection()
