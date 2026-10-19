@@ -2731,6 +2731,22 @@ def set_capital_forex_enabled(enabled: bool) -> None:
     """Sets the global Forex Exchange trading state in system_settings."""
     update_system_setting("capital_forex_enabled", "1" if enabled else "0")
 
+def is_capital_crypto_enabled(chat_id: Optional[int] = None) -> bool:
+    """
+    Returns True if Crypto CFD trading is allowed on Capital.com.
+    Institutional Fiduciary Integrity Standard (AQ76 / Invariant 80):
+    Defaults to False (0) to eliminate high broker spread drag ($60-$80 on BTC), overnight rollover fees,
+    and negative mathematical expectancy. Capital.com trading is 100% focused on GOLD and TradFi.
+    """
+    val = get_system_setting("capital_crypto_enabled", default="0")
+    if val is None or str(val).strip() in ("", "0", "false", "False", "OFF", "off"):
+        return False
+    return str(val).strip() in ("1", "true", "True", "ON", "on")
+
+def set_capital_crypto_enabled(enabled: bool) -> None:
+    """Sets the global Capital.com Crypto CFD trading state in system_settings."""
+    update_system_setting("capital_crypto_enabled", "1" if enabled else "0")
+
 def update_capital_auto_last_trade_time(chat_id: int, last_time: float):
     """Updates the last trade timestamp for cooldown calculations."""
     conn = get_db_connection()
@@ -3081,21 +3097,32 @@ _DISABLED_CAPITAL_EPICS_CACHE: Optional[set] = None
 def get_capital_disabled_assets() -> list:
     """Returns list of TradFi/Crypto asset epics deactivated by Super Admin for all users."""
     global _DISABLED_CAPITAL_EPICS_CACHE
+    crypto_disabled = not is_capital_crypto_enabled()
+    crypto_cfds = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD", "BTC", "ETH", "SOL"}
     if _DISABLED_CAPITAL_EPICS_CACHE is not None:
-        return sorted(list(_DISABLED_CAPITAL_EPICS_CACHE))
+        disabled_copy = set(_DISABLED_CAPITAL_EPICS_CACHE)
+        if crypto_disabled:
+            disabled_copy.update(crypto_cfds)
+        return sorted(list(disabled_copy))
     val = get_system_setting("cap_disabled_assets", "")
-    if not val:
-        _DISABLED_CAPITAL_EPICS_CACHE = set()
-        return []
-    items = {x.strip().upper() for x in val.split(",") if x.strip()}
+    items = set()
+    if val:
+        items = {x.strip().upper() for x in val.split(",") if x.strip()}
     _DISABLED_CAPITAL_EPICS_CACHE = items
-    return sorted(list(items))
+    disabled_copy = set(items)
+    if crypto_disabled:
+        disabled_copy.update(crypto_cfds)
+    return sorted(list(disabled_copy))
 
 def is_capital_asset_enabled(epic: str) -> bool:
     """Returns True if the TradFi/Crypto asset is active, False if disabled by Super Admin for all users."""
     if not epic:
         return True
     s = str(epic).upper().strip()
+    if not is_capital_crypto_enabled():
+        crypto_roots = ("BTC", "ETH", "SOL", "XRP", "DOGE", "LTC", "BNB")
+        if any(cr in s for cr in crypto_roots):
+            return False
     disabled = set(get_capital_disabled_assets())
     aliases = [s, s.replace("USDT", "USD"), s.replace("USD", ""), s.replace("USDT", "")]
     for a in aliases:
@@ -3127,7 +3154,14 @@ def get_capital_asset_status_map() -> dict:
         "BTCUSD", "ETHUSD", "SOLUSD"
     ]
     disabled = set(get_capital_disabled_assets())
-    return {a: (a not in disabled and a.replace("USD", "") not in disabled) for a in primary_assets}
+    res = {}
+    crypto_on = is_capital_crypto_enabled()
+    for a in primary_assets:
+        if a in ["BTCUSD", "ETHUSD", "SOLUSD"] and not crypto_on:
+            res[a] = False
+        else:
+            res[a] = (a not in disabled and a.replace("USD", "") not in disabled)
+    return res
 
 def is_capital_global_trading_enabled(engine: str = "AUTO") -> bool:
     """Checks if global trading is enabled for all users for AUTO, SCALP, or ALL."""

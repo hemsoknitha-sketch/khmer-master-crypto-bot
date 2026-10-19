@@ -6333,12 +6333,27 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_sell_sp500":
                 context.args = ["SELL", "SP500", "0.1"]
                 await capital_command(update, context)
-            elif data == "btn_cap_buy_btc":
-                context.args = ["BUY", "BTCUSD", "0.001"]
+            elif data in ["btn_cap_buy_us100", "btn_cap_buy_nasdaq"]:
+                context.args = ["BUY", "US100", "0.05"]
                 await capital_command(update, context)
-            elif data == "btn_cap_sell_btc":
-                context.args = ["SELL", "BTCUSD", "0.001"]
+            elif data in ["btn_cap_sell_us100", "btn_cap_sell_nasdaq"]:
+                context.args = ["SELL", "US100", "0.05"]
                 await capital_command(update, context)
+            elif data in ["btn_cap_buy_btc", "btn_cap_sell_btc"]:
+                alert_text = (
+                    "🛑 [CAPITAL.COM CRYPTO CFD: BLOCKED 100%]\n"
+                    "ការជួញដូរ Crypto លើ Capital.com ត្រូវបានបិទទាំងស្រុងដើម្បីការពារដើមទុនពី Spread Drag ធំ ($60-$80 លើ BTC) និងកម្រៃ Swap!\n"
+                    "👉 សម្រាប់ការជួញដូរ Crypto សូមប្រើ Binance Spot & Futures (/spot, /futures)!"
+                ) if user_lang == 'khmer' else (
+                    "🛑 [CAPITAL.COM CRYPTO CFD: BLOCKED 100%]\n"
+                    "Crypto trading on Capital.com is 100% BLOCKED to protect capital from wide CFD spreads ($60-$80 on BTC) and swap fees!\n"
+                    "👉 For Crypto trading, please use Binance Spot & Futures (/spot, /futures)!"
+                )
+                try:
+                    await update.callback_query.answer(alert_text, show_alert=True)
+                except Exception:
+                    pass
+                return
             elif data == "btn_cap_positions":
                 context.args = ["POSITIONS"]
                 await capital_command(update, context)
@@ -24832,7 +24847,7 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            majors_str = ", ".join(active_majors) if active_majors else "GOLD, US100, US500, NVDA, TSLA, BTCUSD, ETHUSD, SOLUSD"
+            majors_str = ", ".join(active_majors) if active_majors else "GOLD, US100, US500, NVDA, TSLA, META, AAPL"
             tot_trades = stats.get("total_trades", 0)
             wins = stats.get("wins", 0)
             win_rate = stats.get("win_rate", 0.0)
@@ -24842,7 +24857,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"⚡ **[CAPITAL.COM 24/7 TREND SCALP ENGINE]** 🎯\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🎯 **ទ្រព្យគោលដៅ ៖** `GOLD, US100, US500, NVDA, TSLA, META, AAPL, BTC, ETH, SOL`\n"
+                    f"🎯 **ទ្រព្យគោលដៅ ៖** `GOLD (XAUUSD), US100, US500, NVDA, TSLA, META, AAPL` (Crypto: 🔴 `100% BLOCKED`)\n"
                     f"📊 **ស្ថានភាព ៖** `{status_badge}`\n"
                     f"💼 **បរិស្ថានគណនី ៖** `{acct_badge}`\n"
                     f"💵 **ទុន Margin ក្នុងមួយក្បាច់ ៖** `${budget:.2f} USD` (Kelly Isolated)\n"
@@ -24869,7 +24884,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"⚡ **[CAPITAL.COM 24/7 TREND SCALP ENGINE]** 🎯\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🎯 **Target Majors:** `GOLD, US100, US500, BTC, ETH, SOL`\n"
+                    f"🎯 **Target Majors:** `GOLD (XAUUSD), US100, US500, NVDA, TSLA, META, AAPL` (Crypto: 🔴 `100% BLOCKED`)\n"
                     f"📊 **Status:** `{status_badge}`\n"
                     f"💼 **Account Environment:** `{acct_badge}`\n"
                     f"💵 **Margin per Trade:** `${budget:.2f} USD` (Kelly Isolated)\n"
@@ -26523,7 +26538,7 @@ class TelegramBotThread(BaseThread):
                             f"🛑 **[CAPITAL.COM FOREX EXCHANGE: BLOCKED 100%]** 🔒\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"✅ **ស្ថានភាព ៖** `បិទទាំងស្រុង (BLOCKED 100%)`\n"
-                            f"📈 **ទីផ្សារអនុញ្ញាត ៖** `US Mega-Caps, Indices, Gold & Crypto CFDs`\n"
+                            f"📈 **ទីផ្សារអនុញ្ញាត ៖** `មាស (GOLD XAUUSD), US Mega-Caps & Indices`\n"
                             f"🚫 **គូ Forex ៖** `EURUSD, GBPUSD, USDJPY, AUDUSD, NZDUSD... (BLOCKED)`\n"
                             f"🛡️ **កិច្ចការពារ ៖** `កម្ចាត់ចោលការស៊ីថ្លៃ Spread Drag & Overnight Swap Drag ១០០%!`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -26532,7 +26547,7 @@ class TelegramBotThread(BaseThread):
                             f"🛑 **[CAPITAL.COM FOREX EXCHANGE: BLOCKED 100%]** 🔒\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"✅ **Status:** `100% BLOCKED`\n"
-                            f"📈 **Permitted Markets:** `US Mega-Caps, Indices, Gold & Crypto CFDs`\n"
+                            f"📈 **Permitted Markets:** `GOLD (XAUUSD), US Mega-Caps & Indices`\n"
                             f"🚫 **Forex Pairs:** `EURUSD, GBPUSD, USDJPY, AUDUSD... (BLOCKED)`\n"
                             f"🛡️ **Capital Shield:** `Zero Spread Drag & Zero Overnight Swap Financing Drag!`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -26579,6 +26594,69 @@ class TelegramBotThread(BaseThread):
                             f"• Enable Forex: `` `/capital forex ON` ``\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"💎 _Recommendation: Keep Forex OFF to focus 100% on high-momentum US Equities!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
+                elif action in ["CRYPTO", "CRYPTO_CFD", "CFD_CRYPTO"]:
+                    sub_opt = str(args[1]).upper().strip() if len(args) > 1 else ""
+                    if sub_opt in ["OFF", "DISABLE", "DISABLED", "0", "STOP", "FALSE"]:
+                        db.set_capital_crypto_enabled(False)
+                        res_msg = (
+                            f"🛑 **[CAPITAL.COM CRYPTO CFD: BLOCKED 100%]** 🔒\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **ស្ថានភាព ៖** `បិទទាំងស្រុង (100% BLOCKED)`\n"
+                            f"🎯 **ការផ្តោតសំខាន់ ៖** `១០០% លើ មាស (GOLD XAUUSD) និង TradFi (US Equities & Indices)`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _កម្ចាត់ការខាតបង់ពី Spread ធំ ($60-$80 លើ BTC) និងកម្រៃ Swap ឆ្លងយប់។ សម្រាប់ការជួញដូរ Crypto សូមប្រើ Binance Spot & Futures!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🛑 **[CAPITAL.COM CRYPTO CFD: BLOCKED 100%]** 🔒\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **Status:** `100% BLOCKED`\n"
+                            f"🎯 **Core Focus:** `100% Dedicated to GOLD (XAUUSD) & TradFi (US Equities & Indices)`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _Eliminates wide CFD spread drag and overnight swap fees. Use Binance Spot/Futures for Crypto trading!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
+                    elif sub_opt in ["ON", "ENABLE", "ENABLED", "1", "START", "TRUE"]:
+                        db.set_capital_crypto_enabled(True)
+                        res_msg = (
+                            f"🪙 **[CAPITAL.COM CRYPTO CFD: ENABLED]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **ស្ថានភាព ៖** `បើកដំណើរការ (ENABLED)`\n"
+                            f"🌐 **ការជួញដូរ ៖** `Crypto CFDs + GOLD + US Stocks + Indices`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚠️ _សូមប្រុងប្រយ័ត្នចំពោះថ្លៃ Spread ធំ ($60-$80 លើ BTC) និងកម្រៃ Swap ឆ្លងយប់!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🪙 **[CAPITAL.COM CRYPTO CFD: ENABLED]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **Status:** `ENABLED`\n"
+                            f"🌐 **Trading Universe:** `Crypto CFDs + GOLD + US Equities + Indices`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚠️ _Be mindful of wide broker CFD spread drag and overnight swap fees!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
+                    else:
+                        cr_status = "🟢 បើកដំណើរការ (ENABLED)" if db.is_capital_crypto_enabled() else "🔴 បិទទាំងស្រុង (100% BLOCKED)"
+                        res_msg = (
+                            f"🪙 **[CAPITAL.COM CRYPTO CFD GATEKEEPER]** 🛡️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚙️ **ស្ថានភាពបច្ចុប្បន្ន ៖** `{cr_status}`\n"
+                            f"💡 **របៀបបញ្ជា ៖**\n"
+                            f"• បិទ Crypto CFDs ទាំងស្រុង ៖ `` `/capital crypto OFF` ``\n"
+                            f"• បើក Crypto CFDs វិញ ៖ `` `/capital crypto ON` ``\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _អនុសាសន៍ Institutional ៖ បិទ Crypto CFDs ដើម្បីកុំឱ្យខាតបង់ដោយសារ Spread ធំ & Swap ហើយផ្តោត ១០០% លើមាស (GOLD) និងភាគហ៊ុនអាមេរិក!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🪙 **[CAPITAL.COM CRYPTO CFD GATEKEEPER]** 🛡️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚙️ **Current Status:** `{'ENABLED' if db.is_capital_crypto_enabled() else '100% BLOCKED'}`\n"
+                            f"💡 **Commands:**\n"
+                            f"• Block Crypto CFDs: `` `/capital crypto OFF` ``\n"
+                            f"• Enable Crypto CFDs: `` `/capital crypto ON` ``\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _Recommendation: Keep Crypto CFDs OFF to eliminate spread drag and focus 100% on GOLD & high-momentum US Equities!_"
                         )
                         await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
                         return
@@ -27297,8 +27375,8 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("📉 Sell S&P 500 (0.1)", callback_data="btn_cap_sell_sp500")
                 ],
                 [
-                    InlineKeyboardButton("🪙 Buy BTC CFD", callback_data="btn_cap_buy_btc"),
-                    InlineKeyboardButton("🪙 Sell BTC CFD", callback_data="btn_cap_sell_btc")
+                    InlineKeyboardButton("💻 Buy US100 (0.05)", callback_data="btn_cap_buy_us100"),
+                    InlineKeyboardButton("💻 Sell US100 (0.05)", callback_data="btn_cap_sell_us100")
                 ],
                 [
                     InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh"),
@@ -27396,8 +27474,8 @@ class TelegramBotThread(BaseThread):
                                 InlineKeyboardButton("📉 Sell S&P 500 (0.1)", callback_data="btn_cap_sell_sp500")
                             ],
                             [
-                                InlineKeyboardButton("🪙 Buy BTC CFD", callback_data="btn_cap_buy_btc"),
-                                InlineKeyboardButton("🪙 Sell BTC CFD", callback_data="btn_cap_sell_btc")
+                                InlineKeyboardButton("💻 Buy US100 (0.05)", callback_data="btn_cap_buy_us100"),
+                                InlineKeyboardButton("💻 Sell US100 (0.05)", callback_data="btn_cap_sell_us100")
                             ],
                             [
                                 InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions"),

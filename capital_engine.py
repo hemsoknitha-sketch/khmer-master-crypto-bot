@@ -67,6 +67,15 @@ def is_forex_instrument(epic_str: str) -> bool:
     )
     return any(fx in s for fx in known_fx)
 
+def is_crypto_cfd_instrument(epic_str: str) -> bool:
+    """
+    Returns True if the given instrument is a Crypto CFD (e.g. BTCUSD, ETHUSD, SOLUSD, XRPUSD, DOGEUSD, etc.).
+    Accurately separates Crypto CFDs from TradFi commodities, equities, and indices.
+    """
+    s = str(epic_str or "").upper().strip()
+    crypto_keys = ("BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD", "BTC", "ETH", "SOL", "XRP", "DOGE", "LTCUSD", "BNBUSD")
+    return any(c == s or c in s for c in crypto_keys)
+
 # Setup Logger
 logger = logging.getLogger("CapitalComEngine")
 if not logger.handlers:
@@ -916,7 +925,17 @@ class CapitalComEngine:
                 logger.warning(f"🛑 [FOREX BLOCKED] Order blocked for {resolved_epic}: Forex trading is 100% disabled by Angkor Quant Fiduciary Guard.")
                 return {
                     "success": False,
-                    "error": f"FOREX_BLOCKED: {resolved_epic} trading is 100% disabled by Angkor Quant Fiduciary Guard. Only US Stocks, Indices, and Gold/Crypto CFDs are permitted."
+                    "error": f"FOREX_BLOCKED: {resolved_epic} trading is 100% disabled by Angkor Quant Fiduciary Guard. Only US Stocks, Indices, and Gold CFDs are permitted."
+                }
+
+        # Step 0.1: Capital.com Crypto CFD Kill-Switch Guard (Invariant 80)
+        if is_crypto_cfd_instrument(resolved_epic):
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                logger.warning(f"🛑 [CRYPTO BLOCKED] Order blocked for {resolved_epic}: Capital.com Crypto CFD trading is 100% disabled by Angkor Quant Fiduciary Guard.")
+                return {
+                    "success": False,
+                    "error": f"CRYPTO_BLOCKED: {resolved_epic} trading is 100% disabled on Capital.com. Angkor Quant is dedicated to GOLD and TradFi (US Equities & Indices). Crypto execution belongs to Binance."
                 }
 
         # Step 0b: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
@@ -1299,6 +1318,18 @@ class CapitalComEngine:
             return {"success": False, "error": f"Invalid direction: {direction}. Must be 'BUY' or 'SELL'."}
         if type_upper not in ["STOP", "LIMIT"]:
             return {"success": False, "error": f"Invalid order_type: {order_type}. Must be 'STOP' or 'LIMIT'."}
+
+        # Step 0: Forex Kill-Switch Guard
+        if is_forex_instrument(resolved_epic):
+            import database as db
+            if not db.is_capital_forex_enabled():
+                return {"success": False, "error": f"FOREX_BLOCKED: {resolved_epic} trading is disabled by Angkor Quant Fiduciary Guard."}
+
+        # Step 0.1: Capital.com Crypto CFD Kill-Switch Guard (Invariant 80)
+        if is_crypto_cfd_instrument(resolved_epic):
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                return {"success": False, "error": f"CRYPTO_BLOCKED: {resolved_epic} trading is 100% disabled on Capital.com."}
 
         # Step 1: Check Market Status & Spread
         market_info = self.get_market_details(resolved_epic)
@@ -3282,6 +3313,7 @@ class CapitalAutonomousEngine:
             * BTCUSD, ETHUSD, SOLUSD (Zero-Swap & Weekend Gap Shield active on TradFi)
         """
         import datetime
+        import database as db
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         weekday = now_dt.weekday()  # Monday = 0, Friday = 4, Saturday = 5, Sunday = 6
         hour_utc = now_dt.hour
@@ -3290,32 +3322,41 @@ class CapitalAutonomousEngine:
         # TradFi weekend closure: Friday 20:45 UTC to Sunday 22:00 UTC (Saturday 03:45 to Monday 05:00 Phnom Penh)
         is_weekend = (weekday == 5) or (weekday == 4 and utc_min >= 1245) or (weekday == 6 and utc_min < 1320)
         
-        if is_weekend:
-            # 100% Dedicated to 24/7 Crypto CFDs on Weekends (TradFi markets closed)
-            return ["BTCUSD", "ETHUSD", "SOLUSD"]
-            
-        # Monday to Friday: Institutional Kill Zones
-        import database as db
+        crypto_allowed = db.is_capital_crypto_enabled()
         forex_allowed = db.is_capital_forex_enabled()
 
+        if is_weekend:
+            if crypto_allowed:
+                return ["BTCUSD", "ETHUSD", "SOLUSD"]
+            # 100% Dedicated to Capital Preservation & Flat Cash on Weekends (TradFi markets closed)
+            return []
+            
+        # Monday to Friday: Institutional Kill Zones
         # Wall Street NY Session (13:30 - 20:30 UTC = 20:30 - 03:30 Phnom Penh) - Prime US Mega-Cap Equities & Indices
         if 810 <= utc_min < 1230:
-            raw_assets = ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
+            raw_assets = ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "GERMANY40"]
+            if crypto_allowed:
+                raw_assets.append("BTCUSD")
         # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh) - Prime Focus on GOLD & DE40 (DAX)
         elif 420 <= utc_min < 810:
+            raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER"]
             if forex_allowed:
-                raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER", "EURUSD", "GBPUSD", "BTCUSD", "ETHUSD"]
-            else:
-                raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD", "SOLUSD"]
+                raw_assets.extend(["EURUSD", "GBPUSD"])
+            if crypto_allowed:
+                raw_assets.extend(["BTCUSD", "ETHUSD", "SOLUSD"])
         # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh) - Prime Focus on GOLD & Commodities
         elif 0 <= utc_min < 420:
+            raw_assets = ["GOLD", "SILVER", "OIL_CRUDE"]
             if forex_allowed:
-                raw_assets = ["GOLD", "SILVER", "OIL_CRUDE", "USDJPY", "AUDUSD", "BTCUSD", "ETHUSD", "SOLUSD"]
-            else:
-                raw_assets = ["GOLD", "SILVER", "OIL_CRUDE", "BTCUSD", "ETHUSD", "SOLUSD"]
-        # Late Night Rollover Lull & Flat Cash (20:30 - 23:59 UTC = 03:30 - 07:00 Phnom Penh): Zero-Swap Shield -> Crypto CFDs
+                raw_assets.extend(["USDJPY", "AUDUSD"])
+            if crypto_allowed:
+                raw_assets.extend(["BTCUSD", "ETHUSD", "SOLUSD"])
+        # Late Night Rollover Lull & Flat Cash (20:30 - 23:59 UTC = 03:30 - 07:00 Phnom Penh): Zero-Swap Shield
         else:
-            raw_assets = ["BTCUSD", "ETHUSD", "SOLUSD"]
+            if crypto_allowed:
+                raw_assets = ["BTCUSD", "ETHUSD", "SOLUSD"]
+            else:
+                raw_assets = []
 
         # Super Admin Asset Control Shield: purge any asset disabled by Super Admin for all users
         disabled_assets = set(db.get_capital_disabled_assets())
@@ -3366,7 +3407,7 @@ class CapitalAutonomousEngine:
                     macro_boost += 10
                     macro_bias = "BULLISH_MACRO"
             elif resolved_epic == "BTCUSD":
-                if dxy_sig == "BULLISH_LIQUIDITY" and tradfi_sent == "RISK_ON":
+                if db.is_capital_crypto_enabled() and dxy_sig == "BULLISH_LIQUIDITY" and tradfi_sent == "RISK_ON":
                     macro_boost += 20
                     macro_bias = "BULLISH_MACRO"
         except Exception as e_macro:
@@ -3395,6 +3436,50 @@ class CapitalAutonomousEngine:
                     cb_boost -= 20  # Penalize Longs when Real Yields are surging
             except Exception:
                 pass
+
+            # Pillar 4b: Gold Mathematical Edge Radar (Bayesian Probability, Hurst Exponent, Kalman Filter & OU Reversion)
+            try:
+                import gold_mathematical_radar
+                import pandas as pd
+                curr_bid = float(base_quant.get("bid", 0.0) or 0.0)
+                curr_ask = float(base_quant.get("ask", 0.0) or 0.0)
+                curr_p = (curr_bid + curr_ask) / 2.0 if (curr_bid > 0 and curr_ask > 0) else float(base_quant.get("mid_price", 0.0) or 0.0)
+                
+                c_history = engine.get_historical_prices("GOLD", resolution="MINUTE_15", max_bars=60)
+                df_gold = pd.DataFrame(c_history) if c_history else None
+                
+                math_edge = gold_mathematical_radar.analyze_gold_mathematical_edge(
+                    current_price=curr_p,
+                    candles_df=df_gold,
+                    tips_bias=ry_bias if 'ry_bias' in locals() else "STRONG_BULLISH",
+                    smc_action=base_quant.get("smc_action", "BUY"),
+                    smc_confidence=float(base_quant.get("smc_confidence", 80.0))
+                )
+                base_quant["gold_math_edge"] = math_edge
+                m_verdict = math_edge.get("math_verdict", "NEUTRAL_WAIT")
+                bayes = math_edge.get("bayesian_confluence", {})
+                p_bull = float(bayes.get("posterior_bullish_prob", 0.5))
+                p_bear = float(bayes.get("posterior_bearish_prob", 0.5))
+                hurst = float(math_edge.get("hurst_exponent", 0.5))
+                ou = math_edge.get("ornstein_uhlenbeck", {})
+                ou_z = float(ou.get("z_score", 0.0))
+
+                if "BUY" in m_verdict and p_bull >= 0.70:
+                    cb_boost += 15
+                    logger.info(f"🥇 [GOLD MATH ALPHA] Bullish Bayesian Prob {p_bull*100:.1f}%, Hurst={hurst:.2f} (+15 Boost)")
+                elif "SELL" in m_verdict and p_bear >= 0.70:
+                    cb_boost += 15
+                    logger.info(f"🥇 [GOLD MATH ALPHA] Bearish Bayesian Prob {p_bear*100:.1f}%, Hurst={hurst:.2f} (+15 Boost)")
+                
+                # Mean-reversion exhaustion warning: penalize stretched entries
+                if ou_z > 2.5:
+                    cb_boost -= 20
+                    logger.info(f"⚠️ [GOLD OU EXHAUSTION] Overbought Z-Score {ou_z:.2f} (Longs Penalized)")
+                elif ou_z < -2.5:
+                    cb_boost -= 20
+                    logger.info(f"⚠️ [GOLD OU EXHAUSTION] Oversold Z-Score {ou_z:.2f} (Shorts Penalized)")
+            except Exception as e_gold_math:
+                logger.debug(f"Gold mathematical edge radar note: {e_gold_math}")
 
         # 2b. MT5 Smart Money Concepts (SMC) Citadel Multi-Timeframe Confluence (Invariant 53)
         smc_boost = 0.0
@@ -8274,10 +8359,13 @@ class CapitalTrendScalpEngine:
         # Daily Rollover Swap Shield & Flat Cash: strictly 20:30 - 23:59 UTC (03:30 - 07:00 ICT)
         is_swap_shield = (utc_min >= 1230) and not is_weekend  # Overnight lull
 
+        import database as db
+        crypto_allowed = db.is_capital_crypto_enabled()
+
         if is_weekend or is_swap_shield:
-            raw_majors = list(self.TREND_MAJORS_CRYPTO)
+            raw_majors = list(self.TREND_MAJORS_CRYPTO) if crypto_allowed else []
         elif mode == "CRYPTO":
-            raw_majors = list(self.TREND_MAJORS_CRYPTO)
+            raw_majors = list(self.TREND_MAJORS_CRYPTO) if crypto_allowed else []
         elif mode == "SHARES":
             # Shares only active during NY Session (13:30 - 20:30 UTC)
             if 810 <= utc_min < 1230:
@@ -8297,17 +8385,20 @@ class CapitalTrendScalpEngine:
         else:
             # Mode "ALL"
             if 810 <= utc_min < 1230:
-                # NY Session: All scalp majors
-                raw_majors = list(self.ALL_SCALP_MAJORS)
+                # NY Session: All scalp majors (excluding crypto when disabled)
+                raw_majors = [m for m in self.ALL_SCALP_MAJORS if (crypto_allowed or m not in self.TREND_MAJORS_CRYPTO)]
             elif 420 <= utc_min < 810:
-                # London Kill Zone: GOLD, DE40 + Crypto
-                raw_majors = ["GOLD", "GERMANY40", "BTCUSD", "ETHUSD", "SOLUSD"]
+                # London Kill Zone: GOLD, DE40
+                raw_majors = ["GOLD", "GERMANY40"]
+                if crypto_allowed:
+                    raw_majors.extend(["BTCUSD", "ETHUSD", "SOLUSD"])
             else:
-                # Asian Session: GOLD + Crypto
-                raw_majors = ["GOLD", "BTCUSD", "ETHUSD", "SOLUSD"]
+                # Asian Session: GOLD
+                raw_majors = ["GOLD"]
+                if crypto_allowed:
+                    raw_majors.extend(["BTCUSD", "ETHUSD", "SOLUSD"])
 
         # Super Admin Asset Control Shield: purge any asset disabled by Super Admin for all users
-        import database as db
         disabled_assets = set(db.get_capital_disabled_assets())
         if disabled_assets:
             return [m for m in raw_majors if m.upper() not in disabled_assets and EPIC_MAP.get(m.upper(), m.upper()) not in disabled_assets]
@@ -9462,16 +9553,22 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SMART_SESSION_TIMED
 
     # 2. Super Smart Session-Timed Mode
     if is_smart_session:
-        # Crypto CFDs trade 24/7 continuously across all sessions and on weekends
+        # Crypto CFDs trade 24/7 continuously only if explicitly enabled
         if is_crypto_asset:
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                return False, f"Crypto CFD trading for {epic} is 100% disabled by Angkor Quant Fiduciary Guard. Dedicated to Gold & TradFi.", info
             return True, f"Crypto CFD 24/7 Continuous Active ({session_name_en})", info
             
         # If TradFi Weekend Gap Shield is active, block new TradFi entries
         if is_tradfi_weekend:
             if epic:
                 return False, f"TradFi Weekend Gap Shield Active ({session_name_en} | Protected until Monday 05:00 ICT)", info
-            # If no epic specified, general engine is active because Crypto CFDs are tradeable
-            return True, f"Smart Session Timed ({session_name_en})", info
+            # If no epic specified, general engine is in standby on weekends
+            import database as db
+            if db.is_capital_crypto_enabled():
+                return True, f"Smart Session Timed ({session_name_en})", info
+            return False, f"Weekend Standby (TradFi Markets Closed | Capital Preservation Active)", info
 
         # Wednesday Triple Swap Shield
         if is_wednesday_triple_swap_window:
@@ -9515,6 +9612,9 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SMART_SESSION_TIMED
 
     # 3. Modernized SCHEDULE_MON_FRI (Full Wall Street Coverage 07:00 to 03:45 ICT)
     if is_crypto_asset:
+        import database as db
+        if not db.is_capital_crypto_enabled():
+            return False, f"Crypto CFD trading for {epic} is 100% disabled by Angkor Quant Fiduciary Guard. Dedicated to Gold & TradFi.", info
         return True, f"Crypto CFD 24/7 Continuous Active ({session_name_en})", info
 
     if is_tradfi_weekend:

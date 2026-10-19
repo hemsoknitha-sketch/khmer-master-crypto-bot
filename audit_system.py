@@ -1909,10 +1909,13 @@ def run_audit():
         default_sched = db.get_capital_schedule_mode(99999902)
         is_default_sched_smart = (default_sched == "SMART_SESSION_TIMED")
 
-        # 4. Crypto CFD 24/7 Continuity Invariant: Must always be active
+        # 4. Crypto CFD 24/7 Continuity Invariant (when enabled) vs Invariant 80 Default Shield
+        is_crypto_default_blocked = not capital_engine.is_capital_trading_schedule_active("SMART_SESSION_TIMED", epic="BTCUSD")[0]
+        db.set_capital_crypto_enabled(True)
         is_crypto_active_btc, _, info_btc = capital_engine.is_capital_trading_schedule_active("SMART_SESSION_TIMED", epic="BTCUSD")
         is_crypto_active_eth, _, info_eth = capital_engine.is_capital_trading_schedule_active("SMART_SESSION_TIMED", epic="ETHUSD")
-        is_crypto_continuous = is_crypto_active_btc and is_crypto_active_eth
+        db.set_capital_crypto_enabled(False)  # Revert to Invariant 80 default
+        is_crypto_continuous = is_crypto_default_blocked and is_crypto_active_btc and is_crypto_active_eth
 
         # 5. Wall Street Coverage standard: start_time 07:00 ICT, end_time 03:45 ICT
         is_wall_st_hours = (
@@ -2924,7 +2927,18 @@ def run_audit():
         priority_assets = auto_engine.get_session_priority_assets()
         # Verify no standard forex pairs in priority assets
         forex_pairs_in_priority = [p for p in priority_assets if p in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "NZDUSD", "USDCAD"]]
-        has_clean_equities = len(forex_pairs_in_priority) == 0 and ("US500" in priority_assets or "NVDA" in priority_assets or "BTCUSD" in priority_assets)
+        from datetime import datetime, timezone
+        now_utc = datetime.now(timezone.utc)
+        is_weekend = now_utc.weekday() in (5, 6)
+        if is_weekend:
+            # On weekends, TradFi is closed: returns [] for 100% capital preservation if crypto disabled
+            has_clean_equities = (len(forex_pairs_in_priority) == 0) and (
+                len(priority_assets) == 0 or "BTCUSD" in priority_assets
+            )
+        else:
+            has_clean_equities = (len(forex_pairs_in_priority) == 0) and any(
+                p in priority_assets for p in ["US500", "NVDA", "GOLD", "US100", "TSLA"]
+            )
 
         # Restore original state
         db.set_capital_forex_enabled(orig_forex_state)
@@ -3107,7 +3121,7 @@ def run_audit():
     # -------------------------------------------------------------------------
     # [CHECK 62/62] Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF) (Invariant 78)
     # -------------------------------------------------------------------------
-    print("\n[CHECK 62/62] Verifying Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF) (Invariant 78)...")
+    print("\n[CHECK 62/63] Verifying Super Admin Exclusive Simulation Authority & Baseline Production Standard (Always Paper Trading OFF) (Invariant 78)...")
     try:
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_md = f.read()
@@ -3154,6 +3168,102 @@ def run_audit():
             log_fail("Invariant 78 check failed!")
     except Exception as e:
         failures.append(f"Invariant 78 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 63/63] Capital.com TradFi Multi-Layer Crypto CFD Deactivation & 100% Gold & TradFi Specialization Shield (Invariant 80)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 63/63] Verifying Capital.com TradFi Multi-Layer Crypto CFD Deactivation & 100% Gold & TradFi Specialization Shield (Invariant 80)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv80 = "Invariant 80: Capital.com TradFi Multi-Layer Crypto CFD Deactivation" in agents_md
+        has_p01_crypto = "Pillar 0.1: Universal Multi-Layer Crypto CFD Deactivation" in agents_md
+
+        # 2. Database layer: is_capital_crypto_enabled, set_capital_crypto_enabled, disabled assets injection
+        import database as db
+        has_crypto_get = hasattr(db, "is_capital_crypto_enabled")
+        has_crypto_set = hasattr(db, "set_capital_crypto_enabled")
+
+        # Baseline Verification: Always disabled (False) by default
+        is_crypto_default_off = (db.is_capital_crypto_enabled() is False)
+        disabled_assets = db.get_capital_disabled_assets()
+        has_crypto_in_disabled = "BTCUSD" in disabled_assets and "ETHUSD" in disabled_assets and "SOLUSD" in disabled_assets
+        is_btc_blocked_in_db = (db.is_capital_asset_enabled("BTCUSD") is False)
+        is_eth_blocked_in_db = (db.is_capital_asset_enabled("ETHUSD") is False)
+        is_gold_enabled_in_db = (db.is_capital_asset_enabled("GOLD") is True)
+
+        # Dynamic Unit Test: Test toggling ON and reverting to OFF
+        db.set_capital_crypto_enabled(True)
+        dynamic_crypto_on_ok = (db.is_capital_crypto_enabled() is True)
+        db.set_capital_crypto_enabled(False)
+        dynamic_crypto_off_ok = (db.is_capital_crypto_enabled() is False)
+
+        # 3. SuperSmartCapitalCitadel Gatekeeper test for Crypto epics
+        import super_smart_capital_citadel as sscc
+        citadel = sscc.get_super_smart_capital_citadel()
+        is_appr_btc, reason_btc, _ = citadel.validate_capital_entry_gatekeeper(epic="BTCUSD", direction="BUY")
+        is_appr_eth, reason_eth, _ = citadel.validate_capital_entry_gatekeeper(epic="ETHUSD", direction="BUY")
+        is_appr_gold, reason_gold, _ = citadel.validate_capital_entry_gatekeeper(epic="GOLD", direction="BUY", bypass_citadel=True)
+
+        is_gatekeeper_blocking_crypto = (is_appr_btc is False) and ("CRYPTO" in str(reason_btc).upper() or "BLOCKED" in str(reason_btc).upper())
+        is_gatekeeper_blocking_eth = (is_appr_eth is False)
+        is_gatekeeper_permits_gold = (is_appr_gold is True)
+
+        # 4. capital_engine.py inspections
+        with open("capital_engine.py", "r", encoding="utf-8") as cf:
+            cap_code = cf.read()
+        has_is_crypto_fn = "def is_crypto_cfd_instrument(" in cap_code
+        has_place_crypto_block = "CRYPTO_BLOCKED" in cap_code
+        has_gold_math_radar = "analyze_gold_mathematical_edge" in cap_code and "gold_mathematical_radar" in cap_code
+
+        # Dynamic instrument check
+        import capital_engine as ce
+        is_btc_inst = ce.is_crypto_cfd_instrument("BTCUSD")
+        is_eth_inst = ce.is_crypto_cfd_instrument("ETHUSD")
+        is_gold_inst = ce.is_crypto_cfd_instrument("GOLD")
+        is_nvda_inst = ce.is_crypto_cfd_instrument("NVDA")
+        instrument_check_ok = is_btc_inst and is_eth_inst and (not is_gold_inst) and (not is_nvda_inst)
+
+        # 5. Universe Purge Verification in TrendScalpEngine & AutonomousEngine
+        scalp_majors = ce.CapitalTrendScalpEngine.get_session_active_majors("ALL")
+        no_crypto_in_scalp = not any(c in scalp_majors for c in ["BTCUSD", "ETHUSD", "SOLUSD"])
+        has_gold_in_scalp = "GOLD" in scalp_majors
+
+        # 6. Telegram UI Command & Callbacks
+        with open("bot_thread.py", "r", encoding="utf-8") as btf:
+            bt_code = btf.read()
+        has_crypto_subcmd = 'action in ["CRYPTO", "CRYPTO_CFD", "CFD_CRYPTO"]' in bt_code
+        has_crypto_blocked_alert = "CAPITAL.COM CRYPTO CFD: BLOCKED 100%" in bt_code
+        has_nasdaq_buttons = "btn_cap_buy_us100" in bt_code and "btn_cap_sell_us100" in bt_code
+
+        all_inv80_passed = (
+            has_inv80 and has_p01_crypto and
+            has_crypto_get and has_crypto_set and
+            is_crypto_default_off and has_crypto_in_disabled and
+            is_btc_blocked_in_db and is_eth_blocked_in_db and is_gold_enabled_in_db and
+            dynamic_crypto_on_ok and dynamic_crypto_off_ok and
+            is_gatekeeper_blocking_crypto and is_gatekeeper_blocking_eth and is_gatekeeper_permits_gold and
+            has_is_crypto_fn and has_place_crypto_block and has_gold_math_radar and
+            instrument_check_ok and no_crypto_in_scalp and has_gold_in_scalp and
+            has_crypto_subcmd and has_crypto_blocked_alert and has_nasdaq_buttons
+        )
+
+        if all_inv80_passed:
+            log_pass("Capital.com TradFi Multi-Layer Crypto CFD Deactivation & 100% Gold & TradFi Specialization Shield (Invariant 80) is 100% locked & certified!")
+        else:
+            failures.append(
+                f"Invariant 80 check failed: inv80={has_inv80}, p01={has_p01_crypto}, "
+                f"c_get={has_crypto_get}, c_set={has_crypto_set}, default_off={is_crypto_default_off}, "
+                f"in_dis={has_crypto_in_disabled}, btc_block={is_btc_blocked_in_db}, gold_ok={is_gold_enabled_in_db}, "
+                f"gate_block={is_gatekeeper_blocking_crypto}, gold_gate={is_gatekeeper_permits_gold}, "
+                f"inst_ok={instrument_check_ok}, no_scalp_crypto={no_crypto_in_scalp}, gold_scalp={has_gold_in_scalp}, "
+                f"subcmd={has_crypto_subcmd}, alert={has_crypto_blocked_alert}, nasdaq_btns={has_nasdaq_buttons}"
+            )
+            log_fail("Capital.com TradFi Multi-Layer Crypto CFD Deactivation (Invariant 80) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 80 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

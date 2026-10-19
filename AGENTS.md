@@ -48,8 +48,8 @@ The system is engineered upon two non-negotiable axioms:
   3. **Smart Bot Guide Dual-Tier Branching:**
      - All guide views in `smart_bot_guide.py` (`_build_spot_view`, `_build_futures_view`, `_build_tradfi_view`, `_build_radars_view`, and `_build_guide_view`) MUST branch on `is_admin`.
 
-### 1.1.1 THE NINE PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ76)
-**(គ្រឹះ ៩ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58, 73, 74, 75, 76)**
+### 1.1.1 THE TEN PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ80)
+**(គ្រឹះ ១០ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58, 73, 74, 75, 76, 80)**
 **Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
 0. **Pillar 0: Universal Multi-Layer Forex Deactivation & Capital Protection Shield (Invariant 73 - របាំងបិទទាំងស្រុង Forex Exchange ការពារ Spread & Negative Expectancy):**
    - Default state: Forex trading is 100% disabled (`capital_forex_enabled = 0`).
@@ -58,15 +58,23 @@ The system is engineered upon two non-negotiable axioms:
      2. Engine Suite Gate: `CapitalForexExchangeSuite.execute_forex_cycle` aborts immediately.
      3. Citadel Pre-Flight Gatekeeper: `validate_capital_entry_gatekeeper` Pillar 0 intercepts and blocks any Forex pair (`is_forex_epic`) with `BLOCKED_FOREX_DISABLED`.
      4. Execution Gateway: `place_position` unconditionally blocks forex order placement with `FOREX_BLOCKED`.
-     5. Autonomous Universe Purge: `CapitalAutonomousEngine.get_session_priority_assets` completely purges all Forex pairs, prioritizing US Mega-Cap equities (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`), Major Indices (`US500`, `US100`, `DE40`), and Commodities/Crypto (`GOLD`, `OIL_CRUDE`, `BTCUSD`).
+     5. Autonomous Universe Purge: `CapitalAutonomousEngine.get_session_priority_assets` completely purges all Forex pairs, prioritizing US Mega-Cap equities (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`), Major Indices (`US500`, `US100`, `DE40`), and Commodities (`GOLD`, `SILVER`, `OIL_CRUDE`).
+0.1. **Pillar 0.1: Universal Multi-Layer Crypto CFD Deactivation & 100% Gold & TradFi Specialization Shield (Invariant 80 - របាំងបិទទាំងស្រុង Crypto CFDs លើ Capital.com ការពារ Spread Drag $60-$80 & ផ្តោត ១០០% លើមាស និង TradFi):**
+   - Default state: Capital.com Crypto CFD trading is 100% disabled (`capital_crypto_enabled = 0`).
+   - 5-Tier Defense Architecture:
+     1. Database & Settings Core: `is_capital_crypto_enabled()` defaults to `False`. `get_capital_disabled_assets()` automatically injects BTCUSD, ETHUSD, SOLUSD, XRPUSD, DOGEUSD.
+     2. Citadel Pre-Flight Gatekeeper: `validate_capital_entry_gatekeeper` Pillar 0.1 intercepts any crypto epic with `CRYPTO_BLOCKED` before order generation.
+     3. Execution Gateway: `place_position` and `place_working_order` unconditionally reject crypto CFD order submission.
+     4. Dynamic Session Universe Purge: `get_session_priority_assets()` and `get_session_active_majors()` purge all crypto pairs, focusing 100% on GOLD (XAUUSD), US Mega-Caps (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`), Indices (`US100`, `US500`, `DE40`), and Commodities (`SILVER`, `OIL_CRUDE`). Weekend trading is held in full capital preservation standby.
+     5. Mathematical Gold Decision Edge: All Gold Buy/Sell decisions are augmented with `gold_mathematical_radar.py` (Hurst Exponent, Kalman Filter, Ornstein-Uhlenbeck exhaustion, Bayesian posterior probability, and SMC FVG/OB confirmation) to ensure highest-conviction order execution. Crypto execution is reserved exclusively for Binance Spot & Futures where liquidity is deep and spreads are tight.
 0.5. **Pillar 0.5: Super Admin Dynamic Asset Control Shield (Invariant 75 - របាំងបញ្ជាបិទបើកទ្រព្យសម្បត្តិឯករាជ្យ & សិទ្ធិបញ្ជាកងនាវាស្វ័យប្រវត្ត):**
-   - Super Admin (`859271875` and system administrators) holds absolute authority to toggle any specific equity/index/commodity/crypto CFD (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`, `US100`, `US500`, `DE40`, `GOLD`, `OIL_CRUDE`, `BTCUSD`, etc.) ON or OFF for all users.
+   - Super Admin (`859271875` and system administrators) holds absolute authority to toggle any specific equity/index/commodity CFD (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`, `US100`, `US500`, `DE40`, `GOLD`, `OIL_CRUDE`, etc.) ON or OFF for all users.
    - Deactivated assets are immediately purged from dynamic priority lists by `CapitalAutonomousEngine.get_session_priority_assets` and `CapitalTrendScalpEngine.get_session_active_majors`, and strictly rejected by `validate_capital_entry_gatekeeper` and `evaluate_institutional_tradfi_trap` with `BLOCKED_ASSET_DISABLED`.
 0.8. **Pillar 0.8: Interbank Session Kill Zone Dynamic Asset Routing & Overnight Flat Cash Protocol (Invariant 77 - របាំងបែងចែកម៉ោងមាស Session Kill Zones & ជម្រះ Flat Cash មុន Swap ឆ្លងយប់):**
-   - **Asian Session (07:00 – 13:30 ICT / 00:00 – 06:30 UTC):** US Tech Equities (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`) and Indices (`US100`, `US500`) are closed / pre-market only. Scanning and entry are strictly VETOED (`SESSION_KILL_ZONE_ASIAN_US_EQUITIES_CLOSED`) to eliminate low-volume sideways chop. Session routing strictly prioritizes GOLD (XAUUSD), Commodities (`SILVER`, `OIL_CRUDE`), and 24/7 Crypto CFDs (`BTCUSD`, `ETHUSD`, `SOLUSD`).
-   - **London Open Kill Zone (14:00 – 18:30 ICT / 07:00 – 11:30 UTC, up to 20:30 ICT / 13:30 UTC):** Prime institutional focus strictly on GOLD (`XAUUSD`) and DE40 (`GERMANY40` / `DAX`) (+ Commodities & Crypto). US Cash Equities are locked until Wall Street Cash Open at 20:30 ICT (13:30 UTC).
-   - **New York Open Kill Zone (20:30 – 01:30 ICT / 13:30 – 18:30 UTC, up to 03:30 ICT / 20:30 UTC):** Prime institutional focus on `US100`, `US500`, `NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`, `GOLD`, `OIL_CRUDE`, and `BTCUSD`.
-   - **Overnight Rollover Swap Shield & Flat Cash (03:30 – 07:00 ICT / 20:30 – 23:59 UTC):** All new TradFi market entries are blocked; intraday TradFi positions in profit or at fee-cleared breakeven (`UPL >= max(0.50, spread * 1.5)` or `UPL >= 0.0`) are harvested to Flat Cash (`OVERNIGHT_FLAT_CASH_EXIT`) before 21:00 UTC rollover to eliminate overnight financing interest and 3x-10x spread blowout. Continuous trading ring-fenced for 24/7 Crypto CFDs (`BTCUSD`, `ETHUSD`, `SOLUSD`).
+   - **Asian Session (07:00 – 13:30 ICT / 00:00 – 06:30 UTC):** US Tech Equities (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`) and Indices (`US100`, `US500`) are closed / pre-market only. Scanning and entry are strictly VETOED (`SESSION_KILL_ZONE_ASIAN_US_EQUITIES_CLOSED`) to eliminate low-volume sideways chop. Session routing strictly prioritizes GOLD (XAUUSD) and Commodities (`SILVER`, `OIL_CRUDE`).
+   - **London Open Kill Zone (14:00 – 18:30 ICT / 07:00 – 11:30 UTC, up to 20:30 ICT / 13:30 UTC):** Prime institutional focus strictly on GOLD (`XAUUSD`) and DE40 (`GERMANY40` / `DAX`) (+ Commodities). US Cash Equities are locked until Wall Street Cash Open at 20:30 ICT (13:30 UTC).
+   - **New York Open Kill Zone (20:30 – 01:30 ICT / 13:30 – 18:30 UTC, up to 03:30 ICT / 20:30 UTC):** Prime institutional focus on `US100`, `US500`, `NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`, `GOLD`, and `OIL_CRUDE`.
+   - **Overnight Rollover Swap Shield & Flat Cash (03:30 – 07:00 ICT / 20:30 – 23:59 UTC):** All new TradFi market entries are blocked; intraday TradFi positions in profit or at fee-cleared breakeven (`UPL >= max(0.50, spread * 1.5)` or `UPL >= 0.0`) are harvested to Flat Cash (`OVERNIGHT_FLAT_CASH_EXIT`) before 21:00 UTC rollover to eliminate overnight financing interest and 3x-10x spread blowout. Continuous weekend preservation ensures zero exposure when TradFi markets are closed.
 1. **Pillar 1: Dynamic Volatility Breathing Stop & Broker Rejection Fallback Armor (Invariant 35 - កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួល & គ្មាន No-SL Trading):**
    - TradFi Standard: $\text{SL Distance} \ge \max(2.50\times\text{ATR}, 3.5\times\text{Spread}, 0.0035\times\text{Price})$.
    - Trend Scalp Standard: $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$.
@@ -1403,6 +1411,29 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - Super Admin holds sole authority to toggle simulation mode via `/paper_trading ON 1234` (enabling zero-risk testing sandbox) or revert to institutional standard via `/paper_trading OFF 1234` (enforcing live real money executions).
      - Status requests `/paper_trading` or `/paper_trading status` display a comprehensive, bilingual operational dashboard with current status badge, baseline rules, and 1-tap inline action buttons.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 62/62].
+
+---
+
+### Invariant 80: Capital.com TradFi Multi-Layer Crypto CFD Deactivation & 100% Gold & TradFi Specialization Shield (AQ80)
+- **Location:** `database.py` (`is_capital_crypto_enabled`, `set_capital_crypto_enabled`, `get_capital_disabled_assets`, `is_capital_asset_enabled`), `capital_engine.py` (`is_crypto_cfd_instrument`, `place_position`, `place_working_order`, `get_session_priority_assets`, `CapitalTrendScalpEngine.get_session_active_majors`, `evaluate_multi_engine_tradfi_setup`), `super_smart_capital_citadel.py` (`validate_capital_entry_gatekeeper`, `validate_session_asset_routing`, `get_current_session_info`), `bot_thread.py` (`capital_command`, `capital_scalp_command`, `button_callback_handler`), `gold_mathematical_radar.py`, `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **Strict Default Crypto CFD Deactivation (លុបបំបាត់ការខាតបង់ពី Spread Drag Crypto CFD ១០០%):**
+     - Crypto CFD trading on Capital.com is 100% disabled by default (`capital_crypto_enabled = 0`). Capital.com CFD spreads on cryptocurrencies ($60-$80 on BTC, $4-$10 on ETH, dynamic spread blowouts, and overnight funding fees) create a mathematically negative expectancy ($E[X] < 0$).
+     - Crypto spot and derivatives execution belongs strictly and exclusively to Binance Spot and USDT-M Futures (`/spot`, `/futures`), where maker/taker fees are ultra-low (0.02% - 0.05%) and orderbook depth is institutional grade.
+  2. **5-Tier Defense Architecture:**
+     - *Tier 1 (Database Core):* `is_capital_crypto_enabled()` defaults to `False`. `get_capital_disabled_assets()` automatically injects all crypto epics (`BTCUSD`, `ETHUSD`, `SOLUSD`, `XRPUSD`, `DOGEUSD`, etc.).
+     - *Tier 2 (Pre-Flight Gatekeeper):* `validate_capital_entry_gatekeeper` Pillar 0.1 intercepts any crypto instrument with `CRYPTO_BLOCKED` prior to order synthesis.
+     - *Tier 3 (Execution Gateway):* `place_position` and `place_working_order` unconditionally reject order submissions for crypto instruments with `CRYPTO_BLOCKED`.
+     - *Tier 4 (Dynamic Session Universe Purge):* `get_session_priority_assets()` and `get_session_active_majors()` purge all crypto pairs from scanning queues. On weekends, when TradFi markets are closed, the engine enters full capital preservation standby (`[]` queue) with zero exposure.
+     - *Tier 5 (Super Admin Dynamic Control):* Super Admin holds exclusive authority via `/capital crypto ON` or `/capital crypto OFF` to toggle crypto execution, with automatic multi-tier synchronization.
+  3. **High-Confidence Gold & TradFi Decision Edge:**
+     - TradFi execution focuses 100% on high-predictability, institutional-spread assets: GOLD (`XAUUSD`), US Mega-Caps (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`), Indices (`US100`, `US500`, `DE40`), and Commodities (`SILVER`, `OIL_CRUDE`).
+     - Gold Buy/Sell decisions are mathematically supercharged via `gold_mathematical_radar.py` in `evaluate_multi_engine_tradfi_setup`:
+       * Hurst Exponent ($H \ge 0.55$ confirms persistent trending momentum, $H \le 0.45$ triggers mean-reversion filter).
+       * Kalman Filter state tracking (velocity divergence detection).
+       * Ornstein-Uhlenbeck process (exhaustion filter preventing chasing moves beyond $\pm 2.5$ Z-scores).
+       * Bayesian posterior probability updating and Smart Money Concept (FVG, Order Block, and ICT 70.5% OTE Sweet Spot confluence) boosting entry conviction by +15 to +25 points.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 63/63].
 
 ---
 

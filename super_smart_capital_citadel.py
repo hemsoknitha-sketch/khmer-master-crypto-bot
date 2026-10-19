@@ -813,20 +813,32 @@ class TradFiSessionKillZoneRouter:
     @classmethod
     def get_current_session_info(cls) -> Dict[str, Any]:
         """Returns the active interbank market session, time windows, and target assets."""
+        import database as db
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         utc_min = now_utc.hour * 60 + now_utc.minute
         weekday = now_utc.weekday()
+        crypto_allowed = db.is_capital_crypto_enabled()
 
         is_weekend = (weekday == 5) or (weekday == 4 and utc_min >= 1245) or (weekday == 6 and utc_min < 1320)
         if is_weekend:
+            if crypto_allowed:
+                return {
+                    "session": "WEEKEND_CRYPTO_ONLY",
+                    "session_name": "Weekend 24/7 Crypto Mode",
+                    "ict_hours": "Weekend",
+                    "utc_hours": "Fri 20:45 - Sun 22:00 UTC",
+                    "primary_focus": ["BTCUSD", "ETHUSD", "SOLUSD"],
+                    "is_tradfi_open": False,
+                    "flat_cash_active": False
+                }
             return {
-                "session": "WEEKEND_CRYPTO_ONLY",
-                "session_name": "Weekend 24/7 Crypto Mode",
+                "session": "WEEKEND_STANDBY",
+                "session_name": "Weekend Standby (TradFi Closed | Flat Cash)",
                 "ict_hours": "Weekend",
                 "utc_hours": "Fri 20:45 - Sun 22:00 UTC",
-                "primary_focus": ["BTCUSD", "ETHUSD", "SOLUSD"],
+                "primary_focus": [],
                 "is_tradfi_open": False,
-                "flat_cash_active": False
+                "flat_cash_active": True
             }
 
         if 1230 <= utc_min <= 1439:
@@ -835,7 +847,7 @@ class TradFiSessionKillZoneRouter:
                 "session_name": "Overnight Rollover Swap Shield & Flat Cash",
                 "ict_hours": "03:30 - 07:00 ICT",
                 "utc_hours": "20:30 - 23:59 UTC",
-                "primary_focus": ["BTCUSD", "ETHUSD", "SOLUSD"],
+                "primary_focus": ["BTCUSD", "ETHUSD", "SOLUSD"] if crypto_allowed else [],
                 "is_tradfi_open": False,
                 "flat_cash_active": True
             }
@@ -846,7 +858,7 @@ class TradFiSessionKillZoneRouter:
                 "session_name": "Tokyo / Asian Session",
                 "ict_hours": "07:00 - 14:00 ICT (Prime: 07:00 - 13:30 ICT)",
                 "utc_hours": "00:00 - 07:00 UTC",
-                "primary_focus": ["GOLD", "SILVER", "OIL_CRUDE", "BTCUSD", "ETHUSD", "SOLUSD"],
+                "primary_focus": ["GOLD", "SILVER", "OIL_CRUDE"] + (["BTCUSD", "ETHUSD", "SOLUSD"] if crypto_allowed else []),
                 "is_tradfi_open": True,
                 "flat_cash_active": False
             }
@@ -857,7 +869,7 @@ class TradFiSessionKillZoneRouter:
                 "session_name": "London Open Kill Zone",
                 "ict_hours": "14:00 - 20:30 ICT (Prime: 14:00 - 18:30 ICT)",
                 "utc_hours": "07:00 - 13:30 UTC",
-                "primary_focus": ["GOLD", "DE40", "GERMANY40", "SILVER", "OIL_CRUDE", "BTCUSD", "ETHUSD"],
+                "primary_focus": ["GOLD", "DE40", "GERMANY40", "SILVER", "OIL_CRUDE"] + (["BTCUSD", "ETHUSD"] if crypto_allowed else []),
                 "is_tradfi_open": True,
                 "flat_cash_active": False
             }
@@ -867,7 +879,7 @@ class TradFiSessionKillZoneRouter:
             "session_name": "New York Open Kill Zone",
             "ict_hours": "20:30 - 03:30 ICT (Prime: 20:30 - 01:30 ICT)",
             "utc_hours": "13:30 - 20:30 UTC",
-            "primary_focus": ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "BTCUSD"],
+            "primary_focus": ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE"] + (["BTCUSD"] if crypto_allowed else []),
             "is_tradfi_open": True,
             "flat_cash_active": False
         }
@@ -885,19 +897,26 @@ class TradFiSessionKillZoneRouter:
         raw_epic = str(epic or "").upper().strip()
         resolved_epic = capital_engine.EPIC_MAP.get(raw_epic, raw_epic)
 
-        # 24/7 Crypto CFDs are always allowed continuous execution
+        # 24/7 Crypto CFDs check
         is_crypto = any(c in resolved_epic for c in ["BTC", "ETH", "SOL", "XRP", "DOGE"])
         session_info = cls.get_current_session_info()
         sess_code = session_info["session"]
 
         if is_crypto:
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                reason = (
+                    f"SESSION_KILL_ZONE_CRYPTO_DISABLED: Crypto CFD trading on Capital.com is 100% disabled "
+                    f"by Angkor Quant Fiduciary Guard. Capital is 100% focused on Gold & TradFi. Use Binance for Crypto."
+                )
+                return False, reason, session_info
             return True, "CRYPTO_24_7_CONTINUOUS_CLEARANCE", session_info
 
         # Weekend check for TradFi
-        if sess_code == "WEEKEND_CRYPTO_ONLY":
+        if sess_code in ["WEEKEND_CRYPTO_ONLY", "WEEKEND_STANDBY"]:
             reason = (
                 f"SESSION_KILL_ZONE_WEEKEND_TRADFI_CLOSED: TradFi markets are closed on weekends. "
-                f"Only continuous 24/7 Crypto CFDs (BTCUSD, ETHUSD, SOLUSD) are permitted."
+                f"Capital preservation mode active until Monday 05:00 ICT."
             )
             return False, reason, session_info
 
@@ -2409,11 +2428,19 @@ class SuperSmartCapitalCitadel:
 
         # Pillar 0: Forex Kill-Switch & Institutional Stock Priority Gatekeeper
         s_epic = str(epic or "").upper().strip()
-        from capital_engine import is_forex_instrument
+        from capital_engine import is_forex_instrument, is_crypto_cfd_instrument
         if is_forex_instrument(s_epic):
             import database as db
             if not db.is_capital_forex_enabled():
-                reason = f"FOREX_BLOCKED: {s_epic} is blocked by Angkor Quant Fiduciary Guard. Trading is restricted to US Equities, Indices, and Gold/Crypto CFDs."
+                reason = f"FOREX_BLOCKED: {s_epic} is blocked by Angkor Quant Fiduciary Guard. Trading is restricted to US Equities, Indices, and Gold CFDs."
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                return False, reason, {"is_approved": False, "rejection_reason": reason}
+
+        # Pillar 0.1: Capital.com Crypto CFD Kill-Switch Guard (Invariant 80)
+        if is_crypto_cfd_instrument(s_epic):
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                reason = f"CRYPTO_BLOCKED: {s_epic} is blocked by Angkor Quant Fiduciary Guard. Capital.com trading is restricted strictly to GOLD (XAUUSD) and TradFi (Equities, Indices, Commodities)."
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
                 return False, reason, {"is_approved": False, "rejection_reason": reason}
 
