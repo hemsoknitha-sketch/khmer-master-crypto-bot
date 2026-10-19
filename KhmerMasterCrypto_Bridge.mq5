@@ -681,7 +681,7 @@ void HandleOrderSend(const string json)
    double fill_price = 0.0;
 
    StringToUpper(action_req);
-   ENUM_SYMBOL_TRADE_EXECUTION exec_mode = (ENUM_SYMBOL_TRADE_EXECUTION)SymbolInfoInteger(symbol, SYMBOL_TRADE_EXECUTION);
+   ENUM_SYMBOL_TRADE_EXECUTION exec_mode = (ENUM_SYMBOL_TRADE_EXECUTION)SymbolInfoInteger(symbol, SYMBOL_TRADE_EXEMODE);
    double order_price = (exec_mode == SYMBOL_TRADE_EXECUTION_MARKET) ? 0.0 : ((action_req == "BUY") ? ask : bid);
 
    if(action_req == "BUY")
