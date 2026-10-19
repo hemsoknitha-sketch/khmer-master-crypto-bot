@@ -1097,7 +1097,16 @@ class TradFiH4MarketStructureAnchor:
         veto_long = False
         reason = "Macro structure in consolidation."
 
-        if is_bullish and not (curr_p < ema200 * 0.992):
+        # Equilibrium Straddle Guard: If price is within +-0.25% of H4 EMA200 without triple stack alignment,
+        # the market is in a battle zone / boundary straddle. Vetoing opposite signals here causes whipsaws.
+        is_straddle = abs(curr_p - ema200) / max(ema200, 1.0) < 0.0025 and not is_triple_bullish and not is_triple_bearish
+
+        if is_straddle:
+            h4_bias = "NEUTRAL"
+            veto_short = False
+            veto_long = False
+            reason = f"{tf_prefix} Market Structure is in Equilibrium Straddle near EMA200 (${ema200:,.2f} +-0.25%). Neutral directional gravity."
+        elif is_bullish and not (curr_p < ema200 * 0.992):
             h4_bias = "BULLISH"
             veto_short = True
             veto_long = False
@@ -2443,6 +2452,17 @@ class SuperSmartCapitalCitadel:
                 reason = f"CRYPTO_BLOCKED: {s_epic} is blocked by Angkor Quant Fiduciary Guard. Capital.com trading is restricted strictly to GOLD (XAUUSD) and TradFi (Equities, Indices, Commodities)."
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
                 return False, reason, {"is_approved": False, "rejection_reason": reason}
+
+        # Pillar 0.2: 45-Minute Post-SL Universal Quarantine Lock (Invariant 35 & AQ80 Pillar 3)
+        try:
+            import capital_engine
+            is_q, rem_q, q_reason = capital_engine.is_asset_quarantined(s_epic)
+            if is_q:
+                reason = f"QUARANTINE_BLOCKED: {s_epic} is under active 45-minute post-SL quarantine ({int(rem_q)}s remaining) to eliminate revenge trading and knife loops."
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                return False, reason, {"is_approved": False, "rejection_reason": reason, "quarantine": True}
+        except Exception:
+            pass
 
         # Pillar 0.5: Super Admin Asset Control Shield (All Users)
         import database as db

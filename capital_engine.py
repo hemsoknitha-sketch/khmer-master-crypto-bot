@@ -154,6 +154,57 @@ DEFAULT_CAPITAL_PASSWORD = "Vipheavy@2297!"
 # Global In-Memory Shared RAM Cache for TradFi Quotes (< 0.05ms)
 _SHARED_PRICE_CACHE: Dict[str, Dict[str, Any]] = {}
 
+# ==============================================================================
+# UNIVERSAL IN-MEMORY 45-MINUTE POST-SL QUARANTINE LOCK (INVARIANT 35 & AQ80 PILLAR 3)
+# ==============================================================================
+_GLOBAL_ASSET_COOLDOWNS: Dict[str, float] = {}
+
+def set_global_asset_quarantine(epic: str, duration_seconds: float = 2700.0, reason: str = "SL_HIT") -> None:
+    """
+    Universal 45-Minute Post-SL Quarantine Lock (Invariant 35 & AQ80 Pillar 3):
+    Enforces an ironclad 45-minute (2700s) trading freeze across ALL engines (Auto, Scalp, ORB, Radar)
+    on any asset that took a stop-loss. Completely eliminates revenge trading and falling knife loops.
+    """
+    epic_u = str(epic or "").upper().strip()
+    resolved = EPIC_MAP.get(epic_u, epic_u)
+    expiry = time.time() + float(duration_seconds)
+    _GLOBAL_ASSET_COOLDOWNS[epic_u] = expiry
+    _GLOBAL_ASSET_COOLDOWNS[resolved] = expiry
+    try:
+        auto_eng = get_capital_auto_engine()
+        auto_eng._asset_cooldowns[epic_u] = expiry
+        auto_eng._asset_cooldowns[resolved] = expiry
+    except Exception:
+        pass
+    try:
+        scalp_eng = get_capital_trend_scalp_engine()
+        scalp_eng._asset_cooldowns[epic_u] = expiry
+        scalp_eng._asset_cooldowns[resolved] = expiry
+    except Exception:
+        pass
+    logger.warning(
+        f"🛑 [UNIVERSAL POST-SL QUARANTINE] {epic_u} ({resolved}) locked until "
+        f"{datetime.datetime.fromtimestamp(expiry, datetime.timezone.utc).strftime('%H:%M:%S UTC')} "
+        f"({int(duration_seconds / 60)}m anti-whipsaw guard engaged): {reason}"
+    )
+
+def is_asset_quarantined(epic: str) -> Tuple[bool, float, str]:
+    """
+    Checks if an asset is currently locked under 45-Minute Post-SL Quarantine.
+    Returns (is_quarantined: bool, remaining_seconds: float, reason: str).
+    """
+    epic_u = str(epic or "").upper().strip()
+    resolved = EPIC_MAP.get(epic_u, epic_u)
+    now = time.time()
+    t1 = _GLOBAL_ASSET_COOLDOWNS.get(epic_u, 0.0)
+    t2 = _GLOBAL_ASSET_COOLDOWNS.get(resolved, 0.0)
+    exp = max(t1, t2)
+    if exp > now:
+        rem = exp - now
+        return True, rem, f"POST_SL_QUARANTINE_ACTIVE ({int(rem)}s remaining)"
+    return False, 0.0, ""
+
+
 # MT5 Smart Money Concepts (SMC) Citadel Engine Integration (Invariant 53)
 try:
     from mt5_smc_citadel import MT5SMCCitadelEngine
@@ -626,6 +677,38 @@ class CapitalComEngine:
 
             conn.close()
 
+            # Direct Broker Transactions Audit (AQ80 Invariant 35 & Pillar 3):
+            # Fetches recent closed transactions directly from Capital.com to guarantee that any broker-side
+            # stop-loss event immediately locks that asset under 45-Minute Post-SL Quarantine across all engines.
+            try:
+                if self.cst_token and self.security_token:
+                    headers = {
+                        "X-CAP-API-KEY": self.api_key,
+                        "CST": self.cst_token,
+                        "X-SECURITY-TOKEN": self.security_token
+                    }
+                    res_tx = self.session.get(f"{self.base_url}/history/transactions?lastPeriod=7200", headers=headers, timeout=5)
+                    if res_tx.status_code == 200:
+                        tx_list = res_tx.json().get("transactions", [])
+                        for tx in tx_list:
+                            if tx.get("transactionType") == "TRADE":
+                                pnl_size = float(tx.get("size", 0.0) or 0.0)
+                                if pnl_size < 0:
+                                    tx_inst = str(tx.get("instrumentName") or "").upper().strip()
+                                    date_str = tx.get("dateUtc") or tx.get("date")
+                                    if date_str and tx_inst:
+                                        try:
+                                            clean_dt = date_str.split(".")[0].replace("Z", "")
+                                            tx_dt = datetime.datetime.fromisoformat(clean_dt).replace(tzinfo=datetime.timezone.utc)
+                                            elapsed = (datetime.datetime.now(datetime.timezone.utc) - tx_dt).total_seconds()
+                                            if 0 <= elapsed < 2700.0:
+                                                rem_q = 2700.0 - elapsed
+                                                set_global_asset_quarantine(tx_inst, duration_seconds=rem_q, reason=f"Broker-Confirmed Loss (${pnl_size:.2f})")
+                                        except Exception:
+                                            pass
+            except Exception as e_tx_audit:
+                logger.debug(f"Direct broker transaction audit note: {e_tx_audit}")
+
             if not all_open_trades:
                 return 0
 
@@ -674,17 +757,7 @@ class CapitalComEngine:
                         # Post-StopLoss Quarantine Lock: Blacklist asset for 45 minutes to prevent re-entry knife loops
                         quarantine_sec = 2700.0  # 45 minutes
                         epic_u = str(epic or "").upper()
-                        try:
-                            auto_eng = get_capital_auto_engine()
-                            auto_eng._asset_cooldowns[epic_u] = time.time() + quarantine_sec
-                        except Exception:
-                            pass
-                        try:
-                            scalp_eng = get_capital_trend_scalp_engine()
-                            scalp_eng.set_asset_cooldown(epic_u, duration_seconds=quarantine_sec)
-                        except Exception:
-                            pass
-                        logger.warning(f"🛑 [POST-SL QUARANTINE] {epic_u} took loss (${pnl:,.2f}). Quarantined for 45 minutes ({int(quarantine_sec/60)}m anti-whipsaw guard engaged).")
+                        set_global_asset_quarantine(epic_u, duration_seconds=quarantine_sec, reason=f"SL Hit Reconciled (${pnl:,.2f})")
 
             return reconciled
         except Exception as e_sync:
@@ -937,6 +1010,15 @@ class CapitalComEngine:
                     "success": False,
                     "error": f"CRYPTO_BLOCKED: {resolved_epic} trading is 100% disabled on Capital.com. Angkor Quant is dedicated to GOLD and TradFi (US Equities & Indices). Crypto execution belongs to Binance."
                 }
+
+        # Step 0.2: 45-Minute Post-SL Quarantine Lock (Invariant 35 & AQ80 Pillar 3)
+        is_q, rem_q, q_reason = is_asset_quarantined(resolved_epic)
+        if is_q:
+            logger.warning(f"🛑 [POST-SL QUARANTINE BLOCKED] Order blocked for {resolved_epic}: {q_reason}")
+            return {
+                "success": False,
+                "error": f"QUARANTINE_BLOCKED: {resolved_epic} is quarantined ({int(rem_q)}s remaining) after recent stop-loss to eliminate revenge trading and knife loops."
+            }
 
         # Step 0b: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
         if getattr(self, "_custom_chat_id", None) and self._custom_chat_id > 0:
@@ -2094,6 +2176,23 @@ class CapitalComEngine:
 
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
         dir_u = direction.upper()
+
+        # Pillar 0.1: Capital.com Crypto CFD Kill-Switch Guard (Invariant 80)
+        if is_crypto_cfd_instrument(resolved_epic):
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                return {
+                    "success": False,
+                    "error": f"CRYPTO_BLOCKED: {resolved_epic} trading is 100% disabled on Capital.com under Invariant 80."
+                }
+
+        # Pillar 0.2: 45-Minute Post-SL Quarantine Lock (Invariant 35 & AQ80 Pillar 3)
+        is_q, rem_q, q_reason = is_asset_quarantined(resolved_epic)
+        if is_q:
+            return {
+                "success": False,
+                "error": f"QUARANTINE_BLOCKED: {resolved_epic} is quarantined ({int(rem_q)}s remaining) after recent stop-loss to eliminate revenge trading and knife loops."
+            }
 
         # Pillar 0.8 / Invariant 77: Interbank Session Kill Zone & TradFi Weekend Gap Shield
         auto_cfg = db.get_capital_auto_config(user_cid or 0)
@@ -3358,6 +3457,10 @@ class CapitalAutonomousEngine:
             else:
                 raw_assets = []
 
+        # Invariant 80: Completely purge Crypto CFDs when capital_crypto_enabled is False
+        if not crypto_allowed:
+            raw_assets = [a for a in raw_assets if not is_crypto_cfd_instrument(a)]
+
         # Super Admin Asset Control Shield: purge any asset disabled by Super Admin for all users
         disabled_assets = set(db.get_capital_disabled_assets())
         if disabled_assets:
@@ -3369,6 +3472,31 @@ class CapitalAutonomousEngine:
         Fuses Google Macro Satellite + Technical Indicators + Radar signals:
         Returns institutional decision with score (0-100) and recommendation.
         """
+        # Step 0: 45-Minute Post-SL Quarantine Lock (Invariant 35 & AQ80 Pillar 3)
+        is_q, rem_q, q_reason = is_asset_quarantined(epic)
+        if is_q:
+            return {
+                "success": False,
+                "epic": epic,
+                "signal": "HOLD_NEUTRAL",
+                "final_action": "HOLD",
+                "final_confidence": 0.0,
+                "reason": f"Asset quarantined ({int(rem_q)}s remaining) after recent stop-loss to eliminate revenge trading."
+            }
+
+        # Step 0.1: Crypto CFD Gatekeeper (Invariant 80)
+        if is_crypto_cfd_instrument(epic):
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                return {
+                    "success": False,
+                    "epic": epic,
+                    "signal": "HOLD_NEUTRAL",
+                    "final_action": "HOLD",
+                    "final_confidence": 0.0,
+                    "reason": f"Crypto CFD {epic} is 100% disabled on Capital.com under Invariant 80."
+                }
+
         engine = get_capital_engine()
         base_quant = engine.evaluate_tradfi_quant_signal(epic)
         if not base_quant.get("success"):
@@ -8334,6 +8462,12 @@ class CapitalTrendScalpEngine:
             pass
         return purged
 
+    def set_asset_cooldown(self, epic: str, duration_seconds: float = 2700.0) -> None:
+        """Sets anti-whipsaw cooldown on an asset across RAM and global quarantine."""
+        epic_u = str(epic or "").upper().strip()
+        resolved = EPIC_MAP.get(epic_u, epic_u)
+        set_global_asset_quarantine(resolved, duration_seconds=duration_seconds, reason="SCALP_COOLDOWN")
+
     def get_armed_radar_traps(self) -> Dict[str, Dict[str, Any]]:
         """Returns active in-memory radar traps."""
         return dict(self._armed_radar_traps)
@@ -8398,6 +8532,10 @@ class CapitalTrendScalpEngine:
                 if crypto_allowed:
                     raw_majors.extend(["BTCUSD", "ETHUSD", "SOLUSD"])
 
+        # Invariant 80: Completely purge Crypto CFDs when capital_crypto_enabled is False
+        if not crypto_allowed:
+            raw_majors = [m for m in raw_majors if not is_crypto_cfd_instrument(m)]
+
         # Super Admin Asset Control Shield: purge any asset disabled by Super Admin for all users
         disabled_assets = set(db.get_capital_disabled_assets())
         if disabled_assets:
@@ -8410,6 +8548,28 @@ class CapitalTrendScalpEngine:
         and enforces Invariant 34 Spread Drag Elimination.
         """
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+
+        # Step 0: 45-Minute Post-SL Quarantine Lock (Invariant 35 & AQ80 Pillar 3)
+        is_q, rem_q, q_reason = is_asset_quarantined(resolved_epic)
+        if is_q:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": f"Asset quarantined ({int(rem_q)}s remaining) after recent stop-loss to eliminate revenge trading."
+            }
+
+        # Step 0.1: Crypto CFD Gatekeeper (Invariant 80)
+        if is_crypto_cfd_instrument(resolved_epic):
+            import database as db
+            if not db.is_capital_crypto_enabled():
+                return {
+                    "success": False,
+                    "epic": resolved_epic,
+                    "signal": "HOLD_NEUTRAL",
+                    "reason": f"Crypto CFD {resolved_epic} is 100% disabled on Capital.com under Invariant 80."
+                }
+
         eng = engine or get_capital_engine()
         market = eng.get_market_details(resolved_epic)
         if not market.get("success"):
@@ -8768,6 +8928,14 @@ class CapitalTrendScalpEngine:
             resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
             if resolved_epic in self._armed_radar_traps:
                 continue
+            # Pillar 0.2: 45-Minute Post-SL Quarantine Lock (Invariant 35)
+            if is_asset_quarantined(resolved_epic)[0]:
+                continue
+            # Pillar 0.1: Crypto CFD Gatekeeper (Invariant 80)
+            if is_crypto_cfd_instrument(resolved_epic):
+                import database as db
+                if not db.is_capital_crypto_enabled():
+                    continue
             try:
                 candles = await asyncio.to_thread(eng.get_historical_prices, resolved_epic, "MINUTE_15", 30)
                 if len(candles) < 15:
