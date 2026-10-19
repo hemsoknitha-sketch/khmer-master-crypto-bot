@@ -31,6 +31,8 @@ DESKTOP_DIR="$TARGET_HOME/Desktop"
 # 1. Force kill all stuck / zombie wine and MT5 processes & clean memory locks
 echo -e "${YELLOW}[1/5] 🧹 Purging all zombie Wine and MT5 processes...${NC}"
 pkill -9 -f "terminal64.exe" 2>/dev/null || true
+pkill -9 -f "metaeditor" 2>/dev/null || true
+pkill -9 -f "wine" 2>/dev/null || true
 pkill -9 -f "wineserver" 2>/dev/null || true
 wineserver -k 2>/dev/null || true
 sleep 1
