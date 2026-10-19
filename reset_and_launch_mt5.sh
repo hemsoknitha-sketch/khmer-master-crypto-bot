@@ -146,6 +146,8 @@ AllowDllImport=1
 Enabled=1
 Account=1
 Profile=Default
+WebRequest=1
+WebRequestUrl=http://127.0.0.1;http://127.0.0.1:5555;http://localhost;127.0.0.1;127.0.0.1:5555
 
 [Chart]
 Symbol=XAUUSD
@@ -169,6 +171,8 @@ AllowDllImport=1
 Enabled=1
 Account=1
 Profile=Default
+WebRequest=1
+WebRequestUrl=http://127.0.0.1;http://127.0.0.1:5555;http://localhost;127.0.0.1;127.0.0.1:5555
 
 [Chart]
 Symbol=XAUUSD
