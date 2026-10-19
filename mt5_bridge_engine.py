@@ -670,6 +670,213 @@ class MT5QuantumSignalCitadel:
             }
 
 
+class MT5GoldCandlestickEngine:
+    """
+    👑 REACHSEY SUPER SMART GOLD CANDLESTICK & MICRO-ORDERFLOW ENGINE
+    Specialized for sub-millisecond RAM scalping on Gold (XAUUSD):
+    1. Multi-Timeframe Candlestick Pattern Recognition (M15 Structural & M1 Micro).
+       - Bullish: Hammer, Inverted Hammer, Bullish Engulfing, Piercing Line, Dragonfly Doji, Bullish Marubozu
+       - Bearish: Shooting Star, Hanging Man, Bearish Engulfing, Dark Cloud Cover, Gravestone Doji, Bearish Marubozu
+    2. Real-Time Order Flow CVD Aggression & Whale Absorption (Taker Buy vs Taker Sell).
+    3. Live Tick Velocity & Micro-Momentum Delta (RAM Quote Velocity).
+    4. Confluence Scoring & Directional Recommendation (BUY, SELL, or WAIT).
+    """
+
+    @classmethod
+    def analyze_candlestick_patterns(cls, klines: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Analyzes a series of klines (OHLCV) and identifies high-probability 1-candle and 2-candle patterns.
+        """
+        if not klines or len(klines) < 2:
+            return {"bullish": [], "bearish": [], "bias": "NEUTRAL", "score": 0.0}
+
+        bullish = []
+        bearish = []
+
+        curr = klines[-1]
+        prev = klines[-2]
+
+        c_open = float(curr.get("open", 0.0))
+        c_high = float(curr.get("high", 0.0))
+        c_low = float(curr.get("low", 0.0))
+        c_close = float(curr.get("close", 0.0))
+
+        p_open = float(prev.get("open", 0.0))
+        p_high = float(prev.get("high", 0.0))
+        p_low = float(prev.get("low", 0.0))
+        p_close = float(prev.get("close", 0.0))
+
+        c_range = max(1e-6, c_high - c_low)
+        c_body = abs(c_close - c_open)
+        c_upper_wick = max(0.0, c_high - max(c_open, c_close))
+        c_lower_wick = max(0.0, min(c_open, c_close) - c_low)
+
+        p_range = max(1e-6, p_high - p_low)
+        p_body = abs(p_close - p_open)
+
+        # 1-CANDLE BULLISH PATTERNS
+        # Hammer (Pinbar rejection at low with long lower wick)
+        if c_lower_wick >= 1.8 * max(0.001, c_body) and c_upper_wick <= 0.40 * max(0.001, c_body) and c_body >= 0.08 * c_range:
+            bullish.append("Hammer (Pinbar Rejection)")
+
+        # Inverted Hammer (Reversal wick off bottom)
+        if c_upper_wick >= 1.8 * max(0.001, c_body) and c_lower_wick <= 0.40 * max(0.001, c_body) and c_body >= 0.08 * c_range and c_close <= p_close:
+            bullish.append("Inverted Hammer")
+
+        # Dragonfly Doji (Exhaustion rejection at bottom)
+        if c_body <= 0.08 * c_range and c_upper_wick <= 0.10 * c_range and c_lower_wick >= 0.60 * c_range:
+            bullish.append("Dragonfly Doji (Bottom Reversal)")
+
+        # Bullish Marubozu (Strong buying momentum thrust)
+        if c_close > c_open and c_body >= 0.82 * c_range:
+            bullish.append("Bullish Marubozu (Strong Thrust)")
+
+        # 1-CANDLE BEARISH PATTERNS
+        # Shooting Star (Pinbar rejection at high with long upper wick)
+        if c_upper_wick >= 1.8 * max(0.001, c_body) and c_lower_wick <= 0.40 * max(0.001, c_body) and c_body >= 0.08 * c_range:
+            bearish.append("Shooting Star (Pinbar Rejection)")
+
+        # Hanging Man (Rejection at peak)
+        if c_lower_wick >= 1.8 * max(0.001, c_body) and c_upper_wick <= 0.40 * max(0.001, c_body) and c_close >= p_close and c_body >= 0.08 * c_range:
+            bearish.append("Hanging Man (Exhaustion)")
+
+        # Gravestone Doji (Exhaustion rejection at peak)
+        if c_body <= 0.08 * c_range and c_lower_wick <= 0.10 * c_range and c_upper_wick >= 0.60 * c_range:
+            bearish.append("Gravestone Doji (Peak Reversal)")
+
+        # Bearish Marubozu (Strong selling momentum thrust)
+        if c_close < c_open and c_body >= 0.82 * c_range:
+            bearish.append("Bearish Marubozu (Strong Thrust)")
+
+        # 2-CANDLE PATTERNS
+        # Bullish Engulfing
+        if p_close < p_open and c_close > c_open:
+            if c_close >= p_open and c_open <= p_close and c_body > p_body:
+                bullish.append("Bullish Engulfing")
+
+        # Bearish Engulfing
+        if p_close > p_open and c_close < c_open:
+            if c_close <= p_open and c_open >= p_close and c_body > p_body:
+                bearish.append("Bearish Engulfing")
+
+        # Piercing Line (Bullish reversal)
+        p_mid = (p_open + p_close) / 2.0
+        if p_close < p_open and c_close > c_open:
+            if c_open <= p_close and c_close > p_mid and c_close < p_open:
+                bullish.append("Piercing Line")
+
+        # Dark Cloud Cover (Bearish reversal)
+        if p_close > p_open and c_close < c_open:
+            if c_open >= p_close and c_close < p_mid and c_close > p_open:
+                bearish.append("Dark Cloud Cover")
+
+        score = (len(bullish) * 15.0) - (len(bearish) * 15.0)
+        bias = "BULLISH" if score > 0 else ("BEARISH" if score < 0 else "NEUTRAL")
+
+        return {
+            "bullish": bullish,
+            "bearish": bearish,
+            "bias": bias,
+            "score": score
+        }
+
+    @classmethod
+    def evaluate_gold_scalp_momentum(cls, bridge_ref=None) -> Dict[str, Any]:
+        """
+        Comprehensive Super Smart evaluation combining:
+        - M15 Structural Candlestick Patterns
+        - M1 Micro Candlestick Patterns
+        - Order Flow CVD Aggression & Whale Absorption
+        - Live RSI Boundaries
+        """
+        candlestick_summary = []
+        action = None
+        confidence = 0.0
+        signal_reason = ""
+        order_flow_desc = "Order flow balanced"
+        order_flow_delta_pct = 50.0
+
+        try:
+            # 1. Fetch live 15m and 1m klines
+            klines_15m = market_data.get_klines("XAUUSDT", interval="15m", limit=35) or []
+            klines_1m = market_data.get_klines("XAUUSDT", interval="1m", limit=25) or []
+
+            pats_15m = cls.analyze_candlestick_patterns(klines_15m)
+            pats_1m = cls.analyze_candlestick_patterns(klines_1m)
+
+            bull_pats = list(dict.fromkeys(pats_15m.get("bullish", []) + pats_1m.get("bullish", [])))
+            bear_pats = list(dict.fromkeys(pats_15m.get("bearish", []) + pats_1m.get("bearish", [])))
+
+            # 2. Order Flow CVD Imbalance & Whale Absorption
+            taker_buy_vol = 0.0
+            total_vol = 0.0
+            if klines_1m:
+                for k in klines_1m[-5:]:
+                    vol = float(k.get("volume", 0.0) or 0.0)
+                    tb = float(k.get("taker_buy_base_asset_volume", 0.0) or (vol * 0.5))
+                    total_vol += vol
+                    taker_buy_vol += tb
+            if total_vol > 0:
+                order_flow_delta_pct = round((taker_buy_vol / total_vol) * 100.0, 1)
+
+            # Check CVD Absorption Divergence if dataframe available
+            cvd_bias = 0.0
+            try:
+                hist_df = market_data.get_historical_klines_1m("XAUUSDT", limit=20)
+                if hist_df is not None and len(hist_df) >= 15:
+                    cvd_res = market_data.get_cvd_absorption_divergence(hist_df)
+                    div_type = cvd_res.get("divergence", "NONE")
+                    if div_type == "BULLISH_ABSORPTION":
+                        cvd_bias = 1.0
+                        order_flow_desc = "Whale Limit Buying Absorbing Dumps (Institutional Accumulation)"
+                    elif div_type == "BEARISH_ABSORPTION":
+                        cvd_bias = -1.0
+                        order_flow_desc = "Whale Limit Selling Absorbing Pumps (Institutional Distribution)"
+                    else:
+                        order_flow_desc = f"Taker Buy Ratio: {order_flow_delta_pct}%"
+            except Exception:
+                order_flow_desc = f"Taker Buy Ratio: {order_flow_delta_pct}%"
+
+            # 3. RSI 15m
+            rsi_15m = 50.0
+            try:
+                rsi_15m = float(market_data.get_symbol_rsi("XAUUSDT", interval="15m"))
+            except Exception:
+                pass
+
+            # 4. Multi-Factor Synthesis
+            bull_score = len(bull_pats) * 20.0 + (pats_15m["score"] if pats_15m["score"] > 0 else 0)
+            bear_score = len(bear_pats) * 20.0 + (abs(pats_15m["score"]) if pats_15m["score"] < 0 else 0)
+
+            if order_flow_delta_pct >= 56.0 or cvd_bias > 0:
+                bull_score += 25.0
+            elif order_flow_delta_pct <= 44.0 or cvd_bias < 0:
+                bear_score += 25.0
+
+            if bull_score > bear_score and bull_score >= 30.0 and rsi_15m < 68.0:
+                action = "BUY"
+                confidence = min(98.5, 75.0 + bull_score * 0.25)
+                candlestick_summary = [f"🟢 {p}" for p in bull_pats] or ["🟢 Bullish Momentum Thrust"]
+                signal_reason = f"Candle_{'_'.join([p.split(' ')[0] for p in bull_pats[:2]]) or 'BullishFlow'}_CVD_{order_flow_delta_pct:.0f}%"
+            elif bear_score > bull_score and bear_score >= 30.0 and rsi_15m > 38.0:
+                action = "SELL"
+                confidence = min(98.5, 75.0 + bear_score * 0.25)
+                candlestick_summary = [f"🔴 {p}" for p in bear_pats] or ["🔴 Bearish Momentum Thrust"]
+                signal_reason = f"Candle_{'_'.join([p.split(' ')[0] for p in bear_pats[:2]]) or 'BearishFlow'}_CVD_{order_flow_delta_pct:.0f}%"
+
+        except Exception as ex_mom:
+            logger.debug(f"Gold scalp momentum eval note: {ex_mom}")
+
+        return {
+            "recommended_action": action,
+            "confidence": round(confidence, 1),
+            "signal_reason": signal_reason,
+            "candlestick_patterns": candlestick_summary,
+            "order_flow_desc": order_flow_desc,
+            "order_flow_delta_pct": order_flow_delta_pct
+        }
+
+
 class MT5BridgeEngine:
     _instance = None
     _lock = threading.Lock()
@@ -2357,6 +2564,20 @@ class MT5BridgeEngine:
             conf = 0.0
             reason = ""
 
+            # 0.5 Super Smart Gold Candlestick Pattern Engine & Order Flow CVD Perception
+            if "XAU" in clean_sym or "GOLD" in clean_sym:
+                try:
+                    gold_intel = MT5GoldCandlestickEngine.evaluate_gold_scalp_momentum(bridge_ref=self)
+                    g_act = gold_intel.get("recommended_action")
+                    g_conf = gold_intel.get("confidence", 0.0)
+                    g_rsn = gold_intel.get("signal_reason", "")
+                    if g_act in ["BUY", "SELL"] and g_conf >= 72.0:
+                        action = g_act
+                        conf = g_conf
+                        reason = g_rsn
+                except Exception:
+                    pass
+
             # 1. 9-SMC Multi-Timeframe Confluence
             try:
                 from mt5_smc_citadel import MT5SMCCitadelEngine
@@ -2704,10 +2925,8 @@ class MT5BridgeEngine:
                 primary_leg_lot = lot_val
                 hedge_leg_lot = lot_val
 
-        for leg_act, leg_tag, tp_mult, sl_mult in plan:
-            # Invariant 48: Indivisible Basket Cohabitation Standard
-            # ZERO broker-side SL/TP on individual legs! All 5 legs must stand together until profit!
-            # The Basket Harvester (monitor_reachsey_5pos_baskets) sweeps all 5 legs simultaneously.
+        def _dispatch_single_5pos_leg(plan_item):
+            leg_act, leg_tag, tp_mult, sl_mult = plan_item
             this_leg_lot = primary_leg_lot if ("LEG" in leg_tag) else hedge_leg_lot
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
             res = self.dispatch_order(
@@ -2722,14 +2941,20 @@ class MT5BridgeEngine:
                 magic=888666,
                 target_account=account_id
             )
-            dispatched_orders.append({
+            return {
                 "action": leg_act,
                 "lot": this_leg_lot,
                 "tag": leg_tag,
                 "tp_dist": 0.0,
                 "sl_dist": 0.0,
                 "result": res
-            })
+            }
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(plan), 5)) as plan_exec:
+            dispatched_orders = list(plan_exec.map(_dispatch_single_5pos_leg, plan))
+
+        for o in dispatched_orders:
+            res = o["result"]
             sig_id = res.get("signal_id", "")
             if sig_id and sig_id in self._signal_to_metadata:
                 self._signal_to_metadata[sig_id]["is_reachsey"] = True
@@ -2879,32 +3104,48 @@ class MT5BridgeEngine:
         signal_conf = 0.0
         signal_reason = ""
 
+        # Step 0.5: Query Super Smart MT5GoldCandlestickEngine for Candlestick Patterns & Order Flow CVD
+        scalp_intel = MT5GoldCandlestickEngine.evaluate_gold_scalp_momentum(bridge_ref=self)
+        candlestick_pats = scalp_intel.get("candlestick_patterns", [])
+        order_flow_desc = scalp_intel.get("order_flow_desc", "Order flow balanced")
+        rec_act = scalp_intel.get("recommended_action")
+        rec_conf = scalp_intel.get("confidence", 0.0)
+        rec_rsn = scalp_intel.get("signal_reason", "")
+
+        if not action and rec_act in ["BUY", "SELL"] and rec_conf >= 75.0:
+            action = rec_act
+            signal_conf = rec_conf
+            signal_reason = rec_rsn
+
         # Step 1: Query SMC & Macro Confluence if direction is not forced
-        if not action:
-            try:
-                from mt5_smc_citadel import MT5SMCCitadelEngine
-                smc_res = MT5SMCCitadelEngine.analyze_9_smc_confluence("XAUUSD")
-                smc_act = str(smc_res.get("action", "WAIT")).upper()
-                smc_conf = float(smc_res.get("confidence", 50.0) or 50.0)
-                if smc_act in ["BUY", "SELL"] and smc_conf >= 72.0:
+        try:
+            from mt5_smc_citadel import MT5SMCCitadelEngine
+            smc_res = MT5SMCCitadelEngine.analyze_9_smc_confluence("XAUUSD")
+            smc_act = str(smc_res.get("action", "WAIT")).upper()
+            smc_conf = float(smc_res.get("confidence", 50.0) or 50.0)
+            if smc_act in ["BUY", "SELL"] and smc_conf >= 70.0:
+                if action and action == smc_act:
+                    signal_conf = min(98.5, max(signal_conf, smc_conf) + 5.0)
+                    signal_reason = f"Confluence_{action}_{signal_conf:.1f}%"
+                elif not action:
                     action = smc_act
                     signal_conf = smc_conf
                     signal_reason = f"SMC_{smc_act}_{smc_conf:.1f}%"
-            except Exception as ex_smc:
-                logger.debug(f"Reachsey Gold SMC note: {ex_smc}")
+        except Exception as ex_smc:
+            logger.debug(f"Reachsey Gold SMC note: {ex_smc}")
 
-            try:
-                sig_act, conf, rsn = MT5QuantumSignalCitadel.evaluate_quantum_signal("XAUUSD", "XAUUSD")
-                if sig_act in ["BUY", "SELL"] and conf >= 75.0:
-                    if action and action == sig_act:
-                        signal_conf = min(98.5, max(signal_conf, conf) + 6.0)
-                        signal_reason = f"Confluence_{action}_{signal_conf:.1f}%"
-                    elif not action:
-                        action = sig_act
-                        signal_conf = conf
-                        signal_reason = rsn
-            except Exception as ex_q:
-                logger.debug(f"Reachsey Gold quantum signal note: {ex_q}")
+        try:
+            sig_act, conf, rsn = MT5QuantumSignalCitadel.evaluate_quantum_signal("XAUUSD", "XAUUSD")
+            if sig_act in ["BUY", "SELL"] and conf >= 75.0:
+                if action and action == sig_act:
+                    signal_conf = min(98.5, max(signal_conf, conf) + 6.0)
+                    signal_reason = f"Confluence_{action}_{signal_conf:.1f}%"
+                elif not action:
+                    action = sig_act
+                    signal_conf = conf
+                    signal_reason = rsn
+        except Exception as ex_q:
+            logger.debug(f"Reachsey Gold quantum signal note: {ex_q}")
 
         # Step 2: Live Klines Anti-Falling-Knife & Anti-Rising-Rocket Gatekeeper
         is_falling_knife = False
@@ -3029,10 +3270,10 @@ class MT5BridgeEngine:
 
         # Step 5: Sub-Millisecond Parallel Direct Socket Dispatch (100% Unidirectional)
         basket_id = f"R_GOLD_{account_id}_{int(now_ts)}"
-        dispatched_orders = []
+        start_dispatch_t = time.perf_counter()
 
-        for i in range(1, num_pos + 1):
-            leg_tag = f"R_GOLD_LEG_{i:02d}"
+        def _dispatch_single_gold_leg(idx: int):
+            leg_tag = f"R_GOLD_LEG_{idx:02d}"
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
             res = self.dispatch_order(
                 symbol=adapted_sym,
@@ -3046,6 +3287,17 @@ class MT5BridgeEngine:
                 magic=888666,
                 target_account=account_id
             )
+            return (idx, leg_tag, res)
+
+        max_workers = min(num_pos, 10)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            raw_results = list(executor.map(_dispatch_single_gold_leg, range(1, num_pos + 1)))
+
+        dispatch_latency_ms = round((time.perf_counter() - start_dispatch_t) * 1000.0, 2)
+        raw_results.sort(key=lambda x: x[0])
+
+        dispatched_orders = []
+        for idx, leg_tag, res in raw_results:
             dispatched_orders.append({
                 "action": action,
                 "lot": lot_per_pos,
@@ -3079,6 +3331,9 @@ class MT5BridgeEngine:
             "ratio": f"{len(dispatched_orders)}:0 (Unidirectional)",
             "confidence": round(signal_conf, 1),
             "signal_reason": signal_reason,
+            "candlestick_patterns": candlestick_pats,
+            "order_flow_desc": order_flow_desc,
+            "dispatch_latency_ms": dispatch_latency_ms,
             "net_delta": net_delta_val,
             "min_harvest_milestone": min_harvest_pnl,
             "target_profit": target_pnl,
@@ -3099,7 +3354,7 @@ class MT5BridgeEngine:
             "dispatched_tickets": set()
         }
         self._reachsey_baskets[basket_id] = basket_info
-        logger.info(f"👑 [REACHSEY GOLD APEX MATRIX DISPATCHED] Basket {basket_id} ({action} XAUUSD x {len(dispatched_orders)} Pos, Unidirectional 100%, Conf: {signal_conf:.1f}%, Lot: {lot_per_pos} each / Total: {tot_actual_lot} lots) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
+        logger.info(f"👑 [REACHSEY GOLD APEX MATRIX DISPATCHED] Basket {basket_id} ({action} XAUUSD x {len(dispatched_orders)} Pos in {dispatch_latency_ms}ms, Unidirectional 100%, Conf: {signal_conf:.1f}%, Lot: {lot_per_pos} each / Total: {tot_actual_lot} lots | Patterns: {candlestick_pats} | {order_flow_desc}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
 
         return {
             "success": True,
@@ -3115,6 +3370,9 @@ class MT5BridgeEngine:
             "ratio": f"{len(dispatched_orders)}:0 (100% Unidirectional)",
             "confidence": round(signal_conf, 1),
             "signal_reason": signal_reason,
+            "candlestick_patterns": candlestick_pats,
+            "order_flow_desc": order_flow_desc,
+            "dispatch_latency_ms": dispatch_latency_ms,
             "target_profit": target_pnl,
             "target_profit_usd": target_pnl if unit_label == "USD" else (target_pnl / 100.0),
             "min_harvest_milestone": min_harvest_pnl,
@@ -3247,11 +3505,18 @@ class MT5BridgeEngine:
                 b_data["status"] = "SWEPT_COMPLETED"
                 b_data["final_net_pnl"] = net_pnl
                 logger.info(f"🚀 [REACHSEY BASKET SWEEP] Sweeping Basket {b_id} on Account #{account_id}! Reason: {sweep_reason}. Rapidly closing {len(matching_positions)} positions simultaneously...")
-                for p in matching_positions:
-                    t_num = int(p.get("ticket", 0) or 0)
-                    t_sym = str(p.get("symbol", ""))
+                def _close_single_pos(p_item):
+                    t_num = int(p_item.get("ticket", 0) or 0)
+                    t_sym = str(p_item.get("symbol", ""))
                     if t_num > 0:
                         self.dispatch_close(ticket=t_num, symbol=t_sym, comment=f"SWEEP_{b_id[-4:]}", target_account=account_id)
+
+                if len(matching_positions) > 1:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(matching_positions), 10)) as close_exec:
+                        list(close_exec.map(_close_single_pos, matching_positions))
+                else:
+                    for p in matching_positions:
+                        _close_single_pos(p)
 
                 # Basket-Level Circuit Breaker Tracking (Invariant 48)
                 streak_key = f"{account_id}_{target_sym}"
