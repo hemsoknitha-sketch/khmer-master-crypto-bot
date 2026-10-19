@@ -55,13 +55,15 @@ if [ ! -f "$WORKSPACE_BRIDGE" ]; then
     WORKSPACE_BRIDGE="$(dirname "$0")/KhmerMasterCrypto_Bridge.mq5"
 fi
 if [ -f "$WORKSPACE_BRIDGE" ]; then
-    mkdir -p "$MT5_ADMIN/MQL5/Experts" "$MT5_PLATFORM/MQL5/Experts"
+    mkdir -p "$MT5_ADMIN/MQL5/Experts/Advisors" "$MT5_PLATFORM/MQL5/Experts/Advisors"
     cp -f "$WORKSPACE_BRIDGE" "$MT5_ADMIN/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
     cp -f "$WORKSPACE_BRIDGE" "$MT5_PLATFORM/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    cp -f "$WORKSPACE_BRIDGE" "$MT5_ADMIN/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    cp -f "$WORKSPACE_BRIDGE" "$MT5_PLATFORM/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
     if [ -d "$DESKTOP_DIR" ]; then
         cp -f "$WORKSPACE_BRIDGE" "$DESKTOP_DIR/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
     fi
-    echo -e "   ${GREEN}✅ Synced latest KhmerMasterCrypto_Bridge.mq5 to all MT5 Experts directories!${NC}"
+    echo -e "   ${GREEN}✅ Synced latest KhmerMasterCrypto_Bridge.mq5 to all MT5 Experts & Advisors directories!${NC}"
 fi
 
 # 3. Detect the EXACT display the user is currently viewing
@@ -107,7 +109,8 @@ for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
                 sleep 1
             done
             if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
-                echo -e "   ${GREEN}🎯 SUCCESS: KhmerMasterCrypto_Bridge.ex5 compiled in $(basename "$MT5_DIR")!${NC}"
+                cp -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$MT5_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+                echo -e "   ${GREEN}🎯 SUCCESS: KhmerMasterCrypto_Bridge.ex5 compiled and linked to Advisors in $(basename "$MT5_DIR")!${NC}"
             else
                 echo -e "   ${YELLOW}⚠️ Check compile.log in $(basename "$MT5_DIR")/MQL5/Experts/compile.log${NC}"
                 cat "$MT5_DIR/MQL5/Experts/compile.log" 2>/dev/null || true
@@ -119,17 +122,27 @@ for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
 done
 echo -e "   ${GREEN}✅ Compilation check completed!${NC}"
 
-# 4. Configure startup.ini for Super Admin MT5 (52135153) (Retcode 10027 Shield)
+# 4. Configure startup.ini for Super Admin MT5 (52135153) (Auto-Attach Bridge EA Shield)
 cat << 'EOF' > "$MT5_PLATFORM/startup.ini"
 [Common]
 Login=52135153
 Server=GTCGlobalSA-Server 2
+
+[StartUp]
+Expert=KhmerMasterCrypto_Bridge
+Symbol=XAUUSD
+Period=M15
 
 [Experts]
 AllowDllImport=1
 Enabled=1
 Account=1
 Profile=Default
+
+[Chart]
+Symbol=XAUUSD
+Period=M15
+Expert=KhmerMasterCrypto_Bridge
 EOF
 chown "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM/startup.ini"
 
@@ -138,11 +151,21 @@ cat << 'EOF' > "$MT5_ADMIN/startup.ini"
 Login=52135153
 Server=GTCGlobalSA-Server 2
 
+[StartUp]
+Expert=KhmerMasterCrypto_Bridge
+Symbol=XAUUSD
+Period=M15
+
 [Experts]
 AllowDllImport=1
 Enabled=1
 Account=1
 Profile=Default
+
+[Chart]
+Symbol=XAUUSD
+Period=M15
+Expert=KhmerMasterCrypto_Bridge
 EOF
 chown "$TARGET_USER:$TARGET_USER" "$MT5_ADMIN/startup.ini"
 

@@ -3820,17 +3820,28 @@ class MT5BridgeEngine:
 
                 for chat_id in active_users:
                     now_ts = time.time()
+                    is_real_admin = (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
+                    super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+
                     cfg = db.get_user_mt5_config(chat_id)
-                    raw_acc = str(cfg.get("login", "")).strip()
+                    raw_acc = str(cfg.get("login", "")).strip() if cfg else ""
                     clean_digits = re.sub(r'[^0-9]', '', raw_acc)
                     acc_id = clean_digits if clean_digits else raw_acc
+
+                    # Super Admin Fallback: Auto-resolve to Master Trading Account if not explicitly bound
+                    if not acc_id and is_real_admin:
+                        for master_acc in ["52135153", "52133938"]:
+                            if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
+                                acc_id = master_acc
+                                break
+                        if not acc_id:
+                            acc_id = getattr(db, "MT5_SUPER_ADMIN_TRADING_ACCOUNT", "52135153")
+
                     if not acc_id:
                         continue
 
                     # Strict Admin Account Access Control (Invariants 1.1, 10, 44):
                     # Super Admin MT5 accounts belong EXCLUSIVELY to authorized Admins!
-                    super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
-                    is_real_admin = (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
                     if not is_real_admin and acc_id in super_admins:
                         db.unbind_user_mt5_config(chat_id)
                         if (now_ts - self._last_admin_hijack_warn.get(chat_id, 0.0)) > 86400.0:

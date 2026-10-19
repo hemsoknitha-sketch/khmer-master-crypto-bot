@@ -92,12 +92,18 @@ if [ -f "KhmerMasterCrypto_Bridge.mq5" ]; then
     # Dynamically sync to all active MT5 instances (Admin, Platform, and all VIP client instances)
     for WINE_DIR in "$TARGET_HOME/.wine/drive_c/Program Files"/MetaTrader\ 5*; do
         if [ -d "$WINE_DIR/MQL5/Experts" ]; then
+            mkdir -p "$WINE_DIR/MQL5/Experts/Advisors" 2>/dev/null || true
             cp -f KhmerMasterCrypto_Bridge.mq5 "$WINE_DIR/MQL5/Experts/" 2>/dev/null || true
+            cp -f KhmerMasterCrypto_Bridge.mq5 "$WINE_DIR/MQL5/Experts/Advisors/" 2>/dev/null || true
             chown -R "$TARGET_USER:$TARGET_USER" "$WINE_DIR/MQL5/Experts" 2>/dev/null || true
             EDITOR_BIN=$(find "$WINE_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
             if [ -n "$EDITOR_BIN" ]; then
                 echo "⚙️ [MT5] Compiling KhmerMasterCrypto_Bridge.mq5 in $(basename "$WINE_DIR")..."
                 DISPLAY="${DISPLAY:-:10.0}" wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true
+                sleep 2
+                if [ -f "$WINE_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
+                    cp -f "$WINE_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$WINE_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+                fi
             fi
         fi
     done
