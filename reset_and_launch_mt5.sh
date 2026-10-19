@@ -49,10 +49,12 @@ if [ -d "$DESKTOP_DIR" ]; then
 fi
 echo -e "   ${GREEN}✅ Permissions fully restored (Zero EACCES errors)!${NC}"
 
-# 2.1 Sync latest KhmerMasterCrypto_Bridge.mq5 into Experts directories
+# 2.1 Sync latest KhmerMasterCrypto_Bridge.mq5 and .ex5 into Experts directories
 WORKSPACE_BRIDGE="/opt/khmer-master-crypto-bot/KhmerMasterCrypto_Bridge.mq5"
+WORKSPACE_BRIDGE_EX5="/opt/khmer-master-crypto-bot/KhmerMasterCrypto_Bridge.ex5"
 if [ ! -f "$WORKSPACE_BRIDGE" ]; then
     WORKSPACE_BRIDGE="$(dirname "$0")/KhmerMasterCrypto_Bridge.mq5"
+    WORKSPACE_BRIDGE_EX5="$(dirname "$0")/KhmerMasterCrypto_Bridge.ex5"
 fi
 if [ -f "$WORKSPACE_BRIDGE" ]; then
     mkdir -p "$MT5_ADMIN/MQL5/Experts/Advisors" "$MT5_PLATFORM/MQL5/Experts/Advisors"
@@ -60,10 +62,17 @@ if [ -f "$WORKSPACE_BRIDGE" ]; then
     cp -f "$WORKSPACE_BRIDGE" "$MT5_PLATFORM/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
     cp -f "$WORKSPACE_BRIDGE" "$MT5_ADMIN/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
     cp -f "$WORKSPACE_BRIDGE" "$MT5_PLATFORM/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    if [ -f "$WORKSPACE_BRIDGE_EX5" ]; then
+        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_ADMIN/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_PLATFORM/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_ADMIN/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_PLATFORM/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+    fi
     if [ -d "$DESKTOP_DIR" ]; then
         cp -f "$WORKSPACE_BRIDGE" "$DESKTOP_DIR/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+        [ -f "$WORKSPACE_BRIDGE_EX5" ] && cp -f "$WORKSPACE_BRIDGE_EX5" "$DESKTOP_DIR/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
     fi
-    echo -e "   ${GREEN}✅ Synced latest KhmerMasterCrypto_Bridge.mq5 to all MT5 Experts & Advisors directories!${NC}"
+    echo -e "   ${GREEN}✅ Synced latest KhmerMasterCrypto_Bridge.mq5 & .ex5 to all MT5 Experts & Advisors directories!${NC}"
 fi
 
 # 3. Detect the EXACT display the user is currently viewing
@@ -93,34 +102,31 @@ fi
 ACTIVE_DISPLAY="${ACTIVE_DISPLAY:-:10.0}"
 echo -e "   ${CYAN}🎯 Targeted Display Screen: ${BOLD}${GREEN}$ACTIVE_DISPLAY${NC}"
 
-# 3.1 Auto-compile latest KhmerMasterCrypto_Bridge.mq5 into .ex5 via MetaEditor
-echo -e "${YELLOW}[3.1/5] ⚙️ Auto-compiling latest KhmerMasterCrypto_Bridge.mq5 into .ex5...${NC}"
+# 3.1 Verify and ensure KhmerMasterCrypto_Bridge.ex5 is present in Advisors
+echo -e "${YELLOW}[3.1/5] ⚙️ Verifying KhmerMasterCrypto_Bridge.ex5 in Advisors...${NC}"
 for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
     if [ -d "$MT5_DIR" ]; then
-        EDITOR_BIN=$(find "$MT5_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
-        MQ5_FILE="$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5"
-        if [ -n "$EDITOR_BIN" ] && [ -f "$MQ5_FILE" ]; then
-            echo -e "   ${CYAN}⚙️ Found compiler: $(basename "$EDITOR_BIN") in $(basename "$MT5_DIR")...${NC}"
-            cd "$MT5_DIR" && DISPLAY="$ACTIVE_DISPLAY" wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true
-            for i in $(seq 1 5); do
-                if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
-                    break
-                fi
-                sleep 1
-            done
-            if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
-                cp -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$MT5_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-                echo -e "   ${GREEN}🎯 SUCCESS: KhmerMasterCrypto_Bridge.ex5 compiled and linked to Advisors in $(basename "$MT5_DIR")!${NC}"
-            else
-                echo -e "   ${YELLOW}⚠️ Check compile.log in $(basename "$MT5_DIR")/MQL5/Experts/compile.log${NC}"
-                cat "$MT5_DIR/MQL5/Experts/compile.log" 2>/dev/null || true
-            fi
+        mkdir -p "$MT5_DIR/MQL5/Experts/Advisors" 2>/dev/null || true
+        # Ensure .ex5 is copied into Advisors
+        if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
+            cp -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$MT5_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+            echo -e "   ${GREEN}🎯 SUCCESS: Verified KhmerMasterCrypto_Bridge.ex5 in $(basename "$MT5_DIR")/MQL5/Experts/Advisors!${NC}"
         else
-            echo -e "   ${YELLOW}ℹ️ Compiler: ${EDITOR_BIN:-Not Found} | MQ5: $MQ5_FILE${NC}"
+            # Only compile if .ex5 is missing, and strictly use timeout 10s to prevent hang
+            EDITOR_BIN=$(find "$MT5_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
+            MQ5_FILE="$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5"
+            if [ -n "$EDITOR_BIN" ] && [ -f "$MQ5_FILE" ]; then
+                echo -e "   ${CYAN}⚙️ Attempting wine compile with 10s timeout in $(basename "$MT5_DIR")...${NC}"
+                (cd "$MT5_DIR" && timeout 10s wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true)
+                if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
+                    cp -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$MT5_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+                    echo -e "   ${GREEN}🎯 SUCCESS: KhmerMasterCrypto_Bridge.ex5 compiled and linked to Advisors!${NC}"
+                fi
+            fi
         fi
     fi
 done
-echo -e "   ${GREEN}✅ Compilation check completed!${NC}"
+echo -e "   ${GREEN}✅ Compilation and sync check completed!${NC}"
 
 # 4. Configure startup.ini for Super Admin MT5 (52135153) (Auto-Attach Bridge EA Shield)
 cat << 'EOF' > "$MT5_PLATFORM/startup.ini"

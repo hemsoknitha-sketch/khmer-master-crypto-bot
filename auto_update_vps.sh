@@ -95,23 +95,29 @@ if [ -f "KhmerMasterCrypto_Bridge.mq5" ]; then
             mkdir -p "$WINE_DIR/MQL5/Experts/Advisors" 2>/dev/null || true
             cp -f KhmerMasterCrypto_Bridge.mq5 "$WINE_DIR/MQL5/Experts/" 2>/dev/null || true
             cp -f KhmerMasterCrypto_Bridge.mq5 "$WINE_DIR/MQL5/Experts/Advisors/" 2>/dev/null || true
+            if [ -f "KhmerMasterCrypto_Bridge.ex5" ]; then
+                cp -f KhmerMasterCrypto_Bridge.ex5 "$WINE_DIR/MQL5/Experts/" 2>/dev/null || true
+                cp -f KhmerMasterCrypto_Bridge.ex5 "$WINE_DIR/MQL5/Experts/Advisors/" 2>/dev/null || true
+            fi
             chown -R "$TARGET_USER:$TARGET_USER" "$WINE_DIR/MQL5/Experts" 2>/dev/null || true
-            EDITOR_BIN=$(find "$WINE_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
-            if [ -n "$EDITOR_BIN" ]; then
-                echo "⚙️ [MT5] Compiling KhmerMasterCrypto_Bridge.mq5 in $(basename "$WINE_DIR")..."
-                DISPLAY="${DISPLAY:-:10.0}" wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true
-                sleep 2
-                if [ -f "$WINE_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
-                    cp -f "$WINE_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$WINE_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+            if [ ! -f "$WINE_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
+                EDITOR_BIN=$(find "$WINE_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
+                if [ -n "$EDITOR_BIN" ]; then
+                    echo "⚙️ [MT5] Compiling KhmerMasterCrypto_Bridge.mq5 in $(basename "$WINE_DIR")..."
+                    (cd "$WINE_DIR" && timeout 10s wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true)
+                    if [ -f "$WINE_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
+                        cp -f "$WINE_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$WINE_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
+                    fi
                 fi
             fi
         fi
     done
     if [ -d "$TARGET_HOME/Desktop" ]; then
         cp -f KhmerMasterCrypto_Bridge.mq5 "$TARGET_HOME/Desktop/" 2>/dev/null || true
-        chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/Desktop/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+        [ -f "KhmerMasterCrypto_Bridge.ex5" ] && cp -f KhmerMasterCrypto_Bridge.ex5 "$TARGET_HOME/Desktop/" 2>/dev/null || true
+        chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/Desktop/KhmerMasterCrypto_Bridge."* 2>/dev/null || true
     fi
-    echo "🏛️ [MT5] Staged & compiled updated KhmerMasterCrypto_Bridge to all MT5 instances."
+    echo "🏛️ [MT5] Staged & synced updated KhmerMasterCrypto_Bridge (.ex5 & .mq5) to all MT5 instances."
 fi
 
 # 4.1 Auto-Inject Capital.com Demo Credentials to .env if Missing
