@@ -2800,11 +2800,11 @@ class MT5BridgeEngine:
             except Exception as ex_rsi:
                 logger.warning(f"⚠️ Reachsey RSI trend check notice: {ex_rsi}")
 
-        # Strict Fiduciary Protection: If market is consolidating or choppy (confidence < 75%),
+        # Strict Fiduciary Protection: If market is consolidating or choppy (confidence < 80%),
         # NEVER gamble with a 5-position matrix. Abort dispatch and preserve 100% capital!
-        if action not in ["BUY", "SELL"] or signal_conf < 75.0:
-            logger.info(f"⏸️ [REACHSEY DISPATCH ABORTED] Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). No high-conviction directional edge! Capital 100% Protected!")
-            return {"success": False, "reason": f"Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). 100% Capital Protected (Zero Blind Trading)."}
+        if action not in ["BUY", "SELL"] or signal_conf < 80.0:
+            logger.info(f"⏸️ [REACHSEY DISPATCH ABORTED] Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}% < 80%). No high-conviction directional edge! Capital 100% Protected!")
+            return {"success": False, "reason": f"Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}% < 80%). 100% Capital Protected (Zero Blind Trading)."}
 
         # 100% Unidirectional Momentum Standard (Zero Opposite Hedge Drag):
         # Eliminates opposite losing positions fighting each other.
@@ -2866,9 +2866,11 @@ class MT5BridgeEngine:
                 lot_val = 0.01
                 primary_leg_lot = 0.01
                 hedge_leg_lot = 0.01
-            target_pnl = max(2.50, round(real_usd * 0.10, 2))
-            min_harvest_pnl = max(1.00, round(real_usd * 0.04, 2))
-            floor_pnl = max(4.50, round(real_usd * 0.18, 2))
+            # Wide Breathing Room: Never choke trades on micro oscillations ($0.50-$1.00 noise).
+            # Allows Gold to breathe through normal pullback wicks before surging to target.
+            target_pnl = max(15.00, round(real_usd * 0.15, 2))
+            min_harvest_pnl = max(8.00, round(real_usd * 0.08, 2))
+            floor_pnl = max(20.00, round(real_usd * 0.20, 2))
         else:
             lot_val = max(0.01, float(lot_per_pos or lot_val or 0.20))
             if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
@@ -3414,16 +3416,11 @@ class MT5BridgeEngine:
             should_sweep = False
             sweep_reason = ""
 
-            # Invariant 48: Indivisible Basket Cohabitation & Anti-Decoupling Shield
-            # "លុបចោលការរត់ចោលគ្នា ត្រូវឈររួមជាមួយគ្នារហូតទាល់តែកើបប្រាក់ចំណេញទើបបិតព្រមគ្នាក្នុងល្បឿនលឿនបំផុត"
-            # If any leg was prematurely closed outside our control (broker anomaly / manual intervention)
-            # leaving remaining legs nakedly exposed without their hedge:
-            expected_legs = len(b_data.get("orders", [])) or 5
-            if 0 < len(matching_positions) < expected_legs and (now_ts - b_data.get("created_at", 0.0)) > 10.0:
-                should_sweep = True
-                sweep_reason = f"ANTI_DECOUPLING_EMERGENCY_RECONCILIATION ({len(matching_positions)}/{expected_legs} legs open - Sweeping all remaining to prevent unhedged exposure!)"
-                logger.error(f"🛑 [ANTI-DECOUPLING SHIELD] Basket {b_id} on Account #{account_id} lost leg symmetry ({len(matching_positions)}/{expected_legs} open)! Emergency sweeping remaining legs immediately!")
-            elif net_pnl >= target_p:
+            # Unidirectional Cohesion (Invariant 48):
+            # All legs ride the trend together in the same direction.
+            # Only sweep when Net Profit target is reached, Trailing Ratchet locks cash,
+            # or Structural Hard Floor is breached. Never panic-sweep on minor latency!
+            if net_pnl >= target_p:
                 should_sweep = True
                 sweep_reason = f"TARGET_NET_PROFIT_HIT (+{net_pnl:,.2f} {unit} >= +{target_p:,.2f} {unit})"
             elif net_pnl >= min_harvest:
@@ -3954,8 +3951,11 @@ class MT5BridgeEngine:
                             gold_ratchet_peak = 10.00
                             fx_be_trigger = max(3.50, base_risk_usd * 1.5)
                             fx_ratchet_peak = 8.00
-                            scaled_profit_target = profit_target_usd
-                            scaled_max_risk = max(5.00, base_risk_usd * 2.0)
+                            scaled_profit_target = max(profit_target_usd, 15.00)
+                            # Wide Volatility Breathing Room (Invariant 35):
+                            # Never cut positions on micro oscillations ($0.50-$1.50 noise).
+                            # Allows normal intraday wicks to breathe so trade can run to profit targets!
+                            scaled_max_risk = max(25.00, base_risk_usd * 4.0)
 
                         # Track peak profit
                         peak = self._ticket_peak_profit.get(ticket, 0.0)
