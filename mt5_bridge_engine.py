@@ -2534,17 +2534,8 @@ class MT5BridgeEngine:
         existing_basket_syms = existing_basket_syms or set()
         broker_open_syms = broker_open_syms or set()
 
-        if is_cent_account:
-            # Cent Account Universe: High-liquidity metals & major forex pairs with cent contract availability
-            candidates = ["XAUUSD", "XAGUSD", "EURUSD", "GBPUSD", "USDJPY", "GBPJPY", "EURJPY"]
-        else:
-            # Standard USD Multi-Asset Universe: Metals, Crypto, Indices, High-Beta FX
-            candidates = [
-                "XAUUSD", "XAGUSD",              # Precious Metals
-                "BTCUSD", "ETHUSD", "SOLUSD",    # High-Velocity Crypto
-                "US30", "US100", "GER40",        # Global Mega Indices
-                "GBPJPY", "EURJPY", "GBPUSD"     # High-Beta Forex
-            ]
+        # Reachsey Gold Specialization: 100% Pure XAUUSD Focus (Zero Forex / Crypto / Index Contamination)
+        candidates = ["XAUUSD"]
 
         session = self.clients.get(str(account_id))
         scored_candidates: List[Tuple[float, str, str, str]] = []
@@ -2832,48 +2823,27 @@ class MT5BridgeEngine:
             logger.info(f"⏸️ [REACHSEY DISPATCH ABORTED] Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). No high-conviction directional edge! Capital 100% Protected!")
             return {"success": False, "reason": f"Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). 100% Capital Protected (Zero Blind Trading)."}
 
-        # Standard Institutional Rebate & Fast-Exit Architecture (3:2 Skew Standard):
-        # - Primary: 3 Positions = 0.60 Lot (0.20 x 3)
-        # - Hedge:   2 Positions = 0.40 Lot (0.20 x 2)
-        # - Total Volume = 1.00 Lot (Maximized Rebate Turnover with 80% Reduced Market Risk)
-        # - Net Delta = 0.20 Lot (Low Drawdown, Rapid Profit Harvest & Fast Market Exit)
+        # 100% Unidirectional Momentum Standard (Zero Opposite Hedge Drag):
+        # Eliminates opposite losing positions fighting each other.
+        # Single spread friction only. When Gold pushes, all 5 positions bank profit together!
         is_extreme_skew = bool(kwargs.get("extreme_skew", False))
-        ratio_label = "4:1" if is_extreme_skew else "3:2"
-
+        ratio_label = "5:0 Unidirectional"
         if action == "BUY":
-            if is_extreme_skew:
-                plan = [
-                    ("BUY", "R5_LEG_1", 0.0, 0.0),
-                    ("BUY", "R5_LEG_2", 0.0, 0.0),
-                    ("BUY", "R5_LEG_3", 0.0, 0.0),
-                    ("BUY", "R5_LEG_4", 0.0, 0.0),
-                    ("SELL", "R5_HEDGE_5", 0.0, 0.0)
-                ]
-            else:
-                plan = [
-                    ("BUY", "R5_LEG_1", 0.0, 0.0),
-                    ("BUY", "R5_LEG_2", 0.0, 0.0),
-                    ("BUY", "R5_LEG_3", 0.0, 0.0),
-                    ("SELL", "R5_HEDGE_4", 0.0, 0.0),
-                    ("SELL", "R5_HEDGE_5", 0.0, 0.0)
-                ]
+            plan = [
+                ("BUY", "R5_LEG_1", 0.0, 0.0),
+                ("BUY", "R5_LEG_2", 0.0, 0.0),
+                ("BUY", "R5_LEG_3", 0.0, 0.0),
+                ("BUY", "R5_LEG_4", 0.0, 0.0),
+                ("BUY", "R5_LEG_5", 0.0, 0.0)
+            ]
         else:
-            if is_extreme_skew:
-                plan = [
-                    ("SELL", "R5_LEG_1", 0.0, 0.0),
-                    ("SELL", "R5_LEG_2", 0.0, 0.0),
-                    ("SELL", "R5_LEG_3", 0.0, 0.0),
-                    ("SELL", "R5_LEG_4", 0.0, 0.0),
-                    ("BUY", "R5_HEDGE_5", 0.0, 0.0)
-                ]
-            else:
-                plan = [
-                    ("SELL", "R5_LEG_1", 0.0, 0.0),
-                    ("SELL", "R5_LEG_2", 0.0, 0.0),
-                    ("SELL", "R5_LEG_3", 0.0, 0.0),
-                    ("BUY", "R5_HEDGE_4", 0.0, 0.0),
-                    ("BUY", "R5_HEDGE_5", 0.0, 0.0)
-                ]
+            plan = [
+                ("SELL", "R5_LEG_1", 0.0, 0.0),
+                ("SELL", "R5_LEG_2", 0.0, 0.0),
+                ("SELL", "R5_LEG_3", 0.0, 0.0),
+                ("SELL", "R5_LEG_4", 0.0, 0.0),
+                ("SELL", "R5_LEG_5", 0.0, 0.0)
+            ]
 
         is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
@@ -4364,14 +4334,14 @@ class MT5BridgeEngine:
                                     target_sym, target_act, target_conf, target_rsn = best_cand
                                     logger.info(f"👑 [REACHSEY MOMENTUM RADAR] Selected Top High-Velocity Asset: {target_sym} ({target_act} | Score: {target_conf:.1f}% | {target_rsn})")
                                 else:
-                                    candidate_syms = ["XAUUSD"] if is_cent_account else ["XAUUSD", "BTCUSD", "ETHUSD", "US30", "US100"]
+                                    candidate_syms = ["XAUUSD"]
                                     for cs in candidate_syms:
                                         if cs not in existing_basket_syms and cs not in broker_open_syms:
                                             target_sym = cs
                                             break
 
                                 if target_sym:
-                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | 3 Primary = 0.60 Lot, 2 Hedge = 0.40 Lot | Total: 1.00 Lot)...")
+                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position Unidirectional matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | 5 Pos @ 0.20 Lot | 100% Directional Thrust)...")
                                     threading.Thread(
                                         target=self.execute_reachsey_5pos_matrix,
                                         kwargs={
