@@ -216,28 +216,10 @@ def is_mt5_supported_symbol(symbol: str) -> Tuple[bool, str]:
 # =========================================================================
 APEX_OMNI_UNIVERSE = [
     {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.01, "category": "Metals", "name": "Gold / USD"},
+    {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.01, "category": "Metals", "name": "Silver / USD"},
     {"symbol": "BTCUSD", "raw_symbol": "BTCUSD", "lot_size": 0.01, "category": "Crypto", "name": "Bitcoin / USD"},
     {"symbol": "ETHUSD", "raw_symbol": "ETHUSD", "lot_size": 0.01, "category": "Crypto", "name": "Ethereum / USD"},
     {"symbol": "SOLUSD", "raw_symbol": "SOLUSD", "lot_size": 0.01, "category": "Crypto", "name": "Solana / USD"},
-    {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.01, "category": "Forex", "name": "Euro / USD"},
-    {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.01, "category": "Forex", "name": "GBP / USD"},
-    {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.01, "category": "Forex", "name": "USD / JPY"},
-    {"symbol": "AUDUSD", "raw_symbol": "AUDUSD", "lot_size": 0.01, "category": "Forex", "name": "AUD / USD"},
-    {"symbol": "USDCAD", "raw_symbol": "USDCAD", "lot_size": 0.01, "category": "Forex", "name": "USD / CAD"},
-    {"symbol": "USDCHF", "raw_symbol": "USDCHF", "lot_size": 0.01, "category": "Forex", "name": "USD / CHF"},
-    {"symbol": "NZDUSD", "raw_symbol": "NZDUSD", "lot_size": 0.01, "category": "Forex", "name": "NZD / USD"},
-    {"symbol": "EURJPY", "raw_symbol": "EURJPY", "lot_size": 0.01, "category": "Forex", "name": "EUR / JPY"},
-    {"symbol": "GBPJPY", "raw_symbol": "GBPJPY", "lot_size": 0.01, "category": "Forex", "name": "GBP / JPY"},
-    {"symbol": "AUDJPY", "raw_symbol": "AUDJPY", "lot_size": 0.01, "category": "Forex", "name": "AUD / JPY"},
-    {"symbol": "CADJPY", "raw_symbol": "CADJPY", "lot_size": 0.01, "category": "Forex", "name": "CAD / JPY"},
-    {"symbol": "EURGBP", "raw_symbol": "EURGBP", "lot_size": 0.01, "category": "Forex", "name": "EUR / GBP"},
-    {"symbol": "EURAUD", "raw_symbol": "EURAUD", "lot_size": 0.01, "category": "Forex", "name": "EUR / AUD"},
-    {"symbol": "GBPAUD", "raw_symbol": "GBPAUD", "lot_size": 0.01, "category": "Forex", "name": "GBP / AUD"},
-    {"symbol": "EURCAD", "raw_symbol": "EURCAD", "lot_size": 0.01, "category": "Forex", "name": "EUR / CAD"},
-    {"symbol": "GBPCAD", "raw_symbol": "GBPCAD", "lot_size": 0.01, "category": "Forex", "name": "GBP / CAD"},
-    {"symbol": "NZDJPY", "raw_symbol": "NZDJPY", "lot_size": 0.01, "category": "Forex", "name": "NZD / JPY"},
-    {"symbol": "AUDNZD", "raw_symbol": "AUDNZD", "lot_size": 0.01, "category": "Forex", "name": "AUD / NZD"},
-    {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.01, "category": "Metals", "name": "Silver / USD"},
 ]
 
 
@@ -2674,7 +2656,8 @@ class MT5BridgeEngine:
             return {"success": False, "reason": f"No online MT5 terminal connected for Account #{account_id or 'UNKNOWN'}."}
 
         session = self.clients[account_id]
-        if not session.is_prop_compliant:
+        is_prop_firm = bool(getattr(session, "is_prop_firm", False))
+        if not session.is_prop_compliant and is_prop_firm:
             return {"success": False, "reason": "Account is in cooling off due to Prop Firm / Risk limit breach."}
 
         curr_str = str(getattr(session, "currency", "USD")).upper().strip()
@@ -3035,18 +3018,14 @@ class MT5BridgeEngine:
             return {"success": False, "reason": f"No online MT5 terminal connected for Account #{account_id or 'UNKNOWN'}."}
 
         session = self.clients[account_id]
-        if not session.is_prop_compliant:
+        is_prop_firm = bool(getattr(session, "is_prop_firm", False))
+        if not session.is_prop_compliant and is_prop_firm:
             return {"success": False, "reason": "Account is in cooling off due to Prop Firm / Risk limit breach."}
 
         now_ts = time.time()
+        # Zero Blind Cooldown Invariant: 45-minute rigid timer unlocked completely for Super Fast Auto Buy/Sell.
         streak_key = f"{account_id}_XAUUSD"
-        lockout_ts = self._symbol_lockout_until.get(streak_key, 0.0)
-        if lockout_ts > now_ts:
-            remain_min = int((lockout_ts - now_ts) / 60) + 1
-            return {
-                "success": False,
-                "reason": f"Post-Loss 45-Minute Quarantine Active: XAUUSD ស្ថិតក្នុងរយៈពេលសម្រាកសុវត្ថិភាព ({remain_min} នាទីទៀត) ដើម្បីការពារកុំឱ្យចូល Trade សងសឹក។"
-            }
+        self._symbol_lockout_until.pop(streak_key, None)
 
         curr_str = str(getattr(session, "currency", "USD")).upper().strip()
         broker_str = str(getattr(session, "broker", "")).lower()
@@ -3492,13 +3471,9 @@ class MT5BridgeEngine:
                 streak_key = f"{account_id}_{target_sym}"
                 if net_pnl < 0:
                     self._consecutive_losses[streak_key] = self._consecutive_losses.get(streak_key, 0) + 1
-                    b_losses = self._consecutive_losses[streak_key]
-                    is_gold_basket = ("XAU" in str(target_sym).upper() or "GOLD" in str(target_sym).upper())
-                    lockout_duration = 2700.0 if is_gold_basket else (300.0 if is_cent else 1800.0)
-                    if b_losses >= (1 if is_gold_basket else 2):
-                        lockout_until = now_ts + lockout_duration
-                        self._symbol_lockout_until[streak_key] = lockout_until
-                        logger.error(f"🛑 [REACHSEY BASKET CIRCUIT BREAKER] Account {account_id} Symbol {target_sym} hit loss! Locked for {int(lockout_duration/60)}m until {datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC (Invariant 48 Quarantine Active)!")
+                    # Zero Blind Quarantine: Lockout completely bypassed per user directive for Super Fast Auto execution
+                    self._symbol_lockout_until.pop(streak_key, None)
+                    logger.info(f"🔄 [REACHSEY FAST RECOVERY] Account {account_id} Symbol {target_sym}: Lockout completely bypassed for Super Fast Auto Buy/Sell!")
                 else:
                     self._consecutive_losses[streak_key] = 0
 
@@ -4306,12 +4281,11 @@ class MT5BridgeEngine:
 
                         last_reachsey_scan = self._last_reachsey_auto_scan.get(str(acc_id), 0.0)
                         last_sweep_ts = getattr(self, "_reachsey_last_sweep_ts", {}).get(str(acc_id), 0.0)
-                        if (now_ts - last_sweep_ts) < 60.0:
-                            # 60-second Cooldown: Allows MT5 broker to clear closed tickets cleanly,
-                            # and gives the market time to form a new candle for fresh SMC/Quantum AI analysis!
+                        if (now_ts - last_sweep_ts) < 15.0:
+                            # 15-second Fast Cooldown: Allows MT5 broker to clear closed tickets cleanly
                             continue
 
-                        if (now_ts - last_reachsey_scan) >= 30.0:
+                        if (now_ts - last_reachsey_scan) >= 10.0:
                             self._last_reachsey_auto_scan[str(acc_id)] = now_ts
                             logger.info(f"👑 [REACHSEY AUTO-RADAR] User {chat_id} (Acc #{acc_id}): Active Baskets ({len(active_reachsey_baskets)}/{max_reachsey_baskets}, Open Pos: {len(reachsey_open_positions)}) | Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | Real Bal: ${real_usd_balance:,.2f} | Scanning Top Volatility Assets...")
 
@@ -4381,46 +4355,16 @@ class MT5BridgeEngine:
                         else:
                             continue
 
-                    # Dynamic 10-Asset Universe & 20-Asset Cent Universe
+                    # 100% Gold & TradFi Specialization Universe (Zero Forex Contamination)
                     default_10_universe = [
                         {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.01, "category": "Metals"},
-                        {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "US30", "raw_symbol": "US30", "lot_size": 0.01, "category": "Indices"},
-                        {"symbol": "BTCUSD", "raw_symbol": "BTCUSD", "lot_size": 0.01, "category": "Crypto"},
-                        {"symbol": "ETHUSD", "raw_symbol": "ETHUSD", "lot_size": 0.01, "category": "Crypto"},
-                        {"symbol": "SOLUSD", "raw_symbol": "SOLUSD", "lot_size": 0.01, "category": "Crypto"},
-                        {"symbol": "NVDA", "raw_symbol": "NVDA", "lot_size": 0.01, "category": "Stocks"},
-                        {"symbol": "AAPL", "raw_symbol": "AAPL", "lot_size": 0.01, "category": "Stocks"},
                     ]
 
                     default_cent_20_universe = [
                         {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.10, "category": "Metals"},
-                        {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "AUDUSD", "raw_symbol": "AUDUSD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "USDCAD", "raw_symbol": "USDCAD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "USDCHF", "raw_symbol": "USDCHF", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "NZDUSD", "raw_symbol": "NZDUSD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "EURJPY", "raw_symbol": "EURJPY", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "GBPJPY", "raw_symbol": "GBPJPY", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "AUDJPY", "raw_symbol": "AUDJPY", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "CADJPY", "raw_symbol": "CADJPY", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "EURGBP", "raw_symbol": "EURGBP", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "EURAUD", "raw_symbol": "EURAUD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "GBPAUD", "raw_symbol": "GBPAUD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "EURCAD", "raw_symbol": "EURCAD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "GBPCAD", "raw_symbol": "GBPCAD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "NZDJPY", "raw_symbol": "NZDJPY", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "AUDNZD", "raw_symbol": "AUDNZD", "lot_size": 0.10, "category": "Forex"},
-                        {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.10, "category": "Metals"},
                     ]
 
                     allocations = auto_cfg.get("allocations", []) or (default_cent_20_universe if is_cent_account else default_10_universe)
-                    if is_cent_account and len(allocations) < 15:
-                        allocations = default_cent_20_universe
 
                     # Strict Sub-$5.00 Minimum Capital Gatekeeper (Standard Account):
                     # 0.01 lot of Gold requires >$5.32 margin. Trading with < $5.00 causes broker Retcode 10017/10019 rejection.
