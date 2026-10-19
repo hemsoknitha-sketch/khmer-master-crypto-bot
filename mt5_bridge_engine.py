@@ -2660,6 +2660,23 @@ class MT5BridgeEngine:
         if not session.is_prop_compliant and is_prop_firm:
             return {"success": False, "reason": "Account is in cooling off due to Prop Firm / Risk limit breach."}
 
+        # Invariant 35 & 48: Strict 45-Minute Post-Loss Circuit Breaker (Quarantine Lock)
+        now_ts = time.time()
+        sym_clean = normalize_mt5_symbol(symbol)
+        streak_key = f"{account_id}_{sym_clean}"
+        all_key = f"{account_id}_ALL"
+        lockout_ts = max(
+            self._symbol_lockout_until.get(streak_key, 0.0),
+            self._symbol_lockout_until.get(all_key, 0.0)
+        )
+        if lockout_ts > now_ts:
+            remain_min = int((lockout_ts - now_ts) / 60) + 1
+            logger.warning(f"🛑 [REACHSEY QUARANTINE BLOCKED] Account #{account_id} Symbol {sym_clean} in post-loss quarantine ({remain_min}m remaining). Preserving capital!")
+            return {
+                "success": False,
+                "reason": f"Post-Loss 45-Minute Quarantine Active: {sym_clean} ស្ថិតក្នុងរយៈពេលសម្រាកសុវត្ថិភាព ({remain_min} នាទីទៀត) ដើម្បីការពារកុំឱ្យចូល Trade សងសឹក (Anti-Revenge Lock)!"
+            }
+
         curr_str = str(getattr(session, "currency", "USD")).upper().strip()
         broker_str = str(getattr(session, "broker", "")).lower()
         srv_str = str(getattr(session, "server", "")).lower()
@@ -2854,23 +2871,26 @@ class MT5BridgeEngine:
                 hedge_leg_lot = lot_val
         elif not is_cent and 0.0 < real_usd < 1000.0:
             # Invariant 8, 25 & 44: Standard Account Micro-Capital Fortress
-            if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
-                primary_leg_lot = max(0.01, round(custom_primary_lot / (4 if is_extreme_skew else 3), 2))
-                hedge_leg_lot = max(0.01, round(custom_hedge_lot / (1 if is_extreme_skew else 2), 2))
-                lot_val = primary_leg_lot
-            elif lot_per_pos and float(lot_per_pos) > 0.01:
-                lot_val = float(lot_per_pos)
-                primary_leg_lot = lot_val
-                hedge_leg_lot = lot_val
+            # STRICT CAPITAL SIZING: Never allow suicide lot sizes on accounts < $1,000!
+            if real_usd < 300.0:
+                safe_lot = 0.01
+                target_pnl = max(5.00, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(2.50, round(real_usd * 0.05, 2))
+                floor_pnl = max(3.50, min(8.00, round(real_usd * 0.04, 2)))  # Hard dollar risk clamp <= $8
+            elif real_usd < 600.0:
+                safe_lot = 0.01
+                target_pnl = max(10.00, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(5.00, round(real_usd * 0.05, 2))
+                floor_pnl = max(6.00, min(15.00, round(real_usd * 0.04, 2)))
             else:
-                lot_val = 0.01
-                primary_leg_lot = 0.01
-                hedge_leg_lot = 0.01
-            # Wide Breathing Room: Never choke trades on micro oscillations ($0.50-$1.00 noise).
-            # Allows Gold to breathe through normal pullback wicks before surging to target.
-            target_pnl = max(15.00, round(real_usd * 0.15, 2))
-            min_harvest_pnl = max(8.00, round(real_usd * 0.08, 2))
-            floor_pnl = max(20.00, round(real_usd * 0.20, 2))
+                safe_lot = 0.02
+                target_pnl = max(20.00, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(10.00, round(real_usd * 0.05, 2))
+                floor_pnl = max(12.00, min(25.00, round(real_usd * 0.05, 2)))
+
+            lot_val = safe_lot
+            primary_leg_lot = safe_lot
+            hedge_leg_lot = safe_lot
         else:
             lot_val = max(0.01, float(lot_per_pos or lot_val or 0.20))
             if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
@@ -2880,18 +2900,38 @@ class MT5BridgeEngine:
                 primary_leg_lot = lot_val
                 hedge_leg_lot = lot_val
 
+        # Invariant 35: Dynamic Volatility Breathing Stop Loss (Broker Terminal Locked)
+        # Prevents naked positions (sl=0.0) and guarantees broker-side protection against flash drops.
+        if is_gold:
+            sl_dist = max(4.50, round(cur_mid * 0.0035, 2)) if cur_mid > 0 else 4.50
+            tp_dist = max(9.00, round(sl_dist * 2.0, 2))
+        else:
+            sl_dist = max(0.0035 * cur_mid, 0.0050) if cur_mid > 0 else 0.0050
+            tp_dist = round(sl_dist * 2.0, 5)
+
         def _dispatch_single_5pos_leg(plan_item):
             leg_act, leg_tag, tp_mult, sl_mult = plan_item
             this_leg_lot = primary_leg_lot if ("LEG" in leg_tag) else hedge_leg_lot
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
+            if cur_mid > 0:
+                if leg_act == "BUY":
+                    leg_sl = round(cur_mid - sl_dist, 2 if is_gold else 5)
+                    leg_tp = round(cur_mid + tp_dist, 2 if is_gold else 5)
+                else:
+                    leg_sl = round(cur_mid + sl_dist, 2 if is_gold else 5)
+                    leg_tp = round(cur_mid - tp_dist, 2 if is_gold else 5)
+            else:
+                leg_sl = 0.0
+                leg_tp = 0.0
+
             res = self.dispatch_order(
                 symbol=adapted_sym,
                 action=leg_act,
                 lot=this_leg_lot,
-                sl=0.0,
-                tp=0.0,
-                sl_dist=0.0,
-                tp_dist=0.0,
+                sl=leg_sl,
+                tp=leg_tp,
+                sl_dist=sl_dist,
+                tp_dist=tp_dist,
                 comment=comment_str,
                 magic=888666,
                 target_account=account_id
@@ -2900,8 +2940,10 @@ class MT5BridgeEngine:
                 "action": leg_act,
                 "lot": this_leg_lot,
                 "tag": leg_tag,
-                "tp_dist": 0.0,
-                "sl_dist": 0.0,
+                "tp_dist": tp_dist,
+                "sl_dist": sl_dist,
+                "sl": leg_sl,
+                "tp": leg_tp,
                 "result": res
             }
 
@@ -3025,9 +3067,20 @@ class MT5BridgeEngine:
             return {"success": False, "reason": "Account is in cooling off due to Prop Firm / Risk limit breach."}
 
         now_ts = time.time()
-        # Zero Blind Cooldown Invariant: 45-minute rigid timer unlocked completely for Super Fast Auto Buy/Sell.
+        # Invariant 35 & 48: Strict 45-Minute Post-Loss Circuit Breaker (Quarantine Lock)
         streak_key = f"{account_id}_XAUUSD"
-        self._symbol_lockout_until.pop(streak_key, None)
+        all_key = f"{account_id}_ALL"
+        lockout_ts = max(
+            self._symbol_lockout_until.get(streak_key, 0.0),
+            self._symbol_lockout_until.get(all_key, 0.0)
+        )
+        if lockout_ts > now_ts:
+            remain_min = int((lockout_ts - now_ts) / 60) + 1
+            logger.warning(f"🛑 [REACHSEY GOLD QUARANTINE BLOCKED] Account #{account_id} XAUUSD in post-loss quarantine ({remain_min}m remaining). Preserving capital!")
+            return {
+                "success": False,
+                "reason": f"Post-Loss 45-Minute Quarantine Active: XAUUSD ស្ថិតក្នុងរយៈពេលសម្រាកសុវត្ថិភាព ({remain_min} នាទីទៀត) ដើម្បីការពារកុំឱ្យចូល Trade សងសឹក (Anti-Revenge Lock)!"
+            }
 
         curr_str = str(getattr(session, "currency", "USD")).upper().strip()
         broker_str = str(getattr(session, "broker", "")).lower()
@@ -3170,75 +3223,108 @@ class MT5BridgeEngine:
             signal_conf = 88.0
             signal_reason = f"DIRECT_{action}_CONFIRMED"
 
-        # Step 4: Dynamic Capital Sizing (10 to 20 Positions, 100% Unidirectional)
-        if custom_positions and 10 <= int(custom_positions) <= 20:
-            num_pos = int(custom_positions)
-        else:
-            if real_usd >= 4000.0 or (is_cent and raw_bal >= 400000.0):
-                num_pos = 20
-            elif real_usd >= 1500.0 or (is_cent and raw_bal >= 150000.0):
-                num_pos = 18
-            elif real_usd >= 500.0 or (is_cent and raw_bal >= 50000.0):
-                num_pos = 14
-            elif real_usd >= 200.0 or (is_cent and raw_bal >= 20000.0):
-                num_pos = 12
-            else:
-                num_pos = 10
+        # Step 4: Dynamic Capital Sizing with Small Capital Protection (Invariant 8, 44 & 48)
+        quote = self.get_live_symbol_quote(adapted_sym) or self.get_live_symbol_quote(sym_clean)
+        cur_mid = float(quote.get("mid", 0.0) if quote else 0.0)
 
-        if custom_lot_per_pos and float(custom_lot_per_pos) >= 0.01:
-            lot_per_pos = float(custom_lot_per_pos)
-        else:
-            if is_cent:
-                if raw_bal >= 300000.0:
-                    lot_per_pos = 0.05
-                elif raw_bal >= 100000.0:
-                    lot_per_pos = 0.02
-                else:
-                    lot_per_pos = 0.01
-            else:
-                if real_usd >= 10000.0:
-                    lot_per_pos = 0.10
-                elif real_usd >= 5000.0:
-                    lot_per_pos = 0.05
-                elif real_usd >= 2500.0:
-                    lot_per_pos = 0.03
-                elif real_usd >= 1000.0:
-                    lot_per_pos = 0.02
-                else:
-                    lot_per_pos = 0.01
-
-        total_vol = round(lot_per_pos * num_pos, 2)
         if is_cent:
             unit_label = "USC"
-            target_pnl = max(1500.0, round(raw_bal * 0.10, 2))
-            min_harvest_pnl = max(500.0, round(raw_bal * 0.04, 2))
-            floor_pnl = max(2500.0, round(raw_bal * 0.15, 2))
+            if raw_bal < 20000.0:  # Micro Cent < 20,000 USC ($200 USD)
+                num_pos = 3
+                lot_per_pos = 0.01
+                target_pnl = max(200.0, round(raw_bal * 0.05, 2))
+                min_harvest_pnl = max(100.0, round(raw_bal * 0.025, 2))
+                floor_pnl = max(300.0, min(600.0, round(raw_bal * 0.04, 2)))  # Hard clamp risk
+            elif raw_bal < 100000.0:
+                num_pos = 5
+                lot_per_pos = 0.02
+                target_pnl = max(500.0, round(raw_bal * 0.08, 2))
+                min_harvest_pnl = max(250.0, round(raw_bal * 0.04, 2))
+                floor_pnl = max(800.0, min(2000.0, round(raw_bal * 0.05, 2)))
+            else:
+                num_pos = 10 if raw_bal < 300000.0 else 15
+                lot_per_pos = 0.05
+                target_pnl = max(1500.0, round(raw_bal * 0.10, 2))
+                min_harvest_pnl = max(500.0, round(raw_bal * 0.04, 2))
+                floor_pnl = max(2500.0, round(raw_bal * 0.10, 2))
         else:
             unit_label = "USD"
-            target_pnl = max(25.0, round(real_usd * 0.10, 2))
-            min_harvest_pnl = max(10.0, round(real_usd * 0.04, 2))
-            floor_pnl = max(35.0, round(real_usd * 0.15, 2))
+            if real_usd < 300.0:
+                num_pos = 2
+                lot_per_pos = 0.01
+                target_pnl = max(5.0, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(2.50, round(real_usd * 0.05, 2))
+                floor_pnl = max(3.50, min(8.00, round(real_usd * 0.04, 2)))  # Max dollar loss <= $8
+            elif real_usd < 600.0:
+                num_pos = 3
+                lot_per_pos = 0.01
+                target_pnl = max(10.0, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(5.00, round(real_usd * 0.05, 2))
+                floor_pnl = max(6.00, min(15.00, round(real_usd * 0.04, 2)))
+            elif real_usd < 1500.0:
+                num_pos = 5
+                lot_per_pos = 0.01
+                target_pnl = max(15.0, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(7.50, round(real_usd * 0.05, 2))
+                floor_pnl = max(12.00, min(25.00, round(real_usd * 0.05, 2)))
+            elif real_usd < 3000.0:
+                num_pos = 8
+                lot_per_pos = 0.01
+                target_pnl = max(25.0, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(12.0, round(real_usd * 0.05, 2))
+                floor_pnl = max(25.00, min(50.00, round(real_usd * 0.05, 2)))
+            else:
+                num_pos = 10 if real_usd < 6000.0 else 15
+                lot_per_pos = 0.02 if real_usd < 6000.0 else 0.05
+                target_pnl = max(50.0, round(real_usd * 0.10, 2))
+                min_harvest_pnl = max(25.0, round(real_usd * 0.05, 2))
+                floor_pnl = max(50.0, round(real_usd * 0.08, 2))
 
-        # Step 5: Sub-Millisecond Parallel Direct Socket Dispatch (100% Unidirectional)
+        if custom_positions and 2 <= int(custom_positions) <= 20:
+            max_safe_pos = 3 if real_usd < 500.0 else (5 if real_usd < 1500.0 else 20)
+            num_pos = min(int(custom_positions), max_safe_pos)
+
+        if custom_lot_per_pos and float(custom_lot_per_pos) >= 0.01:
+            max_safe_lot = 0.01 if real_usd < 1000.0 else (0.02 if real_usd < 3000.0 else float(custom_lot_per_pos))
+            lot_per_pos = min(float(custom_lot_per_pos), max_safe_lot)
+
+        total_vol = round(lot_per_pos * num_pos, 2)
+
+        # Invariant 35: Dynamic Volatility Breathing Stop Loss (Broker Terminal Locked)
+        sl_dist = max(4.50, round(cur_mid * 0.0035, 2)) if cur_mid > 0 else 4.50
+        tp_dist = max(9.00, round(sl_dist * 2.0, 2))
+
+        # Step 5: Sub-Millisecond Parallel Direct Socket Dispatch (100% Unidirectional with Breathing SL)
         basket_id = f"R_GOLD_{account_id}_{int(now_ts)}"
         start_dispatch_t = time.perf_counter()
 
         def _dispatch_single_gold_leg(idx: int):
             leg_tag = f"R_GOLD_LEG_{idx:02d}"
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
+            if cur_mid > 0:
+                if action == "BUY":
+                    leg_sl = round(cur_mid - sl_dist, 2)
+                    leg_tp = round(cur_mid + tp_dist, 2)
+                else:
+                    leg_sl = round(cur_mid + sl_dist, 2)
+                    leg_tp = round(cur_mid - tp_dist, 2)
+            else:
+                leg_sl = 0.0
+                leg_tp = 0.0
+
             res = self.dispatch_order(
                 symbol=adapted_sym,
                 action=action,
                 lot=lot_per_pos,
-                sl=0.0,
-                tp=0.0,
-                sl_dist=0.0,
-                tp_dist=0.0,
+                sl=leg_sl,
+                tp=leg_tp,
+                sl_dist=sl_dist,
+                tp_dist=tp_dist,
                 comment=comment_str,
                 magic=888666,
                 target_account=account_id
             )
-            return (idx, leg_tag, res)
+            return (idx, leg_tag, res, leg_sl, leg_tp)
 
         max_workers = min(num_pos, 10)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -3248,13 +3334,15 @@ class MT5BridgeEngine:
         raw_results.sort(key=lambda x: x[0])
 
         dispatched_orders = []
-        for idx, leg_tag, res in raw_results:
+        for idx, leg_tag, res, leg_sl, leg_tp in raw_results:
             dispatched_orders.append({
                 "action": action,
                 "lot": lot_per_pos,
                 "tag": leg_tag,
-                "tp_dist": 0.0,
-                "sl_dist": 0.0,
+                "tp_dist": tp_dist,
+                "sl_dist": sl_dist,
+                "sl": leg_sl,
+                "tp": leg_tp,
                 "result": res
             })
             sig_id = res.get("signal_id", "")
@@ -3448,6 +3536,7 @@ class MT5BridgeEngine:
             if should_sweep:
                 if not hasattr(self, "_reachsey_last_sweep_ts"):
                     self._reachsey_last_sweep_ts = {}
+                self._reachsey_last_sweep_ts[str(account_id)] = now_ts
                 b_data["status"] = "SWEPT_COMPLETED"
                 b_data["final_net_pnl"] = net_pnl
                 logger.info(f"🚀 [REACHSEY BASKET SWEEP] Sweeping Basket {b_id} on Account #{account_id}! Reason: {sweep_reason}. Rapidly closing {len(matching_positions)} positions simultaneously...")
@@ -3464,13 +3553,16 @@ class MT5BridgeEngine:
                     for p in matching_positions:
                         _close_single_pos(p)
 
-                # Basket-Level Circuit Breaker Tracking (Invariant 48)
+                # Basket-Level Circuit Breaker Tracking (Invariant 48 & Invariant 35)
                 streak_key = f"{account_id}_{target_sym}"
+                all_key = f"{account_id}_ALL"
                 if net_pnl < 0:
                     self._consecutive_losses[streak_key] = self._consecutive_losses.get(streak_key, 0) + 1
-                    # Zero Blind Quarantine: Lockout completely bypassed per user directive for Super Fast Auto execution
-                    self._symbol_lockout_until.pop(streak_key, None)
-                    logger.info(f"🔄 [REACHSEY FAST RECOVERY] Account {account_id} Symbol {target_sym}: Lockout completely bypassed for Super Fast Auto Buy/Sell!")
+                    lockout_duration = 2700.0  # Mandatory 45-Minute Post-Loss Quarantine Lock
+                    lockout_until = now_ts + lockout_duration
+                    self._symbol_lockout_until[streak_key] = lockout_until
+                    self._symbol_lockout_until[all_key] = lockout_until
+                    logger.error(f"🛑 [REACHSEY POST-LOSS QUARANTINE] Account {account_id} Symbol {target_sym}: Lockout enforced for 45m until {datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC (Invariant 35/48 Anti-Revenge Lock)!")
                 else:
                     self._consecutive_losses[streak_key] = 0
 
@@ -4270,9 +4362,16 @@ class MT5BridgeEngine:
                             or (is_cent_account and str(p.get("symbol", "")).endswith(".C"))
                         ]
 
-                        # Hard Overtrade Citadel: If already reached max baskets or max open positions, never spawn duplicate matrix!
+                        # Hard Overtrade Citadel: If already reached max baskets, max open positions, or under quarantine, NEVER spawn matrix!
+                        streak_key = f"{acc_id}_XAUUSD"
+                        all_key = f"{acc_id}_ALL"
+                        is_quarantined = (
+                            self._symbol_lockout_until.get(streak_key, 0.0) > now_ts
+                            or self._symbol_lockout_until.get(all_key, 0.0) > now_ts
+                        )
                         can_deploy_reachsey = (
-                            len(active_reachsey_baskets) < max_reachsey_baskets
+                            not is_quarantined
+                            and len(active_reachsey_baskets) < max_reachsey_baskets
                             and len(reachsey_open_positions) < (5 * max_reachsey_baskets)
                         )
 
@@ -4281,11 +4380,11 @@ class MT5BridgeEngine:
 
                         last_reachsey_scan = self._last_reachsey_auto_scan.get(str(acc_id), 0.0)
                         last_sweep_ts = getattr(self, "_reachsey_last_sweep_ts", {}).get(str(acc_id), 0.0)
-                        if (now_ts - last_sweep_ts) < 15.0:
-                            # 15-second Fast Cooldown: Allows MT5 broker to clear closed tickets cleanly
+                        if (now_ts - last_sweep_ts) < 900.0:
+                            # 15-minute Minimum Cooldown: Allows MT5 broker to settle and gives market time to form a new cycle!
                             continue
 
-                        if (now_ts - last_reachsey_scan) >= 10.0:
+                        if (now_ts - last_reachsey_scan) >= 60.0:
                             self._last_reachsey_auto_scan[str(acc_id)] = now_ts
                             logger.info(f"👑 [REACHSEY AUTO-RADAR] User {chat_id} (Acc #{acc_id}): Active Baskets ({len(active_reachsey_baskets)}/{max_reachsey_baskets}, Open Pos: {len(reachsey_open_positions)}) | Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | Real Bal: ${real_usd_balance:,.2f} | Scanning Top Volatility Assets...")
 
@@ -4315,7 +4414,27 @@ class MT5BridgeEngine:
                                             break
 
                                 if target_sym:
-                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position Unidirectional matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | 5 Pos @ 0.20 Lot | 100% Directional Thrust)...")
+                                    # Strict Safe Capital Lot Scaling (Invariant 8 & 33)
+                                    if is_cent_account:
+                                        if raw_bal >= 300000.0:
+                                            safe_auto_lot = 0.20
+                                        elif raw_bal >= 100000.0:
+                                            safe_auto_lot = 0.05
+                                        elif raw_bal >= 20000.0:
+                                            safe_auto_lot = 0.02
+                                        else:
+                                            safe_auto_lot = 0.01
+                                    else:
+                                        if real_usd_balance >= 10000.0:
+                                            safe_auto_lot = 0.10
+                                        elif real_usd_balance >= 5000.0:
+                                            safe_auto_lot = 0.05
+                                        elif real_usd_balance >= 3000.0:
+                                            safe_auto_lot = 0.02
+                                        else:
+                                            safe_auto_lot = 0.01
+
+                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position Unidirectional matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | 5 Pos @ {safe_auto_lot:.2f} Lot | 100% Directional Thrust)...")
                                     threading.Thread(
                                         target=self.execute_reachsey_5pos_matrix,
                                         kwargs={
@@ -4326,9 +4445,9 @@ class MT5BridgeEngine:
                                             "custom_action": target_act,
                                             "confidence": target_conf,
                                             "signal_reason": target_rsn,
-                                            "lot_per_pos": 0.20,
-                                            "primary_lot": 0.60,
-                                            "hedge_lot": 0.40
+                                            "lot_per_pos": safe_auto_lot,
+                                            "primary_lot": round(safe_auto_lot * 3, 2),
+                                            "hedge_lot": round(safe_auto_lot * 2, 2)
                                         },
                                         daemon=True
                                     ).start()

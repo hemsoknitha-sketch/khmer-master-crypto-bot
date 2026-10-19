@@ -8476,7 +8476,8 @@ class CapitalTrendScalpEngine:
         """Returns radar telemetry statistics."""
         return dict(self._radar_stats)
 
-    def get_session_active_majors(self, mode: str = "ALL") -> List[str]:
+    @classmethod
+    def get_session_active_majors(cls, mode: str = "ALL") -> List[str]:
         """
         Returns active tradable instruments based on global market hours (UTC+7 Phnom Penh).
         - Saturday & Sunday (Weekend) & Overnight Swap Shield: 100% Crypto CFDs (BTCUSD, ETHUSD, SOLUSD).
@@ -8497,19 +8498,19 @@ class CapitalTrendScalpEngine:
         crypto_allowed = db.is_capital_crypto_enabled()
 
         if is_weekend or is_swap_shield:
-            raw_majors = list(self.TREND_MAJORS_CRYPTO) if crypto_allowed else []
+            raw_majors = list(cls.TREND_MAJORS_CRYPTO) if crypto_allowed else []
         elif mode == "CRYPTO":
-            raw_majors = list(self.TREND_MAJORS_CRYPTO) if crypto_allowed else []
+            raw_majors = list(cls.TREND_MAJORS_CRYPTO) if crypto_allowed else []
         elif mode == "SHARES":
             # Shares only active during NY Session (13:30 - 20:30 UTC)
             if 810 <= utc_min < 1230:
-                raw_majors = list(self.TREND_MAJORS_SHARES)
+                raw_majors = list(cls.TREND_MAJORS_SHARES)
             else:
                 raw_majors = []
         elif mode == "TRADFI":
             if 810 <= utc_min < 1230:
                 # NY Session
-                raw_majors = list(self.TREND_MAJORS_TRADFI)
+                raw_majors = list(cls.TREND_MAJORS_TRADFI)
             elif 420 <= utc_min < 810:
                 # London Kill Zone: GOLD and DE40
                 raw_majors = ["GOLD", "GERMANY40"]
@@ -8520,7 +8521,7 @@ class CapitalTrendScalpEngine:
             # Mode "ALL"
             if 810 <= utc_min < 1230:
                 # NY Session: All scalp majors (excluding crypto when disabled)
-                raw_majors = [m for m in self.ALL_SCALP_MAJORS if (crypto_allowed or m not in self.TREND_MAJORS_CRYPTO)]
+                raw_majors = [m for m in cls.ALL_SCALP_MAJORS if (crypto_allowed or m not in cls.TREND_MAJORS_CRYPTO)]
             elif 420 <= utc_min < 810:
                 # London Kill Zone: GOLD, DE40
                 raw_majors = ["GOLD", "GERMANY40"]
