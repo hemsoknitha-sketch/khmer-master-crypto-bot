@@ -580,6 +580,45 @@ def evaluate_bar_signals(
     meta["raw_score"] = raw_score
     meta["calibrated_p"] = calibrated_prob
     meta["conviction_tier"] = cal_res.get("conviction_tier", "SOLID_CONVICTION")
+
+    # -------------------------------------------------------------------------
+    # 6. MODEL 2 (META-LABELING): XGBOOST WIN PROBABILITY FILTER (AQ84 INVARIANT 85)
+    # -------------------------------------------------------------------------
+    if ablation_flags.get("use_meta_labeling", False):
+        try:
+            from capital_meta_labeling_engine import CapitalMetaLabelingEngine
+            sp_val = float(spec.get("spread", 0.0))
+            dxy_c = macro_row.get("dxy_change", 0.0) if macro_row else 0.0
+            vix_v = macro_row.get("vix", 20.0) if macro_row else 20.0
+            dow = row["Date"].weekday() if hasattr(row["Date"], "weekday") else 0
+
+            meta_features = CapitalMetaLabelingEngine.extract_features(
+                direction=chosen_dir,
+                raw_score=raw_score,
+                calib_p=calibrated_prob,
+                adx14=adx,
+                rsi14=rsi,
+                range_pct=range_pct,
+                atr14=atr,
+                price=curr_p,
+                spread=sp_val,
+                ema20=ema20,
+                ema50=ema50,
+                ema200=ema200,
+                dxy_change=dxy_c,
+                vix=vix_v,
+                day_of_week=dow
+            )
+            meta_threshold = float(ablation_flags.get("meta_threshold", 0.60))
+            meta_eval = CapitalMetaLabelingEngine.predict_meta_label(meta_features, threshold=meta_threshold)
+            meta["meta_label"] = meta_eval
+
+            if not meta_eval["is_approved"]:
+                meta["veto_reason"] = meta_eval["reason"]
+                return None, raw_score, calibrated_prob, meta
+        except Exception as e:
+            logger.debug(f"Meta-labeling check note: {e}")
+
     return chosen_dir, raw_score, calibrated_prob, meta
 
 
@@ -601,7 +640,8 @@ class Trade:
         raw_score: float,
         contract_multiplier: float,
         regime: str,
-        ablation_mode: str = "BASELINE"
+        ablation_mode: str = "BASELINE",
+        sizing_multiplier: float = 1.0
     ):
         self.trade_id = trade_id
         self.symbol = symbol
@@ -617,10 +657,11 @@ class Trade:
         self.contract_multiplier = contract_multiplier
         self.regime = regime
         self.ablation_mode = ablation_mode
+        self.sizing_multiplier = float(sizing_multiplier)
 
         # Normalized Institutional Risk Parity ($100 base risk = 1.0% of $10,000 equity)
-        # Guarantees risk parity across Equities, Indices, and Commodities without 60:1 sizing distortion
-        target_risk_dollars = 100.0
+        # Scaled dynamically by Meta-Model conviction multiplier (Invariant 85)
+        target_risk_dollars = 100.0 * max(0.50, min(2.0, self.sizing_multiplier))
         raw_size = target_risk_dollars / max(1e-4, self.sl_dist * contract_multiplier)
         if contract_multiplier == 1.0:
             self.position_size = max(0.1, round(raw_size, 2))
@@ -929,6 +970,8 @@ def run_backtest_simulation(
 
                 trade_counter += 1
                 ablation_mode = "DROP_SCALE_OUT" if ablation_flags.get("drop_scale_out", False) else "BASELINE"
+                meta_label = meta.get("meta_label", {})
+                sz_mult = float(meta_label.get("sizing_multiplier", 1.0) or 1.0) if meta_label else 1.0
                 new_trade = Trade(
                     trade_id=trade_counter,
                     symbol=epic,
@@ -942,7 +985,8 @@ def run_backtest_simulation(
                     raw_score=raw_score,
                     contract_multiplier=ASSET_SPECS[epic]['contract_multiplier'],
                     regime=regime,
-                    ablation_mode=ablation_mode
+                    ablation_mode=ablation_mode,
+                    sizing_multiplier=sz_mult
                 )
                 trades.append(new_trade)
                 open_trades[epic] = new_trade

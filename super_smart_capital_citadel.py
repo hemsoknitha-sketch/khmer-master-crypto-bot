@@ -2818,6 +2818,72 @@ class SuperSmartCapitalCitadel:
                 pass
             return False, reason, diag
 
+        # Pillar 0.9: Institutional Meta-Labeling Model 2 Gatekeeper (Invariant 85 - Marcos López de Prado 2-Model Architecture)
+        try:
+            from capital_meta_labeling_engine import CapitalMetaLabelingEngine
+            raw_sc = float(diag.get("confluence_score", 0.0) or 0.0)
+            cal_p = float(diag.get("calibrated_win_prob", 0.50) or 0.50)
+            adx_val = float(diag.get("adx_15m", 0.0) or 0.0)
+            rsi_val = float(diag.get("rsi_15m", 0.0) or 0.0)
+            rng_pct = float(diag.get("price_range_pct", 50.0) or 50.0)
+            c_price = float(diag.get("current_price", 0.0) or 1.0)
+            atr_val = float(diag.get("atr", 0.0) or (c_price * 0.01))
+            sp_val = float(diag.get("spread", 0.0) or 0.0)
+            e20 = float(diag.get("ema20", c_price) or c_price)
+            e50 = float(diag.get("ema50", c_price) or c_price)
+            e200 = float(diag.get("ema200", c_price) or c_price)
+            now_dow = datetime.datetime.now().weekday() if hasattr(datetime, "datetime") else 0
+
+            meta_features = CapitalMetaLabelingEngine.extract_features(
+                direction=direction,
+                raw_score=raw_sc,
+                calib_p=cal_p,
+                adx14=adx_val,
+                rsi14=rsi_val,
+                range_pct=rng_pct,
+                atr14=atr_val,
+                price=c_price,
+                spread=sp_val,
+                ema20=e20,
+                ema50=e50,
+                ema200=e200,
+                dxy_change=0.0,
+                vix=20.0,
+                day_of_week=now_dow
+            )
+            meta_res = CapitalMetaLabelingEngine.predict_meta_label(meta_features, threshold=0.60)
+            diag["meta_label"] = meta_res
+
+            if not meta_res.get("is_approved", True):
+                reason = f"META_REJECTED: P(Win)={meta_res.get('meta_win_prob', 0.0)*100:.1f}% < 60.0% (Model 2 Quality Filter Veto)"
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
+                try:
+                    import database as db
+                    db.record_capital_signal_audit(
+                        engine="CITADEL_GATEKEEPER",
+                        epic=epic,
+                        direction=direction,
+                        raw_score=raw_sc,
+                        post_gate_score=0.0,
+                        gate_verdict="REJECTED",
+                        rejection_reason=reason,
+                        entry_price=c_price,
+                        proposed_sl=float(diag.get("invalidation_sl", 0.0) or 0.0),
+                        proposed_tp=float(diag.get("target_tp_min", 0.0) or 0.0),
+                        spread=sp_val,
+                        atr_15m=atr_val,
+                        rsi_15m=rsi_val,
+                        adx_15m=adx_val,
+                        hurst_exponent=float(diag.get("hurst_exponent", 0.50) or 0.50),
+                        ou_zscore=float(diag.get("ou_zscore", 0.0) or 0.0),
+                        features_json=diag
+                    )
+                except Exception:
+                    pass
+                return False, reason, diag
+        except Exception as e_meta:
+            logger.debug(f"Meta-labeling check note: {e_meta}")
+
         prec = _get_tradfi_precision(epic, diag.get("current_price", 0.0))
         sl_val = diag.get('invalidation_sl', 0.0)
         tp_val = diag.get('target_tp_min', 0.0)
