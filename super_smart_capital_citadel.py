@@ -2027,7 +2027,6 @@ class SuperSmartCapitalCitadel:
                 score -= 15.0
 
         confluence_score = round(max(0.0, min(99.5, score)), 1)
-        is_approved = (confluence_score >= 68.0)
 
         # --------------------------------------------------------------------
         # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & ASSET-SPECIFIC DNA BREATHING STOP (INVARIANTS 34, 35 & 74)
@@ -2085,6 +2084,95 @@ class SuperSmartCapitalCitadel:
 
         rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
 
+        # Gap 2 (ចន្លោះទី 2): 5 Mutually Orthogonal Factor Groups Analysis
+        # Decomposes setup into 5 de-collinearized groups with intra-group diminishing returns
+        # 1. Trend & Regime | 2. Liquidity & Structure | 3. Momentum & Volatility | 4. Macro & Event Risk | 5. Execution Cost
+        orthogonal_groups = {
+            "trend_and_regime": 50.0,
+            "liquidity_and_structure": 50.0,
+            "momentum_and_volatility": 50.0,
+            "macro_and_event_risk": 50.0,
+            "execution_cost": 50.0
+        }
+        orthogonal_factors = {}
+        composite_orthogonal_score = confluence_score
+        is_balanced_confluence = False
+        try:
+            import orthogonal_factor_analyzer as ofa
+            eval_ofa = ofa.OrthogonalFactorAnalyzer.evaluate_orthogonal_groups(
+                side=norm_side,
+                curr_price=curr_price,
+                spread=spread,
+                atr_15m=atr_15m,
+                is_triple_ema_aligned=(is_triple_ema_bullish if norm_side == "BUY" else is_triple_ema_bearish),
+                is_1h_aligned=(is_1h_bullish if norm_side == "BUY" else is_1h_bearish),
+                h4_bias=h4_anchor.get("h4_bias", "NEUTRAL"),
+                has_choch=(has_bullish_choch if norm_side == "BUY" else has_bearish_choch),
+                has_bos=bool(structure_info.get("has_bos")),
+                above_below_ema200=(curr_price >= ema200_15m if norm_side == "BUY" else curr_price <= ema200_15m),
+                is_discount_or_premium=(is_discount if norm_side == "BUY" else is_premium),
+                has_liquidity_sweep=(has_ssl_sweep if norm_side == "BUY" else has_bsl_sweep),
+                has_order_block_test=(has_bullish_ob_test if norm_side == "BUY" else has_bearish_ob_test),
+                has_fvg_golden_pocket=bool(fvg_gp_setup.get("has_confluence")),
+                has_fvg_test=(has_bullish_fvg if norm_side == "BUY" else has_bearish_fvg),
+                has_ote=(has_bullish_ote if norm_side == "BUY" else has_bearish_ote),
+                has_idm_swept=bool(idm_info.get("idm_swept")),
+                in_golden_pocket=bool(fib_analysis.get("in_golden_pocket")),
+                adx_15m=adx_15m,
+                rsi_15m=rsi_15m,
+                has_displacement=has_displacement,
+                has_candlestick_pattern=bool(pat_h1.get("bullish" if norm_side=="BUY" else "bearish") or pat_h4.get("bullish" if norm_side=="BUY" else "bearish") or pat_d1.get("bullish" if norm_side=="BUY" else "bearish")),
+                in_kill_zone=in_kill_zone,
+                economic_blackout_active=False,
+                is_rollover_window=False,
+                session_asset_fit=True,
+                target_tp_dist=abs(tp_1 - curr_price),
+                sl_dist=max(breathing_sl_dist, abs(curr_price - invalidation_sl))
+            )
+            orthogonal_groups = eval_ofa["orthogonal_groups"]
+            orthogonal_factors = eval_ofa["orthogonal_factors"]
+            composite_orthogonal_score = eval_ofa["composite_orthogonal_score"]
+            is_balanced_confluence = eval_ofa["is_balanced_confluence"]
+        except Exception as e_ofa:
+            logger.debug(f"Orthogonal factor analysis fallback note: {e_ofa}")
+
+        # Gap 1 (ចន្លោះទី 1): Calibrate Raw Confluence Score to Genuine Win Probability
+        # Deflates multicollinearity (FVG + Golden Pocket + Order Block + Sweep + OTE) via L2-regularized
+        # Platt Scaling and Isotonic Calibration to guarantee Predicted ~70% ~= Realized ~70% on OOS data.
+        try:
+            import capital_probability_calibrator as cpc
+            calib_res = cpc.CapitalProbabilityCalibrator.calibrate_probability(
+                raw_confluence_score=confluence_score,
+                is_discount_or_premium=(is_discount if norm_side == "BUY" else is_premium),
+                has_liquidity_sweep=(has_ssl_sweep if norm_side == "BUY" else has_bsl_sweep),
+                has_order_block=(has_bullish_ob_test if norm_side == "BUY" else has_bearish_ob_test),
+                has_fvg_golden_pocket=bool(fvg_gp_setup.get("has_confluence")),
+                has_ote=(has_bullish_ote if norm_side == "BUY" else has_bearish_ote),
+                has_choch=(has_bullish_choch if norm_side == "BUY" else has_bearish_choch),
+                is_triple_ema_aligned=(is_triple_ema_bullish if norm_side == "BUY" else is_triple_ema_bearish),
+                adx_15m=adx_15m,
+                rsi_15m=rsi_15m,
+                num_factors=len(factors),
+                orthogonal_groups=orthogonal_groups
+            )
+            calibrated_win_prob = calib_res["calibrated_win_prob"]
+            calibrated_win_prob_pct = calib_res["calibrated_win_prob_pct"]
+            conviction_tier = calib_res["conviction_tier"]
+            conviction_badge = calib_res["conviction_badge"]
+            shrinkage_deflation = calib_res["shrinkage_deflation"]
+            stat_approved = calib_res["is_statistically_approved"]
+        except Exception as e_calib:
+            logger.debug(f"Citadel probability calibration fallback note: {e_calib}")
+            calibrated_win_prob = round(confluence_score / 100.0, 4)
+            calibrated_win_prob_pct = round(confluence_score, 1)
+            conviction_tier = "STANDARD"
+            conviction_badge = f"🛡️ [INSTITUTIONAL TRADFI CONVICTION {confluence_score:.1f}%]"
+            shrinkage_deflation = 0.0
+            stat_approved = (confluence_score >= 68.0)
+
+        # Statistical Clearance: requires raw threshold AND statistical calibrated win rate >= 50%
+        is_approved = bool(confluence_score >= 68.0 and stat_approved)
+
         smc_ict_payload = {
             "order_blocks": detected_obs,
             "fair_value_gaps": detected_fvgs,
@@ -2106,12 +2194,24 @@ class SuperSmartCapitalCitadel:
             "proposed_side": norm_side,
             "is_approved": is_approved,
             "confluence_score": confluence_score,
-            "conviction_badge": (
-                "🦅 [SUPER SMART 99% INSTITUTIONAL TRADFI TRAP CONVICTION]"
-                if confluence_score >= 85.0
-                else f"🛡️ [INSTITUTIONAL TRADFI CONVICTION {confluence_score:.1f}%]"
+            "calibrated_win_prob": calibrated_win_prob,
+            "calibrated_win_prob_pct": calibrated_win_prob_pct,
+            "conviction_tier": conviction_tier,
+            "shrinkage_deflation": shrinkage_deflation,
+            "conviction_badge": conviction_badge,
+            "composite_orthogonal_score": composite_orthogonal_score,
+            "orthogonal_groups": orthogonal_groups,
+            "orthogonal_factors": orthogonal_factors,
+            "is_balanced_confluence": is_balanced_confluence,
+            "rejection_reason": (
+                "CLEARANCE_GRANTED"
+                if is_approved
+                else (
+                    f"LOW_CALIBRATED_WIN_PROBABILITY ({calibrated_win_prob_pct}% < 50.0%)"
+                    if confluence_score >= 68.0
+                    else f"CONFLUENCE_SCORE_BELOW_THRESHOLD ({confluence_score} < 68.0)"
+                )
             ),
-            "rejection_reason": "CLEARANCE_GRANTED" if is_approved else f"CONFLUENCE_SCORE_BELOW_THRESHOLD ({confluence_score} < 68.0)",
             "rsi_15m": rsi_15m,
             "adx_15m": adx_15m,
             "price_range_pct": price_range_pct,

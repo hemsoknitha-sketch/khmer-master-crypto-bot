@@ -3662,6 +3662,8 @@ class CapitalAutonomousEngine:
                 base_quant["citadel_diagnostics"] = cit_diag
                 base_quant["citadel_score"] = c_score
                 base_quant["citadel_approved"] = citadel_approved
+                base_quant["calibrated_win_prob"] = cit_diag.get("calibrated_win_prob", 0.50)
+                base_quant["calibrated_win_prob_pct"] = cit_diag.get("calibrated_win_prob_pct", 50.0)
 
                 # Extract and merge Smart Money Concepts & ICT confluence
                 if cit_diag.get("smc_ict_setup"):
@@ -4837,7 +4839,8 @@ class CapitalAutonomousEngine:
                 tp_price=tp_p,
                 confidence_score=confidence,
                 budget=budget,
-                available_equity=user_avail
+                available_equity=user_avail,
+                calibrated_win_prob=setup.get("calibrated_win_prob")
             )
             if not size or size <= 0:
                 logger.debug(f"Kelly sizer returned zero size for {resolved_epic}, testing next setup.")
@@ -7067,14 +7070,26 @@ class CapitalKellyPositionSizer:
         sl_price: float,
         tp_price: float,
         fractional_multiplier: float = 0.35,
-        max_risk_pct: float = 2.5
+        max_risk_pct: float = 2.5,
+        calibrated_win_prob: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Calculates mathematical Kelly fraction (f*), allocated risk fraction, and multiplier.
+        Uses calibrated empirical win probability (p) to eliminate gambler-fallacy drawdown.
         """
-        # 1. Calibrate win probability p from AI confidence (50% - 95%)
         conf = max(40.0, min(98.0, float(confidence_score)))
-        p = conf / 100.0
+
+        # 1. Calibrate win probability p:
+        # If calibrated_win_prob is explicitly passed, use it directly.
+        # Otherwise, run Platt-Isotonic calibration on conf (no naive conf / 100).
+        if calibrated_win_prob is not None and 0.05 <= float(calibrated_win_prob) <= 0.95:
+            p = float(calibrated_win_prob)
+        else:
+            try:
+                import capital_probability_calibrator as cpc
+                p = cpc.CapitalProbabilityCalibrator.calibrate_from_score(conf)
+            except Exception:
+                p = max(0.20, min(0.72, 0.25 + (0.45 * (conf / 100.0))))
 
         # 2. Compute Payoff Ratio b (R:R)
         risk_dist = abs(entry_price - sl_price) if entry_price and sl_price else 0.0
@@ -7101,17 +7116,21 @@ class CapitalKellyPositionSizer:
         final_risk_fraction = min(allocated_fraction, max_risk) if raw_kelly > 0 else 0.005
 
         # 6. Dynamic Scale Multiplier vs Baseline Risk (0.02)
-        # Scale range: 0.5x (choppy / low conf) to 2.0x (high confluence >= 90%)
-        if conf >= 90.0:
-            scale_multiplier = 1.5 + (0.5 * ((conf - 90.0) / 10.0))  # 1.5x - 2.0x
-        elif conf >= 75.0:
-            scale_multiplier = 1.0 + (0.5 * ((conf - 75.0) / 15.0))  # 1.0x - 1.5x
-        elif conf >= 65.0:
-            scale_multiplier = 0.8 + (0.2 * ((conf - 65.0) / 10.0))  # 0.8x - 1.0x
+        # Calibrated probability scaling:
+        # p >= 0.68: Elite high-conviction scale (1.2x - 1.5x)
+        # p >= 0.55: Solid conviction scale (0.9x - 1.2x)
+        # p >= 0.45: Speculative edge scale (0.7x - 0.9x)
+        # p < 0.45: Micro-lot chop floor (0.5x)
+        if p >= 0.68:
+            scale_multiplier = 1.2 + (0.3 * ((p - 0.68) / 0.12))
+        elif p >= 0.55:
+            scale_multiplier = 0.9 + (0.3 * ((p - 0.55) / 0.13))
+        elif p >= 0.45:
+            scale_multiplier = 0.7 + (0.2 * ((p - 0.45) / 0.10))
         else:
-            scale_multiplier = 0.5  # Micro-lot chop floor
+            scale_multiplier = 0.5
 
-        scale_multiplier = max(0.5, min(2.0, scale_multiplier))
+        scale_multiplier = max(0.5, min(1.8, scale_multiplier))
 
         return {
             "p": round(p, 4),
@@ -7133,7 +7152,8 @@ class CapitalKellyPositionSizer:
         tp_price: float,
         confidence_score: float,
         budget: float = 50.0,
-        available_equity: float = 0.0
+        available_equity: float = 0.0,
+        calibrated_win_prob: Optional[float] = None
     ) -> float:
         """
         Computes dynamic lot size via Fractional Kelly Criterion with asset DNA clamping.
@@ -7159,7 +7179,8 @@ class CapitalKellyPositionSizer:
             sl_price=sl_price,
             tp_price=tp_price,
             fractional_multiplier=fractional_mult,
-            max_risk_pct=max_risk
+            max_risk_pct=max_risk,
+            calibrated_win_prob=calibrated_win_prob
         )
 
         scale_mult = kelly_res["scale_multiplier"]
@@ -9152,7 +9173,8 @@ class CapitalTrendScalpEngine:
                 sl_price=sl,
                 tp_price=tp,
                 confidence_score=setup.get("confidence", 85.0),
-                budget=budget
+                budget=budget,
+                calibrated_win_prob=setup.get("calibrated_win_prob")
             )
             # Min deal clamp
             try:
