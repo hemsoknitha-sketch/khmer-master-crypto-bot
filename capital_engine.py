@@ -92,6 +92,43 @@ CAPITAL_PRO_REFERRAL_URL = "https://capital.com/referafriend-pro?c=az48cxia&pid=
 CAPITAL_PRO_PARTNER_CODE = "az48cxia"
 SUPER_ADMIN_ID = 859271875
 
+def get_all_capital_vip_recipients() -> List[int]:
+    """
+    Returns a unified, deduplicated list of all VIP users, Capital traders,
+    and Super Admin eligible to receive institutional TradFi VIP alerts.
+    """
+    import database as db
+    recipients = set()
+    try:
+        recipients.update(db.get_all_vip_users())
+    except Exception:
+        pass
+    try:
+        recipients.update(db.get_vip_users())
+    except Exception:
+        pass
+    try:
+        for u in db.get_active_capital_auto_users():
+            recipients.add(u["chat_id"])
+    except Exception:
+        pass
+    try:
+        for u in db.get_active_capital_orb_users():
+            recipients.add(u["chat_id"])
+    except Exception:
+        pass
+    try:
+        for u in db.get_active_capital_scalp_users():
+            recipients.add(u["chat_id"])
+    except Exception:
+        pass
+    try:
+        recipients.update(db.get_active_capital_credential_users())
+    except Exception:
+        pass
+    recipients.add(SUPER_ADMIN_ID)
+    return sorted([uid for uid in recipients if uid and isinstance(uid, int) and uid > 0])
+
 # ==============================================================================
 # 1. CAPITAL.COM REST API ENDPOINTS & CONSTANTS
 # ==============================================================================
@@ -5061,6 +5098,50 @@ class CapitalAutonomousEngine:
                                 f"💡 _AI Engine actively monitoring and trailing profits 24/7!_"
                             )
                         await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
+                        if is_master and app and hasattr(app, "bot"):
+                            try:
+                                all_vip_uids = get_all_capital_vip_recipients()
+                                for v_uid in all_vip_uids:
+                                    if v_uid == chat_id:
+                                        continue
+                                    v_lang = db.get_user_language(v_uid)
+                                    v_head_kh = "👑 **[MASTER LOCOMOTIVE AUTO TRADE EXECUTED]** ⚡"
+                                    v_head_en = "👑 **[MASTER LOCOMOTIVE AUTO TRADE EXECUTED]** ⚡"
+                                    if v_lang == 'khmer':
+                                        v_msg = (
+                                            f"{v_head_kh}\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🤖 **ស្ថានភាព ៖** `ក្បាលម៉ាស៊ីន Super Admin បានចូល Trade ជោគជ័យ (LIVE EXECUTED)`\n"
+                                            f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                            f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
+                                            f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
+                                            f"📈 **Exponential MA Trend ៖** EMA 20/50/200 [{setup.get('triple_ema_alignment', 'TREND')}]\n"
+                                            f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
+                                            f"🛑 **Stop-Loss (1R) ៖** `${sl:,.2f}`\n"
+                                            f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🛡️ **ការការពារទុនស្ថាប័ន ៖** `Breakeven Armor & Delayed Multi-Tier Harvest`\n"
+                                            f"💡 _សញ្ញាជួញដូរស្ថាប័នកម្រិត VIP ពីក្បាលម៉ាស៊ីន Super Admin Master Locomotive 24/7!_"
+                                        )
+                                    else:
+                                        v_msg = (
+                                            f"{v_head_en}\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🤖 **Status:** `Master Locomotive Live Trade Executed (VIP Institutional Signal)`\n"
+                                            f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
+                                            f"🎯 **Direction:** `{dir_emoji}`\n"
+                                            f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
+                                            f"📈 **Exponential MA Trend:** EMA 20/50/200 [{setup.get('triple_ema_alignment', 'TREND')}]\n"
+                                            f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
+                                            f"🛑 **Stop-Loss (1R):** `${sl:,.2f}`\n"
+                                            f"🎯 **Take-Profit (6R):** `${tp:,.2f}`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🛡️ _Guarded by Breakeven Armor & Delayed Multi-Tier Harvest 24/7!_\n"
+                                            f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
+                                        )
+                                    asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_msg, parse_mode="Markdown"))
+                            except Exception as e_v_auto:
+                                logger.debug(f"VIP auto trade broadcast error: {e_v_auto}")
                     except Exception as notif_err:
                         if "blocked by the user" in str(notif_err).lower():
                             logger.warning(f"[Capital.com] User {chat_id} has blocked the bot in Telegram; skipped notification.")
@@ -6665,6 +6746,78 @@ class CapitalOpeningRangeBreakoutEngine:
                 self._armed_traps[trap_key] = trap_entry
                 logger.info(f"✅ [ORB 15M] Successfully armed Virtual Radar for {resolved_epic} across {len(trap_entry['user_orders'])} accounts!")
 
+            # ==================================================================
+            # 👑 UNIVERSAL VIP INSTITUTIONAL RADAR ARMED BROADCAST ⚡
+            # Broadcasts Institutional Breakout Radar Armed signal to ALL VIP users
+            # ==================================================================
+            if app and hasattr(app, "bot") and (trap_entry.get("allow_buy") or trap_entry.get("allow_sell")):
+                armed_uids = set(trap_entry.get("user_orders", {}).keys())
+                all_vip_uids = get_all_capital_vip_recipients()
+                non_armed_vips = [v_uid for v_uid in all_vip_uids if v_uid not in armed_uids]
+                if non_armed_vips:
+                    import ui_standards
+                    for v_uid in non_armed_vips:
+                        try:
+                            v_lang = db.get_user_language(v_uid)
+                            head_kh = "👑 **[MASTER LOCOMOTIVE VIRTUAL RADAR ARMED]** ⚡"
+                            head_en = "👑 **[MASTER LOCOMOTIVE VIRTUAL RADAR ARMED]** ⚡"
+                            if v_lang == 'khmer':
+                                v_trap_msg = (
+                                    f"{head_kh}\n"
+                                    f"🏛️ **[ស្ថាបត្យកម្មរ៉ាដាទម្លុះស្វ័យប្រវត្ត ១០០% (IN-MEMORY RADAR)]** 🛡️\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🤖 **ស្ថានភាព ៖** `រ៉ាដាកំពុងតាមប្រមាញ់ (VIP INSTITUTIONAL SIGNAL ACTIVE)`\n"
+                                    f"🌐 **Session ៖** `{session_name} OPEN (ចប់ 15m Range)`\n"
+                                    f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                    f"📊 **15m Range ៖** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
+                                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                                    f"🟢 **LONG Trigger ៖** `${buy_trigger:,.2f}`\n"
+                                    f"   └ Tight ATR SL: `${buy_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${buy_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${buy_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${buy_tp3:,.2f}` (+4.0R Harvest)\n"
+                                    f"🔴 **SHORT Trigger ៖** `${sell_trigger:,.2f}`\n"
+                                    f"   └ Tight ATR SL: `${sell_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${sell_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${sell_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${sell_tp3:,.2f}` (+4.0R Harvest)\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🛡️ **អត្ថប្រយោជន៍ In-Memory Virtual Radar ៖**\n"
+                                    f"• **Zero Broker Exposure ៖** គ្មាន Broker Working Order នៅក្នុង Book ទេ\n"
+                                    f"• **Immune to Judas Swings ៖** មិនចាញ់បោកការអូស Stop-Hunting មុនពេលទម្លុះពិត\n"
+                                    f"• **Dynamic Tight ATR SL ៖** កាត់បន្ថយហានិភ័យពី 50% មកត្រឹម ~30% នៃ Range!\n"
+                                    f"• **Multi-Tier Scale-Out ៖** +1.2R Lock BE -> +2.5R Lock Profit -> +4.0R Harvest\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"💡 _សញ្ញាស្ថាប័នកម្រិត VIP ពីក្បាលម៉ាស៊ីន Super Admin Master Locomotive 24/7!_"
+                                )
+                            else:
+                                v_trap_msg = (
+                                    f"{head_en}\n"
+                                    f"🏛️ **[Institutional Virtual Breakout Radar]** 🛡️\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🤖 **Status:** `In-Memory Radar Armed (VIP Institutional Signal Active)`\n"
+                                    f"🌐 **Session:** `{session_name} OPEN (15m Range Closed)`\n"
+                                    f"🏛️ **Instrument:** `{resolved_epic}`\n"
+                                    f"📊 **15m Range:** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
+                                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                                    f"🟢 **LONG Trigger:** `${buy_trigger:,.2f}`\n"
+                                    f"   └ Tight SL: `${buy_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${buy_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${buy_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${buy_tp3:,.2f}` (+4.0R Harvest)\n"
+                                    f"🔴 **SHORT Trigger:** `${sell_trigger:,.2f}`\n"
+                                    f"   └ Tight SL: `${sell_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${sell_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${sell_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${sell_tp3:,.2f}` (+4.0R Harvest)\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🛡️ _Virtual Radar: Zero broker exposure, 100% immune to Judas Swings!_\n"
+                                    f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
+                                )
+                            asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_trap_msg, parse_mode="Markdown"))
+                        except Exception as e_v_trap:
+                            logger.debug(f"VIP ORB trap broadcast error for {v_uid}: {e_v_trap}")
+
     async def manage_armed_traps_oco(self, app=None):
         """
         Monitors armed ORB pending working orders:
@@ -6985,7 +7138,77 @@ class CapitalOpeningRangeBreakoutEngine:
                 )
                 for chat_id, user_cfg in all_target_users.items()
             ]
-            await asyncio.gather(*orb_tasks, return_exceptions=True)
+            dispatch_results = await asyncio.gather(*orb_tasks, return_exceptions=True)
+
+            # ==================================================================
+            # 🚀 UNIVERSAL VIP ORB 15M AUTO-TRADE BREAKOUT BROADCAST 🟢
+            # Broadcasts Institutional Breakout execution signal to ALL VIP users
+            # ==================================================================
+            if app and hasattr(app, "bot"):
+                executed_uids = set()
+                for (u_cid, _), res in zip(all_target_users.items(), dispatch_results):
+                    if res is True:
+                        executed_uids.add(u_cid)
+
+                all_vip_uids = get_all_capital_vip_recipients()
+                non_exec_vips = [v_uid for v_uid in all_vip_uids if v_uid not in executed_uids]
+                if non_exec_vips:
+                    import ui_standards
+                    exec_emoji = "🟢" if direction == "BUY" else "🔴"
+                    dir_emoji = "🟢 LONG BREAKOUT" if direction == "BUY" else "🔴 SHORT BREAKDOWN"
+                    eff_tp = tp
+                    for v_uid in non_exec_vips:
+                        try:
+                            v_lang = db.get_user_language(v_uid)
+                            if v_lang == 'khmer':
+                                v_exec_msg = (
+                                    f"🚀 **[ORB 15M VIRTUAL RADAR AUTO-TRADE]** {exec_emoji}\n"
+                                    f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🤖 **ស្ថានភាព ៖** `ក្បាលម៉ាស៊ីន Super Admin បានចូល Position ជោគជ័យ (LIVE EXECUTED)`\n"
+                                    f"🌐 **Session ៖** `{session_name} OPEN (បញ្ចប់ ១៥ នាទីដំបូង)`\n"
+                                    f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                    f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
+                                    f"📊 **15m Range ៖** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
+                                    f"💵 **តម្លៃទម្លុះ (Breakout Entry) ៖** `${mid:,.2f}`\n"
+                                    f"🛑 **Dynamic Tight ATR SL ៖** `${sl:,.2f}` (ហានិភ័យទាប ~${sl_dist:,.2f})\n"
+                                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                                    f"🎯 **Multi-Tier Scale-Out Targets ៖**\n"
+                                    f"• **TP1 (+1.2R) ៖** `${(tp1 or eff_tp):,.2f}` (Lock Breakeven Risk -> 0.00R)\n"
+                                    f"• **TP2 (+2.5R) ៖** `${(tp2 or eff_tp):,.2f}` (Lock +1.2R Profit Floor)\n"
+                                    f"• **TP3 (+4.0R) ៖** `${eff_tp:,.2f}` (Moonshot Clean Cash Harvest)\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🛡️ **លក្ខណៈពិសេស In-Memory Virtual Radar ៖**\n"
+                                    f"• Zero Broker Pending Exposure (គ្មានការលេចធ្លាយទៅ Broker)\n"
+                                    f"• 100% មិនចាញ់បោក Judas Swing ឬ Stop-Hunting\n"
+                                    f"• កាត់បន្ថយទំហំ Stop-Loss ដល់ទៅ ៣០%-៥០% ធៀបនឹង Midpoint ចាស់!\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"💡 _សញ្ញាជួញដូរស្ថាប័នកម្រិត VIP ពីក្បាលម៉ាស៊ីន Super Admin Master Locomotive 24/7!_"
+                                )
+                            else:
+                                v_exec_msg = (
+                                    f"🚀 **[ORB 15M VIRTUAL RADAR AUTO-TRADE]** {exec_emoji}\n"
+                                    f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🤖 **Status:** `Master Locomotive Executed & Active (VIP Institutional Signal)`\n"
+                                    f"🌐 **Session:** `{session_name} OPEN (15m Range)`\n"
+                                    f"🏛️ **Instrument:** `{resolved_epic}`\n"
+                                    f"🎯 **Direction:** `{dir_emoji}`\n"
+                                    f"📊 **15m Range:** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
+                                    f"💵 **Breakout Entry:** `${mid:,.2f}`\n"
+                                    f"🛑 **Dynamic Tight ATR SL:** `${sl:,.2f}` (Risk ~${sl_dist:,.2f})\n"
+                                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                                    f"🎯 **Multi-Tier Scale-Out Targets:**\n"
+                                    f"• **TP1 (+1.2R):** `${(tp1 or eff_tp):,.2f}` (Locks Breakeven / Risk: 0.00R)\n"
+                                    f"• **TP2 (+2.5R):** `${(tp2 or eff_tp):,.2f}` (Locks +1.2R Profit Floor)\n"
+                                    f"• **TP3 (+4.0R):** `${eff_tp:,.2f}` (Moonshot Cash Harvest)\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🛡️ _In-Memory Virtual Radar + Multi-Tier Scale-Out Engine Active!_\n"
+                                    f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
+                                )
+                            asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_exec_msg, parse_mode="Markdown"))
+                        except Exception as e_v_exec:
+                            logger.debug(f"VIP ORB breakout broadcast error for {v_uid}: {e_v_exec}")
 
     def get_telemetry(self) -> Dict[str, Any]:
         """Returns real-time telemetry of session status, clock, and tracked ranges."""
@@ -9543,6 +9766,48 @@ class CapitalTrendScalpEngine:
                             f"🚀 _ប្រព័ន្ធដេញកើបចំណេញ Triple EMA (20/50/200) & SMC/ICT ២៤/៧!_"
                         )
                         asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
+                        if chat_id == SUPER_ADMIN_ID and app and hasattr(app, "bot"):
+                            try:
+                                all_vip_uids = get_all_capital_vip_recipients()
+                                for v_uid in all_vip_uids:
+                                    if v_uid == chat_id:
+                                        continue
+                                    v_lang = db.get_user_language(v_uid)
+                                    if v_lang == 'khmer':
+                                        v_scalp_msg = (
+                                            f"⚡ **[CAPITAL.COM 24/7 TREND SCALP EXECUTED]** 🎯\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🤖 **ស្ថានភាព ៖** `ក្បាលម៉ាស៊ីន Super Admin បានចូល Position ជោគជ័យ (LIVE SCALP)`\n"
+                                            f"🏛️ **ឧបករណ៍ TradFi ៖** `{epic}` (Major)\n"
+                                            f"🎯 **ទិសដៅ ៖** `{direction}` ({smc_tag})\n"
+                                            f"📈 **Exponential Trend ៖** `{ema_lbl}`\n"
+                                            f"🧠 **SMC & ICT Confluence ៖** `{smc_facts_str}`\n"
+                                            f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
+                                            f"🛑 **Dynamic Breathing Stop ៖** `${sl:,.2f}` (2.2x ATR Noise Buffer)\n"
+                                            f"🎯 **Scalp Target TP ៖** `${tp:,.2f}` (R:R 1:{rr_val:.1f} | 10x Spread Hurdle)\n"
+                                            f"🛡️ **ការការពារ ៖** `Delayed Multi-Tier Harvest & Breakeven Armor`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"💡 _សញ្ញាជួញដូរស្ថាប័នកម្រិត VIP ពីក្បាលម៉ាស៊ីន Super Admin Master Locomotive 24/7!_"
+                                        )
+                                    else:
+                                        v_scalp_msg = (
+                                            f"⚡ **[CAPITAL.COM 24/7 TREND SCALP EXECUTED]** 🎯\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🤖 **Status:** `Master Locomotive Scalp Executed (VIP Institutional Signal)`\n"
+                                            f"🏛️ **TradFi Instrument:** `{epic}` (Major)\n"
+                                            f"🎯 **Direction:** `{direction}` ({smc_tag})\n"
+                                            f"📈 **Exponential Trend:** `{ema_lbl}`\n"
+                                            f"🧠 **SMC & ICT Confluence:** `{smc_facts_str}`\n"
+                                            f"💵 **Entry Price:** `${entry_p:,.2f}`\n"
+                                            f"🛑 **Dynamic Breathing Stop:** `${sl:,.2f}` (2.2x ATR Noise Buffer)\n"
+                                            f"🎯 **Scalp Target TP:** `${tp:,.2f}` (R:R 1:{rr_val:.1f} | 10x Spread Hurdle)\n"
+                                            f"🛡️ **Protection:** `Delayed Multi-Tier Harvest & Breakeven Armor`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
+                                        )
+                                    asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_scalp_msg, parse_mode="Markdown"))
+                            except Exception as e_v_scalp:
+                                logger.debug(f"VIP scalp broadcast error: {e_v_scalp}")
                     except Exception as e_msg:
                         logger.debug(f"Scalp notif error: {e_msg}")
                 return True
