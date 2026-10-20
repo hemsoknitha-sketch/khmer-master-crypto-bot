@@ -1,0 +1,348 @@
+{
+  "project": "ANGKOR QUANT \u2014 Institutional TradFi 10-Year Backtesting & Validation Project",
+  "generated_at": "2026-10-20T20:49:17.694662",
+  "period": "2016-10-20 to 2026-10-20 (10 Full Years)",
+  "full_metrics": {
+    "total_trades": 294,
+    "n_wins": 168,
+    "n_losses": 126,
+    "win_rate": 57.14,
+    "ci_lower": 51.43,
+    "ci_upper": 62.67,
+    "avg_win_r": 1.36,
+    "avg_loss_r": 0.98,
+    "realized_rr": 1.38,
+    "expectancy_r": 0.354,
+    "gross_profit": 10382.42,
+    "gross_loss": 7402.06,
+    "net_profit": 2980.36,
+    "profit_factor": 1.4,
+    "total_costs": 1624.79,
+    "cost_drag_pct": 15.65,
+    "max_drawdown_pct": 14.03,
+    "max_drawdown_dollars": 2117.87,
+    "sharpe_ratio": 0.55,
+    "sortino_ratio": 0.27,
+    "brier_score": 0.2591,
+    "avg_holding_days": 21.5
+  },
+  "chronological_splits": {
+    "in_sample_60": {
+      "total_trades": 169,
+      "n_wins": 94,
+      "n_losses": 75,
+      "win_rate": 55.62,
+      "ci_lower": 48.09,
+      "ci_upper": 62.9,
+      "avg_win_r": 1.41,
+      "avg_loss_r": 0.99,
+      "realized_rr": 1.43,
+      "expectancy_r": 0.344,
+      "gross_profit": 5069.54,
+      "gross_loss": 2742.33,
+      "net_profit": 2327.21,
+      "profit_factor": 1.85,
+      "total_costs": 668.0,
+      "cost_drag_pct": 13.18,
+      "max_drawdown_pct": 7.47,
+      "max_drawdown_dollars": 748.23,
+      "sharpe_ratio": 0.8,
+      "sortino_ratio": 0.54,
+      "brier_score": 0.2622,
+      "avg_holding_days": 22.2
+    },
+    "validation_20": {
+      "total_trades": 72,
+      "n_wins": 42,
+      "n_losses": 30,
+      "win_rate": 58.33,
+      "ci_lower": 46.81,
+      "ci_upper": 69.01,
+      "avg_win_r": 1.59,
+      "avg_loss_r": 0.9,
+      "realized_rr": 1.77,
+      "expectancy_r": 0.552,
+      "gross_profit": 3077.89,
+      "gross_loss": 1019.02,
+      "net_profit": 2058.87,
+      "profit_factor": 3.02,
+      "total_costs": 475.31,
+      "cost_drag_pct": 15.44,
+      "max_drawdown_pct": 2.32,
+      "max_drawdown_dollars": 259.05,
+      "sharpe_ratio": 1.63,
+      "sortino_ratio": 1.18,
+      "brier_score": 0.2537,
+      "avg_holding_days": 21.4
+    },
+    "out_of_sample_20": {
+      "total_trades": 52,
+      "n_wins": 28,
+      "n_losses": 24,
+      "win_rate": 53.85,
+      "ci_lower": 40.5,
+      "ci_upper": 66.66,
+      "avg_win_r": 0.84,
+      "avg_loss_r": 0.96,
+      "realized_rr": 0.87,
+      "expectancy_r": 0.008,
+      "gross_profit": 1450.29,
+      "gross_loss": 3685.29,
+      "net_profit": -2235.0,
+      "profit_factor": 0.39,
+      "total_costs": 403.96,
+      "cost_drag_pct": 27.85,
+      "max_drawdown_pct": 23.02,
+      "max_drawdown_dollars": 2322.57,
+      "sharpe_ratio": -1.42,
+      "sortino_ratio": -0.54,
+      "brier_score": 0.2811,
+      "avg_holding_days": 18.2
+    }
+  },
+  "walk_forward_stability": [
+    {
+      "fold": 1,
+      "period": "2018-10-21 -> 2020-10-20",
+      "trades": 55,
+      "win_rate": 52.73,
+      "expectancy_r": 0.691,
+      "profit_factor": 2.09,
+      "net_profit": 1047.04,
+      "max_dd_pct": 3.96,
+      "sharpe": 0.94,
+      "brier": 0.2703
+    },
+    {
+      "fold": 2,
+      "period": "2020-10-21 -> 2022-10-20",
+      "trades": 67,
+      "win_rate": 53.73,
+      "expectancy_r": 0.245,
+      "profit_factor": 2.38,
+      "net_profit": 1572.02,
+      "max_dd_pct": 4.53,
+      "sharpe": 1.38,
+      "brier": 0.2661
+    },
+    {
+      "fold": 3,
+      "period": "2022-10-21 -> 2024-10-20",
+      "trades": 72,
+      "win_rate": 58.33,
+      "expectancy_r": 0.552,
+      "profit_factor": 3.02,
+      "net_profit": 2058.87,
+      "max_dd_pct": 2.32,
+      "sharpe": 1.63,
+      "brier": 0.2537
+    },
+    {
+      "fold": 4,
+      "period": "2024-10-21 -> 2025-10-20",
+      "trades": 25,
+      "win_rate": 56.0,
+      "expectancy_r": 0.169,
+      "profit_factor": 0.33,
+      "net_profit": -973.22,
+      "max_dd_pct": 10.74,
+      "sharpe": -1.38,
+      "brier": 0.2544
+    },
+    {
+      "fold": 5,
+      "period": "2025-10-21 -> 2026-10-20",
+      "trades": 29,
+      "win_rate": 44.83,
+      "expectancy_r": -0.212,
+      "profit_factor": 0.37,
+      "net_profit": -1415.51,
+      "max_dd_pct": 17.89,
+      "sharpe": -1.68,
+      "brier": 0.3242
+    }
+  ],
+  "ablation_matrix": [
+    {
+      "variant": "1. Baseline Full System (AQ84)",
+      "trades": 294,
+      "win_rate": 57.14,
+      "realized_rr": 1.38,
+      "expectancy_r": 0.354,
+      "delta_expectancy": 0.0,
+      "profit_factor": 1.4,
+      "net_profit": 2980.36,
+      "max_dd_pct": 14.03,
+      "sharpe": 0.55,
+      "brier": 0.2591
+    },
+    {
+      "variant": "2. Minus H4 Trend Anchor",
+      "trades": 358,
+      "win_rate": 54.19,
+      "realized_rr": 1.21,
+      "expectancy_r": 0.196,
+      "delta_expectancy": -0.158,
+      "profit_factor": 1.25,
+      "net_profit": 2246.93,
+      "max_dd_pct": 18.68,
+      "sharpe": 0.41,
+      "brier": 0.284
+    },
+    {
+      "variant": "3. Minus SMC (OB/FVG/Sweeps)",
+      "trades": 263,
+      "win_rate": 56.65,
+      "realized_rr": 1.39,
+      "expectancy_r": 0.347,
+      "delta_expectancy": -0.007,
+      "profit_factor": 1.32,
+      "net_profit": 2153.98,
+      "max_dd_pct": 13.53,
+      "sharpe": 0.43,
+      "brier": 0.2626
+    },
+    {
+      "variant": "4. Minus RSI Guard (Inv 16)",
+      "trades": 295,
+      "win_rate": 56.95,
+      "realized_rr": 1.38,
+      "expectancy_r": 0.35,
+      "delta_expectancy": -0.004,
+      "profit_factor": 1.39,
+      "net_profit": 2897.34,
+      "max_dd_pct": 14.58,
+      "sharpe": 0.54,
+      "brier": 0.2597
+    },
+    {
+      "variant": "5. Minus ADX Filter (< 25)",
+      "trades": 812,
+      "win_rate": 52.09,
+      "realized_rr": 1.31,
+      "expectancy_r": 0.199,
+      "delta_expectancy": -0.155,
+      "profit_factor": 1.02,
+      "net_profit": 350.93,
+      "max_dd_pct": 24.81,
+      "sharpe": 0.08,
+      "brier": 0.3067
+    },
+    {
+      "variant": "6. Minus Scale-Out / Fixed 1:1.5",
+      "trades": 287,
+      "win_rate": 51.22,
+      "realized_rr": 1.51,
+      "expectancy_r": 0.284,
+      "delta_expectancy": -0.07,
+      "profit_factor": 1.74,
+      "net_profit": 5165.38,
+      "max_dd_pct": 6.02,
+      "sharpe": 0.96,
+      "brier": 0.2793
+    },
+    {
+      "variant": "7. Minus Chop Filter (35-65%)",
+      "trades": 389,
+      "win_rate": 54.76,
+      "realized_rr": 1.29,
+      "expectancy_r": 0.247,
+      "delta_expectancy": -0.107,
+      "profit_factor": 1.08,
+      "net_profit": 901.25,
+      "max_dd_pct": 23.0,
+      "sharpe": 0.16,
+      "brier": 0.268
+    }
+  ],
+  "asset_breakdown": {
+    "GOLD": {
+      "trades": 30,
+      "win_rate": 66.7,
+      "expectancy_r": 0.526,
+      "net_profit": 1296.77
+    },
+    "US100": {
+      "trades": 38,
+      "win_rate": 65.8,
+      "expectancy_r": 0.488,
+      "net_profit": 1203.74
+    },
+    "US500": {
+      "trades": 29,
+      "win_rate": 62.1,
+      "expectancy_r": 0.481,
+      "net_profit": 274.76
+    },
+    "DE40": {
+      "trades": 24,
+      "win_rate": 66.7,
+      "expectancy_r": 0.277,
+      "net_profit": 334.7
+    },
+    "OIL": {
+      "trades": 29,
+      "win_rate": 51.7,
+      "expectancy_r": 0.337,
+      "net_profit": 260.31
+    },
+    "SILVER": {
+      "trades": 19,
+      "win_rate": 42.1,
+      "expectancy_r": 0.253,
+      "net_profit": -446.57
+    },
+    "NVDA": {
+      "trades": 23,
+      "win_rate": 56.5,
+      "expectancy_r": 0.685,
+      "net_profit": 34.6
+    },
+    "TSLA": {
+      "trades": 34,
+      "win_rate": 52.9,
+      "expectancy_r": 0.277,
+      "net_profit": 18.17
+    },
+    "AAPL": {
+      "trades": 37,
+      "win_rate": 48.6,
+      "expectancy_r": 0.011,
+      "net_profit": -8.67
+    },
+    "MSFT": {
+      "trades": 31,
+      "win_rate": 54.8,
+      "expectancy_r": 0.29,
+      "net_profit": 12.55
+    }
+  },
+  "regime_breakdown": {
+    "BULL_TREND": {
+      "trades": 124,
+      "win_rate": 56.5,
+      "expectancy_r": 0.414
+    },
+    "BEAR_TREND": {
+      "trades": 14,
+      "win_rate": 50.0,
+      "expectancy_r": 0.439
+    },
+    "CHOP": {
+      "trades": 122,
+      "win_rate": 59.8,
+      "expectancy_r": 0.235
+    },
+    "VOLATILITY_SHOCK": {
+      "trades": 34,
+      "win_rate": 52.9,
+      "expectancy_r": 0.53
+    }
+  },
+  "charts": {
+    "equity_drawdown": "data\\capital_10y_equity_drawdown.png",
+    "walk_forward": "data\\capital_10y_walk_forward.png",
+    "calibration": "data\\capital_10y_calibration_curve.png",
+    "ablation": "data\\capital_10y_ablation_comparison.png"
+  }
+}

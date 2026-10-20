@@ -28,6 +28,8 @@ ico_silent_logs.txt
 !Users_agrement.pdf
 !assets/docs/*.pdf
 !data/legal_agreements_pdf/.gitkeep
+!ANGKOR_QUANT_CAPITAL_10Y_BACKTEST_REPORT.pdf
+!data/capital_10y_*.png
 
 # Root-level AI Model Weights (Canonical tracked in models/ and Hugging Face Hub)
 /*.pkl
