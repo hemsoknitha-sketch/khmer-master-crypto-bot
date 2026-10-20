@@ -2159,30 +2159,59 @@ class SuperSmartCapitalCitadel:
             breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
             tp_spread_mult = 10.0
 
-        if norm_side == "BUY":
-            # Structural Invalidation anchored behind Order Block bottom, Swing Low or FVG Golden Pocket floor
-            ob_anchor = (active_bullish_ob.get("bottom", swing_low) - (0.15 * atr_15m)) if active_bullish_ob else swing_low
-            if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY":
-                fvg_anchor = min(fvg_gp_setup.get("fvg_bottom", swing_low), fvg_gp_setup.get("fib_786", swing_low)) - (0.15 * atr_15m)
-                ob_anchor = min(ob_anchor, fvg_anchor)
-            invalidation_sl = round(min(ob_anchor, swing_low - (0.25 * atr_15m), curr_price - breathing_sl_dist), prec)
-            risk_dist = max(breathing_sl_dist, curr_price - invalidation_sl)
-            tp_1 = round(curr_price + max(risk_dist * 2.5, tp_spread_mult * spread), prec)  # Institutional 1:2.5 Min Hurdle
-            # If FVG + Golden Pocket Retest is validated, aim for asymmetric R:R >= 1:4.0 to 1:6.0
-            tp2_mult = 4.5 if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY") else 5.0
-            tp_2 = round(curr_price + max(risk_dist * tp2_mult, 15.0 * spread), prec)  # Institutional Major Target
-        else:
-            ob_anchor = (active_bearish_ob.get("top", swing_high) + (0.15 * atr_15m)) if active_bearish_ob else swing_high
-            if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "SELL":
-                fvg_anchor = max(fvg_gp_setup.get("fvg_top", swing_high), fvg_gp_setup.get("fib_786", swing_high)) + (0.15 * atr_15m)
-                ob_anchor = max(ob_anchor, fvg_anchor)
-            invalidation_sl = round(max(ob_anchor, swing_high + (0.25 * atr_15m), curr_price + breathing_sl_dist), prec)
-            risk_dist = max(breathing_sl_dist, invalidation_sl - curr_price)
-            tp_1 = round(curr_price - max(risk_dist * 2.5, tp_spread_mult * spread), prec)
-            tp2_mult = 4.5 if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "SELL") else 5.0
-            tp_2 = round(curr_price - max(risk_dist * tp2_mult, 15.0 * spread), prec)
-
-        rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
+        # Gap 6 (ចន្លោះទី 6): DYNAMIC STRUCTURAL STOPS & MFE/MAE CALIBRATION
+        # Replaces single static formula with Structural Invalidation + Volatility Buffer
+        # and Market Structure / MFE-calibrated Take-Profit Targets.
+        structural_stops_meta = {}
+        try:
+            import dynamic_structural_stops as dss
+            vol_regime = "HIGH_VOLATILITY" if adx_15m >= 35.0 else ("LOW_VOLATILITY" if adx_15m < 20.0 else "NORMAL")
+            struct_stops = dss.DynamicStructuralStops.evaluate_structural_stops(
+                side=norm_side,
+                curr_price=curr_price,
+                spread=spread,
+                atr_15m=atr_15m,
+                swing_high=swing_high,
+                swing_low=swing_low,
+                active_ob=(active_bullish_ob if norm_side == "BUY" else active_bearish_ob),
+                has_liquidity_sweep=(has_ssl_sweep if norm_side == "BUY" else has_bsl_sweep),
+                sweep_wick_extreme=(float(candles_15m[-1]["low"]) if (norm_side == "BUY" and candles_15m) else (float(candles_15m[-1]["high"]) if candles_15m else None)),
+                fvg_gp_setup=fvg_gp_setup if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == norm_side) else None,
+                volatility_regime=vol_regime
+            )
+            invalidation_sl = round(struct_stops["invalidation_sl"], prec)
+            risk_dist = struct_stops["sl_dist"]
+            tp_1 = round(struct_stops["tp1"], prec)
+            tp_2 = round(struct_stops["tp2"], prec)
+            tp_3 = round(struct_stops["tp3"], prec)
+            rr_ratio = struct_stops["rr_tp1"]
+            structural_stops_meta = struct_stops
+        except Exception as e_dss:
+            logger.debug(f"Dynamic structural stops fallback note: {e_dss}")
+            if norm_side == "BUY":
+                ob_anchor = (active_bullish_ob.get("bottom", swing_low) - (0.15 * atr_15m)) if active_bullish_ob else swing_low
+                if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY":
+                    fvg_anchor = min(fvg_gp_setup.get("fvg_bottom", swing_low), fvg_gp_setup.get("fib_786", swing_low)) - (0.15 * atr_15m)
+                    ob_anchor = min(ob_anchor, fvg_anchor)
+                invalidation_sl = round(min(ob_anchor, swing_low - (0.25 * atr_15m), curr_price - breathing_sl_dist), prec)
+                risk_dist = max(breathing_sl_dist, curr_price - invalidation_sl)
+                tp_1 = round(curr_price + max(risk_dist * 2.5, tp_spread_mult * spread), prec)
+                tp2_mult = 4.5 if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY") else 5.0
+                tp_2 = round(curr_price + max(risk_dist * tp2_mult, 15.0 * spread), prec)
+                tp_3 = round(curr_price + max(risk_dist * 6.0, 20.0 * spread), prec)
+            else:
+                ob_anchor = (active_bearish_ob.get("top", swing_high) + (0.15 * atr_15m)) if active_bearish_ob else swing_high
+                if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "SELL":
+                    fvg_anchor = max(fvg_gp_setup.get("fvg_top", swing_high), fvg_gp_setup.get("fib_786", swing_high)) + (0.15 * atr_15m)
+                    ob_anchor = max(ob_anchor, fvg_anchor)
+                invalidation_sl = round(max(ob_anchor, swing_high + (0.25 * atr_15m), curr_price + breathing_sl_dist), prec)
+                risk_dist = max(breathing_sl_dist, invalidation_sl - curr_price)
+                tp_1 = round(curr_price - max(risk_dist * 2.5, tp_spread_mult * spread), prec)
+                tp2_mult = 4.5 if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "SELL") else 5.0
+                tp_2 = round(curr_price - max(risk_dist * tp2_mult, 15.0 * spread), prec)
+                tp_3 = round(curr_price - max(risk_dist * 6.0, 20.0 * spread), prec)
+            rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
+            structural_stops_meta = {"method": "LEGACY_FALLBACK"}
 
         # Gap 2 (ចន្លោះទី 2): 5 Mutually Orthogonal Factor Groups Analysis
         # Decomposes setup into 5 de-collinearized groups with intra-group diminishing returns
@@ -2334,7 +2363,9 @@ class SuperSmartCapitalCitadel:
             "invalidation_sl": invalidation_sl,
             "target_tp_min": tp_1,
             "target_tp_major": tp_2,
+            "target_tp_moonshot": tp_3,
             "risk_reward_ratio": rr_ratio,
+            "structural_stops_meta": structural_stops_meta,
             "confluence_factors": factors,
             "smc_ict_setup": smc_ict_payload,
             "ema20_15m": round(ema20_15m, prec),
@@ -3325,10 +3356,14 @@ class TradFiMultiTargetScaleOutManager:
         min_deal_size: float = 0.01,
         tp1_r: float = 2.20,
         tp2_r: float = 4.00,
-        runner_r: float = 10.00
+        runner_r: float = 10.00,
+        tp1_price: Optional[float] = None,
+        tp2_price: Optional[float] = None,
+        tp3_price: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Calculates 3-stage scale-out target prices and tranche lot sizes.
+        Supports calibrated target prices from DynamicStructuralStops / Citadel.
         """
         prec = _get_tradfi_precision(epic, entry_price)
         dir_u = direction.upper()
@@ -3337,15 +3372,15 @@ class TradFiMultiTargetScaleOutManager:
         sl_dist = max(raw_sl_dist, min_sl_dist)
 
         if dir_u == "BUY":
-            tp1 = round(entry_price + (tp1_r * sl_dist), prec)
-            tp2 = round(entry_price + (tp2_r * sl_dist), prec)
-            tp3 = round(entry_price + (runner_r * sl_dist), prec)
+            tp1 = round(tp1_price, prec) if (tp1_price is not None and tp1_price > 0) else round(entry_price + (tp1_r * sl_dist), prec)
+            tp2 = round(tp2_price, prec) if (tp2_price is not None and tp2_price > 0) else round(entry_price + (tp2_r * sl_dist), prec)
+            tp3 = round(tp3_price, prec) if (tp3_price is not None and tp3_price > 0) else round(entry_price + (runner_r * sl_dist), prec)
             be_sl = round(entry_price + max(spread * 0.5, entry_price * 0.001), prec)
             tp2_floor_sl = round(entry_price + (2.0 * sl_dist), prec)
         else:
-            tp1 = round(entry_price - (tp1_r * sl_dist), prec)
-            tp2 = round(entry_price - (tp2_r * sl_dist), prec)
-            tp3 = round(entry_price - (runner_r * sl_dist), prec)
+            tp1 = round(tp1_price, prec) if (tp1_price is not None and tp1_price > 0) else round(entry_price - (tp1_r * sl_dist), prec)
+            tp2 = round(tp2_price, prec) if (tp2_price is not None and tp2_price > 0) else round(entry_price - (tp2_r * sl_dist), prec)
+            tp3 = round(tp3_price, prec) if (tp3_price is not None and tp3_price > 0) else round(entry_price - (runner_r * sl_dist), prec)
             be_sl = round(entry_price - max(spread * 0.5, entry_price * 0.001), prec)
             tp2_floor_sl = round(entry_price - (2.0 * sl_dist), prec)
 

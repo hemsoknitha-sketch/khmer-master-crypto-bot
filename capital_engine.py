@@ -2095,7 +2095,11 @@ class CapitalComEngine:
                 spread=spread,
                 atr=atr,
                 min_rr_ratio=6.0,
-                min_target_spread_ratio=10.0
+                min_target_spread_ratio=10.0,
+                swing_high=sw_high,
+                swing_low=sw_low,
+                fvg_gp_setup=fib_analysis if fib_analysis.get("in_golden_pocket") else None,
+                volatility_regime="HIGH_VOLATILITY" if adx >= 35.0 else ("LOW_VOLATILITY" if adx < 20.0 else "NORMAL")
             )
         elif bearish_score >= 75:
             signal = "STRONG_SELL" if bearish_score >= 85 else "SELL"
@@ -2107,7 +2111,11 @@ class CapitalComEngine:
                 spread=spread,
                 atr=atr,
                 min_rr_ratio=6.0,
-                min_target_spread_ratio=10.0
+                min_target_spread_ratio=10.0,
+                swing_high=sw_high,
+                swing_low=sw_low,
+                fvg_gp_setup=fib_analysis if fib_analysis.get("in_golden_pocket") else None,
+                volatility_regime="HIGH_VOLATILITY" if adx >= 35.0 else ("LOW_VOLATILITY" if adx < 20.0 else "NORMAL")
             )
         else:
             signal = "HOLD_NEUTRAL"
@@ -2142,6 +2150,10 @@ class CapitalComEngine:
             "vsqi": spread_audit.get("vsqi", 10.0),
             "sl": sl,
             "tp": tp,
+            "tp1": spread_audit.get("tp1", tp),
+            "tp2": spread_audit.get("tp2", tp),
+            "tp3": spread_audit.get("tp3", tp),
+            "structural_stops_meta": spread_audit.get("structural_stops_meta", {}),
             "market_status": market_status,
             "is_falling_knife": is_falling_knife,
             "is_rising_rocket": is_rising_rocket,
@@ -2363,7 +2375,10 @@ class CapitalComEngine:
             min_deal_size=min_size,
             tp1_r=2.20,
             tp2_r=4.00,
-            runner_r=10.00
+            runner_r=10.00,
+            tp1_price=analysis.get("tp1"),
+            tp2_price=analysis.get("tp2"),
+            tp3_price=analysis.get("tp3")
         )
 
         # 4. Transmit Protected Position (Multi-Tranche Scale-Out or Single Dynamic Order)
@@ -7624,12 +7639,65 @@ class CapitalSpreadDragManager:
         spread: float,
         atr: float,
         min_rr_ratio: float = 6.0,
-        min_target_spread_ratio: float = 10.0
+        min_target_spread_ratio: float = 10.0,
+        swing_high: Optional[float] = None,
+        swing_low: Optional[float] = None,
+        active_ob: Optional[Dict[str, Any]] = None,
+        has_liquidity_sweep: bool = False,
+        sweep_wick_extreme: Optional[float] = None,
+        fvg_gp_setup: Optional[Dict[str, Any]] = None,
+        volatility_regime: str = "NORMAL"
     ) -> Tuple[float, float, Dict[str, Any]]:
         """
         Calculates mathematically optimal SL and TP guaranteeing R:R >= 6.0 and TP >= 10.0x spread.
+        Upgraded with Gap 6 Dynamic Structural Invalidation & MFE/MAE Calibration.
         """
         resolved_epic = epic.upper().replace(".PRO", "").strip()
+        prec = _get_tradfi_precision(resolved_epic, entry_price)
+
+        try:
+            import dynamic_structural_stops as dss
+            sh = float(swing_high) if (swing_high is not None and swing_high > 0) else (entry_price + max(2.5 * atr, 10.0 * spread))
+            sl_low = float(swing_low) if (swing_low is not None and swing_low > 0) else (entry_price - max(2.5 * atr, 10.0 * spread))
+            struct_stops = dss.DynamicStructuralStops.evaluate_structural_stops(
+                side=direction,
+                curr_price=entry_price,
+                spread=spread,
+                atr_15m=atr,
+                swing_high=sh,
+                swing_low=sl_low,
+                active_ob=active_ob,
+                has_liquidity_sweep=has_liquidity_sweep,
+                sweep_wick_extreme=sweep_wick_extreme,
+                fvg_gp_setup=fvg_gp_setup,
+                volatility_regime=volatility_regime
+            )
+            sl = round(struct_stops["invalidation_sl"], prec)
+            sl_dist = struct_stops["sl_dist"]
+            required_min_tp_dist = max(min_rr_ratio * sl_dist, min_target_spread_ratio * spread, 0.015 * entry_price)
+            eff_tp_dist = max(struct_stops.get("tp2_dist", 0.0), required_min_tp_dist)
+            is_buy = direction.upper() in ["BUY", "STRONG_BUY", "LONG"]
+            tp = round(entry_price + eff_tp_dist if is_buy else entry_price - eff_tp_dist, prec)
+
+            audit = self.evaluate_spread_drag(
+                epic=resolved_epic,
+                entry_price=entry_price,
+                sl_price=sl,
+                tp_price=tp,
+                spread=spread,
+                atr=atr,
+                min_target_spread_ratio=min_target_spread_ratio,
+                min_rr_ratio=min_rr_ratio
+            )
+            audit["tp1"] = round(struct_stops["tp1"], prec)
+            audit["tp2"] = round(struct_stops["tp2"], prec)
+            audit["tp3"] = round(struct_stops["tp3"], prec)
+            audit["structural_stops_meta"] = struct_stops
+            return sl, tp, audit
+        except Exception as e_dss:
+            logger.debug(f"Dynamic structural stops in hurdle fallback: {e_dss}")
+
+        # Fallback to baseline
         # 1. Downside Risk (1R): Clamped strictly outside market noise (Pillar 2 TradFi Standard)
         min_sl_dist = max(2.50 * atr, spread * 3.5, 0.0035 * entry_price)
 
@@ -7638,11 +7706,11 @@ class CapitalSpreadDragManager:
 
         is_buy = direction.upper() in ["BUY", "STRONG_BUY", "LONG"]
         if is_buy:
-            sl = round(entry_price - min_sl_dist, 2)
-            tp = round(entry_price + min_tp_dist, 2)
+            sl = round(entry_price - min_sl_dist, prec)
+            tp = round(entry_price + min_tp_dist, prec)
         else:
-            sl = round(entry_price + min_sl_dist, 2)
-            tp = round(entry_price - min_tp_dist, 2)
+            sl = round(entry_price + min_sl_dist, prec)
+            tp = round(entry_price - min_tp_dist, prec)
 
         audit = self.evaluate_spread_drag(
             epic=resolved_epic,
@@ -9099,17 +9167,45 @@ class CapitalTrendScalpEngine:
                     "signal": "HOLD_NEUTRAL",
                     "reason": f"360° Citadel Trap Block: {cit_eval.get('rejection_reason', 'Trap detected')}"
                 }
-            # Structural Invalidation Anchor from Citadel if available
+            # Gap 6: Calibrated Structural Invalidation SL & MFE/Structure-Calibrated TP
             if cit_eval.get("invalidation_sl"):
-                cit_sl = float(cit_eval["invalidation_sl"])
-                if direction == "BUY" and cit_sl < entry_price:
-                    sl_dist = max(sl_dist, entry_price - cit_sl)
-                    sl_price = entry_price - sl_dist
-                elif direction == "SELL" and cit_sl > entry_price:
-                    sl_dist = max(sl_dist, cit_sl - entry_price)
-                    sl_price = entry_price + sl_dist
-                tp_dist = max(tp_dist, sl_dist * 2.5)
-                tp_price = entry_price + tp_dist if direction == "BUY" else entry_price - tp_dist
+                sl_price = float(cit_eval["invalidation_sl"])
+                sl_dist = abs(entry_price - sl_price)
+                if cit_eval.get("target_tp_major"):
+                    tp_price = float(cit_eval["target_tp_major"])
+                    tp_dist = abs(tp_price - entry_price)
+                elif cit_eval.get("target_tp_min"):
+                    tp_price = float(cit_eval["target_tp_min"])
+                    tp_dist = abs(tp_price - entry_price)
+                else:
+                    tp_dist = max(sl_dist * 2.5, 10.0 * spread)
+                    tp_price = entry_price + tp_dist if direction == "BUY" else entry_price - tp_dist
+            else:
+                # Direct DynamicStructuralStops fallback
+                try:
+                    import dynamic_structural_stops as dss
+                    act_ob = next((ob for ob in obs_5m if ob.get("is_testing")), None)
+                    dss_res = dss.DynamicStructuralStops.evaluate_structural_stops(
+                        side=direction,
+                        curr_price=entry_price,
+                        spread=spread,
+                        atr_15m=atr_15m,
+                        swing_high=max(highs_5m[-15:]),
+                        swing_low=min(lows_5m[-15:]),
+                        active_ob=act_ob,
+                        has_liquidity_sweep=(has_bull_idm_5m if direction == "BUY" else has_bear_idm_5m),
+                        fvg_gp_setup=fib_15m if fib_15m.get("in_golden_pocket") else None
+                    )
+                    sl_price = dss_res["invalidation_sl"]
+                    sl_dist = dss_res["sl_dist"]
+                    tp_price = dss_res["tp2"]
+                    tp_dist = dss_res["tp2_dist"]
+                    cit_eval["target_tp_min"] = dss_res["tp1"]
+                    cit_eval["target_tp_major"] = dss_res["tp2"]
+                    cit_eval["target_tp_moonshot"] = dss_res["tp3"]
+                    cit_eval["structural_stops_meta"] = dss_res
+                except Exception as e_dss_fb:
+                    logger.debug(f"Direct DSS fallback note: {e_dss_fb}")
         except Exception as e_cit:
             logger.debug(f"360 Citadel check note: {e_cit}")
 
@@ -9128,6 +9224,9 @@ class CapitalTrendScalpEngine:
             "entry_price": entry_price,
             "sl": round(sl_price, 4),
             "tp": round(tp_price, 4),
+            "tp1": round(cit_eval.get("target_tp_min", tp_price), 4),
+            "tp2": round(cit_eval.get("target_tp_major", tp_price), 4),
+            "tp3": round(cit_eval.get("target_tp_moonshot", tp_price), 4),
             "sl_dist": round(sl_dist, 4),
             "tp_dist": round(tp_dist, 4),
             "rr_ratio": round(rr_ratio, 2),
@@ -9145,7 +9244,8 @@ class CapitalTrendScalpEngine:
             "candlestick_summary": [f for f in cit_eval.get("confluence_factors", []) if "BULLISH_" in f or "BEARISH_" in f],
             "candle_trigger": candle_trigger_name,
             "fibonacci": cit_eval.get("fibonacci", fib_15m),
-            "reason": f"15M Trend + {smc_trigger_reason} + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Breathing SL)"
+            "structural_stops_meta": cit_eval.get("structural_stops_meta", {}),
+            "reason": f"15M Trend + {smc_trigger_reason} + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Structural SL)"
         }
 
     async def auto_arm_event_universe_radar(self, engine: Optional[CapitalComEngine] = None):
