@@ -1151,7 +1151,8 @@ class SuperSmartCapitalCitadel:
         cls,
         epic: str,
         proposed_side: str,
-        engine: Optional[Any] = None
+        engine: Optional[Any] = None,
+        strategy_regime: str = "AUTO"
     ) -> Dict[str, Any]:
         """
         Comprehensive Institutional Trap & Confluence Evaluation for a Capital.com TradFi Asset.
@@ -1169,7 +1170,7 @@ class SuperSmartCapitalCitadel:
             norm_side = "UNKNOWN"
 
         now = time.time()
-        cache_key = f"{resolved_epic}_{norm_side}"
+        cache_key = f"{resolved_epic}_{norm_side}_{strategy_regime}"
         if cache_key in cls._CITADEL_CACHE:
             cached_ts, cached_res = cls._CITADEL_CACHE[cache_key]
             if now - cached_ts < cls._CACHE_TTL:
@@ -1339,49 +1340,50 @@ class SuperSmartCapitalCitadel:
             bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
             sp_val = spread if spread > 0 else bench_sp
 
-            if norm_side == "SELL" and h4_anchor.get("veto_short"):
-                ema200_val = h4_anchor.get("ema200_h4", curr_price)
-                reason = (
-                    f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BULLISH (Price ${curr_price:,.2f} >= "
-                    f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'HH-HL')}). "
-                    f"Selling/Shorting on 15m against the institutional H4 macro uptrend is strictly prohibited "
-                    f"by Wall Street Top-Down Anchor."
-                )
-                sl_default = round(curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
-                res = {
-                    "epic": resolved_epic,
-                    "proposed_side": norm_side,
-                    "is_approved": False,
-                    "rejection_reason": reason,
-                    "confluence_score": 0.0,
-                    "spread": sp_val,
-                    "invalidation_sl": sl_default,
-                    "h4_trend_anchor": h4_anchor
-                }
-                cls._CITADEL_CACHE[cache_key] = (now, res)
-                return res
+            if strategy_regime == "TREND_FOLLOWING":
+                if norm_side == "SELL" and h4_anchor.get("veto_short"):
+                    ema200_val = h4_anchor.get("ema200_h4", curr_price)
+                    reason = (
+                        f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BULLISH (Price ${curr_price:,.2f} >= "
+                        f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'HH-HL')}). "
+                        f"Selling/Shorting on 15m against the institutional H4 macro uptrend is strictly prohibited "
+                        f"by Wall Street Top-Down Anchor."
+                    )
+                    sl_default = round(curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
+                    res = {
+                        "epic": resolved_epic,
+                        "proposed_side": norm_side,
+                        "is_approved": False,
+                        "rejection_reason": reason,
+                        "confluence_score": 0.0,
+                        "spread": sp_val,
+                        "invalidation_sl": sl_default,
+                        "h4_trend_anchor": h4_anchor
+                    }
+                    cls._CITADEL_CACHE[cache_key] = (now, res)
+                    return res
 
-            if norm_side == "BUY" and h4_anchor.get("veto_long"):
-                ema200_val = h4_anchor.get("ema200_h4", curr_price)
-                reason = (
-                    f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BEARISH (Price ${curr_price:,.2f} <= "
-                    f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'LH-LL')}). "
-                    f"Buying/Longing on 15m against the institutional H4 macro downtrend is strictly prohibited "
-                    f"by Wall Street Top-Down Anchor (Falling Knife Guard)."
-                )
-                sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5), prec)
-                res = {
-                    "epic": resolved_epic,
-                    "proposed_side": norm_side,
-                    "is_approved": False,
-                    "rejection_reason": reason,
-                    "confluence_score": 0.0,
-                    "spread": sp_val,
-                    "invalidation_sl": sl_default,
-                    "h4_trend_anchor": h4_anchor
-                }
-                cls._CITADEL_CACHE[cache_key] = (now, res)
-                return res
+                if norm_side == "BUY" and h4_anchor.get("veto_long"):
+                    ema200_val = h4_anchor.get("ema200_h4", curr_price)
+                    reason = (
+                        f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BEARISH (Price ${curr_price:,.2f} <= "
+                        f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'LH-LL')}). "
+                        f"Buying/Longing on 15m against the institutional H4 macro downtrend is strictly prohibited "
+                        f"by Wall Street Top-Down Anchor (Falling Knife Guard)."
+                    )
+                    sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5), prec)
+                    res = {
+                        "epic": resolved_epic,
+                        "proposed_side": norm_side,
+                        "is_approved": False,
+                        "rejection_reason": reason,
+                        "confluence_score": 0.0,
+                        "spread": sp_val,
+                        "invalidation_sl": sl_default,
+                        "h4_trend_anchor": h4_anchor
+                    }
+                    cls._CITADEL_CACHE[cache_key] = (now, res)
+                    return res
         except Exception as e_h4:
             logger.debug(f"H4 trend anchor evaluation note: {e_h4}")
 
@@ -1447,6 +1449,17 @@ class SuperSmartCapitalCitadel:
         # --------------------------------------------------------------------
         # 1. PILLAR 6: NON-NEGOTIABLE SAFETY HARD GUARDS (RSI ARMOR & ADX MOMENTUM)
         # --------------------------------------------------------------------
+        # Calculate 15m ADX (14 period)
+        adx_15m = _calc_adx_14(highs, lows, closes)
+
+        # Pre-calculate 15m EMA Suite for dynamic momentum verification
+        s_closes_15m = pd.Series(closes)
+        ema20_15m = float(s_closes_15m.ewm(span=20, adjust=False).mean().iloc[-1]) if len(closes) >= 15 else curr_price
+        ema50_15m = float(s_closes_15m.ewm(span=50, adjust=False).mean().iloc[-1]) if len(closes) >= 20 else curr_price
+        ema200_15m = float(s_closes_15m.ewm(span=200, adjust=False).mean().iloc[-1]) if len(closes) >= 40 else ema50_15m
+        is_triple_ema_bullish = (curr_price > ema20_15m > ema50_15m > ema200_15m)
+        is_triple_ema_bearish = (curr_price < ema20_15m < ema50_15m < ema200_15m)
+
         # Calculate 15m RSI (14 period)
         gains, losses = [], []
         for i in range(1, len(closes)):
@@ -1463,49 +1476,56 @@ class SuperSmartCapitalCitadel:
         rs = avg_gain / max(0.00001, avg_loss)
         rsi_15m = round(100.0 - (100.0 / (1.0 + rs)), 2)
 
-        # Invariant 16: Anti-Oversold Short Guard (15m RSI <= 36.0 Bottom Shield)
-        if norm_side == "SELL" and rsi_15m <= 36.0:
-            reason = (
-                f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI ({rsi_15m:.1f}) <= 36.0 (Invariant 16). "
-                f"Selling panic liquidation bottom into institutional support is prohibited."
-            )
-            res = {
-                "epic": resolved_epic,
-                "proposed_side": norm_side,
-                "is_approved": False,
-                "rejection_reason": reason,
-                "rsi_15m": rsi_15m,
-                "confluence_score": 0.0,
-                "spread": spread,
-                "invalidation_sl": preliminary_sl,
-                "breathing_sl_dist": breathing_sl_dist
-            }
-            cls._CITADEL_CACHE[cache_key] = (now, res)
-            return res
+        # Gap 3 Decoupling: Invariant 16 Anti-Oversold & Dimension 7 Anti-Overbought Strategy Guards
+        if strategy_regime != "MEAN_REVERSION":
+            # In strong bear trend continuation (ADX >= 30.0 + Bearish EMA Stack), RSI can expand down to 28.0.
+            # Below 28.0 (or below 36.0 without high momentum), selling panic drops into support is strictly prohibited.
+            is_bear_expansion = (adx_15m >= 30.0 and is_triple_ema_bearish)
+            rsi_oversold_limit = 28.0 if is_bear_expansion else 36.0
+            if norm_side == "SELL" and rsi_15m <= rsi_oversold_limit:
+                reason = (
+                    f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI ({rsi_15m:.1f}) <= {rsi_oversold_limit:.1f} (Invariant 16). "
+                    f"Selling panic liquidation bottom into institutional support is prohibited."
+                )
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": reason,
+                    "rsi_15m": rsi_15m,
+                    "confluence_score": 0.0,
+                    "spread": spread,
+                    "invalidation_sl": preliminary_sl,
+                    "breathing_sl_dist": breathing_sl_dist
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
 
-        # Dimension 7 Anti-FOMO: Anti-Overbought Peak Guard (15m RSI >= 70.0 Peak Long Shield)
-        if norm_side == "BUY" and rsi_15m >= 70.0:
-            reason = (
-                f"ANTI_OVERBOUGHT_LONG_GUARD: 15m RSI ({rsi_15m:.1f}) >= 70.0. "
-                f"Buying blow-off euphoria peak into institutional distribution is prohibited."
-            )
-            res = {
-                "epic": resolved_epic,
-                "proposed_side": norm_side,
-                "is_approved": False,
-                "rejection_reason": reason,
-                "rsi_15m": rsi_15m,
-                "confluence_score": 0.0,
-                "spread": spread,
-                "invalidation_sl": preliminary_sl,
-                "breathing_sl_dist": breathing_sl_dist
-            }
-            cls._CITADEL_CACHE[cache_key] = (now, res)
-            return res
+            # In strong bull trend continuation (ADX >= 30.0 + Bullish EMA Stack), RSI can expand up to 78.0.
+            # Above 78.0 (or above 70.0 without momentum expansion), buying blow-off euphoria peaks is strictly prohibited.
+            is_bull_expansion = (adx_15m >= 30.0 and is_triple_ema_bullish)
+            rsi_overbought_limit = 78.0 if is_bull_expansion else 70.0
+            if norm_side == "BUY" and rsi_15m >= rsi_overbought_limit:
+                reason = (
+                    f"ANTI_OVERBOUGHT_LONG_GUARD: 15m RSI ({rsi_15m:.1f}) >= {rsi_overbought_limit:.1f}. "
+                    f"Buying blow-off euphoria peak into institutional distribution is prohibited."
+                )
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": reason,
+                    "rsi_15m": rsi_15m,
+                    "confluence_score": 0.0,
+                    "spread": spread,
+                    "invalidation_sl": preliminary_sl,
+                    "breathing_sl_dist": breathing_sl_dist
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
 
         # Pillar 3: 360° Citadel Sweep Confirmation & Trap Clearance (ADX >= 25.0 Sideways Trap Clearance)
-        adx_15m = _calc_adx_14(highs, lows, closes)
-        if adx_15m < 25.0:
+        if adx_15m < 25.0 and strategy_regime == "TREND_FOLLOWING":
             reason = (
                 f"CHOPPY_SIDEWAYS_MARKET: 15m ADX ({adx_15m:.1f}) < 25.0 (Pillar 3 Citadel Clearance). "
                 f"Trading inside trendless sideways consolidation is strictly prohibited to eliminate whipsaw bleed."
@@ -1563,6 +1583,8 @@ class SuperSmartCapitalCitadel:
                 "proposed_side": norm_side,
                 "is_approved": False,
                 "rejection_reason": reason,
+                "strategy_regime": "EQUILIBRIUM_CHOP",
+                "regime_veto_code": "VETO_EQUILIBRIUM_CHOP",
                 "price_range_pct": price_range_pct,
                 "confluence_score": 20.0,
                 "is_chop_zone": True,
@@ -1588,6 +1610,8 @@ class SuperSmartCapitalCitadel:
                 "proposed_side": norm_side,
                 "is_approved": False,
                 "rejection_reason": reason,
+                "strategy_regime": strategy_regime,
+                "regime_veto_code": "VETO_DEEP_PREMIUM_TRAP",
                 "price_range_pct": price_range_pct,
                 "confluence_score": 25.0,
                 "spread": spread,
@@ -1608,6 +1632,8 @@ class SuperSmartCapitalCitadel:
                 "proposed_side": norm_side,
                 "is_approved": False,
                 "rejection_reason": reason,
+                "strategy_regime": strategy_regime,
+                "regime_veto_code": "VETO_DEEP_DISCOUNT_TRAP",
                 "price_range_pct": price_range_pct,
                 "confluence_score": 25.0,
                 "spread": spread,
@@ -1797,10 +1823,84 @@ class SuperSmartCapitalCitadel:
         in_kill_zone = (7 <= utc_hour <= 10) or (13 <= utc_hour <= 16)
 
         # --------------------------------------------------------------------
+        # Gap 3 (ចន្លោះទី 3): DUAL-REGIME STRATEGY DECOUPLING & VETO CALIBRATION
+        # Decouples Trend-Following from Mean-Reversion. Prevents choking valid
+        # breakout runs (high RSI) or high R:R counter-trend sweeps (extreme RSI/opposing H4).
+        # --------------------------------------------------------------------
+        import dual_regime_strategy_manager as drsm
+
+        has_sweep = (has_ssl_sweep if norm_side == "BUY" else has_bsl_sweep)
+        has_choch = (has_bullish_choch if norm_side == "BUY" else has_bearish_choch)
+        has_ob = (has_bullish_ob_test if norm_side == "BUY" else has_bearish_ob_test)
+        is_stacked = (is_triple_ema_bullish if norm_side == "BUY" else is_triple_ema_bearish)
+
+        if strategy_regime == "AUTO":
+            classified_regime, regime_meta = drsm.DualRegimeStrategyManager.classify_market_regime(
+                side=norm_side,
+                price_range_pct=price_range_pct,
+                adx_15m=adx_15m,
+                rsi_15m=rsi_15m,
+                has_liquidity_sweep=has_sweep,
+                has_choch=has_choch,
+                has_bos=bool(structure_info.get("has_bos")),
+                is_triple_ema_aligned=is_stacked,
+                h4_bias=h4_anchor.get("h4_bias", "NEUTRAL"),
+                has_order_block_test=has_ob
+            )
+            active_regime = classified_regime
+            regime_evidence = regime_meta.get("evidence", [])
+        elif strategy_regime == "MEAN_REVERSION":
+            active_regime = drsm.StrategyRegime.MEAN_REVERSION
+            regime_evidence = ["EXPLICIT_MEAN_REVERSION_OVERRIDE"]
+        else:
+            active_regime = drsm.StrategyRegime.TREND_FOLLOWING
+            regime_evidence = ["EXPLICIT_TREND_FOLLOWING_OVERRIDE"]
+
+        regime_veto = drsm.DualRegimeStrategyManager.evaluate_regime_vetoes(
+            strategy_regime=active_regime,
+            side=norm_side,
+            rsi_15m=rsi_15m,
+            adx_15m=adx_15m,
+            price_range_pct=price_range_pct,
+            h4_bias=h4_anchor.get("h4_bias", "NEUTRAL"),
+            has_liquidity_sweep=has_sweep,
+            has_choch=has_choch,
+            is_triple_ema_aligned=is_stacked,
+            has_order_block_test=has_ob
+        )
+
+        if regime_veto["is_vetoed"]:
+            res = {
+                "epic": resolved_epic,
+                "proposed_side": norm_side,
+                "is_approved": False,
+                "rejection_reason": regime_veto["explanation"],
+                "regime_veto_code": regime_veto["veto_code"],
+                "strategy_regime": active_regime.value if hasattr(active_regime, "value") else str(active_regime),
+                "regime_evidence": regime_evidence,
+                "confluence_score": 25.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist,
+                "rsi_15m": rsi_15m,
+                "adx_15m": adx_15m,
+                "price_range_pct": price_range_pct,
+                "h4_trend_anchor": h4_anchor
+            }
+            cls._CITADEL_CACHE[cache_key] = (now, res)
+            return res
+
+        # --------------------------------------------------------------------
         # 7. CONFLUENCE SCORING & DECISION MATRIX (SMC & ICT ENHANCED)
         # --------------------------------------------------------------------
         score = 50.0
         factors = []
+        if active_regime == drsm.StrategyRegime.MEAN_REVERSION:
+            score += 10.0
+            factors.append(f"STRATEGY_REGIME: MEAN_REVERSION ({', '.join(regime_evidence)}) (+10)")
+        elif active_regime == drsm.StrategyRegime.TREND_FOLLOWING:
+            score += 10.0
+            factors.append(f"STRATEGY_REGIME: TREND_FOLLOWING ({', '.join(regime_evidence)}) (+10)")
 
         if norm_side == "BUY":
             # Discount advantage
@@ -2203,6 +2303,9 @@ class SuperSmartCapitalCitadel:
             "orthogonal_groups": orthogonal_groups,
             "orthogonal_factors": orthogonal_factors,
             "is_balanced_confluence": is_balanced_confluence,
+            "strategy_regime": active_regime.value if hasattr(active_regime, "value") else str(active_regime),
+            "regime_evidence": regime_evidence,
+            "regime_veto_code": regime_veto.get("veto_code", "PASSED"),
             "rejection_reason": (
                 "CLEARANCE_GRANTED"
                 if is_approved
