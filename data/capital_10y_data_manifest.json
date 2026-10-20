@@ -1,0 +1,158 @@
+{
+  "verified_at": "2026-10-20T22:55:24.775710",
+  "data_directory": "data/tradfi_10y_dna",
+  "assets_count": 10,
+  "macro_count": 3,
+  "assets": {
+    "GOLD": {
+      "csv": "GCF_1d_10y.csv",
+      "name": "Gold (Spot/Futures)",
+      "bars": 2514,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 1127.800048828125,
+      "max_close": 5318.39990234375,
+      "status": "VERIFIED_VALID"
+    },
+    "US100": {
+      "csv": "NQF_1d_10y.csv",
+      "name": "US Tech 100 (Nasdaq)",
+      "bars": 2515,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 4657.75,
+      "max_close": 31483.25,
+      "status": "VERIFIED_VALID"
+    },
+    "US500": {
+      "csv": "ESF_1d_10y.csv",
+      "name": "US 500 (S&P 500)",
+      "bars": 2515,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 2080.0,
+      "max_close": 7874.0,
+      "status": "VERIFIED_VALID"
+    },
+    "DE40": {
+      "csv": "GDAXI_1d_10y.csv",
+      "name": "Germany 40 (DAX)",
+      "bars": 2538,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 8441.7099609375,
+      "max_close": 26569.990234375,
+      "status": "VERIFIED_VALID"
+    },
+    "OIL": {
+      "csv": "CLF_1d_10y.csv",
+      "name": "Crude Oil (WTI)",
+      "bars": 2514,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": -37.630001068115234,
+      "max_close": 123.6999969482422,
+      "status": "VERIFIED_VALID"
+    },
+    "SILVER": {
+      "csv": "SIF_1d_10y.csv",
+      "name": "Silver (XAGUSD)",
+      "bars": 2513,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 11.734999656677246,
+      "max_close": 115.08000183105467,
+      "status": "VERIFIED_VALID"
+    },
+    "NVDA": {
+      "csv": "NVDA_1d_10y.csv",
+      "name": "NVIDIA Corp",
+      "bars": 2512,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-19",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 1.656948208808899,
+      "max_close": 239.2400054931641,
+      "status": "VERIFIED_VALID"
+    },
+    "TSLA": {
+      "csv": "TSLA_1d_10y.csv",
+      "name": "Tesla Inc",
+      "bars": 2512,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-19",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 11.9313325881958,
+      "max_close": 489.8800048828125,
+      "status": "VERIFIED_VALID"
+    },
+    "AAPL": {
+      "csv": "AAPL_1d_10y.csv",
+      "name": "Apple Inc",
+      "bars": 2512,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-19",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 24.298473358154297,
+      "max_close": 343.4599914550781,
+      "status": "VERIFIED_VALID"
+    },
+    "MSFT": {
+      "csv": "MSFT_1d_10y.csv",
+      "name": "Microsoft Corp",
+      "bars": 2512,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-19",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "min_close": 50.83613586425781,
+      "max_close": 543.4500122070312,
+      "status": "VERIFIED_VALID"
+    }
+  },
+  "macro": {
+    "DXY": {
+      "csv": "DX-Y.NYB_1d_10y.csv",
+      "bars": 2514,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "status": "VERIFIED_VALID"
+    },
+    "TNX": {
+      "csv": "TNX_1d_10y.csv",
+      "bars": 2512,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "status": "VERIFIED_VALID"
+    },
+    "VIX": {
+      "csv": "VIX_1d_10y.csv",
+      "bars": 2515,
+      "start_date": "2016-10-20",
+      "end_date": "2026-10-20",
+      "duplicate_dates": 0,
+      "null_values": 0,
+      "status": "VERIFIED_VALID"
+    }
+  },
+  "integrity_status": "ALL_13_SERIES_VERIFIED_100_PERCENT"
+}

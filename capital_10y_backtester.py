@@ -44,8 +44,14 @@ import matplotlib.dates as mdates
 # Set encoding
 sys.stdout.reconfigure(encoding='utf-8')
 
+# Import institutional probability calibrator for exact live/backtest parity (Priority 4)
+from capital_probability_calibrator import CapitalProbabilityCalibrator
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("Capital10YBacktester")
+
+# Quantitative Architecture Constants
+WARMUP_BARS = 200  # Strict warm-up period (~1 calendar year): zero trading or signals allowed
 
 # -----------------------------------------------------------------------------
 # Asset Specifications & Realistic Broker Cost Table (Capital.com Institutional)
@@ -104,45 +110,140 @@ ASSET_SPECS = {
 }
 
 
-def load_dataset_clean(data_dir: str = "data/tradfi_10y_dna") -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+def load_dataset_clean(
+    data_dir: str = "data/tradfi_10y_dna",
+    manifest_output_path: str = "data/capital_10y_data_manifest.json"
+) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame], Dict[str, Any]]:
     """
-    Loads and aligns 10-year OHLCV for all instruments and macro overlays.
+    Loads, rigorously verifies, and aligns 10-year OHLCV for all 10 instruments and 3 macro overlays.
+    Priority 2 Pre-flight Data Verification:
+      - Confirms all 10 assets & 3 macro series exist (aborts immediately if any missing).
+      - Checks minimum row count (>= 2,000 bars per asset).
+      - Verifies valid date range coverage (starts <= 2017-01-01, ends >= 2026-01-01).
+      - Validates 0 duplicate dates and 0 null OHLC values.
+      - Generates an auditable Dataset Manifest JSON.
     """
     assets_data = {}
     macro_data = {}
+    manifest = {
+        "verified_at": datetime.datetime.now().isoformat(),
+        "data_directory": data_dir,
+        "assets_count": len(ASSET_SPECS),
+        "macro_count": 3,
+        "assets": {},
+        "macro": {},
+        "integrity_status": "PENDING_VERIFICATION"
+    }
 
+    missing_assets = []
+    # 1. Rigorous Asset Ingestion & Validation
     for sym, spec in ASSET_SPECS.items():
         p = os.path.join(data_dir, spec["csv"])
-        if os.path.exists(p):
-            df = pd.read_csv(p)
-            df['Date'] = pd.to_datetime(df['Date'])
-            df = df.sort_values('Date').reset_index(drop=True)
-            for c in ['open', 'high', 'low', 'close', 'volume']:
-                df[c] = pd.to_numeric(df[c], errors='coerce')
-            df = df.dropna(subset=['close']).reset_index(drop=True)
-            assets_data[sym] = df
-            logger.info(f"Loaded {sym}: {len(df)} bars ({df['Date'].iloc[0].date()} to {df['Date'].iloc[-1].date()})")
-        else:
-            logger.warning(f"File missing for {sym}: {p}")
+        if not os.path.exists(p):
+            missing_assets.append((sym, p))
+            continue
 
+        df = pd.read_csv(p)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df.sort_values('Date').reset_index(drop=True)
+
+        # Integrity Checks
+        dups = int(df['Date'].duplicated().sum())
+        if dups > 0:
+            raise ValueError(f"CRITICAL DATA INTEGRITY ERROR: Asset {sym} contains {dups} duplicate dates in {p}!")
+
+        for c in ['open', 'high', 'low', 'close', 'volume']:
+            df[c] = pd.to_numeric(df[c], errors='coerce')
+
+        nulls = int(df[['open', 'high', 'low', 'close']].isna().sum().sum())
+        if nulls > 0:
+            raise ValueError(f"CRITICAL DATA INTEGRITY ERROR: Asset {sym} contains {nulls} null OHLC values in {p}!")
+
+        df = df.dropna(subset=['close']).reset_index(drop=True)
+        bar_count = len(df)
+        if bar_count < 2000:
+            raise ValueError(f"CRITICAL DATA SHORTAGE: Asset {sym} has only {bar_count} bars (< 2,000 required for 10-year audit)!")
+
+        start_dt = df['Date'].iloc[0]
+        end_dt = df['Date'].iloc[-1]
+        if start_dt > pd.to_datetime("2017-01-01") or end_dt < pd.to_datetime("2026-01-01"):
+            raise ValueError(f"CRITICAL DATE RANGE ERROR: Asset {sym} span ({start_dt.date()} to {end_dt.date()}) does not cover required 10-year window!")
+
+        assets_data[sym] = df
+        manifest["assets"][sym] = {
+            "csv": spec["csv"],
+            "name": spec["name"],
+            "bars": bar_count,
+            "start_date": str(start_dt.date()),
+            "end_date": str(end_dt.date()),
+            "duplicate_dates": dups,
+            "null_values": nulls,
+            "min_close": float(df['close'].min()),
+            "max_close": float(df['close'].max()),
+            "status": "VERIFIED_VALID"
+        }
+        logger.info(f"Verified & Loaded {sym:6s}: {bar_count} bars ({start_dt.date()} to {end_dt.date()}) | 0 dups, 0 nulls")
+
+    if missing_assets:
+        raise FileNotFoundError(f"CRITICAL PRE-FLIGHT ABORT: Missing {len(missing_assets)} required asset datasets: {missing_assets}")
+
+    # 2. Rigorous Macro Overlays Ingestion & Validation
     macro_files = {
         "DXY": "DX-Y.NYB_1d_10y.csv",
         "TNX": "TNX_1d_10y.csv",
         "VIX": "VIX_1d_10y.csv"
     }
+    missing_macro = []
     for mkey, fname in macro_files.items():
         p = os.path.join(data_dir, fname)
-        if os.path.exists(p):
-            df = pd.read_csv(p)
-            df['Date'] = pd.to_datetime(df['Date'])
-            df = df.sort_values('Date').reset_index(drop=True)
-            for c in ['open', 'high', 'low', 'close', 'volume']:
-                df[c] = pd.to_numeric(df[c], errors='coerce')
-            df = df.dropna(subset=['close']).reset_index(drop=True)
-            macro_data[mkey] = df
-            logger.info(f"Loaded Macro {mkey}: {len(df)} bars")
+        if not os.path.exists(p):
+            missing_macro.append((mkey, p))
+            continue
 
-    return assets_data, macro_data
+        df = pd.read_csv(p)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df.sort_values('Date').reset_index(drop=True)
+
+        dups = int(df['Date'].duplicated().sum())
+        if dups > 0:
+            raise ValueError(f"CRITICAL DATA INTEGRITY ERROR: Macro {mkey} contains {dups} duplicate dates in {p}!")
+
+        for c in ['open', 'high', 'low', 'close', 'volume']:
+            df[c] = pd.to_numeric(df[c], errors='coerce')
+
+        nulls = int(df[['open', 'high', 'low', 'close']].isna().sum().sum())
+        if nulls > 0:
+            raise ValueError(f"CRITICAL DATA INTEGRITY ERROR: Macro {mkey} contains {nulls} null OHLC values in {p}!")
+
+        df = df.dropna(subset=['close']).reset_index(drop=True)
+        bar_count = len(df)
+        if bar_count < 2000:
+            raise ValueError(f"CRITICAL DATA SHORTAGE: Macro {mkey} has only {bar_count} bars (< 2,000 required)!")
+
+        start_dt = df['Date'].iloc[0]
+        end_dt = df['Date'].iloc[-1]
+        macro_data[mkey] = df
+        manifest["macro"][mkey] = {
+            "csv": fname,
+            "bars": bar_count,
+            "start_date": str(start_dt.date()),
+            "end_date": str(end_dt.date()),
+            "duplicate_dates": dups,
+            "null_values": nulls,
+            "status": "VERIFIED_VALID"
+        }
+        logger.info(f"Verified & Loaded Macro {mkey:4s}: {bar_count} bars ({start_dt.date()} to {end_dt.date()}) | 0 dups, 0 nulls")
+
+    if missing_macro:
+        raise FileNotFoundError(f"CRITICAL PRE-FLIGHT ABORT: Missing {len(missing_macro)} required macro datasets: {missing_macro}")
+
+    manifest["integrity_status"] = "ALL_13_SERIES_VERIFIED_100_PERCENT"
+    os.makedirs(os.path.dirname(manifest_output_path), exist_ok=True)
+    with open(manifest_output_path, "w", encoding="utf-8") as mf:
+        json.dump(manifest, mf, indent=2)
+    logger.info(f"Saved complete Dataset Manifest to {manifest_output_path}")
+
+    return assets_data, macro_data, manifest
 
 
 # -----------------------------------------------------------------------------
@@ -170,8 +271,8 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     tr3 = (low - prev_close).abs()
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     d['tr'] = tr
+    # Priority 3 Fix: Pure forward-only rolling calculation; NEVER use .bfill() (eliminates look-ahead bias)
     d['atr14'] = tr.rolling(window=14, min_periods=14).mean()
-    d['atr14'] = d['atr14'].bfill()
 
     # 3. Wilder's ADX 14
     up_move = high - high.shift(1)
@@ -453,28 +554,32 @@ def evaluate_bar_signals(
         return None, 0.0, 0.0, meta
 
     # -------------------------------------------------------------------------
-    # 5. PROBABILITY CALIBRATION (L2-Regularized Logistic & Isotonic Mapping)
+    # 5. PROBABILITY CALIBRATION (Priority 4 Live/Backtest Parity via CapitalProbabilityCalibrator)
     # -------------------------------------------------------------------------
-    # Platt logistic transform: logit = -0.7172 - 0.1442*(score_std) + 0.3466*(sweep) + 0.2433*(ob) + 0.1877*(discount) - 0.4076*(adx_std) + 0.0933*(rsi_std)
-    score_std = (raw_score - 89.70) / 11.14
-    sweep_val = 1.0 if (has_ssl_sweep if chosen_dir == "BUY" else has_bsl_sweep) else 0.0
-    ob_val = 1.0 if (has_bullish_ob if chosen_dir == "BUY" else has_bearish_ob) else 0.0
-    disc_val = 1.0 if (range_pct < 50.0 if chosen_dir == "BUY" else range_pct > 50.0) else 0.0
-    adx_std = (adx - 38.67) / 11.68
-    rsi_std = (rsi - 62.25) / 14.96
+    is_disc_prem = (range_pct < 50.0) if chosen_dir == "BUY" else (range_pct > 50.0)
+    has_sweep = has_ssl_sweep if chosen_dir == "BUY" else has_bsl_sweep
+    has_ob = has_bullish_ob if chosen_dir == "BUY" else has_bearish_ob
+    has_fvg = has_bullish_fvg if chosen_dir == "BUY" else has_bearish_fvg
 
-    logit = -0.7172 - 0.1442 * score_std + 0.3466 * sweep_val + 0.2433 * ob_val + 0.1877 * disc_val - 0.4076 * adx_std + 0.0933 * rsi_std
-    # Platt temperature-scaled logistic calibration (centered at In-Sample empirical base rate ~55.6%)
-    # Eliminates artificial probability inflation, aligning Brier score with empirical realization
-    calibrated_prob = 1.0 / (1.0 + math.exp(-max(-3.0, min(3.0, (logit + 0.95) / 1.5))))
+    cal_res = CapitalProbabilityCalibrator.calibrate_probability(
+        raw_confluence_score=raw_score,
+        is_discount_or_premium=is_disc_prem,
+        has_liquidity_sweep=has_sweep,
+        has_order_block=has_ob,
+        has_fvg_golden_pocket=has_fvg,
+        adx_15m=adx,
+        rsi_15m=rsi
+    )
+    calibrated_prob = cal_res["calibrated_win_prob"]
 
-    # Statistical clearance hurdle: Calibrated probability >= 50%
-    if calibrated_prob < 0.50:
-        meta["veto_reason"] = f"CALIBRATED_PROB_BELOW_50 ({calibrated_prob*100:.1f}%)"
+    # Statistical clearance hurdle: Calibrated probability >= 50% and statistically approved
+    if not cal_res["is_statistically_approved"]:
+        meta["veto_reason"] = f"CALIBRATED_PROB_BELOW_THRESHOLD (p={calibrated_prob*100:.1f}%, score={raw_score:.1f})"
         return None, raw_score, calibrated_prob, meta
 
     meta["raw_score"] = raw_score
     meta["calibrated_p"] = calibrated_prob
+    meta["conviction_tier"] = cal_res.get("conviction_tier", "SOLID_CONVICTION")
     return chosen_dir, raw_score, calibrated_prob, meta
 
 
@@ -774,10 +879,15 @@ def run_backtest_simulation(
 
             # Find row index for current_date via O(1) dictionary
             curr_row_idx = date_idx_maps[epic].get(current_date)
-            if curr_row_idx is None or curr_row_idx < 40:
-                continue  # Require 40-bar warm-up
+            # Priority 3 Warm-up Period: Strictly require 200-bar warm-up (no early unformed signals)
+            if curr_row_idx is None or curr_row_idx < WARMUP_BARS:
+                continue
 
             curr_row = df_sym.iloc[curr_row_idx]
+            # Ensure ATR is valid and strictly positive (no look-ahead bfill)
+            if pd.isna(curr_row['atr14']) or curr_row['atr14'] <= 0:
+                continue
+
             prev_rows = df_sym.iloc[max(0, curr_row_idx - 35):curr_row_idx]
 
             # Evaluate strategy rules
@@ -790,10 +900,18 @@ def run_backtest_simulation(
             )
 
             if dir_signal is not None and curr_row_idx + 1 < len(df_sym):
-                # Entry executed on NEXT bar's Open price (strictly prevents look-ahead)
                 next_bar = df_sym.iloc[curr_row_idx + 1]
+                next_bar_date = next_bar['Date']
+
+                # Window-End Trade Handling: Trade cannot enter past simulation end_date
+                if end_date and next_bar_date > pd.to_datetime(end_date):
+                    continue
+                if next_bar_date > all_dates[-1]:
+                    continue
+
+                # Entry executed on NEXT bar's Open price (strictly prevents look-ahead)
                 entry_p = float(next_bar['open'])
-                entry_date = next_bar['Date'].date()
+                entry_date = next_bar_date.date()
 
                 # Dynamic breathing stop distance
                 atr_val = float(curr_row['atr14'])
@@ -836,10 +954,29 @@ def run_backtest_simulation(
             "open_trades": len(open_trades)
         })
 
-    # Close any lingering open trades at end of simulation
-    for tr in open_trades.values():
+    # Window-End Trade Handling: Mark-to-market all remaining open trades with true closing costs
+    for epic, tr in list(open_trades.items()):
         if tr.status == "OPEN":
-            tr._close(all_dates[-1].date(), tr.entry_price, "BACKTEST_END_FLAT", 0.0)
+            df_sym = processed_assets[epic]
+            last_bar = df_sym.iloc[-1]
+            last_date = last_bar['Date'].date()
+            last_close = float(last_bar['close'])
+
+            # Realized R based on mark-to-market
+            if tr.direction == "BUY":
+                exit_r = (last_close - tr.entry_price) / tr.sl_dist
+            else:
+                exit_r = (tr.entry_price - last_close) / tr.sl_dist
+
+            # Deduct exit spread cost and finalize
+            exit_spread_cost = tr.spread * tr.position_size * tr.contract_multiplier
+            tr.costs_paid += exit_spread_cost
+            tr._close(last_date, last_close, "WINDOW_END_MARK_TO_MARKET", round(exit_r, 3))
+            portfolio_equity += tr.pnl_dollars
+
+    if equity_curve:
+        equity_curve[-1]["equity"] = round(portfolio_equity, 2)
+        equity_curve[-1]["open_trades"] = 0
 
     df_equity = pd.DataFrame(equity_curve)
     metrics = calculate_performance_metrics(trades, df_equity)
@@ -971,6 +1108,11 @@ def run_anchored_walk_forward(
       Fold 3: Train 2016-2022 -> Test 2022-2024
       Fold 4: Train 2016-2024 -> Test 2024-2025
       Fold 5: Train 2016-2025 -> Test 2025-2026
+    
+    METHODOLOGY NOTE:
+    Evaluates fixed institutional quantitative rules (The 84 Pillars) across 5 non-overlapping
+    chronological out-of-sample forward test windows. In accordance with quantitative standards,
+    rule logic and structural constants are held fixed without in-sample curve-fitting per fold.
     """
     folds = [
         {"fold": 1, "train": ("2016-10-20", "2018-10-20"), "test": ("2018-10-21", "2020-10-20")},
@@ -1207,8 +1349,8 @@ def main():
     print("  Version: 1.0.0 (The 84 Pillars Institutional Audit & Ablation Suite)")
     print("=" * 78)
 
-    # 1. Load Data
-    assets_data, macro_data = load_dataset_clean()
+    # 1. Load & Verify Data with Dataset Manifest (Priority 2)
+    assets_data, macro_data, data_manifest = load_dataset_clean()
 
     # 2. Baseline Full System Simulation (10 Full Years: 2016–2026)
     logger.info(">>> STAGE 1: Simulating Baseline Full System (2016–2026)...")
@@ -1219,11 +1361,12 @@ def main():
         print(f"  {k:22s}: {v}")
 
     # Chronological Continuous Splits (60% Train / 20% Val / 20% Test)
-    # Sliced continuously from baseline simulation to prevent boundary cold-start state loss (169 + 72 + 53 = 294 trades)
+    # Sliced continuously from baseline simulation to prevent boundary cold-start state loss
     logger.info(">>> STAGE 2: Chronological Continuous Splits (60% Train / 20% Val / 20% Test)...")
     is_trades = [t for t in trades if pd.to_datetime(t.entry_date) <= pd.to_datetime("2022-10-20")]
     val_trades = [t for t in trades if pd.to_datetime("2022-10-21") <= pd.to_datetime(t.entry_date) <= pd.to_datetime("2024-10-20")]
     oos_trades = [t for t in trades if pd.to_datetime("2024-10-21") <= pd.to_datetime(t.entry_date) <= pd.to_datetime("2026-10-20")]
+    logger.info(f"Verified trade counts: In-Sample={len(is_trades)}, Validation={len(val_trades)}, Out-of-Sample={len(oos_trades)}, Total={len(trades)}")
 
     df_eq_is = df_equity[df_equity['date'] <= pd.to_datetime("2022-10-20")]
     df_eq_val = df_equity[(df_equity['date'] >= pd.to_datetime("2022-10-21")) & (df_equity['date'] <= pd.to_datetime("2024-10-20"))]
@@ -1313,6 +1456,7 @@ def main():
         "project": "ANGKOR QUANT — Institutional TradFi 10-Year Backtesting & Validation Project",
         "generated_at": datetime.datetime.now().isoformat(),
         "period": "2016-10-20 to 2026-10-20 (10 Full Years)",
+        "data_manifest": data_manifest,
         "full_metrics": full_metrics,
         "chronological_splits": {
             "in_sample_60": is_metrics,

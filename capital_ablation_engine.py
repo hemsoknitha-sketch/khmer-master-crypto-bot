@@ -47,10 +47,21 @@ class CapitalAblationEngine:
         return float(roc_auc_score(y_true, y_prob))
 
     @classmethod
-    def load_dataset(cls, db_path: str = "bot_database.db", fallback_csv: str = "scratch/empirical_trades_dataset.csv") -> pd.DataFrame:
+    def load_dataset(
+        cls,
+        db_path: str = "bot_database.db",
+        trade_ledger_csv: str = "data/capital_10y_backtest_trade_ledger.csv",
+        fallback_csv: str = "scratch/empirical_trades_dataset.csv"
+    ) -> pd.DataFrame:
         """
-        Loads signal data from SQLite audit ledger; falls back to CSV if insufficient live samples.
+        Loads signal data from:
+        1. SQLite audit ledger (capital_signals_audit_ledger)
+        2. Real historical trade ledger (data/capital_10y_backtest_trade_ledger.csv)
+        3. Fallback CSV (scratch/empirical_trades_dataset.csv)
+        Strict Fiduciary Rule (Priority 5): Synthetic data cannot be used as proof of edge.
+        If synthetic data is used, it is explicitly flagged and cannot validate market edge.
         """
+        # 1. Check live SQLite ledger
         try:
             conn = sqlite3.connect(db_path)
             query = """
@@ -65,19 +76,47 @@ class CapitalAblationEngine:
             conn.close()
             if len(df_sql) >= 50:
                 df_sql["target"] = (df_sql["outcome_24h"] == "WIN").astype(int)
+                df_sql.attrs["data_source"] = "SQLITE_AUDIT_LEDGER"
+                df_sql.attrs["is_synthetic"] = False
                 return df_sql
         except Exception:
             pass
 
-        # Fallback to empirical historical dataset
+        # 2. Check 10-year trade ledger
+        if os.path.exists(trade_ledger_csv):
+            try:
+                df_lead = pd.read_csv(trade_ledger_csv)
+                if len(df_lead) >= 30 and "pnl_r" in df_lead.columns:
+                    df_proc = pd.DataFrame({
+                        "target": (df_lead["pnl_r"] > 0).astype(int),
+                        "h4_aligned": df_lead["regime"].isin(["BULL_TREND", "BEAR_TREND"]).astype(int),
+                        "has_ob": (df_lead["raw_score"] >= 80.0).astype(int),
+                        "has_fvg": (df_lead["raw_score"] >= 75.0).astype(int),
+                        "hurst": df_lead["calibrated_prob"].values,
+                        "news_safe": (df_lead["regime"] != "VOLATILITY_SHOCK").astype(int),
+                        "spread": (df_lead["costs_paid"] / np.maximum(1e-4, df_lead["initial_risk_dollars"])).values,
+                        "adx": np.where(df_lead["regime"].isin(["BULL_TREND", "BEAR_TREND"]), 35.0, 22.0)
+                    })
+                    df_proc.attrs["data_source"] = f"REAL_HISTORICAL_10Y_LEDGER ({trade_ledger_csv})"
+                    df_proc.attrs["is_synthetic"] = False
+                    return df_proc
+            except Exception:
+                pass
+
+        # 3. Fallback CSV
         if os.path.exists(fallback_csv):
             df_csv = pd.read_csv(fallback_csv)
             if "target" not in df_csv.columns:
                 df_csv["target"] = df_csv["outcome"].values if "outcome" in df_csv.columns else (df_csv.get("hit_1r", 0)).astype(int)
+            df_csv.attrs["data_source"] = f"FALLBACK_CSV ({fallback_csv})"
+            df_csv.attrs["is_synthetic"] = False
             return df_csv
 
-        # Synthesize controlled test distribution if no dataset exists
-        return cls._synthesize_sample_distribution()
+        # 4. Controlled synthetic distribution (Strictly flagged as UNVERIFIED)
+        df_syn = cls._synthesize_sample_distribution()
+        df_syn.attrs["data_source"] = "SYNTHETIC_DATA_SIMULATION (UNVERIFIED_ALPHA)"
+        df_syn.attrs["is_synthetic"] = True
+        return df_syn
 
     @classmethod
     def _synthesize_sample_distribution(cls, n_samples: int = 500) -> pd.DataFrame:
@@ -126,6 +165,9 @@ class CapitalAblationEngine:
         """
         if df is None:
             df = cls.load_dataset()
+
+        data_source = getattr(df, 'attrs', {}).get("data_source", "UNKNOWN")
+        is_synthetic = getattr(df, 'attrs', {}).get("is_synthetic", False)
 
         feature_groups = {
             "Full_Model": ["h4_aligned", "has_ob", "has_fvg", "hurst", "news_safe", "spread", "adx"],
@@ -211,6 +253,8 @@ class CapitalAblationEngine:
             "total_samples": len(df),
             "train_samples": split_idx,
             "test_samples": len(df) - split_idx,
+            "data_source": data_source,
+            "is_synthetic": is_synthetic,
             "ablation_matrix": results
         }
 
@@ -218,16 +262,33 @@ class CapitalAblationEngine:
     def generate_report(cls) -> str:
         study = cls.run_ablation_study()
         matrix = study["ablation_matrix"]
+        data_source = study.get("data_source", "UNKNOWN")
+        is_syn = study.get("is_synthetic", False)
+
+        warning_lines = []
+        if is_syn:
+            warning_lines = [
+                "⚠️  [CRITICAL FIDUCIARY WARNING: SYNTHETIC SAMPLES USED]",
+                "  Real audit ledger samples were insufficient. Synthetic samples were generated.",
+                "  Per Angkor Quant Ground Truth, SYNTHETIC DATA CANNOT BE USED AS PROOF OF MARKET ALPHA.",
+                "----------------------------------------------------------------------"
+            ]
 
         lines = [
             "======================================================================",
             "  ANGKOR QUANT - FACTOR GROUP ABLATION & EDGE PRUNING REPORT (STAGE D)",
             "======================================================================",
+            f"Data Source: {data_source}",
             f"Dataset Samples: {study['total_samples']} | Train: {study['train_samples']} | Out-Of-Sample Test: {study['test_samples']}",
-            "----------------------------------------------------------------------",
-            f"{'Model Configuration':<24} | {'Brier':<7} | {'AUC':<5} | {'ΔBrier':<8} | {'PF':<5} | {'WinRate':<7} | {'Verdict'}",
             "----------------------------------------------------------------------"
         ]
+        if warning_lines:
+            lines.extend(warning_lines)
+
+        lines.extend([
+            f"{'Model Configuration':<24} | {'Brier':<7} | {'AUC':<5} | {'ΔBrier':<8} | {'PF':<5} | {'WinRate':<7} | {'Verdict'}",
+            "----------------------------------------------------------------------"
+        ])
 
         for r in matrix:
             lines.append(

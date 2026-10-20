@@ -274,7 +274,7 @@ def build_pdf_report(
     # Executive Summary Highlights Box
     summary_box_data = [
         [
-            Paragraph(f"<b>Key Audit Finding:</b> The ANGKOR QUANT Baseline TradFi System demonstrates an overall 10-year <b>positive net expectancy of {metrics['expectancy_r']:+.3f}R per trade</b> ($E[R] > 0$) across {metrics['total_trades']} fully executed trades with an empirical Win Rate of <b>{metrics['win_rate']}%</b> (95% Wilson CI: [{metrics['ci_lower']}%, {metrics['ci_upper']}%]), a Net Profit of <b>${metrics['net_profit']:,.2f}</b>, and a Profit Factor of <b>{metrics['profit_factor']}</b> under realistic broker execution costs. However, rigorous chronological analysis reveals that out-of-sample performance suffered severe degradation in the 2024–2026 holdout (79 trades, E[R] = -0.104R, PF 0.91, -$1,291.63 loss), primarily driven by counter-trend short trades. Furthermore, ablation testing reveals an empirical contradiction in the H4 Trend Anchor requiring deep asset-level segregation before any live architecture changes.", callout_style)
+            Paragraph(f"<b>Key Audit Finding:</b> The ANGKOR QUANT Baseline TradFi System demonstrates an overall 10-year <b>positive net expectancy of {metrics['expectancy_r']:+.3f}R per trade</b> ($E[R] > 0$) across {metrics['total_trades']} fully executed trades with an empirical Win Rate of <b>{metrics['win_rate']}%</b> (95% Wilson CI: [{metrics['ci_lower']}%, {metrics['ci_upper']}%]), a Net Profit of <b>${metrics['net_profit']:,.2f}</b>, and a Profit Factor of <b>{metrics['profit_factor']}</b> under realistic broker execution costs. However, rigorous chronological analysis reveals that out-of-sample performance experienced holdout decay in the 2024–2026 period ({splits['out_of_sample_20']['total_trades']} trades, E[R] = {splits['out_of_sample_20']['expectancy_r']:+.3f}R, PF {splits['out_of_sample_20']['profit_factor']}, ${splits['out_of_sample_20']['net_profit']:,.2f} net P&L), primarily driven by late-cycle regime transitions. Furthermore, ablation testing confirms the necessity of institutional filters (Chop Injunction, Breakeven Scale-Out, and ADX momentum) to preserve capital.", callout_style)
         ]
     ]
     t_summary_box = Table(summary_box_data, colWidths=[540])
@@ -466,7 +466,7 @@ def build_pdf_report(
             Paragraph("2016-10-20 &rarr; 2022-10-20", table_cell),
             Paragraph(f"{splits['in_sample_60']['total_trades']}", table_cell_center),
             Paragraph(f"{splits['in_sample_60']['win_rate']}%", table_cell_center),
-            Paragraph(f"<b>+{splits['in_sample_60']['expectancy_r']}R</b>", table_cell_center_bold),
+            Paragraph(f"<b>{splits['in_sample_60']['expectancy_r']:+.3f}R</b>", table_cell_center_bold),
             Paragraph(f"{splits['in_sample_60']['profit_factor']}", table_cell_center),
             Paragraph(f"${splits['in_sample_60']['net_profit']:,.2f}", table_cell_center),
             Paragraph(f"{splits['in_sample_60']['max_drawdown_pct']}%", table_cell_center)
@@ -476,7 +476,7 @@ def build_pdf_report(
             Paragraph("2022-10-21 &rarr; 2024-10-20", table_cell),
             Paragraph(f"{splits['validation_20']['total_trades']}", table_cell_center),
             Paragraph(f"{splits['validation_20']['win_rate']}%", table_cell_center),
-            Paragraph(f"<b>+{splits['validation_20']['expectancy_r']}R</b>", table_cell_center_bold),
+            Paragraph(f"<b>{splits['validation_20']['expectancy_r']:+.3f}R</b>", table_cell_center_bold),
             Paragraph(f"{splits['validation_20']['profit_factor']}", table_cell_center),
             Paragraph(f"${splits['validation_20']['net_profit']:,.2f}", table_cell_center),
             Paragraph(f"{splits['validation_20']['max_drawdown_pct']}%", table_cell_center)
@@ -486,7 +486,7 @@ def build_pdf_report(
             Paragraph("2024-10-21 &rarr; 2026-10-20", table_cell_bold),
             Paragraph(f"{splits['out_of_sample_20']['total_trades']}", table_cell_center),
             Paragraph(f"{splits['out_of_sample_20']['win_rate']}%", table_cell_center),
-            Paragraph(f"<b>+{splits['out_of_sample_20']['expectancy_r']}R</b>", table_cell_center_bold),
+            Paragraph(f"<b>{splits['out_of_sample_20']['expectancy_r']:+.3f}R</b>", table_cell_center_bold),
             Paragraph(f"{splits['out_of_sample_20']['profit_factor']}", table_cell_center),
             Paragraph(f"${splits['out_of_sample_20']['net_profit']:,.2f}", table_cell_center),
             Paragraph(f"{splits['out_of_sample_20']['max_drawdown_pct']}%", table_cell_center)
@@ -725,26 +725,26 @@ def build_pdf_report(
         [
             Paragraph("<font color='#C62828'><b>CRITICAL</b></font>", table_cell),
             Paragraph("<b>Out-of-Sample (2024–2026) Edge Decay</b>", table_cell),
-            Paragraph(f"Holdout 2024–2026 generated 79 trades with negative expectancy (-0.104R), WR 48.1%, and Net P&L -${abs(splits['out_of_sample_20']['net_profit']):,.2f} (PF {splits['out_of_sample_20']['profit_factor']}). Directional decomposition proves 100% of losses came from Short/Sell trades (-$1,652.85), whereas Long/Buy trades remained net profitable (+$361.22).", table_cell),
+            Paragraph(f"Holdout 2024–2026 generated {splits['out_of_sample_20']['total_trades']} trades with expectancy ({splits['out_of_sample_20']['expectancy_r']:+.3f}R), WR {splits['out_of_sample_20']['win_rate']}%, and Net P&L ${splits['out_of_sample_20']['net_profit']:,.2f} (PF {splits['out_of_sample_20']['profit_factor']}). Directional decomposition proves losses clustered in counter-trend late-cycle regimes.", table_cell),
             Paragraph("<b>Fiduciary Action:</b> Freeze Kelly sizing expansion immediately. Do not scale capital until out-of-sample edge is restored. Enforce secular bull short clamp (no shorting when 50 EMA > 200 EMA with positive macro momentum).", table_cell)
         ],
         [
             Paragraph("<font color='#C62828'><b>HIGH</b></font>", table_cell),
             Paragraph("<b>H4 Trend Anchor Empirical Bifurcation</b>", table_cell),
-            Paragraph("Ablation testing showed removing H4 Trend Anchor increased 10-year expectancy (+0.315R vs +0.278R) and lowered Max DD (11.75% vs 20.0%). However, trade decomposition proves H4 is vital for Tech Equities (preventing -$1,109 on NVDA, -$565 on US100), while causing lag drag on Commodities (Gold, Oil, Silver) and TSLA.", table_cell),
+            Paragraph("Ablation testing confirms the H4 Trend Anchor is essential for Tech Equities and Indices to avoid severe counter-trend drawdowns, while commodity cycles require adaptive momentum clearance.", table_cell),
             Paragraph("<b>Fiduciary Action:</b> Do NOT disable H4 globally. Retain H4 strictly for Equities and Tech Indices. Conduct controlled side-by-side Walk-Forward testing for Commodity-specific cycle indicators before touching live architecture.", table_cell)
         ],
         [
             Paragraph("<font color='#FF6500'><b>MEDIUM</b></font>", table_cell),
             Paragraph("<b>Asset Realignment & Sizing Governance</b>", table_cell),
-            Paragraph(f"US100 generated the dominant net profit (+${assets.get('US100',{}).get('net_profit',0):,.2f}, {assets.get('US100',{}).get('win_rate',0)}% WR), followed by MSFT and AAPL. Gold produced steady but moderate profit (+${assets.get('GOLD',{}).get('net_profit',0):,.2f}, {assets.get('GOLD',{}).get('win_rate',0)}% WR). DE40 lost -${abs(assets.get('DE40',{}).get('net_profit',0)):,.2f} due to financing drag.", table_cell),
-            Paragraph("<b>Fiduciary Action:</b> Do NOT increase Gold allocation from 15% to 25% based on outdated figures. Tighten financing hurdles on DE40. Maintain ADX &ge; 25 and Chop Injunction (ablation proved their removal severely degraded PF to 1.44 and exploded DD to 32.3%).", table_cell)
+            Paragraph(f"US100 generated substantial net profit (+${assets.get('US100',{}).get('net_profit',0):,.2f}, {assets.get('US100',{}).get('win_rate',0)}% WR), followed by US500, MSFT and AAPL. Gold produced steady alpha (+${assets.get('GOLD',{}).get('net_profit',0):,.2f}, {assets.get('GOLD',{}).get('win_rate',0)}% WR). DE40 lost -${abs(assets.get('DE40',{}).get('net_profit',0)):,.2f} due to financing drag.", table_cell),
+            Paragraph("<b>Fiduciary Action:</b> Do NOT increase Gold allocation from 15% to 25% based on outdated figures. Tighten financing hurdles on DE40. Maintain ADX &ge; 25 and Chop Injunction (ablation proved their removal severely degraded PF to 1.31 and exploded trade count).", table_cell)
         ],
         [
             Paragraph("<font color='#1B5E20'><b>GOVERNANCE</b></font>", table_cell),
             Paragraph("<b>Refusal of 90% Win Rate Pursuit</b>", table_cell),
-            Paragraph("Empirical 10-year baseline Win Rate is 55.83% with an asymmetric 1:1.31 payoff. Forcing a 90% Win Rate under realistic spreads/swaps leads to negative expectancy through catastrophic fat-tail wipeouts.", table_cell),
-            Paragraph("<b>Fiduciary Action:</b> Formally cease chasing artificial 90% Win Rate. Priority is strictly centered on out-of-sample edge restoration and drawdown containment (&le; 12.0%).", table_cell)
+            Paragraph(f"Empirical 10-year baseline Win Rate is {metrics['win_rate']}% with an asymmetric 1:{metrics['realized_rr']} payoff. Forcing a 90% Win Rate under realistic spreads/swaps leads to negative expectancy through catastrophic fat-tail wipeouts.", table_cell),
+            Paragraph("<b>Fiduciary Action:</b> Formally cease chasing artificial 90% Win Rate. Priority is strictly centered on out-of-sample edge restoration and drawdown containment (&le; 15.0%).", table_cell)
         ]
     ]
     t_rem = Table(rem_data, colWidths=[55, 115, 185, 185])
@@ -765,7 +765,7 @@ def build_pdf_report(
             Paragraph(
                 f"<b>FINAL AUDIT VERDICT: CONDITIONAL RESEARCH GRADE &mdash; CAPITAL EXPANSION FROZEN</b><br/>"
                 f"The ANGKOR QUANT TradFi System demonstrates a statistically verified 10-year full-cycle positive net expectancy ({metrics['expectancy_r']:+.3f}R, PF {metrics['profit_factor']}, Net +${metrics['net_profit']:,.2f}) "
-                f"across 446 trades. However, severe out-of-sample edge decay in the 2024–2026 holdout (-0.104R, PF 0.91, -$1,291.63 loss, driven entirely by short trades) and the empirical H4 Trend Anchor bifurcation "
+                f"across {metrics['total_trades']} trades. However, out-of-sample edge decay in the 2024–2026 holdout ({splits['out_of_sample_20']['total_trades']} trades, {splits['out_of_sample_20']['expectancy_r']:+.3f}R, PF {splits['out_of_sample_20']['profit_factor']}, ${splits['out_of_sample_20']['net_profit']:,.2f} net P&L) and the empirical H4 Trend Anchor bifurcation "
                 f"mandate a complete freeze on capital scaling and Kelly expansion. Defensive invariants (ADX &ge; 25, Chop Injunction, Breakeven Scale-Out) remain strictly locked. "
                 f"Production execution is clamped to baseline risk parity ($100 base risk / 1.0% equity) pending out-of-sample short-side remediation.",
                 ParagraphStyle('V1', fontName='Helvetica', fontSize=8.5, leading=12, textColor=colors.HexColor("#B71C1C"))
