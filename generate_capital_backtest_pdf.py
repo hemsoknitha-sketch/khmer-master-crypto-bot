@@ -110,8 +110,18 @@ def build_pdf_report(
     regimes = data["regime_breakdown"]
     charts = data["charts"]
 
+    # Check if target file is writeable; if locked by user's viewer, use fallback name
+    target_path = output_pdf_path
+    try:
+        with open(target_path, "ab"):
+            pass
+    except (PermissionError, IOError):
+        base, ext = os.path.splitext(output_pdf_path)
+        target_path = f"{base}_REVISED{ext}"
+        print(f"Notice: {output_pdf_path} is open in a viewer. Generating revised copy: {target_path}")
+
     doc = SimpleDocTemplate(
-        output_pdf_path,
+        target_path,
         pagesize=letter,
         leftMargin=36,
         rightMargin=36,
@@ -264,7 +274,7 @@ def build_pdf_report(
     # Executive Summary Highlights Box
     summary_box_data = [
         [
-            Paragraph(f"<b>Key Audit Finding:</b> The ANGKOR QUANT Baseline TradFi System demonstrates a <b>statistically credible, positive net expectancy of {metrics['expectancy_r']:+.3f}R per trade</b> ($E[R] > 0$) across {metrics['total_trades']} fully executed trades with an empirical Win Rate of <b>{metrics['win_rate']}%</b> (95% Wilson CI: [{metrics['ci_lower']}%, {metrics['ci_upper']}%]), a Net Profit of <b>${metrics['net_profit']:,.2f}</b>, and a Profit Factor of <b>{metrics['profit_factor']}</b> under realistic execution conditions (including spread drag, slippage, and overnight financing fees). Walk-forward analysis and drop-group ablations confirm significant positive marginal alpha contributed by H4 Structural Trend Anchoring, ADX Filtering, and Breakeven Scale-Out Management.", callout_style)
+            Paragraph(f"<b>Key Audit Finding:</b> The ANGKOR QUANT Baseline TradFi System demonstrates an overall 10-year <b>positive net expectancy of {metrics['expectancy_r']:+.3f}R per trade</b> ($E[R] > 0$) across {metrics['total_trades']} fully executed trades with an empirical Win Rate of <b>{metrics['win_rate']}%</b> (95% Wilson CI: [{metrics['ci_lower']}%, {metrics['ci_upper']}%]), a Net Profit of <b>${metrics['net_profit']:,.2f}</b>, and a Profit Factor of <b>{metrics['profit_factor']}</b> under realistic broker execution costs. However, rigorous chronological analysis reveals that out-of-sample performance suffered severe degradation in the 2024–2026 holdout (79 trades, E[R] = -0.104R, PF 0.91, -$1,291.63 loss), primarily driven by counter-trend short trades. Furthermore, ablation testing reveals an empirical contradiction in the H4 Trend Anchor requiring deep asset-level segregation before any live architecture changes.", callout_style)
         ]
     ]
     t_summary_box = Table(summary_box_data, colWidths=[540])
@@ -582,6 +592,14 @@ def build_pdf_report(
     story.append(t_ab)
     story.append(Spacer(1, 8))
 
+    story.append(Paragraph(
+        "<b>Critical Ablation Finding on H4 Trend Anchor:</b> In the full 10-year aggregate test, removing the H4 Trend Anchor shows higher expectancy (+0.315R vs +0.278R) and lower drawdown (11.75% vs 20.0%). "
+        "However, granular trade-level decomposition reveals a critical bifurcation: H4 is indispensable for Tech Equities (preventing -$1,109 on NVDA, -$565 on US100, -$515 on AAPL), but induces lag on Commodities (Oil, Gold, Silver) and mean-reverting instruments. "
+        "Therefore, H4 must NOT be disabled globally. Conversely, removing the ADX &ge; 25 Filter caused severe degradation (PF fell from 1.58 to 1.44), and removing the Chop Injunction exploded Max Drawdown from 20.0% to 32.3%, validating their core capital protection roles.",
+        body_style
+    ))
+    story.append(Spacer(1, 8))
+
     # Embed Chart 4: Ablation Comparison Chart
     if os.path.exists(charts.get("ablation", "")):
         story.append(Image(charts["ablation"], width=7.0*inch, height=3.0*inch))
@@ -595,7 +613,8 @@ def build_pdf_report(
     story.append(Paragraph("7. Asset & Market Regime Breakdown", h1_style))
     story.append(Paragraph(
         "Performance varies considerably across asset classes and structural regimes. "
-        "Gold (XAUUSD) and US Tech 100 generate the overwhelming majority of institutional net profits:",
+        "US Tech Equities and Indices (US100, MSFT, AAPL, US500) generated the dominant share of institutional net profits, "
+        "while Gold, Oil, and Silver provided steady uncorrelated positive alpha. DE40 suffered negative net P&L due to higher overnight financing drags:",
         body_style
     ))
 
@@ -704,22 +723,28 @@ def build_pdf_report(
             Paragraph("<b>Recommended Action</b>", table_cell_bold)
         ],
         [
+            Paragraph("<font color='#C62828'><b>CRITICAL</b></font>", table_cell),
+            Paragraph("<b>Out-of-Sample (2024–2026) Edge Decay</b>", table_cell),
+            Paragraph(f"Holdout 2024–2026 generated 79 trades with negative expectancy (-0.104R), WR 48.1%, and Net P&L -${abs(splits['out_of_sample_20']['net_profit']):,.2f} (PF {splits['out_of_sample_20']['profit_factor']}). Directional decomposition proves 100% of losses came from Short/Sell trades (-$1,652.85), whereas Long/Buy trades remained net profitable (+$361.22).", table_cell),
+            Paragraph("<b>Fiduciary Action:</b> Freeze Kelly sizing expansion immediately. Do not scale capital until out-of-sample edge is restored. Enforce secular bull short clamp (no shorting when 50 EMA > 200 EMA with positive macro momentum).", table_cell)
+        ],
+        [
             Paragraph("<font color='#C62828'><b>HIGH</b></font>", table_cell),
-            Paragraph("<b>Fold 5 / 2026 Regime Filter</b>", table_cell),
-            Paragraph("Fold 5 (2025–2026) suffered $E[R] = -0.212R$ and 17.9% DD due to high-rate sideways consolidation and severe tech sector rotation.", table_cell),
-            Paragraph("Deploy adaptive volatility regime clamping: when 30-day macro correlation exceeds 0.85, reduce Kelly fraction $\kappa$ from 0.25 to 0.10 and clamp individual stock exposure.", table_cell)
+            Paragraph("<b>H4 Trend Anchor Empirical Bifurcation</b>", table_cell),
+            Paragraph("Ablation testing showed removing H4 Trend Anchor increased 10-year expectancy (+0.315R vs +0.278R) and lowered Max DD (11.75% vs 20.0%). However, trade decomposition proves H4 is vital for Tech Equities (preventing -$1,109 on NVDA, -$565 on US100), while causing lag drag on Commodities (Gold, Oil, Silver) and TSLA.", table_cell),
+            Paragraph("<b>Fiduciary Action:</b> Do NOT disable H4 globally. Retain H4 strictly for Equities and Tech Indices. Conduct controlled side-by-side Walk-Forward testing for Commodity-specific cycle indicators before touching live architecture.", table_cell)
         ],
         [
             Paragraph("<font color='#FF6500'><b>MEDIUM</b></font>", table_cell),
-            Paragraph("<b>Silver (SIF) Spread Drag</b>", table_cell),
-            Paragraph("Silver produced negative net P&L (-$446.57) with a low 42.1% win rate due to broker spread expansion during off-peak hours.", table_cell),
-            Paragraph("Enforce tighter spread drag hurdle specifically on Silver: require Spread/ATR $\le 10.0\%$ (vs standard 18.0%) and restrict entry to London/NY peak liquidity windows.", table_cell)
+            Paragraph("<b>Asset Realignment & Sizing Governance</b>", table_cell),
+            Paragraph(f"US100 generated the dominant net profit (+${assets.get('US100',{}).get('net_profit',0):,.2f}, {assets.get('US100',{}).get('win_rate',0)}% WR), followed by MSFT and AAPL. Gold produced steady but moderate profit (+${assets.get('GOLD',{}).get('net_profit',0):,.2f}, {assets.get('GOLD',{}).get('win_rate',0)}% WR). DE40 lost -${abs(assets.get('DE40',{}).get('net_profit',0)):,.2f} due to financing drag.", table_cell),
+            Paragraph("<b>Fiduciary Action:</b> Do NOT increase Gold allocation from 15% to 25% based on outdated figures. Tighten financing hurdles on DE40. Maintain ADX &ge; 25 and Chop Injunction (ablation proved their removal severely degraded PF to 1.44 and exploded DD to 32.3%).", table_cell)
         ],
         [
-            Paragraph("<font color='#2E7D32'><b>LOW</b></font>", table_cell),
-            Paragraph("<b>Gold (XAUUSD) Allocation</b>", table_cell),
-            Paragraph("Gold demonstrated highest statistical conviction: 66.7% WR, +0.526R expectancy, and +$1,296.77 net profit, validating Invariant 80.", table_cell),
-            Paragraph("Increase capital weight allocation for Gold from 15% to 25% of fleet margin while preserving $2.50 hard dollar stop-loss floor on micro accounts.", table_cell)
+            Paragraph("<font color='#1B5E20'><b>GOVERNANCE</b></font>", table_cell),
+            Paragraph("<b>Refusal of 90% Win Rate Pursuit</b>", table_cell),
+            Paragraph("Empirical 10-year baseline Win Rate is 55.83% with an asymmetric 1:1.31 payoff. Forcing a 90% Win Rate under realistic spreads/swaps leads to negative expectancy through catastrophic fat-tail wipeouts.", table_cell),
+            Paragraph("<b>Fiduciary Action:</b> Formally cease chasing artificial 90% Win Rate. Priority is strictly centered on out-of-sample edge restoration and drawdown containment (&le; 12.0%).", table_cell)
         ]
     ]
     t_rem = Table(rem_data, colWidths=[55, 115, 185, 185])
@@ -738,27 +763,35 @@ def build_pdf_report(
     verdict_box = [
         [
             Paragraph(
-                f"<b>FINAL AUDIT VERDICT: CERTIFIED WITH CONDITIONAL REGIME GOVERNANCE</b><br/>"
-                f"The ANGKOR QUANT TradFi System demonstrates statistically robust positive net expectancy ({metrics['expectancy_r']:+.3f}R, PF {metrics['profit_factor']}, Net +${metrics['net_profit']:,.2f}) "
-                f"across a full 10-year historical cycle under realistic broker fees. The core defensive invariants (H4 Trend Anchor, "
-                f"ADX &ge; 25 Filter, Dealing Range Chop Injunction, and Breakeven Scale-Out) contribute verifiable mathematical alpha. "
-                f"Deployment authorization is confirmed for Gold, US100, US500, and DE40, subject to the High-Severity 2026 regime filter clamp.",
-                ParagraphStyle('V1', fontName='Helvetica', fontSize=8.5, leading=12, textColor=colors.HexColor("#1B5E20"))
+                f"<b>FINAL AUDIT VERDICT: CONDITIONAL RESEARCH GRADE &mdash; CAPITAL EXPANSION FROZEN</b><br/>"
+                f"The ANGKOR QUANT TradFi System demonstrates a statistically verified 10-year full-cycle positive net expectancy ({metrics['expectancy_r']:+.3f}R, PF {metrics['profit_factor']}, Net +${metrics['net_profit']:,.2f}) "
+                f"across 446 trades. However, severe out-of-sample edge decay in the 2024–2026 holdout (-0.104R, PF 0.91, -$1,291.63 loss, driven entirely by short trades) and the empirical H4 Trend Anchor bifurcation "
+                f"mandate a complete freeze on capital scaling and Kelly expansion. Defensive invariants (ADX &ge; 25, Chop Injunction, Breakeven Scale-Out) remain strictly locked. "
+                f"Production execution is clamped to baseline risk parity ($100 base risk / 1.0% equity) pending out-of-sample short-side remediation.",
+                ParagraphStyle('V1', fontName='Helvetica', fontSize=8.5, leading=12, textColor=colors.HexColor("#B71C1C"))
             )
         ]
     ]
     t_verdict = Table(verdict_box, colWidths=[540])
     t_verdict.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#E8F5E9")),
-        ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor("#2E7D32")),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#FFEBEE")),
+        ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor("#C62828")),
         ('PADDING', (0,0), (-1,-1), 8),
     ]))
     story.append(t_verdict)
 
     # Build Document
-    print(f"Building PDF document: {output_pdf_path}...")
+    print(f"Building PDF document: {target_path}...")
     doc.build(story, canvasmaker=NumberedCanvas)
-    print(f"PDF Successfully generated: {output_pdf_path} ({os.path.getsize(output_pdf_path):,} bytes)")
+    print(f"PDF Successfully generated: {target_path} ({os.path.getsize(target_path):,} bytes)")
+
+    if target_path != output_pdf_path:
+        import shutil
+        try:
+            shutil.copy2(target_path, output_pdf_path)
+            print(f"Synced update to primary path: {output_pdf_path}")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
