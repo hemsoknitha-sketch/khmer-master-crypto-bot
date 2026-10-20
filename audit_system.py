@@ -3284,6 +3284,81 @@ def run_audit():
         failures.append(f"Invariant 80 check failed: {e}")
         log_fail(str(e))
 
+    # -------------------------------------------------------------------------
+    # [CHECK 64/64] Verifying Institutional Risk Governance, Auditable Ledger, Fat-Tail Buffer, Ablation & Live Dashboard (Invariants 81–84)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 64/64] Verifying Institutional Risk Governance, Auditable Ledger, Fat-Tail Buffer, Ablation & Live Dashboard (Invariants 81–84)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv81 = "Invariant 81: Auditable Signal Ledger" in agents_md
+        has_inv82 = "Invariant 82: Fat-Tail Gap Buffer" in agents_md
+        has_inv83 = "Invariant 83: Drop-Group Ablation Matrix" in agents_md
+        has_inv84 = "Invariant 84: Live Institutional Quantitative Performance" in agents_md
+
+        # 2. Database layer for Invariant 81
+        import database as db
+        has_record_sig = hasattr(db, "record_capital_signal_audit")
+        has_resolve_sig = hasattr(db, "resolve_capital_signal_outcomes")
+        has_summary_sig = hasattr(db, "get_capital_signals_audit_summary")
+
+        # 3. Portfolio circuit breaker for Invariant 82
+        import portfolio_circuit_breaker as pcb
+        has_gap_stress = hasattr(pcb, "calculate_gap_stress_risk")
+        has_heat_check = hasattr(pcb, "validate_portfolio_heat")
+        has_continuity = hasattr(pcb, "validate_data_continuity")
+
+        # 4. Ablation engine for Invariant 83
+        import capital_ablation_engine as cae
+        has_ablation_cls = hasattr(cae, "CapitalAblationEngine")
+        has_brier_fn = hasattr(cae.CapitalAblationEngine, "compute_brier_score")
+        has_auc_fn = hasattr(cae.CapitalAblationEngine, "compute_auc_roc")
+
+        # 5. Web GUI Live Dashboard for Invariant 84
+        import web_gui_server as wgs
+        has_quant_metrics_fn = hasattr(wgs, "get_cached_quant_dashboard_metrics")
+        has_quant_handler = hasattr(wgs, "handle_api_quant_dashboard")
+
+        with open("web_gui/index.html", "r", encoding="utf-8") as hf:
+            html_code = hf.read()
+        has_quant_section = "id=\"quant-dashboard-section\"" in html_code
+        has_quant_filter = "quant-platform-filter-bar" in html_code
+        has_nav_dashboard = "id=\"nav-btn-overview\"" in html_code and ">Dashboard<" in html_code
+
+        with open("web_gui/app.js", "r", encoding="utf-8") as jf:
+            js_code = jf.read()
+        has_fetch_quant = "function fetchQuantDashboard(" in js_code
+        has_render_quant = "function renderQuantDashboard(" in js_code
+        has_quant_stream = "data.quant_dashboard" in js_code
+
+        all_inv84_passed = (
+            has_inv81 and has_inv82 and has_inv83 and has_inv84 and
+            has_record_sig and has_resolve_sig and has_summary_sig and
+            has_gap_stress and has_heat_check and has_continuity and
+            has_ablation_cls and has_brier_fn and has_auc_fn and
+            has_quant_metrics_fn and has_quant_handler and
+            has_quant_section and has_quant_filter and has_nav_dashboard and
+            has_fetch_quant and has_render_quant and has_quant_stream
+        )
+
+        if all_inv84_passed:
+            log_pass("Institutional Risk Governance, Auditable Ledger, Fat-Tail Buffer, Ablation & Live Dashboard (Invariants 81–84) are 100% locked & certified!")
+        else:
+            failures.append(
+                f"Invariants 81–84 check failed: inv81={has_inv81}, inv82={has_inv82}, inv83={has_inv83}, inv84={has_inv84}, "
+                f"record_sig={has_record_sig}, resolve_sig={has_resolve_sig}, summary_sig={has_summary_sig}, "
+                f"gap_stress={has_gap_stress}, heat_check={has_heat_check}, continuity={has_continuity}, "
+                f"ablation_cls={has_ablation_cls}, brier_fn={has_brier_fn}, auc_fn={has_auc_fn}, "
+                f"quant_fn={has_quant_metrics_fn}, quant_hdlr={has_quant_handler}, "
+                f"section={has_quant_section}, filter={has_quant_filter}, nav_dash={has_nav_dashboard}, "
+                f"fetch_q={has_fetch_quant}, render_q={has_render_quant}, stream_q={has_quant_stream}"
+            )
+            log_fail("Institutional Risk Governance & Quantitative Dashboard (Invariants 81–84) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariants 81–84 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

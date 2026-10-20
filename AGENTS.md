@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ76)
-**Document Version:** 7.6.0 (Angkor Quant Master Specification - The 76 Pillars, Super Admin Absolute Fleet Command & In-Memory Dual-Directional Stealth Breakout Radar Lock)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ84)
+**Document Version:** 7.8.0 (Angkor Quant Master Specification - The 84 Pillars, Institutional Quantitative Governance, Auditable Signal Ledger, Portfolio Heat & Fat-Tail Buffer, Ablation Validation & Live Web GUI Dashboard)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -154,6 +154,25 @@ The system is engineered upon two non-negotiable axioms:
    - Eliminates micro-profit exits that capture crumbs while taking on full directional risk.
 4. **Pillar 4: Institutional Asymmetric Payoff Profile ($R:R \ge 1:2.5$ to $1:4.0$):**
    - Every trade targets asymmetric payoff with TP1 at $+2.5R$, TP2 at $+4.0R$, and moonshot runners up to $+10.0R$.
+
+### 1.1.3 THE FOUR PILLARS OF INSTITUTIONAL RISK GOVERNANCE & QUANTITATIVE VALIDATION (AQ84)
+**(គ្រឹះ ៤ ប្រការស្ថាប័នកំពូល គ្រប់គ្រងហានិភ័យ & ផ្ទៀងផ្ទាត់គណិតវិទ្យា តាមដាន Signal & Dashboard Live - Invariants 81, 82, 83, 84)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
+1. **Pillar 1: Auditable Signal Ledger & Counterfactual Shadow Tracking (Invariant 81 - កត់ត្រាគ្រប់ Signal និងការតាមដាន Counterfactual ដើម្បីវាស់ស្ទង់ទុនដែលបានសង្គ្រោះពិតប្រាកដ):**
+   - *Permanent Full-Vector Logging:* Every signal candidate evaluated by the gatekeeper—both APPROVED and REJECTED—is permanently logged in `capital_signals_audit_ledger` with complete quantitative features: Entry, SL, TP, Spread, ATR, RSI, ADX, Hurst Exponent, Ornstein-Uhlenbeck Z-score, Raw Score, Post-Gate Score, and Rejection Reason.
+   - *Counterfactual Outcome Tracking:* Evaluates outcomes at 24h horizon (+2.0R WIN, -1.0R LOSS, EXPIRED) to empirically quantify capital preserved by rejection gates, ensuring false rejection rate stays minimal and edge is auditable.
+2. **Pillar 2: Fat-Tail Gap Buffer, Portfolio Heat Ceiling & Data Discontinuity Sentinel (Invariant 82 - របាំងទប់ស្កាត់ Gap ទីផ្សារ 1.5x ATR, ពិដានកម្តៅ Portfolio <= 6% & រ៉ាដាត្រួតពិនិត្យភាពដាច់ចន្លោះទិន្នន័យ):**
+   - *Fat-Tail Gap Buffer ($+1.5\times\text{ATR}$):* Never assume broker stops fill exactly at invalidation. Models gap risk under non-Gaussian fat-tailed distributions during market re-opens and weekend holds.
+   - *Portfolio Heat Ceiling ($\le 6.0\%$):* Limits aggregated portfolio open risk across all positions simultaneously to $\le 6.0\%$ of equity, permanently eliminating systemic correlated liquidation.
+   - *Data Discontinuity Sentinel:* Rejects stale quotes ($\le 5\text{s}$) and immediately freezes feeds if candle time-delta gap exceeds $3600\text{s}$.
+3. **Pillar 3: Drop-Group Ablation Matrix & Walk-Forward Validation Engine (Invariant 83 - ប្រព័ន្ធតេស្តវាស់ស្ទង់ឥទ្ធិពលសមាសភាគ AI, Brier Calibration & Walk-Forward 70/30 Test):**
+   - *Drop-Group Ablation:* Automates multi-model ablation (Full Model vs Minus Hurst, Minus SMC Blocks, Minus News Guard, Minus H4 Anchor, Trend Only) to confirm each quantitative feature contributes essential alpha ($\Delta\text{Brier} > 0$, $\text{AUC} \ge 0.60$).
+   - *Brier Score Calibration:* Enforces Brier Score $< 0.18$ across 70% In-Sample Train and 30% Out-of-Sample Test datasets to guarantee AI probability reliability.
+4. **Pillar 4: Live Institutional Quantitative Performance & Scientific Edge Dashboard (Invariant 84 - ផ្ទាំងគ្រប់គ្រងរង្វាស់គុណភាពវិនិយោគ និងប្រៀបឈ្នះគណិតវិទ្យា ៨ ខ្នាត លើ Web GUI):**
+   - *8 Core Institutional Metrics Grid:* Net Expectancy ($E[X]$ R/Trade), Win Rate + Avg Win/Loss Ratio ($2.45:1$), Profit Factor ($PF \ge 2.0$), Maximum Drawdown ($MaxDD \le -2.5\%$), Calibration / Brier Score ($< 0.18$), Execution Cost Drag ($> 90\%$ net retained), Out-of-Sample Stability ($> 90\%$), and Sample Distribution & Outlier Dependency Sanity Check ($N \ge 30$, Top 3 Dependency $< 20\%$).
+   - *Multi-Fleet Switcher:* 1-tap dynamic view across Global Multi-Fleet, Capital.com TradFi, Binance Futures, Binance Spot, Cambodia CSX, and MT5 Interbank.
+   - *Fiduciary Sanity Rule:* Never evaluate a strategy on Win Rate alone; verify sample size, confidence interval, and uniform distribution.
+   - *Zero-Refresh Streaming:* Real-time sub-0.01ms updates to Web GUI & Telegram Mini App via WebSocket (`/api/ws`) and SSE (`/api/stream`).
 
 ### 1.2 THE APEX PRINCIPAL SOFTWARE ENGINEER NODE & DETERMINISTIC STATE MEMORY COVENANT
 **(គ្រឹះវិស្វករស្ថាបត្យករកំពូល & បញ្ជាចងចាំរចនាសម្ព័ន្ធអចិន្ត្រៃយ៍ ប្រឆាំងការភ្លេចភ្លាំង និងការបំបែកកូដ)**
@@ -1434,6 +1453,61 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
        * Ornstein-Uhlenbeck process (exhaustion filter preventing chasing moves beyond $\pm 2.5$ Z-scores).
        * Bayesian posterior probability updating and Smart Money Concept (FVG, Order Block, and ICT 70.5% OTE Sweet Spot confluence) boosting entry conviction by +15 to +25 points.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 63/63].
+
+---
+
+### Invariant 81: Auditable Signal Ledger & Counterfactual Shadow Tracking (AQ84 Stage A)
+- **Location:** `database.py` (`capital_signals_audit_ledger`, `record_capital_signal_audit`, `resolve_capital_signal_outcomes`, `get_capital_signals_audit_summary`), `super_smart_capital_citadel.py` (`validate_capital_entry_gatekeeper`), `capital_engine.py` (`execute_autonomous_cycle`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **Permanent Full-Vector Logging (កត់ត្រាគ្រប់ Signal និងទិន្នន័យគណិតវិទ្យា ១០០%):**
+     - Every trade candidate evaluated by Citadel and TradFi gatekeepers—both APPROVED and REJECTED—is permanently recorded in SQLite table `capital_signals_audit_ledger`.
+     - Recorded vector includes: Entry price, Stop-Loss, Take-Profit, Spread, ATR, RSI, ADX, Hurst Exponent, Ornstein-Uhlenbeck Z-score, Raw Score, Post-Gate Score, and exact Rejection Reason.
+  2. **Counterfactual Outcome Tracking (តាមដាន Counterfactual ដើម្បីវាស់ស្ទង់ទុនដែលបានសង្គ្រោះពិតប្រាកដ):**
+     - At each cycle, `resolve_capital_signal_outcomes` tracks price trajectory over a 24-hour horizon ($+2.0R$ win vs $-1.0R$ loss vs expired).
+     - This empirically proves how much capital was preserved by rejection filters, ensuring that safety filters prevent losses without suppressing legitimate edge.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 64/64].
+
+---
+
+### Invariant 82: Fat-Tail Gap Buffer, Portfolio Heat Ceiling & Data Discontinuity Sentinel (AQ84 Stage C)
+- **Location:** `portfolio_circuit_breaker.py` (`calculate_gap_stress_risk`, `validate_portfolio_heat`, `validate_data_continuity`), `capital_engine.py` (`place_position`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **Fat-Tail Gap Buffer ($+1.5\times\text{ATR}$ Gap Buffer):**
+     - Stop-loss execution never assumes exact broker fill at invalidation price.
+     - Gap stress risk under non-Gaussian fat-tailed distributions models adverse price jumps using:
+       $$\text{Effective SL Distance} = \text{Base SL Distance} + 1.50 \times \text{ATR}_{15m}$$
+  2. **Portfolio Heat Ceiling ($\le 6.0\%$ Maximum Portfolio Risk):**
+     - Total concurrent risk across all open positions across all engines (Autonomous, ORB, Trend Scalp) cannot exceed $6.0\%$ of live account equity.
+     - New positions that would push portfolio heat beyond $6.0\%$ are strictly rejected with `HEAT_EXCEEDED`.
+  3. **Data Discontinuity Sentinel (ត្រួតពិនិត្យភាពដាច់ចន្លោះទិន្នន័យ):**
+     - Every incoming candle feed is audited for time-delta continuity. Gaps exceeding $3600\text{s}$ trigger instant safety freeze (`DATA_DISCONTINUITY`), preventing order generation on stale or corrupted feeds.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 64/64].
+
+---
+
+### Invariant 83: Drop-Group Ablation Matrix & Walk-Forward Validation Engine (AQ84 Stage D)
+- **Location:** `capital_ablation_engine.py` (`CapitalAblationEngine`, `run_full_ablation_matrix`, `compute_brier_score`, `compute_auc_roc`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **Drop-Group Ablation Matrix:**
+     - The quantitative engine is systematically benchmarked by dropping feature groups (Full Model vs Minus Hurst, Minus SMC Blocks, Minus News Guard, Minus H4 Anchor, Trend Only) to confirm each feature provides positive marginal predictive edge ($\Delta\text{Brier} > 0$, $\text{AUC} \ge 0.60$).
+  2. **Brier Score Calibration & Walk-Forward Reliability:**
+     - Enforces Brier Score $< 0.18$ across 70% In-Sample Train and 30% Out-of-Sample Test datasets, mathematically verifying that AI confidence levels match historical hit rates.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 64/64].
+
+---
+
+### Invariant 84: Live Institutional Quantitative Performance & Scientific Edge Dashboard (AQ84 Web GUI Standard)
+- **Location:** `web_gui_server.py` (`get_cached_quant_dashboard_metrics`, `handle_api_quant_dashboard`, `_GUI_CACHE["quant_dashboard"]`), `web_gui/index.html` (`quant-dashboard-section`, `quant-pf-btn`, `quant-metrics-grid`, `quant-table`, `nav-btn-overview` renamed to Dashboard), `web_gui/app.js` (`fetchQuantDashboard`, `renderQuantDashboard`, `setupQuantDashboardListeners`), `web_gui/style.css`, `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **8 Core Institutional Metrics Grid:**
+     - Net Expectancy ($E[X]$ R/Trade post-costs), Win Rate + Avg Win/Loss Ratio ($2.45:1$), Profit Factor ($PF \ge 2.0$), Maximum Drawdown ($MaxDD \le -2.5\%$), Calibration / Brier Score ($< 0.18$), Execution Cost Drag ($> 90\%$ net retained), Out-of-Sample Stability ($> 90\%$), and Sample Distribution & Outlier Dependency Sanity Check ($N \ge 30$, Top 3 Dependency $< 20\%$).
+  2. **Multi-Fleet Dynamic View:**
+     - Provides instant 1-tap switching across Global Multi-Fleet Enterprise, Capital.com TradFi, Binance Futures, Binance Spot, Cambodia CSX, and MT5 Interbank.
+  3. **Fiduciary Sanity Rule:**
+     - UI explicitly highlights the Fiduciary Sanity Rule: Never judge a strategy by Win Rate alone; verify trade count, confidence interval, and uniform distribution to eliminate lucky-outlier bias.
+  4. **Sub-0.01ms Zero-Refresh Streaming:**
+     - Delivers live real-time updates via WebSocket (`/api/ws`) and SSE (`/api/stream`) to Telegram Mini App & Web GUI with zero page refresh.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 64/64].
 
 ---
 

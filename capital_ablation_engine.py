@@ -38,6 +38,14 @@ import orthogonal_factor_analyzer as ofa
 class CapitalAblationEngine:
     """Institutional Ablation & Walk-Forward Validation Engine."""
 
+    @staticmethod
+    def compute_brier_score(y_true, y_prob) -> float:
+        return float(brier_score_loss(y_true, y_prob))
+
+    @staticmethod
+    def compute_auc_roc(y_true, y_prob) -> float:
+        return float(roc_auc_score(y_true, y_prob))
+
     @classmethod
     def load_dataset(cls, db_path: str = "bot_database.db", fallback_csv: str = "scratch/empirical_trades_dataset.csv") -> pd.DataFrame:
         """
