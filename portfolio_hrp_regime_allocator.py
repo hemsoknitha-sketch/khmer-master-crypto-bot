@@ -26,9 +26,18 @@ from typing import Dict, Any, Tuple, Optional, List
 
 import numpy as np
 import pandas as pd
-from scipy.cluster.hierarchy import linkage, dendrogram
-from scipy.spatial.distance import squareform
-from hmmlearn import hmm
+try:
+    from scipy.cluster.hierarchy import linkage, dendrogram
+    from scipy.spatial.distance import squareform
+except Exception:  # pragma: no cover - production safety fallback
+    linkage = None
+    dendrogram = None
+    squareform = None
+
+try:
+    from hmmlearn import hmm
+except Exception:  # pragma: no cover - optional ML dependency on lean VPS nodes
+    hmm = None
 
 logger = logging.getLogger("PortfolioHRPRegimeAllocator")
 
@@ -131,13 +140,14 @@ class HierarchicalRiskParity:
 
         # 1. Tree Clustering
         dist = cls.correlation_to_distance(corr)
-        condensed_dist = squareform(dist, checks=False)
-        link = linkage(condensed_dist, method="single")
+        if linkage is not None and squareform is not None and n > 1:
+            condensed_dist = squareform(dist, checks=False)
+            link = linkage(condensed_dist, method="single")
+            sorted_order = cls.get_quasi_diag_order(link)
+        else:
+            sorted_order = list(np.argsort(np.diag(cov)))
 
-        # 2. Quasi-Diagonalization
-        sorted_order = cls.get_quasi_diag_order(link)
-
-        # 3. Recursive Bisection
+        # 2. Recursive Bisection
         hrp_raw_weights = cls.recursive_bisection(cov, sorted_order)
 
         return {asset_names[i]: float(hrp_raw_weights[i]) for i in range(n)}
@@ -157,13 +167,14 @@ class HierarchicalRiskParity:
 
         # 1. Tree Clustering
         dist = cls.correlation_to_distance(corr)
-        condensed_dist = squareform(dist, checks=False)
-        link = linkage(condensed_dist, method="single")
+        if linkage is not None and squareform is not None and len(assets) > 1:
+            condensed_dist = squareform(dist, checks=False)
+            link = linkage(condensed_dist, method="single")
+            sorted_order = cls.get_quasi_diag_order(link)
+        else:
+            sorted_order = list(np.argsort(np.diag(cov)))
 
-        # 2. Quasi-Diagonalization
-        sorted_order = cls.get_quasi_diag_order(link)
-
-        # 3. Recursive Bisection
+        # 2. Recursive Bisection
         hrp_raw_weights = cls.recursive_bisection(cov, sorted_order)
 
         # Baseline: Inverse Variance
@@ -212,17 +223,28 @@ class ProbabilisticRegimeHMM:
     def __init__(self, n_components: int = 4, random_state: int = 42):
         self.n_components = n_components
         self.random_state = random_state
-        self.model = hmm.GaussianHMM(
-            n_components=n_components,
-            covariance_type="full",
-            n_iter=100,
-            random_state=random_state
-        )
+        self.model = None
+        if hmm is not None:
+            self.model = hmm.GaussianHMM(
+                n_components=n_components,
+                covariance_type="full",
+                n_iter=100,
+                random_state=random_state
+            )
         self.is_fitted = False
+        self.uses_fallback_model = hmm is None
+        self._fallback_centers = None
         self.regime_labels = ["BULL", "CHOP", "BEAR", "CRASH"]
 
     def fit(self, features: np.ndarray):
         """Fits Gaussian HMM on multivariate macro features."""
+        if self.model is None:
+            self._fit_distance_fallback(features)
+            self.is_fitted = self._fallback_centers is not None
+            if self.is_fitted:
+                logger.info("hmmlearn unavailable; fitted deterministic distance-based regime fallback.")
+            return
+
         try:
             self.model.fit(features)
             self.is_fitted = True
@@ -231,6 +253,48 @@ class ProbabilisticRegimeHMM:
             logger.warning(f"Gaussian HMM fit warning: {e}")
             self.is_fitted = False
 
+    def _fit_distance_fallback(self, features: np.ndarray):
+        """Fits deterministic regime centers when hmmlearn is unavailable."""
+        arr = np.asarray(features, dtype=float)
+        if arr.ndim == 1:
+            arr = arr.reshape(-1, 1)
+        arr = arr[~np.isnan(arr).any(axis=1)]
+        if len(arr) < self.n_components:
+            self._fallback_centers = None
+            return
+
+        order_feature = arr[:, 0]
+        quantiles = np.linspace(0.0, 1.0, self.n_components + 1)
+        centers = []
+        for lo, hi in zip(quantiles[:-1], quantiles[1:]):
+            low = np.quantile(order_feature, lo)
+            high = np.quantile(order_feature, hi)
+            bucket = arr[(order_feature >= low) & (order_feature <= high)]
+            if len(bucket) == 0:
+                bucket = arr
+            centers.append(np.nanmean(bucket, axis=0))
+        self._fallback_centers = np.asarray(centers, dtype=float)
+
+    def _fallback_predict_proba(self, current_features: np.ndarray) -> Dict[str, float]:
+        feats = np.asarray(current_features, dtype=float)
+        if feats.ndim == 1:
+            feats = feats.reshape(1, -1)
+        point = feats[0]
+        centers = self._fallback_centers
+        if centers is None:
+            return {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
+
+        dims = min(point.shape[0], centers.shape[1])
+        dists = np.linalg.norm(centers[:, :dims] - point[:dims], axis=1)
+        inv = 1.0 / np.maximum(1e-6, dists)
+        probs = inv / np.sum(inv)
+        return {
+            "BULL": float(probs[0]),
+            "CHOP": float(probs[1]),
+            "BEAR": float(probs[2]),
+            "CRASH": float(probs[3])
+        }
+
     def predict_regime_probabilities(self, current_features: np.ndarray) -> Dict[str, float]:
         """
         Infers probabilistic regime beliefs.
@@ -238,6 +302,9 @@ class ProbabilisticRegimeHMM:
         """
         if not self.is_fitted:
             return {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
+
+        if self.model is None:
+            return self._fallback_predict_proba(current_features)
 
         feats = np.asarray(current_features)
         if feats.ndim == 1:

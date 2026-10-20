@@ -14,9 +14,9 @@ Covered Universe:
   - Silver (SIF / XAGUSD)
   - US Tech Mega-Caps: NVDA, TSLA, AAPL, MSFT
 Macro Inputs:
-  - DXY Index (DX-Y.NYB)
-  - US 10Y Yield (TNX)
-  - VIX Volatility Index (VIX)
+  - Required: DXY Index (DX-Y.NYB), US 10Y Yield (TNX), VIX Volatility Index (VIX)
+  - Optional if present: TIPS 10Y real yield, 2s10s yield curve, HY credit spread,
+    CBOE put/call ratio, and VIX3M term-structure anchor
 
 Non-Negotiable Execution Standards:
   1. Strict Chronological Information Boundaries (Zero Look-Ahead, confirmed pivots only)
@@ -188,16 +188,28 @@ def load_dataset_clean(
         raise FileNotFoundError(f"CRITICAL PRE-FLIGHT ABORT: Missing {len(missing_assets)} required asset datasets: {missing_assets}")
 
     # 2. Rigorous Macro Overlays Ingestion & Validation
-    macro_files = {
+    required_macro_files = {
         "DXY": "DX-Y.NYB_1d_10y.csv",
         "TNX": "TNX_1d_10y.csv",
         "VIX": "VIX_1d_10y.csv"
     }
+    optional_macro_files = {
+        "TIPS_10Y": "DFII10_1d_10y.csv",
+        "YIELD_CURVE_2S10S": "T10Y2Y_1d_10y.csv",
+        "CREDIT_SPREAD_HY": "BAMLH0A0HYM2_1d_10y.csv",
+        "PUT_CALL_RATIO": "CPC_1d_10y.csv",
+        "VIX3M": "VIX3M_1d_10y.csv"
+    }
+    macro_files = {**required_macro_files, **optional_macro_files}
     missing_macro = []
+    missing_optional_macro = []
     for mkey, fname in macro_files.items():
         p = os.path.join(data_dir, fname)
         if not os.path.exists(p):
-            missing_macro.append((mkey, p))
+            if mkey in required_macro_files:
+                missing_macro.append((mkey, p))
+            else:
+                missing_optional_macro.append((mkey, p))
             continue
 
         df = pd.read_csv(p)
@@ -236,8 +248,12 @@ def load_dataset_clean(
 
     if missing_macro:
         raise FileNotFoundError(f"CRITICAL PRE-FLIGHT ABORT: Missing {len(missing_macro)} required macro datasets: {missing_macro}")
+    if missing_optional_macro:
+        manifest["optional_macro_missing"] = missing_optional_macro
+        logger.warning(f"Optional institutional macro datasets missing: {missing_optional_macro}")
 
-    manifest["integrity_status"] = "ALL_13_SERIES_VERIFIED_100_PERCENT"
+    manifest["macro_count"] = len(macro_data)
+    manifest["integrity_status"] = "ALL_REQUIRED_SERIES_VERIFIED_100_PERCENT"
     os.makedirs(os.path.dirname(manifest_output_path), exist_ok=True)
     with open(manifest_output_path, "w", encoding="utf-8") as mf:
         json.dump(manifest, mf, indent=2)

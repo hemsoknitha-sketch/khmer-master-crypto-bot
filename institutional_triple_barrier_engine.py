@@ -529,6 +529,18 @@ class InstitutionalTripleBarrierEngine:
         vix_df = pd.read_csv("data/tradfi_10y_dna/VIX_1d_10y.csv")
         dxy_df = pd.read_csv("data/tradfi_10y_dna/DX-Y.NYB_1d_10y.csv")
 
+        def _load_optional_macro_map(filename: str) -> Dict[Any, float]:
+            path = os.path.join("data", "tradfi_10y_dna", filename)
+            if not os.path.exists(path):
+                return {}
+            try:
+                opt_df = pd.read_csv(path)
+                opt_df["Date"] = pd.to_datetime(opt_df["Date"])
+                return dict(zip(opt_df["Date"], opt_df["close"]))
+            except Exception as exc:
+                logger.warning(f"Optional macro file {filename} could not be loaded: {exc}")
+                return {}
+
         gold_df["Date"] = pd.to_datetime(gold_df["Date"])
         silver_df["Date"] = pd.to_datetime(silver_df["Date"])
         copper_df["Date"] = pd.to_datetime(copper_df["Date"])
@@ -543,6 +555,11 @@ class InstitutionalTripleBarrierEngine:
         tnx_map = dict(zip(tnx_df["Date"], tnx_df["close"]))
         vix_map = dict(zip(vix_df["Date"], vix_df["close"]))
         dxy_map = dict(zip(dxy_df["Date"], dxy_df["close"]))
+        tips_map = _load_optional_macro_map("DFII10_1d_10y.csv")
+        yield_curve_map = _load_optional_macro_map("T10Y2Y_1d_10y.csv")
+        credit_spread_map = _load_optional_macro_map("BAMLH0A0HYM2_1d_10y.csv")
+        put_call_map = _load_optional_macro_map("CPC_1d_10y.csv")
+        vix3m_map = _load_optional_macro_map("VIX3M_1d_10y.csv")
 
         # VIX 60-day moving average for term structure proxy
         vix_df["vix_sma60"] = vix_df["close"].rolling(60).mean()
@@ -674,12 +691,26 @@ class InstitutionalTripleBarrierEngine:
                     cg_ratio = (c_price / max(1e-5, g_price)) * 1000.0
                     tips_real_yield = tnx_map.get(curr_d, 4.0) - 2.20
                     vix_val = vix_map.get(curr_d, 20.0)
-                    vix_ts = vix_ts_map.get(curr_d, 1.0)
+                    vix3m_val = vix3m_map.get(curr_d)
+                    if vix3m_val:
+                        vix_ts = vix_val / max(1e-5, vix3m_val)
+                    else:
+                        vix_ts = vix_ts_map.get(curr_d, 1.0)
                     dxy_val = dxy_map.get(curr_d, 102.0)
+                    yield_curve_2s10s = yield_curve_map.get(curr_d, 0.0)
+                    credit_spread_hy = credit_spread_map.get(curr_d, 0.0)
+                    put_call_ratio = put_call_map.get(curr_d, 1.0)
+                    if curr_d in tips_map:
+                        tips_real_yield = tips_map[curr_d]
 
                     # Statistical Features
                     hurst = compute_hurst_exponent_rs(df["close"].iloc[max(0, i-60):i])
                     entropy = compute_shannon_entropy(df["close"].iloc[max(0, i-60):i])
+                    volume_profile_poc, volume_profile_vah, volume_profile_val = compute_volume_profile_poc(
+                        df.iloc[:i+1],
+                        lookback=40,
+                        bins=15
+                    )
 
                     records.append({
                         "trade_id": len(records) + 1,
@@ -705,9 +736,15 @@ class InstitutionalTripleBarrierEngine:
                         "range_pct": round(rng_p, 2),
                         "atr14": round(atr_val, 4),
                         "spread_drag_pct": round((spread / atr_val) * 100.0, 2),
+                        "ema20_dist_pct": round(((curr_p / max(1e-5, row["ema20"])) - 1.0) * 100.0, 4),
+                        "ema50_dist_pct": round(((curr_p / max(1e-5, row["ema50"])) - 1.0) * 100.0, 4),
+                        "ema200_dist_pct": round(((curr_p / max(1e-5, row["ema200"])) - 1.0) * 100.0, 4),
                         "cvd": round(float(row["cvd"]), 1),
                         "bavi": round(float(row["bavi"]), 4),
                         "avwap_dist_pct": round(((curr_p / max(1e-5, row["avwap"])) - 1.0) * 100.0, 2),
+                        "volume_profile_poc": round(volume_profile_poc, 4),
+                        "volume_profile_vah": round(volume_profile_vah, 4),
+                        "volume_profile_val": round(volume_profile_val, 4),
                         "boll_pct_b": round(float(row["boll_pct_b"]), 2),
                         "stoch_k": round(float(row["stoch_k"]), 2),
                         "williams_r": round(float(row["williams_r"]), 2),
@@ -716,8 +753,11 @@ class InstitutionalTripleBarrierEngine:
                         "gold_silver_ratio": round(gs_ratio, 2),
                         "copper_gold_ratio": round(cg_ratio, 4),
                         "tips_real_yield": round(tips_real_yield, 2),
+                        "yield_curve_2s10s": round(float(yield_curve_2s10s), 4),
+                        "credit_spread_hy": round(float(credit_spread_hy), 4),
                         "vix": round(vix_val, 2),
                         "vix_term_structure": round(vix_ts, 4),
+                        "put_call_ratio": round(float(put_call_ratio), 4),
                         "dxy": round(dxy_val, 2),
                         # Statistics
                         "hurst_exponent": round(hurst, 3),

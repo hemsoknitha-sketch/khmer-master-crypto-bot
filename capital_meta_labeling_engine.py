@@ -37,6 +37,7 @@ logger = logging.getLogger("CapitalMetaLabelingEngine")
 DEFAULT_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "capital_meta_model.pkl")
 DEFAULT_METRICS_PATH = os.path.join(os.path.dirname(__file__), "models", "capital_meta_training_metrics.json")
 DEFAULT_DATASET_PATH = os.path.join(os.path.dirname(__file__), "data", "capital_meta_dataset.csv")
+DEFAULT_TRIPLE_BARRIER_LEDGER_PATH = os.path.join(os.path.dirname(__file__), "data", "capital_1000_trades_triple_barrier_ledger.csv")
 
 FEATURE_COLUMNS = [
     "direction_num",    # +1 for BUY, -1 for SELL
@@ -52,8 +53,61 @@ FEATURE_COLUMNS = [
     "ema200_dist_pct",  # Macro trend distance: (Price / EMA200 - 1) * 100
     "dxy_change",       # Macro Dollar index 1-day % change
     "vix",              # Market volatility index level
-    "day_of_week"       # Day of week (0=Mon, 4=Fri)
+    "day_of_week",      # Day of week (0=Mon, 4=Fri)
+    "cvd",              # Cumulative Volume Delta proxy
+    "bavi",             # Bid-Ask Volume Imbalance proxy
+    "avwap_dist_pct",   # Distance from anchored VWAP benchmark
+    "volume_profile_poc_dist_pct",  # Distance from VPVR point of control
+    "volume_profile_width_pct",     # VAH-VAL width normalized by entry price
+    "boll_pct_b",       # Bollinger %B
+    "stoch_k",          # Stochastic RSI %K
+    "williams_r",       # Williams %R
+    "cci",              # Commodity Channel Index
+    "gold_silver_ratio",
+    "copper_gold_ratio",
+    "tips_real_yield",
+    "yield_curve_2s10s",
+    "credit_spread_hy",
+    "vix_term_structure",
+    "put_call_ratio",
+    "hurst_exponent",
+    "shannon_entropy"
 ]
+
+FEATURE_DEFAULTS = {
+    "direction_num": 0.0,
+    "raw_score": 50.0,
+    "calib_p": 0.50,
+    "adx14": 25.0,
+    "rsi14": 50.0,
+    "range_pct": 50.0,
+    "atr_norm_pct": 1.0,
+    "spread_drag_pct": 5.0,
+    "ema20_dist_pct": 0.0,
+    "ema50_dist_pct": 0.0,
+    "ema200_dist_pct": 0.0,
+    "dxy_change": 0.0,
+    "vix": 20.0,
+    "day_of_week": 2.0,
+    "cvd": 0.0,
+    "bavi": 0.0,
+    "avwap_dist_pct": 0.0,
+    "volume_profile_poc_dist_pct": 0.0,
+    "volume_profile_width_pct": 0.0,
+    "boll_pct_b": 0.5,
+    "stoch_k": 50.0,
+    "williams_r": -50.0,
+    "cci": 0.0,
+    "gold_silver_ratio": 80.0,
+    "copper_gold_ratio": 2.0,
+    "tips_real_yield": 1.8,
+    "yield_curve_2s10s": 0.0,
+    "credit_spread_hy": 0.0,
+    "vix_term_structure": 1.0,
+    "put_call_ratio": 1.0,
+    "hurst_exponent": 0.50,
+    "shannon_entropy": 2.0
+}
 
 
 class CapitalMetaLabelingEngine:
@@ -128,7 +182,25 @@ class CapitalMetaLabelingEngine:
             "ema200_dist_pct": float(max(-50.0, min(50.0, ema200_dist))),
             "dxy_change": float(max(-10.0, min(10.0, dxy_change))),
             "vix": float(max(5.0, min(100.0, vix))),
-            "day_of_week": float(max(0, min(6, int(day_of_week))))
+            "day_of_week": float(max(0, min(6, int(day_of_week)))),
+            "cvd": 0.0,
+            "bavi": 0.0,
+            "avwap_dist_pct": 0.0,
+            "volume_profile_poc_dist_pct": 0.0,
+            "volume_profile_width_pct": 0.0,
+            "boll_pct_b": 0.5,
+            "stoch_k": 50.0,
+            "williams_r": -50.0,
+            "cci": 0.0,
+            "gold_silver_ratio": 80.0,
+            "copper_gold_ratio": 2.0,
+            "tips_real_yield": 1.8,
+            "yield_curve_2s10s": 0.0,
+            "credit_spread_hy": 0.0,
+            "vix_term_structure": 1.0,
+            "put_call_ratio": 1.0,
+            "hurst_exponent": 0.50,
+            "shannon_entropy": 2.0
         }
 
     @classmethod
@@ -191,7 +263,7 @@ class CapitalMetaLabelingEngine:
         model = cls.load_model(model_path)
         
         # Build DataFrame with exact feature order
-        row_vals = [features.get(col, 0.0) for col in FEATURE_COLUMNS]
+        row_vals = [features.get(col, FEATURE_DEFAULTS.get(col, 0.0)) for col in FEATURE_COLUMNS]
         X = pd.DataFrame([row_vals], columns=FEATURE_COLUMNS)
 
         if model is not None:
@@ -269,6 +341,17 @@ class CapitalMetaLabelingEngine:
         Simulates forward trade execution across 10-year historical bars to label
         true ground truth outcomes (y in {0, 1}) for every Model 1 signal.
         """
+        if os.path.exists(DEFAULT_TRIPLE_BARRIER_LEDGER_PATH):
+            try:
+                ledger_df = pd.read_csv(DEFAULT_TRIPLE_BARRIER_LEDGER_PATH)
+                if len(ledger_df) >= 1000:
+                    return cls.build_training_dataset_from_triple_barrier_ledger(
+                        ledger_csv=DEFAULT_TRIPLE_BARRIER_LEDGER_PATH,
+                        save_csv=save_csv
+                    )
+            except Exception as exc:
+                logger.warning(f"Triple-barrier ledger dataset path unavailable, falling back to signal simulation: {exc}")
+
         import capital_10y_backtester as bt
         
         logger.info("Building 10-year Meta-Labeling training dataset...")
@@ -372,6 +455,141 @@ class CapitalMetaLabelingEngine:
         return df_dataset
 
     @classmethod
+    def build_training_dataset_from_triple_barrier_ledger(
+        cls,
+        ledger_csv: str = DEFAULT_TRIPLE_BARRIER_LEDGER_PATH,
+        save_csv: str = DEFAULT_DATASET_PATH
+    ) -> pd.DataFrame:
+        """
+        Builds the meta-labeling training set from the AFML triple-barrier ledger.
+        This keeps Model 2 tied to realized forward outcomes and avoids expanding
+        the sample count through synthetic duplication.
+        """
+        if not os.path.exists(ledger_csv):
+            raise FileNotFoundError(f"Triple-barrier ledger not found: {ledger_csv}")
+
+        ledger = pd.read_csv(ledger_csv)
+        if len(ledger) < 1000:
+            raise ValueError(f"Triple-barrier ledger has only {len(ledger)} rows (< 1000 required)")
+
+        required_cols = {
+            "direction_num", "raw_score", "adx14", "rsi14", "range_pct",
+            "atr14", "entry_price", "spread_drag_pct", "vix", "day_of_week",
+            "symbol", "entry_date", "binary_win", "realized_r", "barrier_hit"
+        }
+        missing = sorted(required_cols - set(ledger.columns))
+        if missing:
+            raise ValueError(f"Triple-barrier ledger missing meta-label columns: {missing}")
+
+        df = ledger.copy()
+        df["date"] = pd.to_datetime(df["entry_date"]).dt.strftime("%Y-%m-%d")
+        df = df.sort_values(["date", "symbol"]).reset_index(drop=True)
+
+        if "calib_p" not in df.columns:
+            df["calib_p"] = np.clip(df["raw_score"].astype(float) / 100.0, 0.50, 0.95)
+        df["atr_norm_pct"] = (
+            df["atr14"].astype(float) / np.maximum(1e-5, df["entry_price"].astype(float))
+        ) * 100.0
+
+        for col in ["ema20_dist_pct", "ema50_dist_pct", "ema200_dist_pct"]:
+            if col not in df.columns:
+                df[col] = 0.0
+        for col, default in {
+            "cvd": 0.0,
+            "bavi": 0.0,
+            "avwap_dist_pct": 0.0,
+            "boll_pct_b": 0.5,
+            "stoch_k": 50.0,
+            "williams_r": -50.0,
+            "cci": 0.0,
+            "gold_silver_ratio": 80.0,
+            "copper_gold_ratio": 2.0,
+            "tips_real_yield": 1.8,
+            "yield_curve_2s10s": 0.0,
+            "credit_spread_hy": 0.0,
+            "vix_term_structure": 1.0,
+            "put_call_ratio": 1.0,
+            "hurst_exponent": 0.50,
+            "shannon_entropy": 2.0
+        }.items():
+            if col not in df.columns:
+                df[col] = default
+
+        if "volume_profile_poc" in df.columns:
+            df["volume_profile_poc_dist_pct"] = (
+                (df["entry_price"].astype(float) / np.maximum(1e-5, df["volume_profile_poc"].astype(float))) - 1.0
+            ) * 100.0
+        else:
+            df["volume_profile_poc_dist_pct"] = 0.0
+        if "volume_profile_vah" in df.columns and "volume_profile_val" in df.columns:
+            df["volume_profile_width_pct"] = (
+                (df["volume_profile_vah"].astype(float) - df["volume_profile_val"].astype(float)) /
+                np.maximum(1e-5, df["entry_price"].astype(float))
+            ) * 100.0
+        else:
+            df["volume_profile_width_pct"] = 0.0
+
+        if "dxy" in df.columns:
+            dxy_by_date = df[["date", "dxy"]].drop_duplicates("date").sort_values("date")
+            dxy_by_date["dxy_change"] = dxy_by_date["dxy"].pct_change().fillna(0.0) * 100.0
+            dxy_map = dict(zip(dxy_by_date["date"], dxy_by_date["dxy_change"]))
+            df["dxy_change"] = df["date"].map(dxy_map).fillna(0.0)
+        else:
+            df["dxy_change"] = 0.0
+
+        dataset = pd.DataFrame({
+            "direction_num": df["direction_num"].astype(float),
+            "raw_score": df["raw_score"].astype(float),
+            "calib_p": df["calib_p"].astype(float),
+            "adx14": df["adx14"].astype(float),
+            "rsi14": df["rsi14"].astype(float),
+            "range_pct": df["range_pct"].astype(float),
+            "atr_norm_pct": df["atr_norm_pct"].astype(float),
+            "spread_drag_pct": df["spread_drag_pct"].astype(float),
+            "ema20_dist_pct": df["ema20_dist_pct"].astype(float),
+            "ema50_dist_pct": df["ema50_dist_pct"].astype(float),
+            "ema200_dist_pct": df["ema200_dist_pct"].astype(float),
+            "dxy_change": df["dxy_change"].astype(float),
+            "vix": df["vix"].astype(float),
+            "day_of_week": df["day_of_week"].astype(float),
+            "cvd": df["cvd"].astype(float),
+            "bavi": df["bavi"].astype(float),
+            "avwap_dist_pct": df["avwap_dist_pct"].astype(float),
+            "volume_profile_poc_dist_pct": df["volume_profile_poc_dist_pct"].astype(float),
+            "volume_profile_width_pct": df["volume_profile_width_pct"].astype(float),
+            "boll_pct_b": df["boll_pct_b"].astype(float),
+            "stoch_k": df["stoch_k"].astype(float),
+            "williams_r": df["williams_r"].astype(float),
+            "cci": df["cci"].astype(float),
+            "gold_silver_ratio": df["gold_silver_ratio"].astype(float),
+            "copper_gold_ratio": df["copper_gold_ratio"].astype(float),
+            "tips_real_yield": df["tips_real_yield"].astype(float),
+            "yield_curve_2s10s": df["yield_curve_2s10s"].astype(float),
+            "credit_spread_hy": df["credit_spread_hy"].astype(float),
+            "vix_term_structure": df["vix_term_structure"].astype(float),
+            "put_call_ratio": df["put_call_ratio"].astype(float),
+            "hurst_exponent": df["hurst_exponent"].astype(float),
+            "shannon_entropy": df["shannon_entropy"].astype(float),
+            "symbol": df["symbol"].astype(str),
+            "date": df["date"].astype(str),
+            "target_win": df["binary_win"].astype(int),
+            "pnl_r": df["realized_r"].astype(float),
+            "exit_reason": df["barrier_hit"].astype(str),
+            "sample_weight": df.get("sample_weight", pd.Series(1.0, index=df.index)).astype(float)
+        })
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
+        if len(dataset) < 1000:
+            raise ValueError(f"Meta dataset dropped below 1000 clean rows after sanitation: {len(dataset)}")
+
+        if save_csv:
+            os.makedirs(os.path.dirname(save_csv), exist_ok=True)
+            dataset.to_csv(save_csv, index=False)
+            logger.info(f"Saved {len(dataset)} ledger-derived meta-labeling samples to {save_csv}")
+
+        return dataset
+
+    @classmethod
     def train_meta_model(
         cls,
         dataset_csv: str = DEFAULT_DATASET_PATH,
@@ -390,6 +608,11 @@ class CapitalMetaLabelingEngine:
             df_all = cls.build_training_dataset(save_csv=dataset_csv)
         else:
             df_all = pd.read_csv(dataset_csv)
+            if len(df_all) < 1000 and os.path.exists(DEFAULT_TRIPLE_BARRIER_LEDGER_PATH):
+                df_all = cls.build_training_dataset_from_triple_barrier_ledger(
+                    ledger_csv=DEFAULT_TRIPLE_BARRIER_LEDGER_PATH,
+                    save_csv=dataset_csv
+                )
 
         df_all = df_all.sort_values("date").reset_index(drop=True)
         total_samples = len(df_all)
@@ -405,19 +628,23 @@ class CapitalMetaLabelingEngine:
         y_train = train_df["target_win"]
         X_test = test_df[FEATURE_COLUMNS]
         y_test = test_df["target_win"]
+        train_sample_weight = train_df["sample_weight"] if "sample_weight" in train_df.columns else None
 
         logger.info(f"Training XGBoost Meta-Model on {len(X_train)} Train, {len(X_test)} Test samples...")
 
         clf = xgb.XGBClassifier(
-            n_estimators=100,
-            max_depth=3,
-            learning_rate=0.05,
+            n_estimators=50,
+            max_depth=2,
+            learning_rate=0.10,
             subsample=0.8,
             colsample_bytree=0.8,
             random_state=42,
             eval_metric="logloss"
         )
-        clf.fit(X_train, y_train)
+        fit_kwargs = {}
+        if train_sample_weight is not None:
+            fit_kwargs["sample_weight"] = train_sample_weight
+        clf.fit(X_train, y_train, **fit_kwargs)
 
         # In-Sample Predictions
         train_probs = clf.predict_proba(X_train)[:, 1]

@@ -3364,7 +3364,9 @@ def run_audit():
     # -------------------------------------------------------------------------
     print("\n[CHECK 65/65] Verifying Institutional AFML Meta-Labeling, Triple-Barrier, Purged CV, Deflated Sharpe & HRP Allocator (Invariants 85 & 86)...")
     try:
+        import json
         import numpy as np
+        import pandas as pd
 
         # 1. Ground Truth Lock in AGENTS.md
         with open("AGENTS.md", "r", encoding="utf-8") as f:
@@ -3379,6 +3381,22 @@ def run_audit():
         meta_engine = cmle.get_meta_labeling_engine()
         meta_model_file = os.path.exists("models/capital_meta_model.pkl") and os.path.getsize("models/capital_meta_model.pkl") > 1000
         meta_metrics_file = os.path.exists("models/capital_meta_training_metrics.json")
+        meta_metrics = {}
+        if meta_metrics_file:
+            with open("models/capital_meta_training_metrics.json", "r", encoding="utf-8") as mf:
+                meta_metrics = json.load(mf)
+        meta_dataset_file = os.path.exists("data/capital_meta_dataset.csv")
+        meta_dataset_count = 0
+        if meta_dataset_file:
+            with open("data/capital_meta_dataset.csv", "r", encoding="utf-8") as mdf:
+                meta_dataset_count = max(0, sum(1 for _ in mdf) - 1)
+        is_meta_dataset_1000_plus = meta_dataset_count >= 1000
+        is_meta_oos_auc_valid = float(meta_metrics.get("test_auc", 0.0) or 0.0) >= 0.60
+        is_meta_brier_valid = (
+            float(meta_metrics.get("test_brier_score", 999.0) or 999.0) <= 0.22 and
+            float(meta_metrics.get("train_brier_score", 999.0) or 999.0) <= 0.18
+        )
+        is_meta_quality_valid = is_meta_dataset_1000_plus and is_meta_oos_auc_valid and is_meta_brier_valid
         has_predict_edge = hasattr(meta_engine, "predict_meta_edge")
         has_calc_sizing = hasattr(meta_engine, "calculate_conviction_sizing")
 
@@ -3406,6 +3424,22 @@ def run_audit():
             with open("data/capital_1000_trades_triple_barrier_ledger.csv", "r", encoding="utf-8") as lf:
                 ledger_trade_count = sum(1 for _ in lf) - 1
         is_ledger_1000_plus = ledger_trade_count >= 1000
+        ledger_header = set()
+        if has_ledger_file:
+            with open("data/capital_1000_trades_triple_barrier_ledger.csv", "r", encoding="utf-8") as lf:
+                first_line = lf.readline().strip()
+                ledger_header = set(first_line.split(",")) if first_line else set()
+        required_tb_cols = {
+            "triple_barrier_label", "realized_r", "sample_uniqueness", "sample_weight",
+            "cvd", "bavi", "avwap_dist_pct", "gold_silver_ratio", "copper_gold_ratio",
+            "tips_real_yield", "vix_term_structure", "hurst_exponent", "shannon_entropy"
+        }
+        required_institutional_gap_cols = {
+            "volume_profile_poc", "volume_profile_vah", "volume_profile_val",
+            "yield_curve_2s10s", "credit_spread_hy", "put_call_ratio"
+        }
+        has_tb_required_cols = required_tb_cols.issubset(ledger_header)
+        has_institutional_gap_cols = required_institutional_gap_cols.issubset(ledger_header)
 
         # Dynamic Triple-Barrier test
         label, real_r, weight = itbe.label_triple_barrier_with_weights(
@@ -3427,6 +3461,27 @@ def run_audit():
         has_dsr_fn = hasattr(pcds, "compute_deflated_sharpe_ratio")
         has_minbtl_fn = hasattr(pcds, "compute_min_backtest_length")
         has_mc_bootstrap = hasattr(pcds, "monte_carlo_bootstrap_resampling")
+
+        # Dynamic purging validation: no training sample may overlap the test interval.
+        cv_probe = pd.DataFrame({
+            "entry_date": pd.to_datetime([
+                "2026-01-01", "2026-01-02", "2026-01-03", "2026-01-08", "2026-01-09", "2026-01-10"
+            ]),
+            "exit_date": pd.to_datetime([
+                "2026-01-05", "2026-01-05", "2026-01-06", "2026-01-09", "2026-01-11", "2026-01-12"
+            ])
+        })
+        pkf = pcds.PurgedKFold(n_splits=2, pct_embargo=0.0)
+        train_idx, test_idx = next(pkf.split(cv_probe))
+        test_start = cv_probe.loc[test_idx, "entry_date"].min()
+        test_end = cv_probe.loc[test_idx, "exit_date"].max()
+        is_purged_overlap_ok = True
+        for idx in train_idx:
+            t_entry = cv_probe.loc[idx, "entry_date"]
+            t_exit = cv_probe.loc[idx, "exit_date"]
+            if not (t_exit < test_start or t_entry > test_end):
+                is_purged_overlap_ok = False
+                break
 
         # Dynamic DSR validation
         dsr_eval = pcds.compute_deflated_sharpe_ratio(
@@ -3463,6 +3518,15 @@ def run_audit():
         mult_calm = phra.calculate_volatility_targeting_multiplier(realized_vol_20d=0.05, target_annual_vol=0.10)
         mult_crisis = phra.calculate_volatility_targeting_multiplier(realized_vol_20d=0.25, target_annual_vol=0.10)
         is_vol_target_ok = (mult_calm == 2.0) and (0.35 <= mult_crisis <= 0.55)
+        hmm_probe = phra.GaussianHMMRegimeModel()
+        hmm_features = np.array([[i / 10.0, (i % 5) / 5.0, np.sin(i)] for i in range(40)], dtype=float)
+        hmm_probe.fit(hmm_features)
+        regime_probs = hmm_probe.predict_regime_probabilities(np.array([0.25, 0.40, 0.10]))
+        is_hmm_prob_valid = (
+            isinstance(regime_probs, dict) and
+            set(regime_probs.keys()) == {"BULL", "CHOP", "BEAR", "CRASH"} and
+            abs(sum(float(v) for v in regime_probs.values()) - 1.0) < 1e-5
+        )
 
         # 6. Integration in super_smart_capital_citadel.py and capital_10y_backtester.py
         with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as ssf:
@@ -3471,16 +3535,25 @@ def run_audit():
 
         with open("capital_10y_backtester.py", "r", encoding="utf-8") as cbf:
             backtest_code = cbf.read()
+        backtest_active_code = "\n".join(
+            line for line in backtest_code.splitlines()
+            if not line.lstrip().startswith("#")
+        )
         has_backtest_meta_int = "use_meta_labeling" in backtest_code and "sizing_multiplier" in backtest_code
+        has_extended_macro_loader = all(
+            token in backtest_code
+            for token in ["TIPS_10Y", "YIELD_CURVE_2S10S", "CREDIT_SPREAD_HY", "PUT_CALL_RATIO", "VIX3M"]
+        )
+        has_no_bfill_leakage = ".bfill(" not in backtest_active_code and "bfill(" not in backtest_active_code and "method=\"bfill\"" not in backtest_active_code
 
         all_inv85_86_passed = (
             has_inv85 and has_inv86 and
             has_meta_cls and has_get_meta_engine and meta_model_file and meta_metrics_file and
-            has_predict_edge and has_calc_sizing and dynamic_meta_eval_ok and is_sizing_clamped and
-            has_triple_barrier_fn and has_ledger_file and is_ledger_1000_plus and is_tb_label_ok and
-            has_purged_kfold and has_cp_cv and has_dsr_fn and has_minbtl_fn and has_mc_bootstrap and is_dsr_eval_ok and
-            has_hrp_cls and has_regime_cls and has_vol_target_fn and is_hrp_valid and is_vol_target_ok and
-            has_citadel_meta_int and has_backtest_meta_int
+            is_meta_quality_valid and has_predict_edge and has_calc_sizing and dynamic_meta_eval_ok and is_sizing_clamped and
+            has_triple_barrier_fn and has_ledger_file and is_ledger_1000_plus and has_tb_required_cols and has_institutional_gap_cols and is_tb_label_ok and
+            has_purged_kfold and has_cp_cv and has_dsr_fn and has_minbtl_fn and has_mc_bootstrap and is_purged_overlap_ok and is_dsr_eval_ok and
+            has_hrp_cls and has_regime_cls and has_vol_target_fn and is_hrp_valid and is_vol_target_ok and is_hmm_prob_valid and
+            has_citadel_meta_int and has_backtest_meta_int and has_extended_macro_loader and has_no_bfill_leakage
         )
 
         if all_inv85_86_passed:
@@ -3488,11 +3561,15 @@ def run_audit():
         else:
             failures.append(
                 f"Invariants 85-86 check failed: inv85={has_inv85}, inv86={has_inv86}, "
-                f"meta_cls={has_meta_cls}, model_file={meta_model_file}, meta_ok={dynamic_meta_eval_ok}, "
+                f"meta_cls={has_meta_cls}, model_file={meta_model_file}, meta_dataset_1000={is_meta_dataset_1000_plus} ({meta_dataset_count}), "
+                f"meta_auc_ok={is_meta_oos_auc_valid} ({meta_metrics.get('test_auc')}), "
+                f"meta_brier_ok={is_meta_brier_valid} ({meta_metrics.get('test_brier_score')}), meta_ok={dynamic_meta_eval_ok}, "
                 f"tb_fn={has_triple_barrier_fn}, ledger_1000={is_ledger_1000_plus} ({ledger_trade_count}), "
-                f"tb_label={is_tb_label_ok}, purged_kf={has_purged_kfold}, dsr_ok={is_dsr_eval_ok}, "
-                f"hrp_valid={is_hrp_valid}, vol_target={is_vol_target_ok}, "
-                f"citadel_int={has_citadel_meta_int}, backtest_int={has_backtest_meta_int}"
+                f"tb_cols={has_tb_required_cols}, institutional_gap_cols={has_institutional_gap_cols}, "
+                f"tb_label={is_tb_label_ok}, purged_kf={has_purged_kfold}, purge_overlap={is_purged_overlap_ok}, dsr_ok={is_dsr_eval_ok}, "
+                f"hrp_valid={is_hrp_valid}, vol_target={is_vol_target_ok}, hmm_probs={is_hmm_prob_valid}, "
+                f"citadel_int={has_citadel_meta_int}, backtest_int={has_backtest_meta_int}, "
+                f"extended_macro_loader={has_extended_macro_loader}, no_bfill={has_no_bfill_leakage}"
             )
             log_fail("Institutional AFML Meta-Labeling & Quantitative Edge (Invariants 85 & 86) validation failed!")
     except Exception as e:
