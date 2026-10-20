@@ -7055,13 +7055,144 @@ class CapitalKellyPositionSizer:
         "AMZN": {"base_low": 0.20, "base_high": 0.50, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
     }
 
+    CORRELATION_CLUSTERS = {
+        "TECH_INDEX_EQUITY": {
+            "US100", "NASDAQ", "US500", "SP500", "DE40", "GERMANY40",
+            "NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"
+        },
+        "PRECIOUS_METALS": {
+            "GOLD", "XAUUSD", "SILVER", "XAGUSD"
+        },
+        "ENERGY": {
+            "OIL", "OIL_CRUDE", "GAS", "NATURALGAS"
+        }
+    }
+
     def __init__(self):
         self._stats = {
             "total_calculations": 0,
             "high_confluence_boosts": 0,
             "chop_contractions": 0,
+            "multiplier_risk_capped": 0,
+            "portfolio_heat_clamped": 0,
+            "correlation_clamped": 0,
             "last_calculation": None
         }
+
+    @classmethod
+    def _find_correlation_cluster(cls, epic: str) -> Optional[str]:
+        """Maps an asset symbol to its macro correlation cluster."""
+        clean = (epic or "").upper().strip()
+        for cname, members in cls.CORRELATION_CLUSTERS.items():
+            if any(m in clean for m in members):
+                return cname
+        return None
+
+    @classmethod
+    def _get_contract_multiplier(cls, epic: str) -> float:
+        """Returns physical unit multiplier per point for CFD contract risk calculation."""
+        clean = (epic or "").upper().strip()
+        if any(x in clean for x in ["OIL", "OIL_CRUDE"]):
+            return 10.0
+        elif any(x in clean for x in ["NATURALGAS", "GAS"]):
+            return 100.0
+        return 1.0
+
+    @classmethod
+    def get_user_open_tradfi_trades(cls, chat_id: int) -> List[Dict[str, Any]]:
+        """
+        Retrieves all currently active TradFi positions across the 3 execution tables:
+        capital_auto_trades, capital_orb_trades, and capital_scalp_trades.
+        """
+        if not chat_id:
+            return []
+        trades = []
+        try:
+            conn = db.get_db_connection()
+            cur = conn.cursor()
+            
+            # 1. capital_auto_trades
+            try:
+                cur.execute("""
+                    SELECT epic, direction, size, entry_price, sl, tp, 'AUTO' as origin
+                    FROM capital_auto_trades
+                    WHERE chat_id = ? AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
+                """, (chat_id,))
+                for r in cur.fetchall():
+                    trades.append({
+                        "epic": str(r[0]).upper(),
+                        "direction": str(r[1]),
+                        "size": float(r[2] or 0.0),
+                        "entry_price": float(r[3] or 0.0),
+                        "sl": float(r[4] or 0.0),
+                        "tp": float(r[5] or 0.0),
+                        "origin": str(r[6])
+                    })
+            except Exception:
+                pass
+
+            # 2. capital_orb_trades
+            try:
+                cur.execute("""
+                    SELECT epic, direction, 0.05 as size, entry_price, sl, tp, 'ORB' as origin
+                    FROM capital_orb_trades
+                    WHERE chat_id = ? AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
+                """, (chat_id,))
+                for r in cur.fetchall():
+                    trades.append({
+                        "epic": str(r[0]).upper(),
+                        "direction": str(r[1]),
+                        "size": float(r[2] or 0.0),
+                        "entry_price": float(r[3] or 0.0),
+                        "sl": float(r[4] or 0.0),
+                        "tp": float(r[5] or 0.0),
+                        "origin": str(r[6])
+                    })
+            except Exception:
+                pass
+
+            # 3. capital_scalp_trades
+            try:
+                cur.execute("""
+                    SELECT epic, direction, 0.05 as size, entry_price, sl, tp, 'SCALP' as origin
+                    FROM capital_scalp_trades
+                    WHERE chat_id = ? AND status = 'OPEN'
+                """, (chat_id,))
+                for r in cur.fetchall():
+                    trades.append({
+                        "epic": str(r[0]).upper(),
+                        "direction": str(r[1]),
+                        "size": float(r[2] or 0.0),
+                        "entry_price": float(r[3] or 0.0),
+                        "sl": float(r[4] or 0.0),
+                        "tp": float(r[5] or 0.0),
+                        "origin": str(r[6])
+                    })
+            except Exception:
+                pass
+
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Open trades query note for user {chat_id}: {e}")
+        return trades
+
+    @classmethod
+    def calculate_trade_risk_usd(cls, trade: Dict[str, Any]) -> float:
+        """Calculates 1R Dollar Risk for an open trade."""
+        epic = trade.get("epic", "")
+        size = float(trade.get("size", 0.0) or 0.0)
+        entry = float(trade.get("entry_price", 0.0) or 0.0)
+        sl = float(trade.get("sl", 0.0) or 0.0)
+        mult = cls._get_contract_multiplier(epic)
+
+        if entry > 0 and sl > 0 and sl != entry:
+            sl_dist = abs(entry - sl)
+        elif entry > 0:
+            sl_dist = entry * 0.015
+        else:
+            sl_dist = 5.0
+        
+        return round(size * sl_dist * mult, 2)
 
     def compute_kelly_fraction(
         self,
@@ -7075,21 +7206,27 @@ class CapitalKellyPositionSizer:
     ) -> Dict[str, Any]:
         """
         Calculates mathematical Kelly fraction (f*), allocated risk fraction, and multiplier.
-        Uses calibrated empirical win probability (p) to eliminate gambler-fallacy drawdown.
+        Uses Out-Of-Sample (OOS) calibrated win probability (p) to eliminate gambler-fallacy drawdown.
+        Raw heuristic confidence score is NEVER directly used as win probability.
         """
         conf = max(40.0, min(98.0, float(confidence_score)))
 
-        # 1. Calibrate win probability p:
-        # If calibrated_win_prob is explicitly passed, use it directly.
-        # Otherwise, run Platt-Isotonic calibration on conf (no naive conf / 100).
+        # 1. Calibrate win probability p from Out-of-Sample (OOS) empirical data:
+        # Never use raw uncalibrated confluence score as p.
         if calibrated_win_prob is not None and 0.05 <= float(calibrated_win_prob) <= 0.95:
             p = float(calibrated_win_prob)
+            prob_source = "OOS_EXPLICIT_CALIBRATED"
         else:
             try:
                 import capital_probability_calibrator as cpc
                 p = cpc.CapitalProbabilityCalibrator.calibrate_from_score(conf)
+                prob_source = "PLATT_ISOTONIC_OOS_CALIBRATOR"
             except Exception:
                 p = max(0.20, min(0.72, 0.25 + (0.45 * (conf / 100.0))))
+                prob_source = "HEURISTIC_SHRINKAGE_FALLBACK"
+
+        # Institutional clamp: Realized OOS empirical win rate is strictly bounded in [0.20, 0.75]
+        p = max(0.20, min(0.75, float(p)))
 
         # 2. Compute Payoff Ratio b (R:R)
         risk_dist = abs(entry_price - sl_price) if entry_price and sl_price else 0.0
@@ -7111,26 +7248,26 @@ class CapitalKellyPositionSizer:
         # 4. Institutional Fractional Kelly
         allocated_fraction = raw_kelly * max(0.10, min(1.0, fractional_multiplier))
 
-        # 5. Hard Risk Clamp
-        max_risk = max(0.01, min(0.035, max_risk_pct / 100.0))
-        final_risk_fraction = min(allocated_fraction, max_risk) if raw_kelly > 0 else 0.005
+        # 5. Hard Risk Clamp (Absolute Risk Ceiling: default 2.5%, maximum ceiling 2.5%)
+        hard_max_risk = max(0.01, min(0.025, max_risk_pct / 100.0))
+        final_risk_fraction = min(allocated_fraction, hard_max_risk) if raw_kelly > 0 else 0.005
 
-        # 6. Dynamic Scale Multiplier vs Baseline Risk (0.02)
-        # Calibrated probability scaling:
-        # p >= 0.68: Elite high-conviction scale (1.2x - 1.5x)
-        # p >= 0.55: Solid conviction scale (0.9x - 1.2x)
-        # p >= 0.45: Speculative edge scale (0.7x - 0.9x)
-        # p < 0.45: Micro-lot chop floor (0.5x)
-        if p >= 0.68:
-            scale_multiplier = 1.2 + (0.3 * ((p - 0.68) / 0.12))
-        elif p >= 0.55:
-            scale_multiplier = 0.9 + (0.3 * ((p - 0.55) / 0.13))
-        elif p >= 0.45:
-            scale_multiplier = 0.7 + (0.2 * ((p - 0.45) / 0.10))
+        # 6. Dynamic Scale Multiplier based on OOS Calibrated Edge & Confluence:
+        # Sizing multiplier is strictly tied to calibrated probability p:
+        # High Calibrated Edge (p >= 0.58 or conf >= 92% with positive expectancy): 1.1x - 1.5x
+        # Solid Conviction (p >= 0.50): 0.9x - 1.1x
+        # Speculative / Moderate Edge (p >= 0.42): 0.7x - 0.9x
+        # Low Conviction / Chop (p < 0.42 or raw_kelly == 0): 0.5x micro-floor
+        if raw_kelly <= 0 or p < 0.42 or conf < 60.0:
+            scale_multiplier = 0.50
+        elif p >= 0.58 or conf >= 92.0:
+            scale_multiplier = min(1.50, 1.10 + (0.40 * min(1.0, (conf - 85.0) / 13.0)))
+        elif p >= 0.50:
+            scale_multiplier = 0.90 + (0.20 * ((p - 0.50) / 0.08))
         else:
-            scale_multiplier = 0.5
+            scale_multiplier = 0.70 + (0.20 * ((p - 0.42) / 0.08))
 
-        scale_multiplier = max(0.5, min(1.8, scale_multiplier))
+        scale_multiplier = max(0.50, min(1.50, scale_multiplier))
 
         return {
             "p": round(p, 4),
@@ -7140,7 +7277,8 @@ class CapitalKellyPositionSizer:
             "final_risk_fraction": round(final_risk_fraction, 4),
             "risk_pct": round(final_risk_fraction * 100.0, 2),
             "scale_multiplier": round(scale_multiplier, 2),
-            "is_positive_expectancy": raw_kelly > 0
+            "is_positive_expectancy": raw_kelly > 0,
+            "prob_source": prob_source
         }
 
     def calculate_lot_size(
@@ -7156,7 +7294,11 @@ class CapitalKellyPositionSizer:
         calibrated_win_prob: Optional[float] = None
     ) -> float:
         """
-        Computes dynamic lot size via Fractional Kelly Criterion with asset DNA clamping.
+        Computes dynamic lot size via Fractional Kelly Criterion with Multi-Layer Protection:
+        1. Out-of-Sample (OOS) Calibrated Win Probability p (No naive score in Kelly).
+        2. Absolute Hard Risk Cap per Trade & Multiplier Invariant (Multiplier NEVER exceeds Cap).
+        3. Portfolio Heat Governor across ALL open positions (capital_auto, capital_orb, capital_scalp).
+        4. Cross-Asset Correlation-Adjusted Clamping (Beta & cluster contagion elimination).
         """
         self._stats["total_calculations"] += 1
         clean_epic = epic.upper().strip()
@@ -7189,6 +7331,7 @@ class CapitalKellyPositionSizer:
         is_stock = any(s in clean_epic for s in ["NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"])
         is_crypto = any(c in clean_epic for c in ["BTC", "ETH", "SOL", "XRP"])
         leverage = 5.0 if is_stock else (2.0 if is_crypto else 20.0)
+        contract_mult = self._get_contract_multiplier(clean_epic)
 
         # Dynamic Target Margin Sizing: Allocates safe margin per trade based on dynamic slot limits
         eff_cap = max(float(budget or 0.0), float(available_equity or 0.0))
@@ -7202,27 +7345,94 @@ class CapitalKellyPositionSizer:
         else:
             budget_lot = rule["base_low"] if budget < 100 else rule["base_high"]
 
-        # Blend Kelly scale multiplier with budget-based lot (chop contraction to min_lot if scale_mult <= 0.6)
+        # ----------------------------------------------------------------------
+        # LAYER 1: Open Positions & Portfolio Heat Governor across ALL 3 Engines
+        # ----------------------------------------------------------------------
+        open_trades = self.get_user_open_tradfi_trades(chat_id)
+        total_open_risk_usd = 0.0
+        for t in open_trades:
+            total_open_risk_usd += self.calculate_trade_risk_usd(t)
+
+        # Max Portfolio Heat: 6.0% of equity (or $6.00 for micro accounts < $200)
+        max_portfolio_heat_dollar = min(6.00, eff_cap * 0.060) if eff_cap < 200.0 else (eff_cap * 0.060)
+        remaining_heat_budget = max(0.0, max_portfolio_heat_dollar - total_open_risk_usd)
+
+        # ----------------------------------------------------------------------
+        # LAYER 2: Cross-Asset Correlation Cluster Clamping
+        # ----------------------------------------------------------------------
+        target_cluster = self._find_correlation_cluster(clean_epic)
+        cluster_open_trades = []
+        cluster_open_risk_usd = 0.0
+        if target_cluster and open_trades:
+            for t in open_trades:
+                if self._find_correlation_cluster(t.get("epic", "")) == target_cluster:
+                    cluster_open_trades.append(t)
+                    cluster_open_risk_usd += self.calculate_trade_risk_usd(t)
+
+        cluster_count = len(cluster_open_trades)
+        if cluster_count == 1:
+            # 1 correlated asset held: Disallow score boost and apply 30% haircut
+            scale_mult = min(scale_mult, 1.0) * 0.70
+            self._stats["correlation_clamped"] += 1
+        elif cluster_count >= 2:
+            # >= 2 correlated assets held: Disallow score boost and apply 60% haircut
+            scale_mult = min(scale_mult, 0.80) * 0.40
+            self._stats["correlation_clamped"] += 1
+
+        # Max Cluster Risk: 3.5% of equity (or $3.50 for micro accounts < $200)
+        max_cluster_risk_dollar = min(3.50, eff_cap * 0.035) if eff_cap < 200.0 else (eff_cap * 0.035)
+        remaining_cluster_budget = max(0.0, max_cluster_risk_dollar - cluster_open_risk_usd)
+
+        # ----------------------------------------------------------------------
+        # LAYER 3: Kelly Sizing Multiplier Application
+        # ----------------------------------------------------------------------
         if scale_mult <= 0.6:
             raw_lot = rule["min_lot"]
         else:
             raw_lot = budget_lot * scale_mult
 
-        # Clamp strictly between min_lot and max_lot
-        final_lot = max(rule["min_lot"], min(rule["max_lot"], raw_lot))
+        # ----------------------------------------------------------------------
+        # LAYER 4: Absolute Hard Risk Cap per Trade & Multiplier Invariant
+        # The Multiplier can NEVER expand risk beyond the Hard Risk Cap ceiling.
+        # ----------------------------------------------------------------------
+        hard_max_risk_pct = min(float(max_risk or 2.5), 2.5)
+        max_single_risk_dollar = eff_cap * (hard_max_risk_pct / 100.0)
+        if eff_cap < 200.0:
+            max_single_risk_dollar = min(max_single_risk_dollar, 2.50)
+        elif eff_cap < 500.0:
+            max_single_risk_dollar = min(max_single_risk_dollar, 7.50)
 
-        # Small Capital Fortress Clamp for Accounts < $100 (Invariant 25, 31, 33)
-        # Prevents high-beta energy contracts (NatGas & Crude Oil) from producing outsized outlier losses on micro accounts
-        # Clamps Natural Gas strictly to 10.0 - 15.0 contracts, and Crude Oil strictly to 0.3 - 0.5 barrels (1R risk <= $0.30 - $0.50)
+        sl_dist = abs(entry_price - sl_price) if entry_price > 0 and sl_price > 0 else 0.0
+        unit_risk = (sl_dist * contract_mult) if sl_dist > 0 else 1.0
+
+        max_safe_lot_by_risk = max_single_risk_dollar / unit_risk if unit_risk > 0 else rule["max_lot"]
+        max_safe_lot_by_heat = remaining_heat_budget / unit_risk if (unit_risk > 0 and open_trades) else rule["max_lot"]
+        max_safe_lot_by_cluster = remaining_cluster_budget / unit_risk if (unit_risk > 0 and cluster_count > 0) else rule["max_lot"]
+
+        # Clamp raw_lot by Hard Risk Cap (Multiplier Invariant Rule)
+        final_lot = min(raw_lot, max_safe_lot_by_risk)
+        if raw_lot > max_safe_lot_by_risk:
+            self._stats["multiplier_risk_capped"] += 1
+
+        # Clamp by Portfolio Heat & Cluster Risk if open trades exist
+        if open_trades:
+            final_lot = min(final_lot, max_safe_lot_by_heat)
+            if final_lot < max_safe_lot_by_heat:
+                self._stats["portfolio_heat_clamped"] += 1
+        if cluster_count > 0:
+            final_lot = min(final_lot, max_safe_lot_by_cluster)
+
+        # ----------------------------------------------------------------------
+        # LAYER 5: Small Capital Fortress Clamps (Invariant 25, 31, 33, 74)
+        # ----------------------------------------------------------------------
+        # Accounts < $100: Clamps Natural Gas strictly to 10.0 - 15.0, Crude Oil to 0.3 - 0.5 barrels
         if budget < 100 or (available_equity > 0 and available_equity < 100):
             if clean_epic in ["NATURALGAS", "GAS"]:
                 final_lot = min(15.0, max(10.0, final_lot))
             elif clean_epic in ["OIL", "OIL_CRUDE"]:
                 final_lot = min(0.5, max(0.3, final_lot))
 
-        # High-Beta Index & Stock Capital Shield for Accounts < $500 (Invariant 25, 33)
-        # Clamps US100 strictly <= 0.05 contracts, US500 <= 0.10, and Mega-Cap Stocks <= 0.20 shares
-        # Eliminates 0.5 contract index orders ($15k notional) from wiping out $300 capital
+        # Accounts < $500: Clamps US100 <= 0.05, US500 <= 0.10, Mega-Cap Stocks <= 0.20
         if eff_cap < 500:
             if clean_epic in ["US100", "NASDAQ"]:
                 final_lot = min(0.05, max(rule["min_lot"], final_lot))
@@ -7231,7 +7441,7 @@ class CapitalKellyPositionSizer:
             elif is_stock:
                 final_lot = min(0.20, max(rule["min_lot"], final_lot))
 
-        # Small Capital Gold & Crypto Shield for Accounts < $200 (Invariant 74)
+        # Accounts < $200: Clamps Gold <= 0.08, Crypto to min_lot
         if eff_cap < 200:
             if clean_epic in ["GOLD", "XAUUSD"]:
                 final_lot = min(0.08, max(rule["min_lot"], final_lot))
@@ -7239,24 +7449,18 @@ class CapitalKellyPositionSizer:
                 final_lot = rule["min_lot"]
 
         # Invariant 74 & 76: Structural Dynamic Risk Dollar Hard Clamp (Max Risk <= $2.50 for Micro Accounts < $200)
-        sl_dist = abs(entry_price - sl_price) if entry_price > 0 and sl_price > 0 else 0.0
         if eff_cap < 200 and sl_dist > 0:
             max_allowed_risk_dollar = 2.50
-            if clean_epic in ["GOLD", "XAUUSD"]:
-                max_safe_lot = max_allowed_risk_dollar / sl_dist
-                final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
-            elif clean_epic in ["US100", "NASDAQ", "US500", "SP500"]:
+            if clean_epic in ["GOLD", "XAUUSD", "US100", "NASDAQ", "US500", "SP500"] or is_stock:
                 max_safe_lot = max_allowed_risk_dollar / sl_dist
                 final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
             elif clean_epic in ["OIL", "OIL_CRUDE"]:
                 max_safe_lot = max_allowed_risk_dollar / (sl_dist * 10.0)
                 final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
-            elif is_stock:
-                max_safe_lot = max_allowed_risk_dollar / sl_dist
-                final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
 
-        # Snap to lot_step
+        # Snap to lot_step and clamp between min_lot and max_lot
         step = rule["lot_step"]
+        final_lot = max(rule["min_lot"], min(rule["max_lot"], final_lot))
         final_lot = round(round(final_lot / step) * step, rule["precision"])
 
         if scale_mult >= 1.5:
@@ -7269,7 +7473,12 @@ class CapitalKellyPositionSizer:
             "lot": final_lot,
             "scale_multiplier": scale_mult,
             "confidence": confidence_score,
+            "calibrated_p": kelly_res["p"],
+            "prob_source": kelly_res.get("prob_source", "OOS"),
             "risk_pct": kelly_res["risk_pct"],
+            "portfolio_heat_usd": round(total_open_risk_usd, 2),
+            "cluster": target_cluster,
+            "correlated_open_count": cluster_count,
             "mode": kelly_cfg.get("mode", "BALANCED")
         }
 

@@ -26,8 +26,9 @@ logger = logging.getLogger("PortfolioCircuitBreaker")
 MAX_DAILY_DRAWDOWN_PCT = 2.5       # -2.5% maximum daily loss
 LOCK_DURATION_SECONDS = 43200.0    # 12 Hours Lock
 HIGH_BETA_GROUPS = [
-    {"US100", "NASDAQ", "BTC", "BTCUSDT", "NVDA", "TSLA", "META", "GOOGL"}, # Risk-On Tech & Crypto
-    {"OIL", "OIL_CRUDE", "GAS", "NATURALGAS"}                               # Energy Commodities
+    {"US100", "NASDAQ", "US500", "SP500", "DE40", "GERMANY40", "BTC", "BTCUSDT", "NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"}, # Risk-On Tech & Equities
+    {"GOLD", "XAUUSD", "SILVER", "XAGUSD"},                                                                                                 # Precious Metals
+    {"OIL", "OIL_CRUDE", "GAS", "NATURALGAS"}                                                                                               # Energy Commodities
 ]
 
 _CIRCUIT_BREAKER_LOCKED_UNTIL: float = 0.0
