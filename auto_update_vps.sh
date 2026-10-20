@@ -120,16 +120,16 @@ if [ -f "KhmerMasterCrypto_Bridge.mq5" ]; then
     echo "🏛️ [MT5] Staged & synced updated KhmerMasterCrypto_Bridge (.ex5 & .mq5) to all MT5 instances."
 fi
 
-# 4.1 Auto-Inject Capital.com Demo Credentials to .env if Missing
+# 4.1 Check Capital.com Configuration Placeholders in .env if Missing
 if [ -f ".env" ]; then
     if ! grep -q "CAPITAL_API_KEY" .env; then
         echo "" >> .env
         echo "# Capital.com TradFi Multi-Asset Brokerage" >> .env
-        echo "CAPITAL_API_KEY=Vm6tyK0cHtqq6fPe" >> .env
-        echo "CAPITAL_IDENTIFIER=hem.sinath@gmail.com" >> .env
-        echo "CAPITAL_PASSWORD=Vipheavy@2297!" >> .env
+        echo "CAPITAL_API_KEY=" >> .env
+        echo "CAPITAL_IDENTIFIER=" >> .env
+        echo "CAPITAL_PASSWORD=" >> .env
         echo "CAPITAL_IS_DEMO=True" >> .env
-        echo "🏛️ [ENV] Added Capital.com default demo credentials to .env."
+        echo "🏛️ [ENV] Added Capital.com placeholder configuration to .env."
     fi
 fi
 

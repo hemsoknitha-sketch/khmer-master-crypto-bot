@@ -182,10 +182,11 @@ EPIC_MAP = {
 # Session validity duration in seconds (Capital.com sessions expire after 10 minutes)
 SESSION_EXPIRY_THRESHOLD = 500  # Refresh session after ~8.3 minutes to avoid expiration
 
-# Default Capital.com Institutional Demo Credentials (Zero-Config Fallback)
-DEFAULT_CAPITAL_API_KEY = "Vm6tyK0cHtqq6fPe"
-DEFAULT_CAPITAL_IDENTIFIER = "hem.sinath@gmail.com"
-DEFAULT_CAPITAL_PASSWORD = "Vipheavy@2297!"
+# Capital.com Institutional Credentials must be loaded from Environment Variables or Secret Manager.
+# Hardcoding credentials in source code is strictly prohibited by Angkor Quant Institutional Security Policy.
+DEFAULT_CAPITAL_API_KEY = ""
+DEFAULT_CAPITAL_IDENTIFIER = ""
+DEFAULT_CAPITAL_PASSWORD = ""
 
 
 # Global In-Memory Shared RAM Cache for TradFi Quotes (< 0.05ms)
@@ -333,9 +334,9 @@ class CapitalComEngine:
             self.is_guest = True
         else:
             self.is_guest = False
-            self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip() or DEFAULT_CAPITAL_API_KEY
-            self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip() or DEFAULT_CAPITAL_IDENTIFIER
-            self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip() or DEFAULT_CAPITAL_PASSWORD
+            self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip()
+            self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip()
+            self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip()
         self.last_auth_error: str = ""
         self._custom_chat_id: Optional[int] = custom_chat_id
         
