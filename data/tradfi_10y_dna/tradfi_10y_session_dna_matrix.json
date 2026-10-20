@@ -1,6 +1,6 @@
 {
   "ASIAN_SESSION": {
-    "description": "Tokyo, Sydney, Seoul, Hong Kong, Singapore & Asian Commodities",
+    "description": "Tokyo, Sydney, Seoul, Hong Kong, Singapore & Asian Mega-Caps & Commodities",
     "prime_hours_ict": "07:00 - 13:30",
     "sub_phases": {
       "TOKYO_OPEN": {
@@ -20,192 +20,6 @@
       }
     },
     "assets": {
-      "JP225": {
-        "symbol": "JP225",
-        "name": "Nikkei 225 (Japan)",
-        "category": "indices",
-        "ticker": "^N225",
-        "10y_dna": {
-          "total_bars_10y": 2441,
-          "first_price": 17235.5,
-          "current_price": 64075.4219,
-          "total_return_10y_pct": 271.76,
-          "cagr_pct": 14.52,
-          "max_drawdown_pct": -31.8,
-          "golden_crosses_count": 10,
-          "death_crosses_count": 10,
-          "time_in_bull_stack_pct": 43.8,
-          "time_in_bear_stack_pct": 7.7,
-          "time_in_squeeze_pct": 48.5,
-          "current_metrics": {
-            "close": 64075.4219,
-            "ema20": 66559.6617,
-            "ema50": 66303.4771,
-            "ema200": 61214.7313,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 4.67,
-            "ema200_zscore": -0.07,
-            "atr_volatility_pct": 2.28,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "AU200": {
-        "symbol": "AU200",
-        "name": "ASX 200 (Australia)",
-        "category": "indices",
-        "ticker": "^AXJO",
-        "10y_dna": {
-          "total_bars_10y": 2529,
-          "first_price": 5442.1001,
-          "current_price": 8816.9004,
-          "total_return_10y_pct": 62.01,
-          "cagr_pct": 4.93,
-          "max_drawdown_pct": -36.53,
-          "golden_crosses_count": 8,
-          "death_crosses_count": 8,
-          "time_in_bull_stack_pct": 41.6,
-          "time_in_bear_stack_pct": 7.1,
-          "time_in_squeeze_pct": 51.3,
-          "current_metrics": {
-            "close": 8816.9004,
-            "ema20": 8765.8567,
-            "ema50": 8817.1145,
-            "ema200": 8806.4257,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 0.12,
-            "ema200_zscore": -0.4,
-            "atr_volatility_pct": 0.9,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "KR200": {
-        "symbol": "KR200",
-        "name": "KOSPI 200 (South Korea)",
-        "category": "indices",
-        "ticker": "^KS200",
-        "10y_dna": {
-          "total_bars_10y": 2520,
-          "first_price": 148.1901,
-          "current_price": 369.0954,
-          "total_return_10y_pct": 149.07,
-          "cagr_pct": 9.55,
-          "max_drawdown_pct": -35.35,
-          "golden_crosses_count": 9,
-          "death_crosses_count": 9,
-          "time_in_bull_stack_pct": 27.5,
-          "time_in_bear_stack_pct": 21.7,
-          "time_in_squeeze_pct": 50.8,
-          "current_metrics": {
-            "close": 369.0954,
-            "ema20": 392.4908,
-            "ema50": 398.3791,
-            "ema200": 358.2416,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 3.03,
-            "ema200_zscore": -0.04,
-            "atr_volatility_pct": 1.8,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "HK50": {
-        "symbol": "HK50",
-        "name": "Hang Seng Index (Hong Kong)",
-        "category": "indices",
-        "ticker": "^HSI",
-        "10y_dna": {
-          "total_bars_10y": 2459,
-          "first_price": 23374.4004,
-          "current_price": 23867.7402,
-          "total_return_10y_pct": 2.11,
-          "cagr_pct": 0.21,
-          "max_drawdown_pct": -55.7,
-          "golden_crosses_count": 11,
-          "death_crosses_count": 11,
-          "time_in_bull_stack_pct": 24.8,
-          "time_in_bear_stack_pct": 24.9,
-          "time_in_squeeze_pct": 50.3,
-          "current_metrics": {
-            "close": 23867.7402,
-            "ema20": 24352.0754,
-            "ema50": 24695.1656,
-            "ema200": 25056.7911,
-            "stack_state": -1,
-            "dist_to_ema200_pct": -4.75,
-            "ema200_zscore": -0.63,
-            "atr_volatility_pct": 1.47,
-            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
-            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
-      "CN50": {
-        "symbol": "CN50",
-        "name": "FTSE China 50 ETF",
-        "category": "indices",
-        "ticker": "FXI",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 29.7409,
-          "current_price": 33.53,
-          "total_return_10y_pct": 12.74,
-          "cagr_pct": 1.21,
-          "max_drawdown_pct": -60.81,
-          "golden_crosses_count": 8,
-          "death_crosses_count": 9,
-          "time_in_bull_stack_pct": 23.5,
-          "time_in_bear_stack_pct": 24.0,
-          "time_in_squeeze_pct": 52.5,
-          "current_metrics": {
-            "close": 33.53,
-            "ema20": 34.0281,
-            "ema50": 34.3997,
-            "ema200": 35.3588,
-            "stack_state": -1,
-            "dist_to_ema200_pct": -5.17,
-            "ema200_zscore": -0.65,
-            "atr_volatility_pct": 1.37,
-            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
-            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
-      "SG30": {
-        "symbol": "SG30",
-        "name": "Straits Times Index (Singapore)",
-        "category": "indices",
-        "ticker": "^STI",
-        "10y_dna": {
-          "total_bars_10y": 2511,
-          "first_price": 2842.6201,
-          "current_price": 5404.02,
-          "total_return_10y_pct": 90.11,
-          "cagr_pct": 6.66,
-          "max_drawdown_pct": -38.22,
-          "golden_crosses_count": 10,
-          "death_crosses_count": 10,
-          "time_in_bull_stack_pct": 42.1,
-          "time_in_bear_stack_pct": 14.7,
-          "time_in_squeeze_pct": 43.2,
-          "current_metrics": {
-            "close": 5404.02,
-            "ema20": 5521.7685,
-            "ema50": 5570.4997,
-            "ema200": 5225.6943,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 3.41,
-            "ema200_zscore": 0.17,
-            "atr_volatility_pct": 1.25,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
       "TW50": {
         "symbol": "TW50",
         "name": "Taiwan Weighted Index",
@@ -268,6 +82,130 @@
           }
         }
       },
+      "HK50": {
+        "symbol": "HK50",
+        "name": "Hang Seng Index (Hong Kong)",
+        "category": "indices",
+        "ticker": "^HSI",
+        "10y_dna": {
+          "total_bars_10y": 2459,
+          "first_price": 23374.4004,
+          "current_price": 23867.7402,
+          "total_return_10y_pct": 2.11,
+          "cagr_pct": 0.21,
+          "max_drawdown_pct": -55.7,
+          "golden_crosses_count": 11,
+          "death_crosses_count": 11,
+          "time_in_bull_stack_pct": 24.8,
+          "time_in_bear_stack_pct": 24.9,
+          "time_in_squeeze_pct": 50.3,
+          "current_metrics": {
+            "close": 23867.7402,
+            "ema20": 24352.0754,
+            "ema50": 24695.1656,
+            "ema200": 25056.7911,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -4.75,
+            "ema200_zscore": -0.63,
+            "atr_volatility_pct": 1.47,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "SG30": {
+        "symbol": "SG30",
+        "name": "Straits Times Index (Singapore)",
+        "category": "indices",
+        "ticker": "^STI",
+        "10y_dna": {
+          "total_bars_10y": 2511,
+          "first_price": 2842.6201,
+          "current_price": 5404.02,
+          "total_return_10y_pct": 90.11,
+          "cagr_pct": 6.66,
+          "max_drawdown_pct": -38.22,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 42.1,
+          "time_in_bear_stack_pct": 14.7,
+          "time_in_squeeze_pct": 43.2,
+          "current_metrics": {
+            "close": 5404.02,
+            "ema20": 5521.7685,
+            "ema50": 5570.4997,
+            "ema200": 5225.6943,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 3.41,
+            "ema200_zscore": 0.17,
+            "atr_volatility_pct": 1.25,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "JP225": {
+        "symbol": "JP225",
+        "name": "Nikkei 225 (Japan)",
+        "category": "indices",
+        "ticker": "^N225",
+        "10y_dna": {
+          "total_bars_10y": 2441,
+          "first_price": 17235.5,
+          "current_price": 64075.4219,
+          "total_return_10y_pct": 271.76,
+          "cagr_pct": 14.52,
+          "max_drawdown_pct": -31.8,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 43.8,
+          "time_in_bear_stack_pct": 7.7,
+          "time_in_squeeze_pct": 48.5,
+          "current_metrics": {
+            "close": 64075.4219,
+            "ema20": 66559.6617,
+            "ema50": 66303.4771,
+            "ema200": 61214.7313,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 4.67,
+            "ema200_zscore": -0.07,
+            "atr_volatility_pct": 2.28,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "AU200": {
+        "symbol": "AU200",
+        "name": "ASX 200 (Australia)",
+        "category": "indices",
+        "ticker": "^AXJO",
+        "10y_dna": {
+          "total_bars_10y": 2529,
+          "first_price": 5442.1001,
+          "current_price": 8816.9004,
+          "total_return_10y_pct": 62.01,
+          "cagr_pct": 4.93,
+          "max_drawdown_pct": -36.53,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 41.6,
+          "time_in_bear_stack_pct": 7.1,
+          "time_in_squeeze_pct": 51.3,
+          "current_metrics": {
+            "close": 8816.9004,
+            "ema20": 8765.8567,
+            "ema50": 8817.1145,
+            "ema200": 8806.4257,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 0.12,
+            "ema200_zscore": -0.4,
+            "atr_volatility_pct": 0.9,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
       "COPPER": {
         "symbol": "COPPER",
         "name": "High Grade Copper Futures",
@@ -296,6 +234,37 @@
             "atr_volatility_pct": 1.2,
             "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
             "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "CN50": {
+        "symbol": "CN50",
+        "name": "FTSE China 50 ETF",
+        "category": "indices",
+        "ticker": "FXI",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 29.7409,
+          "current_price": 33.53,
+          "total_return_10y_pct": 12.74,
+          "cagr_pct": 1.21,
+          "max_drawdown_pct": -60.81,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 23.5,
+          "time_in_bear_stack_pct": 24.0,
+          "time_in_squeeze_pct": 52.5,
+          "current_metrics": {
+            "close": 33.53,
+            "ema20": 34.0281,
+            "ema50": 34.3997,
+            "ema200": 35.3588,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -5.17,
+            "ema200_zscore": -0.65,
+            "atr_volatility_pct": 1.37,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
           }
         }
       },
@@ -330,37 +299,6 @@
           }
         }
       },
-      "USOIL": {
-        "symbol": "USOIL",
-        "name": "WTI Crude Oil Futures",
-        "category": "commodities",
-        "ticker": "CL=F",
-        "10y_dna": {
-          "total_bars_10y": 2514,
-          "first_price": 50.43,
-          "current_price": 99.55,
-          "total_return_10y_pct": 97.4,
-          "cagr_pct": 7.05,
-          "max_drawdown_pct": -149.25,
-          "golden_crosses_count": 11,
-          "death_crosses_count": 10,
-          "time_in_bull_stack_pct": 25.2,
-          "time_in_bear_stack_pct": 22.5,
-          "time_in_squeeze_pct": 52.3,
-          "current_metrics": {
-            "close": 99.55,
-            "ema20": 95.3006,
-            "ema50": 92.1461,
-            "ema200": 84.3167,
-            "stack_state": 1,
-            "dist_to_ema200_pct": 18.07,
-            "ema200_zscore": 1.02,
-            "atr_volatility_pct": 4.12,
-            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
-            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
       "GOLD": {
         "symbol": "GOLD",
         "name": "Gold Spot / Comex Futures",
@@ -389,6 +327,37 @@
             "atr_volatility_pct": 1.67,
             "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
             "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "USOIL": {
+        "symbol": "USOIL",
+        "name": "WTI Crude Oil Futures",
+        "category": "commodities",
+        "ticker": "CL=F",
+        "10y_dna": {
+          "total_bars_10y": 2514,
+          "first_price": 50.43,
+          "current_price": 99.55,
+          "total_return_10y_pct": 97.4,
+          "cagr_pct": 7.05,
+          "max_drawdown_pct": -149.25,
+          "golden_crosses_count": 11,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 25.2,
+          "time_in_bear_stack_pct": 22.5,
+          "time_in_squeeze_pct": 52.3,
+          "current_metrics": {
+            "close": 99.55,
+            "ema20": 95.3006,
+            "ema50": 92.1461,
+            "ema200": 84.3167,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 18.07,
+            "ema200_zscore": 1.02,
+            "atr_volatility_pct": 4.12,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
           }
         }
       },
@@ -515,11 +484,507 @@
             "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
           }
         }
+      },
+      "KR200": {
+        "symbol": "KR200",
+        "name": "KOSPI 200 (South Korea)",
+        "category": "indices",
+        "ticker": "^KS200",
+        "10y_dna": {
+          "total_bars_10y": 2520,
+          "first_price": 150.2999,
+          "current_price": 756.3209,
+          "total_return_10y_pct": 403.21,
+          "cagr_pct": 17.54,
+          "max_drawdown_pct": -38.8,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 41.4,
+          "time_in_bear_stack_pct": 11.3,
+          "time_in_squeeze_pct": 47.3,
+          "current_metrics": {
+            "close": 756.3209,
+            "ema20": 759.2605,
+            "ema50": 748.1732,
+            "ema200": 686.5519,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 10.16,
+            "ema200_zscore": 0.42,
+            "atr_volatility_pct": 1.51,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "MEITUAN": {
+        "symbol": "MEITUAN",
+        "name": "Meituan",
+        "category": "asian_mega_caps",
+        "ticker": "3690.HK",
+        "10y_dna": {
+          "total_bars_10y": 1986,
+          "first_price": 72.65,
+          "current_price": 76.1,
+          "total_return_10y_pct": 4.75,
+          "cagr_pct": 0.59,
+          "max_drawdown_pct": -86.14,
+          "golden_crosses_count": 3,
+          "death_crosses_count": 4,
+          "time_in_bull_stack_pct": 20.1,
+          "time_in_bear_stack_pct": 32.6,
+          "time_in_squeeze_pct": 47.2,
+          "current_metrics": {
+            "close": 76.1,
+            "ema20": 73.7552,
+            "ema50": 76.2587,
+            "ema200": 85.4269,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -10.92,
+            "ema200_zscore": -0.46,
+            "atr_volatility_pct": 3.22,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "ALIBABA": {
+        "symbol": "ALIBABA",
+        "name": "Alibaba Group",
+        "category": "asian_mega_caps",
+        "ticker": "BABA",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 97.7283,
+          "current_price": 108.57,
+          "total_return_10y_pct": 11.09,
+          "cagr_pct": 1.06,
+          "max_drawdown_pct": -80.09,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 26.2,
+          "time_in_bear_stack_pct": 26.4,
+          "time_in_squeeze_pct": 47.5,
+          "current_metrics": {
+            "close": 108.57,
+            "ema20": 110.0152,
+            "ema50": 112.4604,
+            "ema200": 122.8635,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -11.63,
+            "ema200_zscore": -0.73,
+            "atr_volatility_pct": 2.93,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "SAMSUNG": {
+        "symbol": "SAMSUNG",
+        "name": "Samsung Electronics",
+        "category": "asian_mega_caps",
+        "ticker": "005930.KS",
+        "10y_dna": {
+          "total_bars_10y": 2446,
+          "first_price": 25280.8828,
+          "current_price": 211500.0,
+          "total_return_10y_pct": 736.6,
+          "cagr_pct": 24.46,
+          "max_drawdown_pct": -42.85,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 38.0,
+          "time_in_bear_stack_pct": 15.0,
+          "time_in_squeeze_pct": 47.0,
+          "current_metrics": {
+            "close": 211500.0,
+            "ema20": 244443.9232,
+            "ema50": 255236.4642,
+            "ema200": 227825.4866,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -7.17,
+            "ema200_zscore": -0.83,
+            "atr_volatility_pct": 5.88,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "TENCENT": {
+        "symbol": "TENCENT",
+        "name": "Tencent Holdings",
+        "category": "asian_mega_caps",
+        "ticker": "0700.HK",
+        "10y_dna": {
+          "total_bars_10y": 2461,
+          "first_price": 186.952,
+          "current_price": 410.4,
+          "total_return_10y_pct": 119.52,
+          "cagr_pct": 8.38,
+          "max_drawdown_pct": -72.8,
+          "golden_crosses_count": 6,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 29.8,
+          "time_in_bear_stack_pct": 22.1,
+          "time_in_squeeze_pct": 48.1,
+          "current_metrics": {
+            "close": 410.4,
+            "ema20": 425.0373,
+            "ema50": 435.0828,
+            "ema200": 474.4518,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -13.5,
+            "ema200_zscore": -1.15,
+            "atr_volatility_pct": 2.41,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "SK_HYNIX": {
+        "symbol": "SK_HYNIX",
+        "name": "SK Hynix",
+        "category": "asian_mega_caps",
+        "ticker": "000660.KS",
+        "10y_dna": {
+          "total_bars_10y": 2446,
+          "first_price": 35297.5547,
+          "current_price": 1223000.0,
+          "total_return_10y_pct": 3364.83,
+          "cagr_pct": 44.09,
+          "max_drawdown_pct": -58.09,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 41.3,
+          "time_in_bear_stack_pct": 11.2,
+          "time_in_squeeze_pct": 47.4,
+          "current_metrics": {
+            "close": 1223000.0,
+            "ema20": 1548491.3122,
+            "ema50": 1666103.7844,
+            "ema200": 1462159.3731,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -16.36,
+            "ema200_zscore": -1.18,
+            "atr_volatility_pct": 7.02,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "TOKYO_ELEC": {
+        "symbol": "TOKYO_ELEC",
+        "name": "Tokyo Electron",
+        "category": "asian_mega_caps",
+        "ticker": "8035.T",
+        "10y_dna": {
+          "total_bars_10y": 2462,
+          "first_price": 434.1273,
+          "current_price": 10085.0,
+          "total_return_10y_pct": 2223.05,
+          "cagr_pct": 37.98,
+          "max_drawdown_pct": -55.85,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 44.5,
+          "time_in_bear_stack_pct": 10.8,
+          "time_in_squeeze_pct": 44.7,
+          "current_metrics": {
+            "close": 10085.0,
+            "ema20": 11150.7328,
+            "ema50": 11181.3755,
+            "ema200": 9962.9498,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 1.23,
+            "ema200_zscore": -0.63,
+            "atr_volatility_pct": 5.61,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "SOFTBANK": {
+        "symbol": "SOFTBANK",
+        "name": "SoftBank Group",
+        "category": "asian_mega_caps",
+        "ticker": "9984.T",
+        "10y_dna": {
+          "total_bars_10y": 2462,
+          "first_price": 785.3765,
+          "current_price": 4554.0,
+          "total_return_10y_pct": 479.85,
+          "cagr_pct": 19.71,
+          "max_drawdown_pct": -59.67,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 32.4,
+          "time_in_bear_stack_pct": 13.9,
+          "time_in_squeeze_pct": 53.8,
+          "current_metrics": {
+            "close": 4554.0,
+            "ema20": 5601.4203,
+            "ema50": 5766.8526,
+            "ema200": 5341.5255,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -14.74,
+            "ema200_zscore": -1.2,
+            "atr_volatility_pct": 7.46,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "TOYOTA": {
+        "symbol": "TOYOTA",
+        "name": "Toyota Motor Corp",
+        "category": "asian_mega_caps",
+        "ticker": "7203.T",
+        "10y_dna": {
+          "total_bars_10y": 2462,
+          "first_price": 892.6364,
+          "current_price": 3102.0,
+          "total_return_10y_pct": 247.51,
+          "cagr_pct": 13.6,
+          "max_drawdown_pct": -41.67,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 35.1,
+          "time_in_bear_stack_pct": 14.1,
+          "time_in_squeeze_pct": 50.7,
+          "current_metrics": {
+            "close": 3102.0,
+            "ema20": 2990.4625,
+            "ema50": 2968.4972,
+            "ema200": 2981.2277,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 4.05,
+            "ema200_zscore": -0.09,
+            "atr_volatility_pct": 1.68,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "SONY": {
+        "symbol": "SONY",
+        "name": "Sony Group Corp",
+        "category": "asian_mega_caps",
+        "ticker": "6758.T",
+        "10y_dna": {
+          "total_bars_10y": 2462,
+          "first_price": 638.2491,
+          "current_price": 3960.0,
+          "total_return_10y_pct": 520.45,
+          "cagr_pct": 20.54,
+          "max_drawdown_pct": -39.78,
+          "golden_crosses_count": 5,
+          "death_crosses_count": 5,
+          "time_in_bull_stack_pct": 42.1,
+          "time_in_bear_stack_pct": 9.1,
+          "time_in_squeeze_pct": 48.8,
+          "current_metrics": {
+            "close": 3960.0,
+            "ema20": 3818.8186,
+            "ema50": 3741.4251,
+            "ema200": 3628.0994,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 9.15,
+            "ema200_zscore": 0.22,
+            "atr_volatility_pct": 2.01,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "XIAOMI": {
+        "symbol": "XIAOMI",
+        "name": "Xiaomi Corp",
+        "category": "asian_mega_caps",
+        "ticker": "1810.HK",
+        "10y_dna": {
+          "total_bars_10y": 2039,
+          "first_price": 16.8,
+          "current_price": 27.06,
+          "total_return_10y_pct": 61.07,
+          "cagr_pct": 6.07,
+          "max_drawdown_pct": -76.06,
+          "golden_crosses_count": 4,
+          "death_crosses_count": 4,
+          "time_in_bull_stack_pct": 25.6,
+          "time_in_bear_stack_pct": 29.2,
+          "time_in_squeeze_pct": 45.3,
+          "current_metrics": {
+            "close": 27.06,
+            "ema20": 25.8531,
+            "ema50": 26.2987,
+            "ema200": 30.6008,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -11.57,
+            "ema200_zscore": -0.55,
+            "atr_volatility_pct": 4.27,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "BYD": {
+        "symbol": "BYD",
+        "name": "BYD Company",
+        "category": "asian_mega_caps",
+        "ticker": "1211.HK",
+        "10y_dna": {
+          "total_bars_10y": 2461,
+          "first_price": 16.1464,
+          "current_price": 73.65,
+          "total_return_10y_pct": 356.14,
+          "cagr_pct": 16.81,
+          "max_drawdown_pct": -57.94,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 24.8,
+          "time_in_bear_stack_pct": 22.1,
+          "time_in_squeeze_pct": 53.0,
+          "current_metrics": {
+            "close": 73.65,
+            "ema20": 75.8883,
+            "ema50": 80.4,
+            "ema200": 90.3168,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -18.45,
+            "ema200_zscore": -1.04,
+            "atr_volatility_pct": 2.98,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "TSMC": {
+        "symbol": "TSMC",
+        "name": "Taiwan Semiconductor Mfg",
+        "category": "asian_mega_caps",
+        "ticker": "TSM",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 24.6273,
+          "current_price": 420.22,
+          "total_return_10y_pct": 1606.32,
+          "cagr_pct": 32.92,
+          "max_drawdown_pct": -56.47,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 48.5,
+          "time_in_bear_stack_pct": 9.2,
+          "time_in_squeeze_pct": 42.3,
+          "current_metrics": {
+            "close": 420.22,
+            "ema20": 441.7198,
+            "ema50": 436.0704,
+            "ema200": 390.9394,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 7.49,
+            "ema200_zscore": -0.23,
+            "atr_volatility_pct": 3.03,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "BHP": {
+        "symbol": "BHP",
+        "name": "BHP Group",
+        "category": "asian_mega_caps",
+        "ticker": "BHP",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 17.0681,
+          "current_price": 83.22,
+          "total_return_10y_pct": 387.58,
+          "cagr_pct": 17.23,
+          "max_drawdown_pct": -44.29,
+          "golden_crosses_count": 13,
+          "death_crosses_count": 13,
+          "time_in_bull_stack_pct": 37.7,
+          "time_in_bear_stack_pct": 10.5,
+          "time_in_squeeze_pct": 51.9,
+          "current_metrics": {
+            "close": 83.22,
+            "ema20": 85.1833,
+            "ema50": 85.9174,
+            "ema200": 78.5276,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 5.98,
+            "ema200_zscore": -0.01,
+            "atr_volatility_pct": 2.31,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "CBA": {
+        "symbol": "CBA",
+        "name": "Commonwealth Bank Australia",
+        "category": "asian_mega_caps",
+        "ticker": "CBA.AX",
+        "10y_dna": {
+          "total_bars_10y": 2531,
+          "first_price": 49.0436,
+          "current_price": 155.6,
+          "total_return_10y_pct": 217.27,
+          "cagr_pct": 12.18,
+          "max_drawdown_pct": -39.02,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 42.3,
+          "time_in_bear_stack_pct": 10.7,
+          "time_in_squeeze_pct": 46.9,
+          "current_metrics": {
+            "close": 155.6,
+            "ema20": 153.1244,
+            "ema50": 155.7415,
+            "ema200": 160.5279,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -3.07,
+            "ema200_zscore": -1.02,
+            "atr_volatility_pct": 1.9,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "RIO": {
+        "symbol": "RIO",
+        "name": "Rio Tinto Group",
+        "category": "asian_mega_caps",
+        "ticker": "RIO",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 15.2132,
+          "current_price": 89.5,
+          "total_return_10y_pct": 488.31,
+          "cagr_pct": 19.46,
+          "max_drawdown_pct": -37.47,
+          "golden_crosses_count": 13,
+          "death_crosses_count": 12,
+          "time_in_bull_stack_pct": 38.4,
+          "time_in_bear_stack_pct": 10.4,
+          "time_in_squeeze_pct": 51.2,
+          "current_metrics": {
+            "close": 89.5,
+            "ema20": 93.646,
+            "ema50": 95.6518,
+            "ema200": 91.1865,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -1.85,
+            "ema200_zscore": -0.84,
+            "atr_volatility_pct": 2.17,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
       }
     }
   },
   "EUROPEAN_SESSION": {
-    "description": "Frankfurt, London, Zurich, Paris, Madrid & European Commodities",
+    "description": "Frankfurt, London, Zurich, Paris, Madrid & European Blue-Chips & Commodities",
     "prime_hours_ict": "14:00 - 18:30",
     "sub_phases": {
       "LONDON_PRE_OPEN": {
@@ -694,37 +1159,6 @@
           }
         }
       },
-      "ESP35": {
-        "symbol": "ESP35",
-        "name": "IBEX 35 (Spain)",
-        "category": "indices",
-        "ticker": "^IBEX",
-        "10y_dna": {
-          "total_bars_10y": 2556,
-          "first_price": 9061.2002,
-          "current_price": 18915.3008,
-          "total_return_10y_pct": 108.75,
-          "cagr_pct": 7.53,
-          "max_drawdown_pct": -45.16,
-          "golden_crosses_count": 10,
-          "death_crosses_count": 9,
-          "time_in_bull_stack_pct": 38.5,
-          "time_in_bear_stack_pct": 15.1,
-          "time_in_squeeze_pct": 46.4,
-          "current_metrics": {
-            "close": 18915.3008,
-            "ema20": 19274.0321,
-            "ema50": 19444.4415,
-            "ema200": 18522.9241,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 2.12,
-            "ema200_zscore": -0.09,
-            "atr_volatility_pct": 1.51,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
       "IT40": {
         "symbol": "IT40",
         "name": "FTSE MIB (Italy)",
@@ -753,6 +1187,37 @@
             "atr_volatility_pct": 1.54,
             "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
             "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "ESP35": {
+        "symbol": "ESP35",
+        "name": "IBEX 35 (Spain)",
+        "category": "indices",
+        "ticker": "^IBEX",
+        "10y_dna": {
+          "total_bars_10y": 2556,
+          "first_price": 9061.2002,
+          "current_price": 18915.3008,
+          "total_return_10y_pct": 108.75,
+          "cagr_pct": 7.53,
+          "max_drawdown_pct": -45.16,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 38.5,
+          "time_in_bear_stack_pct": 15.1,
+          "time_in_squeeze_pct": 46.4,
+          "current_metrics": {
+            "close": 18915.3008,
+            "ema20": 19274.0321,
+            "ema50": 19444.4415,
+            "ema200": 18522.9241,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 2.12,
+            "ema200_zscore": -0.09,
+            "atr_volatility_pct": 1.51,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
           }
         }
       },
@@ -911,37 +1376,6 @@
           }
         }
       },
-      "EURGBP": {
-        "symbol": "EURGBP",
-        "name": "EUR/GBP Relative Cross",
-        "category": "macro_gauges",
-        "ticker": "EURGBP=X",
-        "10y_dna": {
-          "total_bars_10y": 2602,
-          "first_price": 0.8928,
-          "current_price": 0.8396,
-          "total_return_10y_pct": -5.96,
-          "cagr_pct": -0.59,
-          "max_drawdown_pct": -15.94,
-          "golden_crosses_count": 12,
-          "death_crosses_count": 13,
-          "time_in_bull_stack_pct": 18.6,
-          "time_in_bear_stack_pct": 28.1,
-          "time_in_squeeze_pct": 53.3,
-          "current_metrics": {
-            "close": 0.8396,
-            "ema20": 0.8486,
-            "ema50": 0.8528,
-            "ema200": 0.8594,
-            "stack_state": -1,
-            "dist_to_ema200_pct": -2.3,
-            "ema200_zscore": -1.21,
-            "atr_volatility_pct": 0.43,
-            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
-            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
       "EURUSD": {
         "symbol": "EURUSD",
         "name": "EUR/USD Macro Flow",
@@ -968,6 +1402,37 @@
             "dist_to_ema200_pct": -2.48,
             "ema200_zscore": -0.89,
             "atr_volatility_pct": 0.66,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "EURGBP": {
+        "symbol": "EURGBP",
+        "name": "EUR/GBP Relative Cross",
+        "category": "macro_gauges",
+        "ticker": "EURGBP=X",
+        "10y_dna": {
+          "total_bars_10y": 2602,
+          "first_price": 0.8928,
+          "current_price": 0.8396,
+          "total_return_10y_pct": -5.96,
+          "cagr_pct": -0.59,
+          "max_drawdown_pct": -15.94,
+          "golden_crosses_count": 12,
+          "death_crosses_count": 13,
+          "time_in_bull_stack_pct": 18.6,
+          "time_in_bear_stack_pct": 28.1,
+          "time_in_squeeze_pct": 53.3,
+          "current_metrics": {
+            "close": 0.8396,
+            "ema20": 0.8486,
+            "ema50": 0.8528,
+            "ema200": 0.8594,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -2.3,
+            "ema200_zscore": -1.21,
+            "atr_volatility_pct": 0.43,
             "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
             "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
           }
@@ -1003,11 +1468,507 @@
             "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
           }
         }
+      },
+      "ASML": {
+        "symbol": "ASML",
+        "name": "ASML Holding NV",
+        "category": "european_mega_caps",
+        "ticker": "ASML",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 94.3354,
+          "current_price": 1647.12,
+          "total_return_10y_pct": 1646.03,
+          "cagr_pct": 33.23,
+          "max_drawdown_pct": -56.86,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 47.7,
+          "time_in_bear_stack_pct": 10.4,
+          "time_in_squeeze_pct": 41.9,
+          "current_metrics": {
+            "close": 1647.12,
+            "ema20": 1726.3769,
+            "ema50": 1729.2109,
+            "ema200": 1554.3677,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 5.97,
+            "ema200_zscore": -0.34,
+            "atr_volatility_pct": 3.15,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "NESTLE": {
+        "symbol": "NESTLE",
+        "name": "Nestle SA",
+        "category": "european_mega_caps",
+        "ticker": "NESN.SW",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 55.1533,
+          "current_price": 83.27,
+          "total_return_10y_pct": 50.98,
+          "cagr_pct": 4.22,
+          "max_drawdown_pct": -38.45,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 30.2,
+          "time_in_bear_stack_pct": 20.9,
+          "time_in_squeeze_pct": 48.9,
+          "current_metrics": {
+            "close": 83.27,
+            "ema20": 78.6289,
+            "ema50": 78.5638,
+            "ema200": 78.2941,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 6.36,
+            "ema200_zscore": 0.81,
+            "atr_volatility_pct": 1.41,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "LVMH": {
+        "symbol": "LVMH",
+        "name": "LVMH Moet Hennessy",
+        "category": "european_mega_caps",
+        "ticker": "MC.PA",
+        "10y_dna": {
+          "total_bars_10y": 2560,
+          "first_price": 140.6642,
+          "current_price": 389.05,
+          "total_return_10y_pct": 176.58,
+          "cagr_pct": 10.53,
+          "max_drawdown_pct": -54.79,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 39.6,
+          "time_in_bear_stack_pct": 16.6,
+          "time_in_squeeze_pct": 43.8,
+          "current_metrics": {
+            "close": 389.05,
+            "ema20": 393.4244,
+            "ema50": 413.82,
+            "ema200": 468.4036,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -16.94,
+            "ema200_zscore": -1.88,
+            "atr_volatility_pct": 2.09,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "NOVO_NORD": {
+        "symbol": "NOVO_NORD",
+        "name": "Novo Nordisk",
+        "category": "european_mega_caps",
+        "ticker": "NVO",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 16.2458,
+          "current_price": 38.42,
+          "total_return_10y_pct": 136.49,
+          "cagr_pct": 9.02,
+          "max_drawdown_pct": -74.7,
+          "golden_crosses_count": 5,
+          "death_crosses_count": 5,
+          "time_in_bull_stack_pct": 41.5,
+          "time_in_bear_stack_pct": 13.8,
+          "time_in_squeeze_pct": 44.7,
+          "current_metrics": {
+            "close": 38.42,
+            "ema20": 39.1302,
+            "ema50": 41.4393,
+            "ema200": 45.5318,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -15.62,
+            "ema200_zscore": -1.31,
+            "atr_volatility_pct": 1.96,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "SAP": {
+        "symbol": "SAP",
+        "name": "SAP SE",
+        "category": "european_mega_caps",
+        "ticker": "SAP",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 74.6405,
+          "current_price": 226.03,
+          "total_return_10y_pct": 202.82,
+          "cagr_pct": 11.76,
+          "max_drawdown_pct": -52.26,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 40.7,
+          "time_in_bear_stack_pct": 16.3,
+          "time_in_squeeze_pct": 43.0,
+          "current_metrics": {
+            "close": 226.03,
+            "ema20": 216.1353,
+            "ema50": 208.5816,
+            "ema200": 202.0499,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 11.87,
+            "ema200_zscore": 0.65,
+            "atr_volatility_pct": 2.26,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "TOTAL_ENG": {
+        "symbol": "TOTAL_ENG",
+        "name": "TotalEnergies SE",
+        "category": "european_mega_caps",
+        "ticker": "TTE",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 27.3282,
+          "current_price": 89.95,
+          "total_return_10y_pct": 229.15,
+          "cagr_pct": 12.69,
+          "max_drawdown_pct": -59.56,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 39.3,
+          "time_in_bear_stack_pct": 10.1,
+          "time_in_squeeze_pct": 50.7,
+          "current_metrics": {
+            "close": 89.95,
+            "ema20": 88.0678,
+            "ema50": 87.4172,
+            "ema200": 81.6441,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 10.17,
+            "ema200_zscore": 0.62,
+            "atr_volatility_pct": 2.14,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "NOVARTIS": {
+        "symbol": "NOVARTIS",
+        "name": "Novartis AG",
+        "category": "european_mega_caps",
+        "ticker": "NVS",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 47.1904,
+          "current_price": 150.2,
+          "total_return_10y_pct": 218.29,
+          "cagr_pct": 12.32,
+          "max_drawdown_pct": -26.03,
+          "golden_crosses_count": 12,
+          "death_crosses_count": 12,
+          "time_in_bull_stack_pct": 43.0,
+          "time_in_bear_stack_pct": 7.3,
+          "time_in_squeeze_pct": 49.7,
+          "current_metrics": {
+            "close": 150.2,
+            "ema20": 145.536,
+            "ema50": 147.1116,
+            "ema200": 145.6005,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 3.16,
+            "ema200_zscore": -0.21,
+            "atr_volatility_pct": 1.59,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "SIEMENS": {
+        "symbol": "SIEMENS",
+        "name": "Siemens AG",
+        "category": "european_mega_caps",
+        "ticker": "SIE.DE",
+        "10y_dna": {
+          "total_bars_10y": 2542,
+          "first_price": 70.545,
+          "current_price": 258.05,
+          "total_return_10y_pct": 265.79,
+          "cagr_pct": 13.72,
+          "max_drawdown_pct": -48.67,
+          "golden_crosses_count": 11,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 40.1,
+          "time_in_bear_stack_pct": 12.3,
+          "time_in_squeeze_pct": 47.6,
+          "current_metrics": {
+            "close": 258.05,
+            "ema20": 270.9558,
+            "ema50": 272.3414,
+            "ema200": 259.786,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -0.67,
+            "ema200_zscore": -0.59,
+            "atr_volatility_pct": 2.66,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "AIRBUS": {
+        "symbol": "AIRBUS",
+        "name": "Airbus SE",
+        "category": "european_mega_caps",
+        "ticker": "AIR.PA",
+        "10y_dna": {
+          "total_bars_10y": 2560,
+          "first_price": 47.3777,
+          "current_price": 192.06,
+          "total_return_10y_pct": 305.38,
+          "cagr_pct": 14.77,
+          "max_drawdown_pct": -64.7,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 45.0,
+          "time_in_bear_stack_pct": 9.3,
+          "time_in_squeeze_pct": 45.7,
+          "current_metrics": {
+            "close": 192.06,
+            "ema20": 192.0943,
+            "ema50": 194.5751,
+            "ema200": 190.0661,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 1.05,
+            "ema200_zscore": -0.35,
+            "atr_volatility_pct": 2.35,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "ASTRAZENECA": {
+        "symbol": "ASTRAZENECA",
+        "name": "AstraZeneca PLC",
+        "category": "european_mega_caps",
+        "ticker": "AZN",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 47.1944,
+          "current_price": 163.95,
+          "total_return_10y_pct": 247.39,
+          "cagr_pct": 13.31,
+          "max_drawdown_pct": -27.87,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 40.9,
+          "time_in_bear_stack_pct": 8.8,
+          "time_in_squeeze_pct": 50.2,
+          "current_metrics": {
+            "close": 163.95,
+            "ema20": 161.8364,
+            "ema50": 163.7536,
+            "ema200": 171.7403,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -4.54,
+            "ema200_zscore": -1.32,
+            "atr_volatility_pct": 2.24,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "SHELL": {
+        "symbol": "SHELL",
+        "name": "Shell PLC",
+        "category": "european_mega_caps",
+        "ticker": "SHEL",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 31.9941,
+          "current_price": 104.82,
+          "total_return_10y_pct": 227.62,
+          "cagr_pct": 12.64,
+          "max_drawdown_pct": -67.24,
+          "golden_crosses_count": 6,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 42.2,
+          "time_in_bear_stack_pct": 10.5,
+          "time_in_squeeze_pct": 47.3,
+          "current_metrics": {
+            "close": 104.82,
+            "ema20": 99.8347,
+            "ema50": 95.7012,
+            "ema200": 86.4105,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 21.3,
+            "ema200_zscore": 1.59,
+            "atr_volatility_pct": 1.74,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "MERCEDES": {
+        "symbol": "MERCEDES",
+        "name": "Mercedes-Benz Group",
+        "category": "european_mega_caps",
+        "ticker": "MBG.DE",
+        "10y_dna": {
+          "total_bars_10y": 2542,
+          "first_price": 29.1791,
+          "current_price": 41.055,
+          "total_return_10y_pct": 40.7,
+          "cagr_pct": 3.44,
+          "max_drawdown_pct": -66.64,
+          "golden_crosses_count": 11,
+          "death_crosses_count": 12,
+          "time_in_bull_stack_pct": 26.0,
+          "time_in_bear_stack_pct": 21.4,
+          "time_in_squeeze_pct": 52.7,
+          "current_metrics": {
+            "close": 41.055,
+            "ema20": 41.0226,
+            "ema50": 42.9388,
+            "ema200": 46.962,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -12.58,
+            "ema200_zscore": -1.22,
+            "atr_volatility_pct": 2.5,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "BMW": {
+        "symbol": "BMW",
+        "name": "Bayerische Motoren Werke",
+        "category": "european_mega_caps",
+        "ticker": "BMW.DE",
+        "10y_dna": {
+          "total_bars_10y": 2542,
+          "first_price": 46.286,
+          "current_price": 57.22,
+          "total_return_10y_pct": 23.62,
+          "cagr_pct": 2.12,
+          "max_drawdown_pct": -56.97,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 27.5,
+          "time_in_bear_stack_pct": 19.2,
+          "time_in_squeeze_pct": 53.3,
+          "current_metrics": {
+            "close": 57.22,
+            "ema20": 56.0094,
+            "ema50": 57.8832,
+            "ema200": 66.1943,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -13.56,
+            "ema200_zscore": -1.47,
+            "atr_volatility_pct": 2.4,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "SANTANDER": {
+        "symbol": "SANTANDER",
+        "name": "Banco Santander",
+        "category": "european_mega_caps",
+        "ticker": "SAN",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 3.3911,
+          "current_price": 13.02,
+          "total_return_10y_pct": 283.95,
+          "cagr_pct": 14.45,
+          "max_drawdown_pct": -73.84,
+          "golden_crosses_count": 5,
+          "death_crosses_count": 4,
+          "time_in_bull_stack_pct": 35.9,
+          "time_in_bear_stack_pct": 17.8,
+          "time_in_squeeze_pct": 46.3,
+          "current_metrics": {
+            "close": 13.02,
+            "ema20": 13.7053,
+            "ema50": 13.9551,
+            "ema200": 12.8077,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 1.66,
+            "ema200_zscore": -0.22,
+            "atr_volatility_pct": 2.57,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "SCHNEIDER": {
+        "symbol": "SCHNEIDER",
+        "name": "Schneider Electric",
+        "category": "european_mega_caps",
+        "ticker": "SU.PA",
+        "10y_dna": {
+          "total_bars_10y": 2560,
+          "first_price": 51.364,
+          "current_price": 244.25,
+          "total_return_10y_pct": 375.53,
+          "cagr_pct": 16.59,
+          "max_drawdown_pct": -35.98,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 45.3,
+          "time_in_bear_stack_pct": 7.9,
+          "time_in_squeeze_pct": 46.8,
+          "current_metrics": {
+            "close": 244.25,
+            "ema20": 268.188,
+            "ema50": 277.6471,
+            "ema200": 268.0261,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -8.87,
+            "ema200_zscore": -1.81,
+            "atr_volatility_pct": 4.39,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "ROCHE": {
+        "symbol": "ROCHE",
+        "name": "Roche Holding AG",
+        "category": "european_mega_caps",
+        "ticker": "ROG.SW",
+        "10y_dna": {
+          "total_bars_10y": 2520,
+          "first_price": 149.6838,
+          "current_price": 1229.8153,
+          "total_return_10y_pct": 721.61,
+          "cagr_pct": 23.44,
+          "max_drawdown_pct": -44.7,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 44.2,
+          "time_in_bear_stack_pct": 10.8,
+          "time_in_squeeze_pct": 45.0,
+          "current_metrics": {
+            "close": 1229.8153,
+            "ema20": 1144.2473,
+            "ema50": 1078.6459,
+            "ema200": 972.0472,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 26.52,
+            "ema200_zscore": 1.59,
+            "atr_volatility_pct": 1.68,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
       }
     }
   },
   "NEW_YORK_SESSION": {
-    "description": "Wall Street Cash Equities, US Benchmark Indices & Mega-Cap Tech",
+    "description": "Wall Street Cash Equities, US Benchmark Indices, Mega-Caps & Sectors",
     "prime_hours_ict": "20:30 - 01:30",
     "sub_phases": {
       "US_CASH_OPEN": {
@@ -1032,37 +1993,6 @@
       }
     },
     "assets": {
-      "NAS100": {
-        "symbol": "NAS100",
-        "name": "Nasdaq 100 Futures",
-        "category": "indices",
-        "ticker": "NQ=F",
-        "10y_dna": {
-          "total_bars_10y": 2515,
-          "first_price": 4843.75,
-          "current_price": 29606.25,
-          "total_return_10y_pct": 511.23,
-          "cagr_pct": 19.89,
-          "max_drawdown_pct": -35.28,
-          "golden_crosses_count": 5,
-          "death_crosses_count": 5,
-          "time_in_bull_stack_pct": 56.6,
-          "time_in_bear_stack_pct": 6.3,
-          "time_in_squeeze_pct": 37.1,
-          "current_metrics": {
-            "close": 29606.25,
-            "ema20": 30326.2748,
-            "ema50": 30058.9754,
-            "ema200": 28196.6027,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 5.0,
-            "ema200_zscore": -0.26,
-            "atr_volatility_pct": 1.79,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
       "US500": {
         "symbol": "US500",
         "name": "S&P 500 E-mini Futures",
@@ -1089,6 +2019,37 @@
             "dist_to_ema200_pct": 5.09,
             "ema200_zscore": 0.04,
             "atr_volatility_pct": 1.03,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "NAS100": {
+        "symbol": "NAS100",
+        "name": "Nasdaq 100 Futures",
+        "category": "indices",
+        "ticker": "NQ=F",
+        "10y_dna": {
+          "total_bars_10y": 2515,
+          "first_price": 4843.75,
+          "current_price": 29606.25,
+          "total_return_10y_pct": 511.23,
+          "cagr_pct": 19.89,
+          "max_drawdown_pct": -35.28,
+          "golden_crosses_count": 5,
+          "death_crosses_count": 5,
+          "time_in_bull_stack_pct": 56.6,
+          "time_in_bear_stack_pct": 6.3,
+          "time_in_squeeze_pct": 37.1,
+          "current_metrics": {
+            "close": 29606.25,
+            "ema20": 30326.2748,
+            "ema50": 30058.9754,
+            "ema200": 28196.6027,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 5.0,
+            "ema200_zscore": -0.26,
+            "atr_volatility_pct": 1.79,
             "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
             "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
           }
@@ -1342,378 +2303,6 @@
           }
         }
       },
-      "NVDA": {
-        "symbol": "NVDA",
-        "name": "NVIDIA Corporation",
-        "category": "mega_cap_equities",
-        "ticker": "NVDA",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 1.6616,
-          "current_price": 217.09,
-          "total_return_10y_pct": 12965.04,
-          "cagr_pct": 63.04,
-          "max_drawdown_pct": -66.34,
-          "golden_crosses_count": 4,
-          "death_crosses_count": 4,
-          "time_in_bull_stack_pct": 51.9,
-          "time_in_bear_stack_pct": 6.6,
-          "time_in_squeeze_pct": 41.5,
-          "current_metrics": {
-            "close": 217.09,
-            "ema20": 224.7491,
-            "ema50": 221.7861,
-            "ema200": 204.5264,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 6.14,
-            "ema200_zscore": -0.57,
-            "atr_volatility_pct": 2.64,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "TSLA": {
-        "symbol": "TSLA",
-        "name": "Tesla Inc.",
-        "category": "mega_cap_equities",
-        "ticker": "TSLA",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 13.2733,
-          "current_price": 368.06,
-          "total_return_10y_pct": 2672.93,
-          "cagr_pct": 39.56,
-          "max_drawdown_pct": -73.63,
-          "golden_crosses_count": 11,
-          "death_crosses_count": 11,
-          "time_in_bull_stack_pct": 35.4,
-          "time_in_bear_stack_pct": 14.3,
-          "time_in_squeeze_pct": 50.2,
-          "current_metrics": {
-            "close": 368.06,
-            "ema20": 368.0718,
-            "ema50": 365.4654,
-            "ema200": 377.1942,
-            "stack_state": 0,
-            "dist_to_ema200_pct": -2.42,
-            "ema200_zscore": -0.52,
-            "atr_volatility_pct": 3.11,
-            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
-          }
-        }
-      },
-      "META": {
-        "symbol": "META",
-        "name": "Meta Platforms Inc.",
-        "category": "mega_cap_equities",
-        "ticker": "META",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 128.7667,
-          "current_price": 705.44,
-          "total_return_10y_pct": 447.84,
-          "cagr_pct": 18.6,
-          "max_drawdown_pct": -76.74,
-          "golden_crosses_count": 7,
-          "death_crosses_count": 6,
-          "time_in_bull_stack_pct": 42.0,
-          "time_in_bear_stack_pct": 14.5,
-          "time_in_squeeze_pct": 43.5,
-          "current_metrics": {
-            "close": 705.44,
-            "ema20": 718.1095,
-            "ema50": 679.8395,
-            "ema200": 642.0164,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 9.88,
-            "ema200_zscore": 0.21,
-            "atr_volatility_pct": 3.03,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "GOOGL": {
-        "symbol": "GOOGL",
-        "name": "Alphabet Inc. (Google)",
-        "category": "mega_cap_equities",
-        "ticker": "GOOGL",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 40.6943,
-          "current_price": 344.18,
-          "total_return_10y_pct": 745.77,
-          "cagr_pct": 23.89,
-          "max_drawdown_pct": -44.32,
-          "golden_crosses_count": 7,
-          "death_crosses_count": 6,
-          "time_in_bull_stack_pct": 46.9,
-          "time_in_bear_stack_pct": 7.7,
-          "time_in_squeeze_pct": 45.4,
-          "current_metrics": {
-            "close": 344.18,
-            "ema20": 346.3433,
-            "ema50": 346.2874,
-            "ema200": 330.7955,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 4.05,
-            "ema200_zscore": -0.37,
-            "atr_volatility_pct": 2.63,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "AAPL": {
-        "symbol": "AAPL",
-        "name": "Apple Inc.",
-        "category": "mega_cap_equities",
-        "ticker": "AAPL",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 26.7699,
-          "current_price": 342.94,
-          "total_return_10y_pct": 1181.06,
-          "cagr_pct": 29.15,
-          "max_drawdown_pct": -38.52,
-          "golden_crosses_count": 7,
-          "death_crosses_count": 7,
-          "time_in_bull_stack_pct": 49.3,
-          "time_in_bear_stack_pct": 6.7,
-          "time_in_squeeze_pct": 44.0,
-          "current_metrics": {
-            "close": 342.94,
-            "ema20": 337.3984,
-            "ema50": 329.309,
-            "ema200": 298.9073,
-            "stack_state": 1,
-            "dist_to_ema200_pct": 14.73,
-            "ema200_zscore": 0.49,
-            "atr_volatility_pct": 1.87,
-            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
-            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
-      "MSFT": {
-        "symbol": "MSFT",
-        "name": "Microsoft Corporation",
-        "category": "mega_cap_equities",
-        "ticker": "MSFT",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 50.8361,
-          "current_price": 533.52,
-          "total_return_10y_pct": 949.49,
-          "cagr_pct": 26.6,
-          "max_drawdown_pct": -37.15,
-          "golden_crosses_count": 4,
-          "death_crosses_count": 3,
-          "time_in_bull_stack_pct": 54.3,
-          "time_in_bear_stack_pct": 7.4,
-          "time_in_squeeze_pct": 38.3,
-          "current_metrics": {
-            "close": 533.52,
-            "ema20": 523.5891,
-            "ema50": 500.9517,
-            "ema200": 456.9863,
-            "stack_state": 1,
-            "dist_to_ema200_pct": 16.75,
-            "ema200_zscore": 0.87,
-            "atr_volatility_pct": 2.15,
-            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
-            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
-      "AMZN": {
-        "symbol": "AMZN",
-        "name": "Amazon.com Inc.",
-        "category": "mega_cap_equities",
-        "ticker": "AMZN",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 40.516,
-          "current_price": 262.45,
-          "total_return_10y_pct": 547.77,
-          "cagr_pct": 20.61,
-          "max_drawdown_pct": -56.15,
-          "golden_crosses_count": 8,
-          "death_crosses_count": 7,
-          "time_in_bull_stack_pct": 43.4,
-          "time_in_bear_stack_pct": 9.4,
-          "time_in_squeeze_pct": 47.3,
-          "current_metrics": {
-            "close": 262.45,
-            "ema20": 255.085,
-            "ema50": 254.5807,
-            "ema200": 245.1194,
-            "stack_state": 1,
-            "dist_to_ema200_pct": 7.07,
-            "ema200_zscore": -0.0,
-            "atr_volatility_pct": 2.52,
-            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
-            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
-      "AMD": {
-        "symbol": "AMD",
-        "name": "Advanced Micro Devices",
-        "category": "mega_cap_equities",
-        "ticker": "AMD",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 6.96,
-          "current_price": 538.05,
-          "total_return_10y_pct": 7630.6,
-          "cagr_pct": 54.68,
-          "max_drawdown_pct": -65.45,
-          "golden_crosses_count": 7,
-          "death_crosses_count": 7,
-          "time_in_bull_stack_pct": 39.5,
-          "time_in_bear_stack_pct": 10.0,
-          "time_in_squeeze_pct": 50.5,
-          "current_metrics": {
-            "close": 538.05,
-            "ema20": 581.4954,
-            "ema50": 554.1429,
-            "ema200": 427.9241,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 25.73,
-            "ema200_zscore": 0.39,
-            "atr_volatility_pct": 4.97,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "AVGO": {
-        "symbol": "AVGO",
-        "name": "Broadcom Inc.",
-        "category": "mega_cap_equities",
-        "ticker": "AVGO",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 13.3091,
-          "current_price": 334.59,
-          "total_return_10y_pct": 2413.99,
-          "cagr_pct": 38.19,
-          "max_drawdown_pct": -48.3,
-          "golden_crosses_count": 7,
-          "death_crosses_count": 7,
-          "time_in_bull_stack_pct": 50.9,
-          "time_in_bear_stack_pct": 4.8,
-          "time_in_squeeze_pct": 44.3,
-          "current_metrics": {
-            "close": 334.59,
-            "ema20": 352.2667,
-            "ema50": 361.8372,
-            "ema200": 361.5725,
-            "stack_state": 0,
-            "dist_to_ema200_pct": -7.46,
-            "ema200_zscore": -1.59,
-            "atr_volatility_pct": 3.51,
-            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
-          }
-        }
-      },
-      "NFLX": {
-        "symbol": "NFLX",
-        "name": "Netflix Inc.",
-        "category": "mega_cap_equities",
-        "ticker": "NFLX",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 12.335,
-          "current_price": 69.85,
-          "total_return_10y_pct": 466.27,
-          "cagr_pct": 19.0,
-          "max_drawdown_pct": -75.95,
-          "golden_crosses_count": 5,
-          "death_crosses_count": 5,
-          "time_in_bull_stack_pct": 42.4,
-          "time_in_bear_stack_pct": 12.3,
-          "time_in_squeeze_pct": 45.3,
-          "current_metrics": {
-            "close": 69.85,
-            "ema20": 71.1574,
-            "ema50": 73.4298,
-            "ema200": 82.9241,
-            "stack_state": -1,
-            "dist_to_ema200_pct": -15.77,
-            "ema200_zscore": -1.22,
-            "atr_volatility_pct": 2.3,
-            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
-            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
-      "JPM": {
-        "symbol": "JPM",
-        "name": "JPMorgan Chase & Co.",
-        "category": "mega_cap_equities",
-        "ticker": "JPM",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 52.6056,
-          "current_price": 333.53,
-          "total_return_10y_pct": 534.02,
-          "cagr_pct": 20.36,
-          "max_drawdown_pct": -43.63,
-          "golden_crosses_count": 4,
-          "death_crosses_count": 3,
-          "time_in_bull_stack_pct": 47.5,
-          "time_in_bear_stack_pct": 7.0,
-          "time_in_squeeze_pct": 45.5,
-          "current_metrics": {
-            "close": 333.53,
-            "ema20": 336.3005,
-            "ema50": 340.0246,
-            "ema200": 323.1712,
-            "stack_state": 0,
-            "dist_to_ema200_pct": 3.21,
-            "ema200_zscore": -0.39,
-            "atr_volatility_pct": 1.89,
-            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
-            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
-          }
-        }
-      },
-      "XOM": {
-        "symbol": "XOM",
-        "name": "Exxon Mobil Corp.",
-        "category": "mega_cap_equities",
-        "ticker": "XOM",
-        "10y_dna": {
-          "total_bars_10y": 2512,
-          "first_price": 56.6177,
-          "current_price": 178.28,
-          "total_return_10y_pct": 214.88,
-          "cagr_pct": 12.2,
-          "max_drawdown_pct": -61.01,
-          "golden_crosses_count": 9,
-          "death_crosses_count": 9,
-          "time_in_bull_stack_pct": 33.7,
-          "time_in_bear_stack_pct": 17.8,
-          "time_in_squeeze_pct": 48.5,
-          "current_metrics": {
-            "close": 178.28,
-            "ema20": 169.4212,
-            "ema50": 163.831,
-            "ema200": 148.9875,
-            "stack_state": 1,
-            "dist_to_ema200_pct": 19.66,
-            "ema200_zscore": 1.28,
-            "atr_volatility_pct": 1.93,
-            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
-            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
-          }
-        }
-      },
       "EURUSD": {
         "symbol": "EURUSD",
         "name": "EUR/USD Primary Forex Benchmark",
@@ -1802,6 +2391,1122 @@
             "dist_to_ema200_pct": 10.29,
             "ema200_zscore": 0.33,
             "atr_volatility_pct": 1.71,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "NVDA": {
+        "symbol": "NVDA",
+        "name": "NVIDIA Corporation",
+        "category": "mega_cap_tech",
+        "ticker": "NVDA",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 1.6616,
+          "current_price": 217.09,
+          "total_return_10y_pct": 12965.04,
+          "cagr_pct": 63.04,
+          "max_drawdown_pct": -66.34,
+          "golden_crosses_count": 4,
+          "death_crosses_count": 4,
+          "time_in_bull_stack_pct": 51.9,
+          "time_in_bear_stack_pct": 6.6,
+          "time_in_squeeze_pct": 41.5,
+          "current_metrics": {
+            "close": 217.09,
+            "ema20": 224.7491,
+            "ema50": 221.7861,
+            "ema200": 204.5264,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 6.14,
+            "ema200_zscore": -0.57,
+            "atr_volatility_pct": 2.64,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "TSLA": {
+        "symbol": "TSLA",
+        "name": "Tesla Inc.",
+        "category": "mega_cap_tech",
+        "ticker": "TSLA",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 13.2733,
+          "current_price": 368.06,
+          "total_return_10y_pct": 2672.93,
+          "cagr_pct": 39.56,
+          "max_drawdown_pct": -73.63,
+          "golden_crosses_count": 11,
+          "death_crosses_count": 11,
+          "time_in_bull_stack_pct": 35.4,
+          "time_in_bear_stack_pct": 14.3,
+          "time_in_squeeze_pct": 50.2,
+          "current_metrics": {
+            "close": 368.06,
+            "ema20": 368.0718,
+            "ema50": 365.4654,
+            "ema200": 377.1942,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -2.42,
+            "ema200_zscore": -0.52,
+            "atr_volatility_pct": 3.11,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "META": {
+        "symbol": "META",
+        "name": "Meta Platforms Inc.",
+        "category": "mega_cap_tech",
+        "ticker": "META",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 128.7667,
+          "current_price": 705.44,
+          "total_return_10y_pct": 447.84,
+          "cagr_pct": 18.6,
+          "max_drawdown_pct": -76.74,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 42.0,
+          "time_in_bear_stack_pct": 14.5,
+          "time_in_squeeze_pct": 43.5,
+          "current_metrics": {
+            "close": 705.44,
+            "ema20": 718.1095,
+            "ema50": 679.8395,
+            "ema200": 642.0164,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 9.88,
+            "ema200_zscore": 0.21,
+            "atr_volatility_pct": 3.03,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "GOOGL": {
+        "symbol": "GOOGL",
+        "name": "Alphabet Inc. (Google)",
+        "category": "mega_cap_tech",
+        "ticker": "GOOGL",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 40.6943,
+          "current_price": 344.18,
+          "total_return_10y_pct": 745.77,
+          "cagr_pct": 23.89,
+          "max_drawdown_pct": -44.32,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 46.9,
+          "time_in_bear_stack_pct": 7.7,
+          "time_in_squeeze_pct": 45.4,
+          "current_metrics": {
+            "close": 344.18,
+            "ema20": 346.3433,
+            "ema50": 346.2874,
+            "ema200": 330.7955,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 4.05,
+            "ema200_zscore": -0.37,
+            "atr_volatility_pct": 2.63,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "AAPL": {
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "category": "mega_cap_tech",
+        "ticker": "AAPL",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 26.7699,
+          "current_price": 342.94,
+          "total_return_10y_pct": 1181.06,
+          "cagr_pct": 29.15,
+          "max_drawdown_pct": -38.52,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 49.3,
+          "time_in_bear_stack_pct": 6.7,
+          "time_in_squeeze_pct": 44.0,
+          "current_metrics": {
+            "close": 342.94,
+            "ema20": 337.3984,
+            "ema50": 329.309,
+            "ema200": 298.9073,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 14.73,
+            "ema200_zscore": 0.49,
+            "atr_volatility_pct": 1.87,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "MSFT": {
+        "symbol": "MSFT",
+        "name": "Microsoft Corporation",
+        "category": "mega_cap_tech",
+        "ticker": "MSFT",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 50.8361,
+          "current_price": 533.52,
+          "total_return_10y_pct": 949.49,
+          "cagr_pct": 26.6,
+          "max_drawdown_pct": -37.15,
+          "golden_crosses_count": 4,
+          "death_crosses_count": 3,
+          "time_in_bull_stack_pct": 54.3,
+          "time_in_bear_stack_pct": 7.4,
+          "time_in_squeeze_pct": 38.3,
+          "current_metrics": {
+            "close": 533.52,
+            "ema20": 523.5891,
+            "ema50": 500.9517,
+            "ema200": 456.9863,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 16.75,
+            "ema200_zscore": 0.87,
+            "atr_volatility_pct": 2.15,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "AMD": {
+        "symbol": "AMD",
+        "name": "Advanced Micro Devices",
+        "category": "mega_cap_tech",
+        "ticker": "AMD",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 6.96,
+          "current_price": 538.05,
+          "total_return_10y_pct": 7630.6,
+          "cagr_pct": 54.68,
+          "max_drawdown_pct": -65.45,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 39.5,
+          "time_in_bear_stack_pct": 10.0,
+          "time_in_squeeze_pct": 50.5,
+          "current_metrics": {
+            "close": 538.05,
+            "ema20": 581.4954,
+            "ema50": 554.1429,
+            "ema200": 427.9241,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 25.73,
+            "ema200_zscore": 0.39,
+            "atr_volatility_pct": 4.97,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "AVGO": {
+        "symbol": "AVGO",
+        "name": "Broadcom Inc.",
+        "category": "mega_cap_tech",
+        "ticker": "AVGO",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 13.3091,
+          "current_price": 334.59,
+          "total_return_10y_pct": 2413.99,
+          "cagr_pct": 38.19,
+          "max_drawdown_pct": -48.3,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 50.9,
+          "time_in_bear_stack_pct": 4.8,
+          "time_in_squeeze_pct": 44.3,
+          "current_metrics": {
+            "close": 334.59,
+            "ema20": 352.2667,
+            "ema50": 361.8372,
+            "ema200": 361.5725,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -7.46,
+            "ema200_zscore": -1.59,
+            "atr_volatility_pct": 3.51,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "AMZN": {
+        "symbol": "AMZN",
+        "name": "Amazon.com Inc.",
+        "category": "mega_cap_tech",
+        "ticker": "AMZN",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 40.516,
+          "current_price": 262.45,
+          "total_return_10y_pct": 547.77,
+          "cagr_pct": 20.61,
+          "max_drawdown_pct": -56.15,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 43.4,
+          "time_in_bear_stack_pct": 9.4,
+          "time_in_squeeze_pct": 47.3,
+          "current_metrics": {
+            "close": 262.45,
+            "ema20": 255.085,
+            "ema50": 254.5807,
+            "ema200": 245.1194,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 7.07,
+            "ema200_zscore": -0.0,
+            "atr_volatility_pct": 2.52,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "NFLX": {
+        "symbol": "NFLX",
+        "name": "Netflix Inc.",
+        "category": "mega_cap_tech",
+        "ticker": "NFLX",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 12.335,
+          "current_price": 69.85,
+          "total_return_10y_pct": 466.27,
+          "cagr_pct": 19.0,
+          "max_drawdown_pct": -75.95,
+          "golden_crosses_count": 5,
+          "death_crosses_count": 5,
+          "time_in_bull_stack_pct": 42.4,
+          "time_in_bear_stack_pct": 12.3,
+          "time_in_squeeze_pct": 45.3,
+          "current_metrics": {
+            "close": 69.85,
+            "ema20": 71.1574,
+            "ema50": 73.4298,
+            "ema200": 82.9241,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -15.77,
+            "ema200_zscore": -1.22,
+            "atr_volatility_pct": 2.3,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "CRM": {
+        "symbol": "CRM",
+        "name": "Salesforce Inc.",
+        "category": "semis_and_fintech",
+        "ticker": "CRM",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 71.2302,
+          "current_price": 242.45,
+          "total_return_10y_pct": 240.38,
+          "cagr_pct": 13.07,
+          "max_drawdown_pct": -58.67,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 40.6,
+          "time_in_bear_stack_pct": 15.0,
+          "time_in_squeeze_pct": 44.4,
+          "current_metrics": {
+            "close": 242.45,
+            "ema20": 235.7151,
+            "ema50": 226.5766,
+            "ema200": 211.326,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 14.73,
+            "ema200_zscore": 0.77,
+            "atr_volatility_pct": 3.55,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "QCOM": {
+        "symbol": "QCOM",
+        "name": "Qualcomm Inc.",
+        "category": "semis_and_fintech",
+        "ticker": "QCOM",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 51.4109,
+          "current_price": 173.53,
+          "total_return_10y_pct": 237.54,
+          "cagr_pct": 12.98,
+          "max_drawdown_pct": -44.29,
+          "golden_crosses_count": 11,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 29.5,
+          "time_in_bear_stack_pct": 17.7,
+          "time_in_squeeze_pct": 52.8,
+          "current_metrics": {
+            "close": 173.53,
+            "ema20": 178.3853,
+            "ema50": 177.8185,
+            "ema200": 172.152,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 0.8,
+            "ema200_zscore": -0.28,
+            "atr_volatility_pct": 3.39,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "ADBE": {
+        "symbol": "ADBE",
+        "name": "Adobe Inc.",
+        "category": "semis_and_fintech",
+        "ticker": "ADBE",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 109.03,
+          "current_price": 247.09,
+          "total_return_10y_pct": 126.63,
+          "cagr_pct": 8.55,
+          "max_drawdown_pct": -71.9,
+          "golden_crosses_count": 4,
+          "death_crosses_count": 4,
+          "time_in_bull_stack_pct": 37.4,
+          "time_in_bear_stack_pct": 20.1,
+          "time_in_squeeze_pct": 42.5,
+          "current_metrics": {
+            "close": 247.09,
+            "ema20": 243.7437,
+            "ema50": 247.5021,
+            "ema200": 265.3874,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -6.89,
+            "ema200_zscore": -0.68,
+            "atr_volatility_pct": 3.35,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "JPM": {
+        "symbol": "JPM",
+        "name": "JPMorgan Chase & Co.",
+        "category": "semis_and_fintech",
+        "ticker": "JPM",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 52.6056,
+          "current_price": 333.53,
+          "total_return_10y_pct": 534.02,
+          "cagr_pct": 20.36,
+          "max_drawdown_pct": -43.63,
+          "golden_crosses_count": 4,
+          "death_crosses_count": 3,
+          "time_in_bull_stack_pct": 47.5,
+          "time_in_bear_stack_pct": 7.0,
+          "time_in_squeeze_pct": 45.5,
+          "current_metrics": {
+            "close": 333.53,
+            "ema20": 336.3005,
+            "ema50": 340.0246,
+            "ema200": 323.1712,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 3.21,
+            "ema200_zscore": -0.39,
+            "atr_volatility_pct": 1.89,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "INTC": {
+        "symbol": "INTC",
+        "name": "Intel Corp.",
+        "category": "semis_and_fintech",
+        "ticker": "INTC",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 28.7072,
+          "current_price": 92.03,
+          "total_return_10y_pct": 220.58,
+          "cagr_pct": 12.4,
+          "max_drawdown_pct": -70.8,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 29.4,
+          "time_in_bear_stack_pct": 20.7,
+          "time_in_squeeze_pct": 49.9,
+          "current_metrics": {
+            "close": 92.03,
+            "ema20": 104.5422,
+            "ema50": 104.7994,
+            "ema200": 87.1607,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 5.59,
+            "ema200_zscore": 0.05,
+            "atr_volatility_pct": 5.95,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "MU": {
+        "symbol": "MU",
+        "name": "Micron Technology",
+        "category": "semis_and_fintech",
+        "ticker": "MU",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 16.7697,
+          "current_price": 904.9,
+          "total_return_10y_pct": 5296.03,
+          "cagr_pct": 49.2,
+          "max_drawdown_pct": -57.63,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 41.6,
+          "time_in_bear_stack_pct": 13.2,
+          "time_in_squeeze_pct": 45.3,
+          "current_metrics": {
+            "close": 904.9,
+            "ema20": 987.007,
+            "ema50": 979.7165,
+            "ema200": 756.6834,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 19.59,
+            "ema200_zscore": 0.17,
+            "atr_volatility_pct": 5.37,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "ORCL": {
+        "symbol": "ORCL",
+        "name": "Oracle Corp.",
+        "category": "semis_and_fintech",
+        "ticker": "ORCL",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 32.8131,
+          "current_price": 129.59,
+          "total_return_10y_pct": 294.93,
+          "cagr_pct": 14.77,
+          "max_drawdown_pct": -64.58,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 42.8,
+          "time_in_bear_stack_pct": 9.9,
+          "time_in_squeeze_pct": 47.3,
+          "current_metrics": {
+            "close": 129.59,
+            "ema20": 138.0002,
+            "ema50": 142.4451,
+            "ema200": 161.3857,
+            "stack_state": -1,
+            "dist_to_ema200_pct": -19.7,
+            "ema200_zscore": -2.0,
+            "atr_volatility_pct": 4.94,
+            "trend_bias": "INSTITUTIONAL_BEARISH_STACK",
+            "recommended_action": "FAVOR_SHORT_RALLIES_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "TXN": {
+        "symbol": "TXN",
+        "name": "Texas Instruments",
+        "category": "semis_and_fintech",
+        "ticker": "TXN",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 53.0709,
+          "current_price": 276.15,
+          "total_return_10y_pct": 420.34,
+          "cagr_pct": 17.99,
+          "max_drawdown_pct": -33.41,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 42.9,
+          "time_in_bear_stack_pct": 9.8,
+          "time_in_squeeze_pct": 47.3,
+          "current_metrics": {
+            "close": 276.15,
+            "ema20": 279.9682,
+            "ema50": 277.0102,
+            "ema200": 255.2474,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 8.19,
+            "ema200_zscore": 0.2,
+            "atr_volatility_pct": 3.19,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "CSCO": {
+        "symbol": "CSCO",
+        "name": "Cisco Systems",
+        "category": "semis_and_fintech",
+        "ticker": "CSCO",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 22.5101,
+          "current_price": 106.5,
+          "total_return_10y_pct": 373.12,
+          "cagr_pct": 16.87,
+          "max_drawdown_pct": -41.95,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 43.8,
+          "time_in_bear_stack_pct": 10.4,
+          "time_in_squeeze_pct": 45.9,
+          "current_metrics": {
+            "close": 106.5,
+            "ema20": 111.2686,
+            "ema50": 111.2382,
+            "ema200": 100.8072,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 5.65,
+            "ema200_zscore": -0.03,
+            "atr_volatility_pct": 2.97,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "IBM": {
+        "symbol": "IBM",
+        "name": "IBM Corp.",
+        "category": "semis_and_fintech",
+        "ticker": "IBM",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 95.5173,
+          "current_price": 236.39,
+          "total_return_10y_pct": 147.48,
+          "cagr_pct": 9.52,
+          "max_drawdown_pct": -40.59,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 34.7,
+          "time_in_bear_stack_pct": 13.0,
+          "time_in_squeeze_pct": 52.3,
+          "current_metrics": {
+            "close": 236.39,
+            "ema20": 229.2222,
+            "ema50": 232.0596,
+            "ema200": 245.1844,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -3.59,
+            "ema200_zscore": -0.81,
+            "atr_volatility_pct": 2.63,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "XOM": {
+        "symbol": "XOM",
+        "name": "Exxon Mobil Corp.",
+        "category": "healthcare_energy_consumer",
+        "ticker": "XOM",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 56.6177,
+          "current_price": 178.28,
+          "total_return_10y_pct": 214.88,
+          "cagr_pct": 12.2,
+          "max_drawdown_pct": -61.01,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 33.7,
+          "time_in_bear_stack_pct": 17.8,
+          "time_in_squeeze_pct": 48.5,
+          "current_metrics": {
+            "close": 178.28,
+            "ema20": 169.4212,
+            "ema50": 163.831,
+            "ema200": 148.9875,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 19.66,
+            "ema200_zscore": 1.28,
+            "atr_volatility_pct": 1.93,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "VISA": {
+        "symbol": "VISA",
+        "name": "Visa Inc.",
+        "category": "semis_and_fintech",
+        "ticker": "V",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 76.878,
+          "current_price": 402.92,
+          "total_return_10y_pct": 424.1,
+          "cagr_pct": 18.08,
+          "max_drawdown_pct": -36.36,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 48.7,
+          "time_in_bear_stack_pct": 7.4,
+          "time_in_squeeze_pct": 43.9,
+          "current_metrics": {
+            "close": 402.92,
+            "ema20": 382.554,
+            "ema50": 372.8766,
+            "ema200": 349.0654,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 15.43,
+            "ema200_zscore": 1.44,
+            "atr_volatility_pct": 1.82,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "MASTERCARD": {
+        "symbol": "MASTERCARD",
+        "name": "Mastercard Inc.",
+        "category": "semis_and_fintech",
+        "ticker": "MA",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 96.7261,
+          "current_price": 616.4,
+          "total_return_10y_pct": 537.26,
+          "cagr_pct": 20.42,
+          "max_drawdown_pct": -41.0,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 51.4,
+          "time_in_bear_stack_pct": 7.0,
+          "time_in_squeeze_pct": 41.6,
+          "current_metrics": {
+            "close": 616.4,
+            "ema20": 586.6931,
+            "ema50": 572.8667,
+            "ema200": 545.319,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 13.03,
+            "ema200_zscore": 0.81,
+            "atr_volatility_pct": 1.77,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "GS": {
+        "symbol": "GS",
+        "name": "Goldman Sachs Group",
+        "category": "semis_and_fintech",
+        "ticker": "GS",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 141.9063,
+          "current_price": 875.78,
+          "total_return_10y_pct": 517.15,
+          "cagr_pct": 20.03,
+          "max_drawdown_pct": -48.75,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 41.4,
+          "time_in_bear_stack_pct": 10.9,
+          "time_in_squeeze_pct": 47.6,
+          "current_metrics": {
+            "close": 875.78,
+            "ema20": 907.2432,
+            "ema50": 950.229,
+            "ema200": 934.5845,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -6.29,
+            "ema200_zscore": -1.13,
+            "atr_volatility_pct": 2.54,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "UNH": {
+        "symbol": "UNH",
+        "name": "UnitedHealth Group",
+        "category": "healthcare_energy_consumer",
+        "ticker": "UNH",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 122.8152,
+          "current_price": 406.88,
+          "total_return_10y_pct": 231.29,
+          "cagr_pct": 12.77,
+          "max_drawdown_pct": -61.39,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 42.0,
+          "time_in_bear_stack_pct": 12.5,
+          "time_in_squeeze_pct": 45.4,
+          "current_metrics": {
+            "close": 406.88,
+            "ema20": 385.791,
+            "ema50": 387.0143,
+            "ema200": 371.8463,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 9.42,
+            "ema200_zscore": 0.46,
+            "atr_volatility_pct": 3.16,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "BAC": {
+        "symbol": "BAC",
+        "name": "Bank of America",
+        "category": "semis_and_fintech",
+        "ticker": "BAC",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 13.2467,
+          "current_price": 50.39,
+          "total_return_10y_pct": 280.4,
+          "cagr_pct": 14.34,
+          "max_drawdown_pct": -48.95,
+          "golden_crosses_count": 6,
+          "death_crosses_count": 5,
+          "time_in_bull_stack_pct": 41.4,
+          "time_in_bear_stack_pct": 11.9,
+          "time_in_squeeze_pct": 46.7,
+          "current_metrics": {
+            "close": 50.39,
+            "ema20": 54.1479,
+            "ema50": 56.7143,
+            "ema200": 55.1631,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -8.65,
+            "ema200_zscore": -1.23,
+            "atr_volatility_pct": 2.56,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "JNJ": {
+        "symbol": "JNJ",
+        "name": "Johnson & Johnson",
+        "category": "healthcare_energy_consumer",
+        "ticker": "JNJ",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 87.5216,
+          "current_price": 253.79,
+          "total_return_10y_pct": 189.97,
+          "cagr_pct": 11.27,
+          "max_drawdown_pct": -27.37,
+          "golden_crosses_count": 12,
+          "death_crosses_count": 12,
+          "time_in_bull_stack_pct": 40.8,
+          "time_in_bear_stack_pct": 10.3,
+          "time_in_squeeze_pct": 48.9,
+          "current_metrics": {
+            "close": 253.79,
+            "ema20": 259.1177,
+            "ema50": 260.7113,
+            "ema200": 240.4567,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 5.54,
+            "ema200_zscore": 0.24,
+            "atr_volatility_pct": 2.47,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "MS": {
+        "symbol": "MS",
+        "name": "Morgan Stanley",
+        "category": "semis_and_fintech",
+        "ticker": "MS",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 24.8321,
+          "current_price": 178.47,
+          "total_return_10y_pct": 618.71,
+          "cagr_pct": 21.88,
+          "max_drawdown_pct": -51.33,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 43.6,
+          "time_in_bear_stack_pct": 11.2,
+          "time_in_squeeze_pct": 45.2,
+          "current_metrics": {
+            "close": 178.47,
+            "ema20": 189.8388,
+            "ema50": 198.7296,
+            "ema200": 192.072,
+            "stack_state": 0,
+            "dist_to_ema200_pct": -7.08,
+            "ema200_zscore": -1.29,
+            "atr_volatility_pct": 2.69,
+            "trend_bias": "MODERATE_BEARISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_RESISTANCE_REJECTION"
+          }
+        }
+      },
+      "LLY": {
+        "symbol": "LLY",
+        "name": "Eli Lilly and Co.",
+        "category": "healthcare_energy_consumer",
+        "ticker": "LLY",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 67.3323,
+          "current_price": 1240.34,
+          "total_return_10y_pct": 1742.12,
+          "cagr_pct": 33.95,
+          "max_drawdown_pct": -34.48,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 48.1,
+          "time_in_bear_stack_pct": 5.1,
+          "time_in_squeeze_pct": 46.8,
+          "current_metrics": {
+            "close": 1240.34,
+            "ema20": 1190.9728,
+            "ema50": 1175.4334,
+            "ema200": 1085.4751,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 14.27,
+            "ema200_zscore": 0.3,
+            "atr_volatility_pct": 2.98,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "PFE": {
+        "symbol": "PFE",
+        "name": "Pfizer Inc.",
+        "category": "healthcare_energy_consumer",
+        "ticker": "PFE",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 19.6002,
+          "current_price": 29.44,
+          "total_return_10y_pct": 50.2,
+          "cagr_pct": 4.17,
+          "max_drawdown_pct": -58.96,
+          "golden_crosses_count": 9,
+          "death_crosses_count": 9,
+          "time_in_bull_stack_pct": 29.4,
+          "time_in_bear_stack_pct": 18.1,
+          "time_in_squeeze_pct": 52.5,
+          "current_metrics": {
+            "close": 29.44,
+            "ema20": 28.507,
+            "ema50": 27.803,
+            "ema200": 26.11,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 12.75,
+            "ema200_zscore": 1.3,
+            "atr_volatility_pct": 1.94,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "CVX": {
+        "symbol": "CVX",
+        "name": "Chevron Corp.",
+        "category": "healthcare_energy_consumer",
+        "ticker": "CVX",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 66.8151,
+          "current_price": 224.37,
+          "total_return_10y_pct": 235.81,
+          "cagr_pct": 12.92,
+          "max_drawdown_pct": -55.77,
+          "golden_crosses_count": 10,
+          "death_crosses_count": 10,
+          "time_in_bull_stack_pct": 37.1,
+          "time_in_bear_stack_pct": 11.0,
+          "time_in_squeeze_pct": 51.9,
+          "current_metrics": {
+            "close": 224.37,
+            "ema20": 213.5867,
+            "ema50": 206.7872,
+            "ema200": 187.6891,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 19.54,
+            "ema200_zscore": 1.56,
+            "atr_volatility_pct": 1.97,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "COST": {
+        "symbol": "COST",
+        "name": "Costco Wholesale",
+        "category": "healthcare_energy_consumer",
+        "ticker": "COST",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 126.7488,
+          "current_price": 995.53,
+          "total_return_10y_pct": 685.44,
+          "cagr_pct": 22.97,
+          "max_drawdown_pct": -31.4,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 8,
+          "time_in_bull_stack_pct": 52.3,
+          "time_in_bear_stack_pct": 5.3,
+          "time_in_squeeze_pct": 42.4,
+          "current_metrics": {
+            "close": 995.53,
+            "ema20": 949.3187,
+            "ema50": 939.9959,
+            "ema200": 950.6424,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 4.72,
+            "ema200_zscore": -0.42,
+            "atr_volatility_pct": 1.6,
+            "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
+            "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
+          }
+        }
+      },
+      "PG": {
+        "symbol": "PG",
+        "name": "Procter & Gamble",
+        "category": "healthcare_energy_consumer",
+        "ticker": "PG",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 65.1791,
+          "current_price": 157.69,
+          "total_return_10y_pct": 141.93,
+          "cagr_pct": 9.27,
+          "max_drawdown_pct": -23.77,
+          "golden_crosses_count": 11,
+          "death_crosses_count": 11,
+          "time_in_bull_stack_pct": 40.4,
+          "time_in_bear_stack_pct": 11.7,
+          "time_in_squeeze_pct": 47.9,
+          "current_metrics": {
+            "close": 157.69,
+            "ema20": 151.4238,
+            "ema50": 148.5914,
+            "ema200": 147.3221,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 7.04,
+            "ema200_zscore": 0.62,
+            "atr_volatility_pct": 1.68,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "KO": {
+        "symbol": "KO",
+        "name": "Coca-Cola Co.",
+        "category": "healthcare_energy_consumer",
+        "ticker": "KO",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 30.7537,
+          "current_price": 93.42,
+          "total_return_10y_pct": 203.77,
+          "cagr_pct": 11.79,
+          "max_drawdown_pct": -36.99,
+          "golden_crosses_count": 8,
+          "death_crosses_count": 7,
+          "time_in_bull_stack_pct": 46.5,
+          "time_in_bear_stack_pct": 6.2,
+          "time_in_squeeze_pct": 47.3,
+          "current_metrics": {
+            "close": 93.42,
+            "ema20": 89.3917,
+            "ema50": 87.8174,
+            "ema200": 81.1659,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 15.1,
+            "ema200_zscore": 2.13,
+            "atr_volatility_pct": 1.61,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "COP": {
+        "symbol": "COP",
+        "name": "ConocoPhillips",
+        "category": "healthcare_energy_consumer",
+        "ticker": "COP",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 30.631,
+          "current_price": 145.24,
+          "total_return_10y_pct": 374.16,
+          "cagr_pct": 16.9,
+          "max_drawdown_pct": -70.66,
+          "golden_crosses_count": 7,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 32.7,
+          "time_in_bear_stack_pct": 15.3,
+          "time_in_squeeze_pct": 52.0,
+          "current_metrics": {
+            "close": 145.24,
+            "ema20": 135.8139,
+            "ema50": 131.0111,
+            "ema200": 118.2161,
+            "stack_state": 1,
+            "dist_to_ema200_pct": 22.86,
+            "ema200_zscore": 1.25,
+            "atr_volatility_pct": 2.09,
+            "trend_bias": "INSTITUTIONAL_BULLISH_STACK",
+            "recommended_action": "FAVOR_LONG_PULLBACKS_AT_EMA20_OR_EMA50"
+          }
+        }
+      },
+      "WMT": {
+        "symbol": "WMT",
+        "name": "Walmart Inc.",
+        "category": "healthcare_energy_consumer",
+        "ticker": "WMT",
+        "10y_dna": {
+          "total_bars_10y": 2512,
+          "first_price": 19.3861,
+          "current_price": 118.7,
+          "total_return_10y_pct": 512.3,
+          "cagr_pct": 19.94,
+          "max_drawdown_pct": -25.74,
+          "golden_crosses_count": 5,
+          "death_crosses_count": 6,
+          "time_in_bull_stack_pct": 51.4,
+          "time_in_bear_stack_pct": 4.1,
+          "time_in_squeeze_pct": 44.5,
+          "current_metrics": {
+            "close": 118.7,
+            "ema20": 111.6691,
+            "ema50": 110.4375,
+            "ema200": 112.7157,
+            "stack_state": 0,
+            "dist_to_ema200_pct": 5.31,
+            "ema200_zscore": -0.22,
+            "atr_volatility_pct": 2.01,
             "trend_bias": "MODERATE_BULLISH_CONSOLIDATION",
             "recommended_action": "RANGE_BOUND_SUPPORT_BOUNCE"
           }

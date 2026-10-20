@@ -1,6 +1,6 @@
 {
-  "last_trained_utc": "2026-10-20 12:53:32 UTC",
-  "total_assets": 56,
+  "last_trained_utc": "2026-10-20 13:07:53 UTC",
+  "total_assets": 103,
   "sessions": [
     "ASIAN_SESSION",
     "EUROPEAN_SESSION",
@@ -8,7 +8,7 @@
   ],
   "sessions_meta": {
     "ASIAN_SESSION": {
-      "description": "Tokyo, Sydney, Seoul, Hong Kong, Singapore & Asian Commodities",
+      "description": "Tokyo, Sydney, Seoul, Hong Kong, Singapore & Asian Mega-Caps & Commodities",
       "prime_hours_ict": "07:00 - 13:30",
       "sub_phases": {
         "TOKYO_OPEN": {
@@ -112,10 +112,87 @@
           "yf_ticker": "CNH=F",
           "name": "USD/Offshore Yuan Gauge"
         }
+      ],
+      "asian_mega_caps": [
+        {
+          "symbol": "TOYOTA",
+          "yf_ticker": "7203.T",
+          "name": "Toyota Motor Corp"
+        },
+        {
+          "symbol": "SONY",
+          "yf_ticker": "6758.T",
+          "name": "Sony Group Corp"
+        },
+        {
+          "symbol": "SOFTBANK",
+          "yf_ticker": "9984.T",
+          "name": "SoftBank Group"
+        },
+        {
+          "symbol": "TOKYO_ELEC",
+          "yf_ticker": "8035.T",
+          "name": "Tokyo Electron"
+        },
+        {
+          "symbol": "SAMSUNG",
+          "yf_ticker": "005930.KS",
+          "name": "Samsung Electronics"
+        },
+        {
+          "symbol": "SK_HYNIX",
+          "yf_ticker": "000660.KS",
+          "name": "SK Hynix"
+        },
+        {
+          "symbol": "TENCENT",
+          "yf_ticker": "0700.HK",
+          "name": "Tencent Holdings"
+        },
+        {
+          "symbol": "ALIBABA",
+          "yf_ticker": "BABA",
+          "name": "Alibaba Group"
+        },
+        {
+          "symbol": "MEITUAN",
+          "yf_ticker": "3690.HK",
+          "name": "Meituan"
+        },
+        {
+          "symbol": "BYD",
+          "yf_ticker": "1211.HK",
+          "name": "BYD Company"
+        },
+        {
+          "symbol": "XIAOMI",
+          "yf_ticker": "1810.HK",
+          "name": "Xiaomi Corp"
+        },
+        {
+          "symbol": "TSMC",
+          "yf_ticker": "TSM",
+          "name": "Taiwan Semiconductor Mfg"
+        },
+        {
+          "symbol": "BHP",
+          "yf_ticker": "BHP",
+          "name": "BHP Group"
+        },
+        {
+          "symbol": "RIO",
+          "yf_ticker": "RIO",
+          "name": "Rio Tinto Group"
+        },
+        {
+          "symbol": "CBA",
+          "yf_ticker": "CBA.AX",
+          "name": "Commonwealth Bank Australia"
+        }
       ]
     },
     "EUROPEAN_SESSION": {
-      "description": "Frankfurt, London, Zurich, Paris, Madrid & European Commodities",
+      "description": "Frankfurt, London, Zurich, Paris, Madrid & European Blue-Chips & Commodities",
       "prime_hours_ict": "14:00 - 18:30",
       "sub_phases": {
         "LONDON_PRE_OPEN": {
@@ -214,10 +291,92 @@
           "yf_ticker": "GBPUSD=X",
           "name": "GBP/USD Cable Gauge"
         }
+      ],
+      "european_mega_caps": [
+        {
+          "symbol": "ASML",
+          "yf_ticker": "ASML",
+          "name": "ASML Holding NV"
+        },
+        {
+          "symbol": "SAP",
+          "yf_ticker": "SAP",
+          "name": "SAP SE"
+        },
+        {
+          "symbol": "LVMH",
+          "yf_ticker": "MC.PA",
+          "name": "LVMH Moet Hennessy"
+        },
+        {
+          "symbol": "NOVO_NORD",
+          "yf_ticker": "NVO",
+          "name": "Novo Nordisk"
+        },
+        {
+          "symbol": "NESTLE",
+          "yf_ticker": "NESN.SW",
+          "name": "Nestle SA"
+        },
+        {
+          "symbol": "ROCHE",
+          "yf_ticker": "ROG.SW",
+          "name": "Roche Holding AG"
+        },
+        {
+          "symbol": "NOVARTIS",
+          "yf_ticker": "NVS",
+          "name": "Novartis AG"
+        },
+        {
+          "symbol": "SIEMENS",
+          "yf_ticker": "SIE.DE",
+          "name": "Siemens AG"
+        },
+        {
+          "symbol": "TOTAL_ENG",
+          "yf_ticker": "TTE",
+          "name": "TotalEnergies SE"
+        },
+        {
+          "symbol": "ASTRAZENECA",
+          "yf_ticker": "AZN",
+          "name": "AstraZeneca PLC"
+        },
+        {
+          "symbol": "SHELL",
+          "yf_ticker": "SHEL",
+          "name": "Shell PLC"
+        },
+        {
+          "symbol": "AIRBUS",
+          "yf_ticker": "AIR.PA",
+          "name": "Airbus SE"
+        },
+        {
+          "symbol": "MERCEDES",
+          "yf_ticker": "MBG.DE",
+          "name": "Mercedes-Benz Group"
+        },
+        {
+          "symbol": "BMW",
+          "yf_ticker": "BMW.DE",
+          "name": "Bayerische Motoren Werke"
+        },
+        {
+          "symbol": "SCHNEIDER",
+          "yf_ticker": "SU.PA",
+          "name": "Schneider Electric"
+        },
+        {
+          "symbol": "SANTANDER",
+          "yf_ticker": "SAN",
+          "name": "Banco Santander"
+        }
       ]
     },
     "NEW_YORK_SESSION": {
-      "description": "Wall Street Cash Equities, US Benchmark Indices & Mega-Cap Tech",
+      "description": "Wall Street Cash Equities, US Benchmark Indices, Mega-Caps & Sectors",
       "prime_hours_ict": "20:30 - 01:30",
       "sub_phases": {
         "US_CASH_OPEN": {
@@ -273,7 +432,7 @@
           "name": "US Dollar Index"
         }
       ],
-      "mega_cap_equities": [
+      "mega_cap_tech": [
         {
           "symbol": "NVDA",
           "yf_ticker": "NVDA",
@@ -323,6 +482,63 @@
           "symbol": "NFLX",
           "yf_ticker": "NFLX",
           "name": "Netflix Inc."
+        }
+      ],
+      "semis_and_fintech": [
+        {
+          "symbol": "QCOM",
+          "yf_ticker": "QCOM",
+          "name": "Qualcomm Inc."
+        },
+        {
+          "symbol": "INTC",
+          "yf_ticker": "INTC",
+          "name": "Intel Corp."
+        },
+        {
+          "symbol": "MU",
+          "yf_ticker": "MU",
+          "name": "Micron Technology"
+        },
+        {
+          "symbol": "TXN",
+          "yf_ticker": "TXN",
+          "name": "Texas Instruments"
+        },
+        {
+          "symbol": "ORCL",
+          "yf_ticker": "ORCL",
+          "name": "Oracle Corp."
+        },
+        {
+          "symbol": "CRM",
+          "yf_ticker": "CRM",
+          "name": "Salesforce Inc."
+        },
+        {
+          "symbol": "ADBE",
+          "yf_ticker": "ADBE",
+          "name": "Adobe Inc."
+        },
+        {
+          "symbol": "CSCO",
+          "yf_ticker": "CSCO",
+          "name": "Cisco Systems"
+        },
+        {
+          "symbol": "IBM",
+          "yf_ticker": "IBM",
+          "name": "IBM Corp."
+        },
+        {
+          "symbol": "VISA",
+          "yf_ticker": "V",
+          "name": "Visa Inc."
+        },
+        {
+          "symbol": "MASTERCARD",
+          "yf_ticker": "MA",
+          "name": "Mastercard Inc."
         },
         {
           "symbol": "JPM",
@@ -330,9 +546,76 @@
           "name": "JPMorgan Chase & Co."
         },
         {
+          "symbol": "BAC",
+          "yf_ticker": "BAC",
+          "name": "Bank of America"
+        },
+        {
+          "symbol": "GS",
+          "yf_ticker": "GS",
+          "name": "Goldman Sachs Group"
+        },
+        {
+          "symbol": "MS",
+          "yf_ticker": "MS",
+          "name": "Morgan Stanley"
+        }
+      ],
+      "healthcare_energy_consumer": [
+        {
+          "symbol": "LLY",
+          "yf_ticker": "LLY",
+          "name": "Eli Lilly and Co."
+        },
+        {
+          "symbol": "UNH",
+          "yf_ticker": "UNH",
+          "name": "UnitedHealth Group"
+        },
+        {
+          "symbol": "JNJ",
+          "yf_ticker": "JNJ",
+          "name": "Johnson & Johnson"
+        },
+        {
+          "symbol": "PFE",
+          "yf_ticker": "PFE",
+          "name": "Pfizer Inc."
+        },
+        {
           "symbol": "XOM",
           "yf_ticker": "XOM",
           "name": "Exxon Mobil Corp."
+        },
+        {
+          "symbol": "CVX",
+          "yf_ticker": "CVX",
+          "name": "Chevron Corp."
+        },
+        {
+          "symbol": "COP",
+          "yf_ticker": "COP",
+          "name": "ConocoPhillips"
+        },
+        {
+          "symbol": "WMT",
+          "yf_ticker": "WMT",
+          "name": "Walmart Inc."
+        },
+        {
+          "symbol": "COST",
+          "yf_ticker": "COST",
+          "name": "Costco Wholesale"
+        },
+        {
+          "symbol": "PG",
+          "yf_ticker": "PG",
+          "name": "Procter & Gamble"
+        },
+        {
+          "symbol": "KO",
+          "yf_ticker": "KO",
+          "name": "Coca-Cola Co."
         }
       ],
       "commodities": [
