@@ -2851,10 +2851,10 @@ class SuperSmartCapitalCitadel:
                 vix=20.0,
                 day_of_week=now_dow
             )
-            meta_res = CapitalMetaLabelingEngine.predict_meta_label(meta_features, threshold=0.60)
+            meta_res = CapitalMetaLabelingEngine.predict_meta_edge(meta_features, threshold=0.60)
             diag["meta_label"] = meta_res
 
-            if not meta_res.get("is_approved", True):
+            if not meta_res.get("is_edge_approved", meta_res.get("is_approved", True)):
                 reason = f"META_REJECTED: P(Win)={meta_res.get('meta_win_prob', 0.0)*100:.1f}% < 60.0% (Model 2 Quality Filter Veto)"
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
                 try:

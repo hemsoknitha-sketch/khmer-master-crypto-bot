@@ -504,3 +504,73 @@ class CapitalMetaLabelingEngine:
         )
 
         return metrics
+
+    @classmethod
+    def calculate_conviction_sizing(cls, meta_win_prob: float, threshold: float = 0.60) -> float:
+        """
+        Dynamically calculates conviction sizing multiplier in range [0.75, 1.50],
+        or returns 0.0 if win probability is below threshold.
+        """
+        if meta_win_prob < threshold:
+            return 0.0
+        conviction_delta = meta_win_prob - threshold
+        return float(np.clip(1.0 + (conviction_delta * 2.0), 0.75, 1.50))
+
+    @classmethod
+    def predict_meta_edge(
+        cls,
+        features: Dict[str, float],
+        threshold: float = 0.60,
+        model_path: str = DEFAULT_MODEL_PATH
+    ) -> Dict[str, Any]:
+        """
+        Evaluates quantitative edge with feature aliasing and returns edge approval status.
+        """
+        feat = dict(features)
+        if "raw_score" not in feat and "primary_score" in feat:
+            feat["raw_score"] = feat["primary_score"]
+        if "rsi14" not in feat and "rsi_15m" in feat:
+            feat["rsi14"] = feat["rsi_15m"]
+        if "adx14" not in feat and "adx_15m" in feat:
+            feat["adx14"] = feat["adx_15m"]
+        if "ema200_dist_pct" not in feat and "dist_to_ema200" in feat:
+            val = float(feat["dist_to_ema200"])
+            feat["ema200_dist_pct"] = val * 100.0 if abs(val) < 1.0 else val
+        if "dxy_change" not in feat and "dxy_trend" in feat:
+            feat["dxy_change"] = feat["dxy_trend"]
+        if "vix" not in feat and "vix_level" in feat:
+            feat["vix"] = feat["vix_level"]
+        if "atr_norm_pct" not in feat and "atr_pct" in feat:
+            val = float(feat["atr_pct"])
+            feat["atr_norm_pct"] = val * 100.0 if abs(val) < 1.0 else val
+        if "spread_drag_pct" not in feat and "spread_atr_ratio" in feat:
+            val = float(feat["spread_atr_ratio"])
+            feat["spread_drag_pct"] = val * 100.0 if abs(val) < 1.0 else val
+
+        res = cls.predict_meta_label(feat, threshold=threshold, model_path=model_path)
+        return {
+            "is_edge_approved": res["is_approved"],
+            "meta_win_prob": res["meta_win_prob"],
+            "threshold": res["threshold"],
+            "sizing_multiplier": res["sizing_multiplier"],
+            "verdict": res["verdict"],
+            "reason": res["reason"],
+            "is_ml_inferred": res.get("is_ml_inferred", False),
+            "features": res.get("features", feat)
+        }
+
+
+def get_meta_labeling_engine() -> Any:
+    """Returns the CapitalMetaLabelingEngine class singleton."""
+    return CapitalMetaLabelingEngine
+
+
+def predict_meta_edge(features: Dict[str, float], threshold: float = 0.60) -> Dict[str, Any]:
+    """Module-level helper to evaluate meta-label edge."""
+    return CapitalMetaLabelingEngine.predict_meta_edge(features, threshold=threshold)
+
+
+def calculate_conviction_sizing(meta_win_prob: float, threshold: float = 0.60) -> float:
+    """Module-level helper to calculate conviction sizing."""
+    return CapitalMetaLabelingEngine.calculate_conviction_sizing(meta_win_prob, threshold=threshold)
+
