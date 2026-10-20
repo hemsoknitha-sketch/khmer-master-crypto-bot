@@ -1,4 +1,4 @@
-# ANGKOR QUANT - DUAL-TIER IP SHIELDING & COMMAND STANDARDS (AQ76 INVARIANT 79)
+# ANGKOR QUANT - DUAL-TIER IP SHIELDING & COMMAND STANDARDS (AQ84 INVARIANT 79 & 81-84)
 **Authority:** Absolute Architectural Rule & Permanent Memory Lock Across All Sessions  
 **Project:** Angkor Quant (Formerly Khmer Master Crypto)  
 **Founder:** HEM SINATH
@@ -39,5 +39,6 @@
 ---
 
 ## 4. AUDIT & DEPLOYMENT COVENANT
-- មុនពេល Git Commit ត្រូវតែដំណើរការ `python audit_system.py` ជាប់ ១០០% (៦២/៦២ Checks Passed, Zero Defects)។
+- មុនពេល Git Commit ត្រូវតែដំណើរការ `python audit_system.py` ជាប់ ១០០% (៦៤/៦៤ Checks Passed, Zero Defects)។
 - បន្ទាប់ពី Commit រួច ត្រូវ Push ទៅកាន់ `origin main` ភ្លាមៗដើម្បីឱ្យ GCP VPS ទាញយកតាមរយៈ `auto_update_vps.sh` ស្វ័យប្រវត្តិ។
+

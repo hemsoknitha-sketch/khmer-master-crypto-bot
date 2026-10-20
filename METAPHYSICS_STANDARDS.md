@@ -1,7 +1,7 @@
 # METAPHYSICS STANDARDS & GROUND TRUTH SPECIFICATION LOCK
 **System:** Angkor Quant AI Quantitative Intelligence Engine (formerly Khmer Master Crypto)  
 **Classification:** Institutional Grade Autonomous Algorithmic Financial System  
-**Standard Version:** 4.0.0-PROD (AQ47)  
+**Standard Version:** 7.8.0-PROD (AQ84 - The 84 Pillars)  
 **Guarantees:** Zero Technical Negligence & Positive Mathematical Expectancy  
 
 ---
@@ -106,4 +106,4 @@ Expected Output:
 ======================================================================
 ```
 
-**Any session, agent, or developer observing 10/10 PASS must consider the codebase in a certified production state.**
+**Any session, agent, or developer observing 64/64 PASS must consider the codebase in a certified production state.**
