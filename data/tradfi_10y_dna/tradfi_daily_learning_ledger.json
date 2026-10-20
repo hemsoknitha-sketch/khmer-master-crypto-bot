@@ -1,0 +1,28 @@
+[
+  {
+    "timestamp": "2026-10-20 19:52:25",
+    "date": "2026-10-19",
+    "metrics": {
+      "total_trades": 1,
+      "win_count": 1,
+      "loss_count": 0,
+      "win_rate_pct": 100.0,
+      "brier_score": 0.0324,
+      "avoided_loss_usd": 2.5,
+      "rejections_count": 1
+    },
+    "adaptive_parameters": {
+      "detected_regime": "HIGH_CONVICTION_TREND_EDGE",
+      "min_adx": 24.0,
+      "chop_zone_range": "35% - 65%",
+      "target_rr": "1:3.5",
+      "be_armor_trigger_usd": 2.5,
+      "post_sl_quarantine_sec": 2700.0
+    },
+    "key_learnings": [
+      "Victories reinforced on 1 trending momentum setups.",
+      "Errors penalized on 0 false wicks; tightened equilibrium chop block.",
+      "Avoided $2.50 in potential drawdown by filtering pre-event traps."
+    ]
+  }
+]

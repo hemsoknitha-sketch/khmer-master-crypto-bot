@@ -1,0 +1,379 @@
+{
+  "last_trained_utc": "2026-10-20 12:53:32 UTC",
+  "total_assets": 56,
+  "sessions": [
+    "ASIAN_SESSION",
+    "EUROPEAN_SESSION",
+    "NEW_YORK_SESSION"
+  ],
+  "sessions_meta": {
+    "ASIAN_SESSION": {
+      "description": "Tokyo, Sydney, Seoul, Hong Kong, Singapore & Asian Commodities",
+      "prime_hours_ict": "07:00 - 13:30",
+      "sub_phases": {
+        "TOKYO_OPEN": {
+          "hours_ict": "07:00 - 08:30",
+          "focus": "JP225, USD/JPY, AUD/JPY, AUD/USD & Early Commodities",
+          "rule": "Observe Tokyo fix liquidity and export flow demand. Prevent chasing false early gap."
+        },
+        "CHINA_HK_OPEN": {
+          "hours_ict": "08:30 - 11:00",
+          "focus": "HK50, CN50, USD/CNH, AUD/USD & Metals",
+          "rule": "Watch mainland liquidity injections and Hang Seng opening drive."
+        },
+        "MID_LATE_ASIA": {
+          "hours_ict": "11:00 - 13:30",
+          "focus": "Trend continuation vs Range mean reversion check",
+          "rule": "Never enter on time alone; confirm structural boundary sweep or breakout volume."
+        }
+      },
+      "indices": [
+        {
+          "symbol": "JP225",
+          "yf_ticker": "^N225",
+          "name": "Nikkei 225 (Japan)"
+        },
+        {
+          "symbol": "AU200",
+          "yf_ticker": "^AXJO",
+          "name": "ASX 200 (Australia)"
+        },
+        {
+          "symbol": "KR200",
+          "yf_ticker": "^KS200",
+          "name": "KOSPI 200 (South Korea)"
+        },
+        {
+          "symbol": "HK50",
+          "yf_ticker": "^HSI",
+          "name": "Hang Seng Index (Hong Kong)"
+        },
+        {
+          "symbol": "CN50",
+          "yf_ticker": "FXI",
+          "name": "FTSE China 50 ETF"
+        },
+        {
+          "symbol": "SG30",
+          "yf_ticker": "^STI",
+          "name": "Straits Times Index (Singapore)"
+        },
+        {
+          "symbol": "TW50",
+          "yf_ticker": "^TWII",
+          "name": "Taiwan Weighted Index"
+        },
+        {
+          "symbol": "IN50",
+          "yf_ticker": "^NSEI",
+          "name": "Nifty 50 (India)"
+        }
+      ],
+      "commodities": [
+        {
+          "symbol": "COPPER",
+          "yf_ticker": "HG=F",
+          "name": "High Grade Copper Futures"
+        },
+        {
+          "symbol": "XAGUSD",
+          "yf_ticker": "SI=F",
+          "name": "Silver Spot/Futures"
+        },
+        {
+          "symbol": "USOIL",
+          "yf_ticker": "CL=F",
+          "name": "WTI Crude Oil Futures"
+        },
+        {
+          "symbol": "GOLD",
+          "yf_ticker": "GC=F",
+          "name": "Gold Spot / Comex Futures"
+        }
+      ],
+      "macro_gauges": [
+        {
+          "symbol": "USDJPY",
+          "yf_ticker": "JPY=X",
+          "name": "USD/JPY Exchange Rate Gauge"
+        },
+        {
+          "symbol": "AUDUSD",
+          "yf_ticker": "AUDUSD=X",
+          "name": "AUD/USD Commodity Gauge"
+        },
+        {
+          "symbol": "AUDJPY",
+          "yf_ticker": "AUDJPY=X",
+          "name": "Risk Appetite Cross Gauge"
+        },
+        {
+          "symbol": "USDCNH",
+          "yf_ticker": "CNH=F",
+          "name": "USD/Offshore Yuan Gauge"
+        }
+      ]
+    },
+    "EUROPEAN_SESSION": {
+      "description": "Frankfurt, London, Zurich, Paris, Madrid & European Commodities",
+      "prime_hours_ict": "14:00 - 18:30",
+      "sub_phases": {
+        "LONDON_PRE_OPEN": {
+          "hours_ict": "14:00 - 15:00",
+          "focus": "London Open prep, European pre-market positioning",
+          "rule": "Assess Asian high/low liquidity traps. Prepare Frankfurt pre-market sweeps."
+        },
+        "EURO_CASH_OPEN": {
+          "hours_ict": "15:00 - 16:30",
+          "focus": "GER40, UK100, EUR/GBP, Brent Oil, Silver",
+          "rule": "Capture Frankfurt/London opening drive with 10x spread hurdle."
+        },
+        "EURO_MIDDAY_EXPANSION": {
+          "hours_ict": "16:30 - 18:30",
+          "focus": "Breakout continuation vs Range return confirmation",
+          "rule": "Verify whether morning breakout sustains momentum or snaps back into balance."
+        }
+      },
+      "indices": [
+        {
+          "symbol": "GER40",
+          "yf_ticker": "^GDAXI",
+          "name": "DAX 40 (Germany)"
+        },
+        {
+          "symbol": "UK100",
+          "yf_ticker": "^FTSE",
+          "name": "FTSE 100 (United Kingdom)"
+        },
+        {
+          "symbol": "EU50",
+          "yf_ticker": "^STOXX50E",
+          "name": "Euro Stoxx 50 (Europe)"
+        },
+        {
+          "symbol": "FRA40",
+          "yf_ticker": "^FCHI",
+          "name": "CAC 40 (France)"
+        },
+        {
+          "symbol": "SWI20",
+          "yf_ticker": "^SSMI",
+          "name": "Swiss Market Index (Switzerland)"
+        },
+        {
+          "symbol": "ESP35",
+          "yf_ticker": "^IBEX",
+          "name": "IBEX 35 (Spain)"
+        },
+        {
+          "symbol": "IT40",
+          "yf_ticker": "FTSEMIB.MI",
+          "name": "FTSE MIB (Italy)"
+        },
+        {
+          "symbol": "NL25",
+          "yf_ticker": "^AEX",
+          "name": "AEX Index (Netherlands)"
+        }
+      ],
+      "commodities": [
+        {
+          "symbol": "GOLD",
+          "yf_ticker": "GC=F",
+          "name": "Gold LBMA / Comex"
+        },
+        {
+          "symbol": "XAGUSD",
+          "yf_ticker": "SI=F",
+          "name": "Silver LBMA / Comex"
+        },
+        {
+          "symbol": "UKOIL",
+          "yf_ticker": "BZ=F",
+          "name": "Brent Crude Oil Futures"
+        },
+        {
+          "symbol": "COPPER",
+          "yf_ticker": "HG=F",
+          "name": "LME / Comex Copper"
+        }
+      ],
+      "macro_gauges": [
+        {
+          "symbol": "EURGBP",
+          "yf_ticker": "EURGBP=X",
+          "name": "EUR/GBP Relative Cross"
+        },
+        {
+          "symbol": "EURUSD",
+          "yf_ticker": "EURUSD=X",
+          "name": "EUR/USD Macro Flow"
+        },
+        {
+          "symbol": "GBPUSD",
+          "yf_ticker": "GBPUSD=X",
+          "name": "GBP/USD Cable Gauge"
+        }
+      ]
+    },
+    "NEW_YORK_SESSION": {
+      "description": "Wall Street Cash Equities, US Benchmark Indices & Mega-Cap Tech",
+      "prime_hours_ict": "20:30 - 01:30",
+      "sub_phases": {
+        "US_CASH_OPEN": {
+          "hours_ict": "20:30 - 21:00",
+          "focus": "NAS100, US500, US30, Mega-Caps & Opening Auction",
+          "rule": "Allow 15m opening range to establish. Never front-run without boundary confirmation."
+        },
+        "POST_OPEN_THRUST": {
+          "hours_ict": "21:00 - 22:30",
+          "focus": "Volume expansion, institutional breakout direction",
+          "rule": "Confirm RVOL >= 1.5x and 3-EMA structural alignment (20/50/200)."
+        },
+        "NY_MIDDAY_CONTINUATION": {
+          "hours_ict": "22:30 - 00:00",
+          "focus": "Trend continuation vs Lunch hour reversal trap",
+          "rule": "Avoid the 35%-65% middle equilibrium chop zone. Enforce Breakeven Armor."
+        },
+        "AFTERNOON_MOMENTUM": {
+          "hours_ict": "00:00 - 01:30",
+          "focus": "Institutional closing drive, key levels retest",
+          "rule": "Enforce strict risk clamping. Prepare flat cash harvest before overnight swap."
+        }
+      },
+      "indices": [
+        {
+          "symbol": "NAS100",
+          "yf_ticker": "NQ=F",
+          "name": "Nasdaq 100 Futures"
+        },
+        {
+          "symbol": "US500",
+          "yf_ticker": "ES=F",
+          "name": "S&P 500 E-mini Futures"
+        },
+        {
+          "symbol": "US30",
+          "yf_ticker": "YM=F",
+          "name": "Dow Jones 30 E-mini Futures"
+        },
+        {
+          "symbol": "US2000",
+          "yf_ticker": "RTY=F",
+          "name": "Russell 2000 Small-Cap Futures"
+        },
+        {
+          "symbol": "VIX",
+          "yf_ticker": "^VIX",
+          "name": "CBOE Volatility Index"
+        },
+        {
+          "symbol": "DXY",
+          "yf_ticker": "DX-Y.NYB",
+          "name": "US Dollar Index"
+        }
+      ],
+      "mega_cap_equities": [
+        {
+          "symbol": "NVDA",
+          "yf_ticker": "NVDA",
+          "name": "NVIDIA Corporation"
+        },
+        {
+          "symbol": "TSLA",
+          "yf_ticker": "TSLA",
+          "name": "Tesla Inc."
+        },
+        {
+          "symbol": "META",
+          "yf_ticker": "META",
+          "name": "Meta Platforms Inc."
+        },
+        {
+          "symbol": "GOOGL",
+          "yf_ticker": "GOOGL",
+          "name": "Alphabet Inc. (Google)"
+        },
+        {
+          "symbol": "AAPL",
+          "yf_ticker": "AAPL",
+          "name": "Apple Inc."
+        },
+        {
+          "symbol": "MSFT",
+          "yf_ticker": "MSFT",
+          "name": "Microsoft Corporation"
+        },
+        {
+          "symbol": "AMZN",
+          "yf_ticker": "AMZN",
+          "name": "Amazon.com Inc."
+        },
+        {
+          "symbol": "AMD",
+          "yf_ticker": "AMD",
+          "name": "Advanced Micro Devices"
+        },
+        {
+          "symbol": "AVGO",
+          "yf_ticker": "AVGO",
+          "name": "Broadcom Inc."
+        },
+        {
+          "symbol": "NFLX",
+          "yf_ticker": "NFLX",
+          "name": "Netflix Inc."
+        },
+        {
+          "symbol": "JPM",
+          "yf_ticker": "JPM",
+          "name": "JPMorgan Chase & Co."
+        },
+        {
+          "symbol": "XOM",
+          "yf_ticker": "XOM",
+          "name": "Exxon Mobil Corp."
+        }
+      ],
+      "commodities": [
+        {
+          "symbol": "GOLD",
+          "yf_ticker": "GC=F",
+          "name": "Gold Comex Futures"
+        },
+        {
+          "symbol": "USOIL",
+          "yf_ticker": "CL=F",
+          "name": "WTI Light Sweet Crude Oil"
+        },
+        {
+          "symbol": "UKOIL",
+          "yf_ticker": "BZ=F",
+          "name": "Brent Crude Oil"
+        },
+        {
+          "symbol": "NATGAS",
+          "yf_ticker": "NG=F",
+          "name": "Henry Hub Natural Gas"
+        }
+      ],
+      "macro_gauges": [
+        {
+          "symbol": "EURUSD",
+          "yf_ticker": "EURUSD=X",
+          "name": "EUR/USD Primary Forex Benchmark"
+        },
+        {
+          "symbol": "USDJPY",
+          "yf_ticker": "JPY=X",
+          "name": "USD/JPY Yield Benchmark"
+        },
+        {
+          "symbol": "US10Y",
+          "yf_ticker": "^TNX",
+          "name": "US 10-Year Treasury Yield Benchmark"
+        }
+      ]
+    }
+  }
+}
