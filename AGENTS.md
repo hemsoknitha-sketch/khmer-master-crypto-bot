@@ -1560,7 +1560,30 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - **Empirical Edge:** Tested on the top 10 TradFi assets, HRP reduced annualized portfolio volatility from **19.03%** (Equal Weight) down to **10.19%** (HRP) — a **46.5% portfolio volatility reduction**!
      - 4-State Gaussian HMM probabilistic regime beliefs: `{"BULL", "CHOP", "BEAR", "CRASH"}`.
      - Volatility targeting dynamically resizes position margins based on $10\% / \text{realized\_vol}_{20d}$, clamped to $[0.50, 2.00]$.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 65/65].
+
+### Invariant 87: Universal Cross-Platform Code Editor Git Push & Zero-Friction VPS Deployment Standard (AQ87 Standard - គ្រឹះស្ដង់ដារបញ្ជា Git Push to VPS ពីគ្រប់ Code Editor Platforms ដោយគ្មានការរាំងស្ទះ ឬ Block)
+- **Location:** `.env`, `.env.example`, `git_push_vps.py`, `setup_git_hooks.py`, `git_update_vps.bat`, `audit_system.py` [CHECK 66/66]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Zero Technical Negligence:
+  1. **Universal Code Editor Platform Authority & Memory Ground Truth (គ្រឹះនៃការចងចាំរាល់កំណែប្រែថ្មី):**
+     - Every revision, architectural enhancement, and code modification is permanently recorded in the system Ground Truth across all sessions.
+     - All modern code editor platforms (Google Antigravity IDE, Cursor AI, VS Code, Windsurf, JetBrains PyCharm, Neovim, and native Windows/Linux CLI terminals) have unrestricted, seamless authority to execute Git staging, audit verification, commits, pushes to GitHub `origin main`, and remote VPS deployments.
+  2. **Git Push Full User Configuration in `.env` (បន្ថែម Git Push Full User to .env):**
+     - `.env` and `.env.example` strictly maintain full user credentials and automated VPS routing:
+       * `GIT_PUSH_USER="hem sinath"`
+       * `GIT_PUSH_USER_EMAIL="hem.sinath@gmail.com"`
+       * `GIT_AUTHOR_NAME="hem sinath"` / `GIT_COMMITTER_NAME="hem sinath"`
+       * `GIT_REMOTE_URL="https://github.com/hemsoknitha-sketch/khmer-master-crypto-bot.git"`
+       * `VPS_HOST="34.146.128.243"` / `VPS_USER="sokni"`
+       * `VPS_SYNC_COMMAND="cd /opt/khmer-master-crypto-bot && bash auto_update_vps.sh"`
+  3. **Zero-Friction & Non-Blocking Execution Standard (គ្មានការរាំងស្ទះ ឬ Block ១០០%):**
+     - Non-interactive Git flags (`GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never`) are permanently enforced across all hooks, scripts, and processes. No integrated terminal in any code editor shall ever hang or freeze waiting for interactive credentials.
+     - Automated credential caching via `git config credential.helper store` guarantees smooth background execution without manual input prompts.
+     - Post-commit hook (`setup_git_hooks.py`) automatically pushes to `origin main` with fault-tolerant non-blocking error handling.
+  4. **Single-Command Unified Deployment (`git_push_vps.py`):**
+     - Every editor can trigger a full-cycle deployment via:
+       `python git_push_vps.py "<commit description>"`
+     - Streamlined pipeline: Pre-Commit Audit Verification $\rightarrow$ Auto-Staging (`git add -A`) $\rightarrow$ Immutable Commit $\rightarrow$ Non-Blocking Push to `origin main` $\rightarrow$ VPS 1-Tap Directive.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 66/66].
 
 ---
 

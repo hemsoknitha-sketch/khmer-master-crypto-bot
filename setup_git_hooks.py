@@ -26,7 +26,9 @@ def setup():
         return False
         
     hook_content = """#!/bin/sh
-# Angkor Quant - Institutional Pre-Commit Invariant Gate
+# Angkor Quant - Institutional Pre-Commit Invariant Gate (AQ87)
+export GIT_TERMINAL_PROMPT=0
+export GCM_INTERACTIVE=never
 echo "🛡️ Running Institutional System Audit before commit..."
 python audit_system.py
 EXIT_CODE=$?
@@ -39,7 +41,9 @@ exit 0
 """
 
     post_hook_content = """#!/bin/sh
-# Angkor Quant - Institutional Auto-Push to GitHub Origin Main
+# Angkor Quant - Institutional Auto-Push to GitHub Origin Main (AQ87)
+export GIT_TERMINAL_PROMPT=0
+export GCM_INTERACTIVE=never
 echo "🚀 [POST-COMMIT] Auto-pushing certified commit to GitHub origin main..."
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
 if [ "$BRANCH" = "main" ]; then

@@ -3360,9 +3360,9 @@ def run_audit():
         log_fail(str(e))
 
     # -------------------------------------------------------------------------
-    # [CHECK 65/65] Verifying Institutional AFML Meta-Labeling, Triple-Barrier, Purged CV, Deflated Sharpe & HRP Allocator (Invariants 85 & 86)
+    # [CHECK 65/66] Verifying Institutional AFML Meta-Labeling, Triple-Barrier, Purged CV, Deflated Sharpe & HRP Allocator (Invariants 85 & 86)
     # -------------------------------------------------------------------------
-    print("\n[CHECK 65/65] Verifying Institutional AFML Meta-Labeling, Triple-Barrier, Purged CV, Deflated Sharpe & HRP Allocator (Invariants 85 & 86)...")
+    print("\n[CHECK 65/66] Verifying Institutional AFML Meta-Labeling, Triple-Barrier, Purged CV, Deflated Sharpe & HRP Allocator (Invariants 85 & 86)...")
     try:
         import json
         import numpy as np
@@ -3574,6 +3574,70 @@ def run_audit():
             log_fail("Institutional AFML Meta-Labeling & Quantitative Edge (Invariants 85 & 86) validation failed!")
     except Exception as e:
         failures.append(f"Invariants 85-86 check failed: {e}")
+        log_fail(str(e))
+
+    # 66. Invariant 87: Universal Cross-Platform Code Editor Git Push & Zero-Friction VPS Deployment Standard
+    print("\n[CHECK 66/66] Verifying Universal Cross-Platform Code Editor Git Push & Zero-Friction VPS Deployment Standard (Invariant 87)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md and GEMINI.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_md = f.read()
+        has_inv87_agents = "Invariant 87: Universal Cross-Platform Code Editor Git Push & Zero-Friction VPS Deployment Standard" in agents_md
+        has_inv87_gemini = "Universal Cross-Platform Code Editor Git Push & Zero-Friction VPS Deployment Standard (Invariant 87)" in gemini_md
+
+        # 2. .env and .env.example Verification
+        has_env_file = os.path.exists(".env")
+        has_env_example = os.path.exists(".env.example")
+        env_content = ""
+        env_example_content = ""
+        if has_env_file:
+            with open(".env", "r", encoding="utf-8") as f:
+                env_content = f.read()
+        if has_env_example:
+            with open(".env.example", "r", encoding="utf-8") as f:
+                env_example_content = f.read()
+
+        has_env_git_user = 'GIT_PUSH_USER=' in env_content and 'GIT_PUSH_USER_EMAIL=' in env_content
+        has_env_vps_cmd = 'VPS_SYNC_COMMAND=' in env_content and 'auto_update_vps.sh' in env_content
+        has_example_git_user = 'GIT_PUSH_USER=' in env_example_content and 'GIT_PUSH_USER_EMAIL=' in env_example_content
+
+        # 3. git_push_vps.py Verification
+        has_push_script = os.path.exists("git_push_vps.py")
+        has_push_runner = False
+        is_cfg_loaded = False
+        if has_push_script:
+            import git_push_vps as gpv
+            has_push_runner = hasattr(gpv, "execute_git_push_vps") and hasattr(gpv, "configure_git_identity") and hasattr(gpv, "load_env_config")
+            cfg = gpv.load_env_config()
+            is_cfg_loaded = isinstance(cfg, dict) and "GIT_PUSH_USER" in cfg
+
+        # 4. setup_git_hooks.py Non-Blocking Environment
+        with open("setup_git_hooks.py", "r", encoding="utf-8") as hf:
+            hooks_code = hf.read()
+        has_hooks_non_interactive = "GIT_TERMINAL_PROMPT=0" in hooks_code and "GCM_INTERACTIVE=never" in hooks_code
+
+        all_inv87_passed = (
+            has_inv87_agents and has_inv87_gemini and
+            has_env_file and has_env_example and
+            has_env_git_user and has_env_vps_cmd and has_example_git_user and
+            has_push_script and has_push_runner and is_cfg_loaded and
+            has_hooks_non_interactive
+        )
+
+        if all_inv87_passed:
+            log_pass("Universal Cross-Platform Code Editor Git Push & Zero-Friction VPS Deployment Standard (Invariant 87) is 100% locked & certified!")
+        else:
+            failures.append(
+                f"Invariant 87 check failed: inv87_agents={has_inv87_agents}, inv87_gemini={has_inv87_gemini}, "
+                f"env={has_env_file}, env_example={has_env_example}, env_user={has_env_git_user}, "
+                f"vps_cmd={has_env_vps_cmd}, push_script={has_push_script}, push_runner={has_push_runner}, "
+                f"hooks_non_interactive={has_hooks_non_interactive}"
+            )
+            log_fail("Universal Cross-Platform Code Editor Git Push Standard (Invariant 87) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 87 check failed: {e}")
         log_fail(str(e))
 
 
