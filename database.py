@@ -1090,6 +1090,42 @@ def init_db():
         except Exception:
             pass
 
+    # Capital.com Auditable Signal & Decision Ledger (Stage A Institutional Dataset)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS capital_signals_audit_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL NOT NULL,
+            datetime_utc TEXT NOT NULL,
+            engine TEXT NOT NULL,
+            epic TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            raw_score REAL DEFAULT 0.0,
+            post_gate_score REAL DEFAULT 0.0,
+            gate_verdict TEXT NOT NULL,
+            rejection_reason TEXT DEFAULT 'NONE',
+            entry_price REAL DEFAULT 0.0,
+            proposed_sl REAL DEFAULT 0.0,
+            proposed_tp REAL DEFAULT 0.0,
+            spread REAL DEFAULT 0.0,
+            atr_15m REAL DEFAULT 0.0,
+            rsi_15m REAL DEFAULT 0.0,
+            adx_15m REAL DEFAULT 0.0,
+            hurst_exponent REAL DEFAULT 0.50,
+            ou_zscore REAL DEFAULT 0.0,
+            features_json TEXT DEFAULT '{}',
+            outcome_24h TEXT DEFAULT 'PENDING',
+            outcome_pnl_r REAL DEFAULT 0.0,
+            resolved_at REAL DEFAULT 0.0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    try:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_epic_ts ON capital_signals_audit_ledger (epic, timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_verdict ON capital_signals_audit_ledger (gate_verdict)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_engine ON capital_signals_audit_ledger (engine)")
+    except Exception:
+        pass
+
     # Prop Firm Challenge Engine Config & Risk Tracker
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS prop_firm_challenge_config (
@@ -3022,6 +3058,220 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
     except Exception:
         conn.close()
     return {"total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0}
+
+def record_capital_signal_audit(
+    engine: str,
+    epic: str,
+    direction: str,
+    raw_score: float = 0.0,
+    post_gate_score: float = 0.0,
+    gate_verdict: str = "APPROVED",
+    rejection_reason: str = "NONE",
+    entry_price: float = 0.0,
+    proposed_sl: float = 0.0,
+    proposed_tp: float = 0.0,
+    spread: float = 0.0,
+    atr_15m: float = 0.0,
+    rsi_15m: float = 0.0,
+    adx_15m: float = 0.0,
+    hurst_exponent: float = 0.50,
+    ou_zscore: float = 0.0,
+    features_json: Optional[Any] = None
+) -> int:
+    """
+    Stage A Institutional Auditable Feature & Decision Ledger.
+    Records every evaluated signal candidate (both APPROVED and REJECTED) with its complete feature vector.
+    """
+    import json
+    ts = time.time()
+    dt_utc = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    f_json = "{}"
+    if isinstance(features_json, dict):
+        try:
+            safe_dict = {str(k): (float(v) if isinstance(v, (int, float)) else str(v)) for k, v in features_json.items() if not str(k).startswith("_")}
+            f_json = json.dumps(safe_dict)
+        except Exception:
+            f_json = "{}"
+    elif isinstance(features_json, str):
+        f_json = features_json
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_signals_audit_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL NOT NULL,
+            datetime_utc TEXT NOT NULL,
+            engine TEXT NOT NULL,
+            epic TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            raw_score REAL DEFAULT 0.0,
+            post_gate_score REAL DEFAULT 0.0,
+            gate_verdict TEXT NOT NULL,
+            rejection_reason TEXT DEFAULT 'NONE',
+            entry_price REAL DEFAULT 0.0,
+            proposed_sl REAL DEFAULT 0.0,
+            proposed_tp REAL DEFAULT 0.0,
+            spread REAL DEFAULT 0.0,
+            atr_15m REAL DEFAULT 0.0,
+            rsi_15m REAL DEFAULT 0.0,
+            adx_15m REAL DEFAULT 0.0,
+            hurst_exponent REAL DEFAULT 0.50,
+            ou_zscore REAL DEFAULT 0.0,
+            features_json TEXT DEFAULT '{}',
+            outcome_24h TEXT DEFAULT 'PENDING',
+            outcome_pnl_r REAL DEFAULT 0.0,
+            resolved_at REAL DEFAULT 0.0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO capital_signals_audit_ledger
+        (timestamp, datetime_utc, engine, epic, direction, raw_score, post_gate_score,
+         gate_verdict, rejection_reason, entry_price, proposed_sl, proposed_tp, spread,
+         atr_15m, rsi_15m, adx_15m, hurst_exponent, ou_zscore, features_json, outcome_24h)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+    """, (
+        float(ts), str(dt_utc), str(engine), str(epic).upper(), str(direction).upper(),
+        float(raw_score), float(post_gate_score), str(gate_verdict).upper(), str(rejection_reason),
+        float(entry_price), float(proposed_sl), float(proposed_tp), float(spread),
+        float(atr_15m), float(rsi_15m), float(adx_15m), float(hurst_exponent), float(ou_zscore),
+        f_json
+    ))
+    signal_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return signal_id
+
+
+def resolve_capital_signal_outcomes(epic: str, current_price: float, high_price: Optional[float] = None, low_price: Optional[float] = None, lookback_hours: float = 24.0) -> int:
+    """
+    Resolves pending signal outcomes across the 24h horizon for Counterfactual (Shadow) validation.
+    Binary Horizon Target definition:
+    - WIN (+2.0R): Price reached TP1 before SL within lookback window.
+    - LOSS (-1.0R): Price hit SL before TP1.
+    - EXPIRED: Time exceeded 24h without touching either target.
+    """
+    if current_price <= 0:
+        return 0
+    hp = float(high_price or current_price)
+    lp = float(low_price or current_price)
+    now = time.time()
+    min_ts = now - (lookback_hours * 3600.0)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, direction, entry_price, proposed_sl, proposed_tp, timestamp, gate_verdict
+        FROM capital_signals_audit_ledger
+        WHERE epic = ? AND outcome_24h = 'PENDING' AND timestamp >= ?
+    """, (str(epic).upper(), min_ts))
+    pending_signals = cursor.fetchall()
+
+    resolved_count = 0
+    for s_id, s_dir, e_px, sl, tp, s_ts, s_verdict in pending_signals:
+        new_outcome = None
+        pnl_r = 0.0
+        if s_dir == "BUY":
+            if tp > 0 and hp >= tp:
+                new_outcome = "WIN"
+                pnl_r = 2.0
+            elif sl > 0 and lp <= sl:
+                new_outcome = "LOSS"
+                pnl_r = -1.0
+            elif now - s_ts >= 86400.0:
+                new_outcome = "EXPIRED"
+                pnl_r = 0.0
+        elif s_dir == "SELL":
+            if tp > 0 and lp <= tp:
+                new_outcome = "WIN"
+                pnl_r = 2.0
+            elif sl > 0 and hp >= sl:
+                new_outcome = "LOSS"
+                pnl_r = -1.0
+            elif now - s_ts >= 86400.0:
+                new_outcome = "EXPIRED"
+                pnl_r = 0.0
+
+        if new_outcome:
+            cursor.execute("""
+                UPDATE capital_signals_audit_ledger
+                SET outcome_24h = ?, outcome_pnl_r = ?, resolved_at = ?
+                WHERE id = ?
+            """, (new_outcome, pnl_r, now, s_id))
+            resolved_count += 1
+
+    conn.commit()
+    conn.close()
+    return resolved_count
+
+
+def get_capital_signals_audit_summary(engine: Optional[str] = None, days: int = 7) -> Dict[str, Any]:
+    """
+    Aggregates statistical audit summary comparing Approved vs Rejected signals (Counterfactual analysis).
+    """
+    now = time.time()
+    min_ts = now - (days * 86400.0)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = """
+        SELECT gate_verdict, outcome_24h, rejection_reason, COUNT(*)
+        FROM capital_signals_audit_ledger
+        WHERE timestamp >= ?
+    """
+    params: List[Any] = [min_ts]
+    if engine:
+        query += " AND engine = ?"
+        params.append(engine)
+    query += " GROUP BY gate_verdict, outcome_24h, rejection_reason"
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+
+    total_evaluated = 0
+    approved_count = 0
+    rejected_count = 0
+    approved_wins = 0
+    approved_losses = 0
+    rejected_wins = 0
+    rejected_losses = 0
+    rejections_by_reason: Dict[str, int] = {}
+
+    for verd, outc, reason, cnt in rows:
+        total_evaluated += cnt
+        if verd == "APPROVED":
+            approved_count += cnt
+            if outc == "WIN":
+                approved_wins += cnt
+            elif outc == "LOSS":
+                approved_losses += cnt
+        else:
+            rejected_count += cnt
+            if outc == "WIN":
+                rejected_wins += cnt
+            elif outc == "LOSS":
+                rejected_losses += cnt
+            r_str = str(reason or "OTHER")
+            rejections_by_reason[r_str] = rejections_by_reason.get(r_str, 0) + cnt
+
+    app_total_res = approved_wins + approved_losses
+    app_win_rate = (approved_wins / app_total_res * 100.0) if app_total_res > 0 else 0.0
+
+    rej_total_res = rejected_wins + rejected_losses
+    rej_loss_rate = (rejected_losses / rej_total_res * 100.0) if rej_total_res > 0 else 0.0
+
+    return {
+        "days": days,
+        "total_evaluated": total_evaluated,
+        "approved_count": approved_count,
+        "rejected_count": rejected_count,
+        "approved_resolved": app_total_res,
+        "approved_win_rate": round(app_win_rate, 1),
+        "rejected_resolved": rej_total_res,
+        "rejected_saved_loss_rate": round(rej_loss_rate, 1),
+        "top_rejection_reasons": sorted(rejections_by_reason.items(), key=lambda x: x[1], reverse=True)[:5]
+    }
 
 def get_capital_auto_trades(chat_id: int, limit: int = 50) -> list:
     """Returns a list of recent TradFi / Forex auto trades for a user."""

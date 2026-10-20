@@ -2793,6 +2793,29 @@ class SuperSmartCapitalCitadel:
         if not diag.get("is_approved"):
             reason = diag.get("rejection_reason", "SUPER_SMART_CAPITAL_CITADEL_REJECTED")
             print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
+            try:
+                import database as db
+                db.record_capital_signal_audit(
+                    engine="CITADEL_GATEKEEPER",
+                    epic=epic,
+                    direction=direction,
+                    raw_score=float(diag.get("confluence_score", 0.0) or 0.0),
+                    post_gate_score=0.0,
+                    gate_verdict="REJECTED",
+                    rejection_reason=reason,
+                    entry_price=float(diag.get("current_price", 0.0) or 0.0),
+                    proposed_sl=float(diag.get("invalidation_sl", 0.0) or 0.0),
+                    proposed_tp=float(diag.get("target_tp_min", 0.0) or 0.0),
+                    spread=float(diag.get("spread", 0.0) or 0.0),
+                    atr_15m=float(diag.get("atr", 0.0) or 0.0),
+                    rsi_15m=float(diag.get("rsi", 0.0) or 0.0),
+                    adx_15m=float(diag.get("adx", 0.0) or 0.0),
+                    hurst_exponent=float(diag.get("hurst_exponent", 0.50) or 0.50),
+                    ou_zscore=float(diag.get("ou_zscore", 0.0) or 0.0),
+                    features_json=diag
+                )
+            except Exception:
+                pass
             return False, reason, diag
 
         prec = _get_tradfi_precision(epic, diag.get("current_price", 0.0))
@@ -2805,6 +2828,29 @@ class SuperSmartCapitalCitadel:
             f"Score: {diag.get('confluence_score')}% | R:R: 1:{diag.get('risk_reward_ratio')} | "
             f"SL: ${sl_str} | TP: ${tp_str}"
         )
+        try:
+            import database as db
+            db.record_capital_signal_audit(
+                engine="CITADEL_GATEKEEPER",
+                epic=epic,
+                direction=direction,
+                raw_score=float(diag.get("confluence_score", 0.0) or 0.0),
+                post_gate_score=float(diag.get("confluence_score", 0.0) or 0.0),
+                gate_verdict="APPROVED",
+                rejection_reason="NONE",
+                entry_price=float(diag.get("current_price", 0.0) or 0.0),
+                proposed_sl=float(diag.get("invalidation_sl", 0.0) or 0.0),
+                proposed_tp=float(diag.get("target_tp_min", 0.0) or 0.0),
+                spread=float(diag.get("spread", 0.0) or 0.0),
+                atr_15m=float(diag.get("atr", 0.0) or 0.0),
+                rsi_15m=float(diag.get("rsi", 0.0) or 0.0),
+                adx_15m=float(diag.get("adx", 0.0) or 0.0),
+                hurst_exponent=float(diag.get("hurst_exponent", 0.50) or 0.50),
+                ou_zscore=float(diag.get("ou_zscore", 0.0) or 0.0),
+                features_json=diag
+            )
+        except Exception:
+            pass
         return True, "SUPER_SMART_CAPITAL_CLEARANCE_GRANTED", diag
 
 

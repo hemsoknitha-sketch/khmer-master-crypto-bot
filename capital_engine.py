@@ -1150,6 +1150,47 @@ class CapitalComEngine:
         except Exception as e_corr:
             logger.debug(f"Portfolio exposure check note: {e_corr}")
 
+        # Step 0.45: Portfolio Heat Ceiling & Fat-Tail Gap Stress Invalidation (Stage C)
+        try:
+            import portfolio_circuit_breaker
+            cur_bal_data = self.get_account_balance()
+            equity_val = max(float(cur_bal_data.get("equity") or 0.0), float(cur_bal_data.get("balance") or 0.0), 100.0)
+
+            ref_price = self.get_market_price(resolved_epic) or 100.0
+            sl_val = float(stop_level or (ref_price * 0.98 if direction == "BUY" else ref_price * 1.02))
+            est_atr = max(ref_price * 0.005, 0.50)
+
+            stress_calc = portfolio_circuit_breaker.calculate_gap_stress_risk(
+                epic=resolved_epic,
+                size=float(size),
+                entry_price=ref_price,
+                sl_price=sl_val,
+                atr_15m=est_atr
+            )
+
+            open_stress_risks = []
+            for p in open_pos:
+                p_size = float(p.get("size") or p.get("dealSize") or 0.0)
+                p_open = float(p.get("openPrice") or p.get("level") or 0.0)
+                p_sl = float(p.get("stopLevel") or (p_open * 0.98))
+                open_stress_risks.append(p_size * abs(p_open - p_sl) * 1.5)
+
+            is_heat_ok, heat_reason, heat_diag = portfolio_circuit_breaker.validate_portfolio_heat(
+                proposed_stress_risk=stress_calc["stress_dollar_risk"],
+                account_equity=equity_val,
+                open_positions_stress_risks=open_stress_risks,
+                max_heat_pct=6.0
+            )
+            if not is_heat_ok:
+                logger.warning(f"🛑 [PORTFOLIO HEAT GUARD] {resolved_epic} blocked: {heat_reason}")
+                return {
+                    "success": False,
+                    "error": f"PORTFOLIO_HEAT_BLOCKED: {heat_reason}",
+                    "diagnostics": heat_diag
+                }
+        except Exception as e_heat:
+            logger.debug(f"Portfolio heat check note: {e_heat}")
+
         # Step 0b: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
         if getattr(self, "_custom_chat_id", None) and self._custom_chat_id > 0:
             try:
@@ -5564,6 +5605,18 @@ class CapitalAutonomousEngine:
         
         # Step 1: In-Flight Position Management & Ratchet (ALWAYS RUNS 24/7)
         self.monitor_and_ratchet_open_positions(app=app)
+
+        # Stage A: Resolve Pending Signal Outcomes in Audit Ledger (Counterfactual Tracking)
+        try:
+            for c_epic, c_val in _SHARED_PRICE_CACHE.items():
+                m_data = c_val.get("data", {}) if isinstance(c_val, dict) else {}
+                c_bid = float(m_data.get("bid") or 0.0)
+                c_ask = float(m_data.get("ask") or 0.0)
+                c_mid = (c_bid + c_ask) / 2.0 if (c_bid > 0 and c_ask > 0) else float(m_data.get("price") or 0.0)
+                if c_mid > 0:
+                    db.resolve_capital_signal_outcomes(c_epic, current_price=c_mid, high_price=c_ask, low_price=c_bid)
+        except Exception as e_res:
+            logger.debug(f"Signal outcome resolution note: {e_res}")
 
         # Step 1.5: Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00-23:50 ICT or VIP 24/7 Mode)
         # Verifies if at least one active trader is in an active trading window before doing candidate scans

@@ -654,3 +654,103 @@ def get_capital_daily_governor():
     return CapitalDailyAGIGovernor
 
 
+# ==============================================================================
+# STAGE C: FAT-TAIL GAP RISK & PORTFOLIO HEAT GOVERNOR
+# ==============================================================================
+
+def calculate_gap_stress_risk(
+    epic: str,
+    size: float,
+    entry_price: float,
+    sl_price: float,
+    atr_15m: float
+) -> Dict[str, Any]:
+    """
+    Computes fat-tail slippage & weekend gap stress risk.
+    Broker SL is never assumed guaranteed; a 1.5x ATR gap buffer is applied to model worst-case tail risk.
+    """
+    sl_dist = abs(entry_price - sl_price) if (entry_price > 0 and sl_price > 0) else (atr_15m * 2.5)
+    gap_buffer = 1.5 * max(atr_15m, 0.001)
+    standard_loss = float(size) * sl_dist
+    stress_loss = float(size) * (sl_dist + gap_buffer)
+
+    return {
+        "epic": str(epic).upper(),
+        "size": float(size),
+        "entry_price": float(entry_price),
+        "sl_price": float(sl_price),
+        "sl_dist": round(sl_dist, 4),
+        "atr_15m": round(atr_15m, 4),
+        "gap_buffer": round(gap_buffer, 4),
+        "standard_dollar_risk": round(standard_loss, 2),
+        "stress_dollar_risk": round(stress_loss, 2),
+        "tail_risk_expansion_ratio": round(stress_loss / max(1e-4, standard_loss), 2)
+    }
+
+
+def validate_portfolio_heat(
+    proposed_stress_risk: float,
+    account_equity: float,
+    open_positions_stress_risks: List[float],
+    max_heat_pct: float = 6.0
+) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Portfolio Heat Ceiling: Enforces that total open tail risk across all open positions
+    cannot exceed max_heat_pct (6.0%) of account equity simultaneously.
+    """
+    if account_equity <= 0:
+        return True, "ZERO_EQUITY_BYPASS", {}
+
+    current_open_heat = sum(open_positions_stress_risks)
+    projected_total_heat = current_open_heat + proposed_stress_risk
+    projected_heat_pct = (projected_total_heat / account_equity) * 100.0
+
+    diag = {
+        "account_equity": round(account_equity, 2),
+        "current_open_stress_risk": round(current_open_heat, 2),
+        "proposed_stress_risk": round(proposed_stress_risk, 2),
+        "projected_total_heat": round(projected_total_heat, 2),
+        "projected_heat_pct": round(projected_heat_pct, 2),
+        "max_heat_pct": float(max_heat_pct)
+    }
+
+    if projected_heat_pct > max_heat_pct:
+        reason = (
+            f"PORTFOLIO_HEAT_LIMIT_EXCEEDED: Projected portfolio tail risk {projected_heat_pct:.1f}% "
+            f"exceeds institutional ceiling {max_heat_pct:.1f}% (${projected_total_heat:.2f} / ${account_equity:.2f}). "
+            f"Entry blocked for capital preservation."
+        )
+        logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+        return False, reason, diag
+
+    return True, "Portfolio heat limit cleared.", diag
+
+
+def validate_data_continuity(
+    candles: List[Dict[str, Any]],
+    max_allowed_gap_seconds: float = 3600.0
+) -> Tuple[bool, str]:
+    """
+    Data Discontinuity Sentinel: Detects abnormal missing candles or broken price feeds.
+    Freezes execution if data integrity is compromised.
+    """
+    if not candles or len(candles) < 2:
+        return True, "INSUFFICIENT_CANDLES_PASSED"
+
+    for i in range(1, len(candles)):
+        t1 = candles[i-1].get("snapshotTimeEpoch") or candles[i-1].get("time") or candles[i-1].get("ts")
+        t2 = candles[i].get("snapshotTimeEpoch") or candles[i].get("time") or candles[i].get("ts")
+        if t1 and t2:
+            try:
+                diff = abs(float(t2) - float(t1))
+                if diff > max_allowed_gap_seconds:
+                    reason = f"DATA_DISCONTINUITY_FREEZE: Time gap of {diff:.0f}s detected between candles. Feed frozen."
+                    logger.warning(f"🛑 [DATA INTEGRITY] {reason}")
+                    return False, reason
+            except Exception:
+                pass
+
+    return True, "Data continuity verified."
+
+
+
