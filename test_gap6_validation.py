@@ -10,6 +10,7 @@ Rigorous verification of Gap 6 (ចន្លោះទី 6):
   - Full End-to-End Citadel, Spread Drag Manager, and Scale-Out Manager Integration
 """
 
+import os
 import sys
 import unittest
 
@@ -18,6 +19,24 @@ try:
         sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
     pass
+
+# Auto-switch to virtual environment Python if running outside venv
+if sys.prefix == getattr(sys, "base_prefix", sys.prefix):
+    possible_venvs = [
+        os.path.join(os.getcwd(), "venv", "bin", "python"),
+        os.path.join(os.getcwd(), "venv", "bin", "python3"),
+        os.path.join(os.getcwd(), ".venv", "bin", "python"),
+        os.path.join(os.getcwd(), ".venv", "bin", "python3"),
+        "/opt/khmer-master-crypto-bot/venv/bin/python",
+        "/opt/khmer-master-crypto-bot/venv/bin/python3",
+    ]
+    for venv_py in possible_venvs:
+        if os.path.isfile(venv_py) and os.access(venv_py, os.X_OK) and venv_py != sys.executable:
+            try:
+                os.execv(venv_py, [venv_py] + sys.argv)
+            except Exception:
+                pass
+            break
 
 import dynamic_structural_stops as dss
 from super_smart_capital_citadel import SuperSmartCapitalCitadel, TradFiMultiTargetScaleOutManager
