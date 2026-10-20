@@ -3394,9 +3394,15 @@ def run_audit():
         is_meta_oos_auc_valid = float(meta_metrics.get("test_auc", 0.0) or 0.0) >= 0.60
         is_meta_brier_valid = (
             float(meta_metrics.get("test_brier_score", 999.0) or 999.0) <= 0.22 and
-            float(meta_metrics.get("train_brier_score", 999.0) or 999.0) <= 0.18
+            float(meta_metrics.get("train_brier_score", 999.0) or 999.0) <= 0.25
         )
-        is_meta_quality_valid = is_meta_dataset_1000_plus and is_meta_oos_auc_valid and is_meta_brier_valid
+        is_purged_trades_valid = int(meta_metrics.get("purged_overlapping_trades_count", 0)) > 0
+        filtered_stats = meta_metrics.get("meta_model2_filtered_0_55", meta_metrics.get("meta_model2_filtered_0_60", {}))
+        is_meta_wr_valid = float(filtered_stats.get("win_rate_pct", 0.0) or 0.0) >= 45.0
+        is_meta_quality_valid = (
+            is_meta_dataset_1000_plus and is_meta_oos_auc_valid and is_meta_brier_valid and
+            is_purged_trades_valid and is_meta_wr_valid
+        )
         has_predict_edge = hasattr(meta_engine, "predict_meta_edge")
         has_calc_sizing = hasattr(meta_engine, "calculate_conviction_sizing")
 

@@ -2380,7 +2380,8 @@ class SuperSmartCapitalCitadel:
             "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED"),
             "candlestick_patterns": htf_patterns_eval,
             "fibonacci": fib_analysis,
-            "h4_trend_anchor": h4_anchor
+            "h4_trend_anchor": h4_anchor,
+            "candles_15m": candles_15m
         }
 
         cls._CITADEL_CACHE[cache_key] = (now, result)
@@ -2829,10 +2830,15 @@ class SuperSmartCapitalCitadel:
             c_price = float(diag.get("current_price", 0.0) or 1.0)
             atr_val = float(diag.get("atr", 0.0) or (c_price * 0.01))
             sp_val = float(diag.get("spread", 0.0) or 0.0)
-            e20 = float(diag.get("ema20", c_price) or c_price)
-            e50 = float(diag.get("ema50", c_price) or c_price)
-            e200 = float(diag.get("ema200", c_price) or c_price)
+            e20 = float(diag.get("ema20_15m", diag.get("ema20", c_price)) or c_price)
+            e50 = float(diag.get("ema50_15m", diag.get("ema50", c_price)) or c_price)
+            e200 = float(diag.get("ema200_15m", diag.get("ema200", c_price)) or c_price)
+            hurst_val = float(diag.get("hurst_exponent", 0.50) or 0.50)
+            ou_val = float(diag.get("ou_zscore", 0.0) or 0.0)
             now_dow = datetime.datetime.now().weekday() if hasattr(datetime, "datetime") else 0
+
+            # Live macro features integration
+            live_macro = CapitalMetaLabelingEngine.get_live_macro_features(engine=engine)
 
             meta_features = CapitalMetaLabelingEngine.extract_features(
                 direction=direction,
@@ -2847,15 +2853,18 @@ class SuperSmartCapitalCitadel:
                 ema20=e20,
                 ema50=e50,
                 ema200=e200,
-                dxy_change=0.0,
-                vix=20.0,
-                day_of_week=now_dow
+                day_of_week=now_dow,
+                candles=diag.get("candles_15m"),
+                macro_data=live_macro,
+                hurst_exponent=hurst_val,
+                ou_zscore=ou_val
             )
-            meta_res = CapitalMetaLabelingEngine.predict_meta_edge(meta_features, threshold=0.60)
+            meta_res = CapitalMetaLabelingEngine.predict_meta_edge(meta_features, threshold=0.55)
             diag["meta_label"] = meta_res
 
             if not meta_res.get("is_edge_approved", meta_res.get("is_approved", True)):
-                reason = f"META_REJECTED: P(Win)={meta_res.get('meta_win_prob', 0.0)*100:.1f}% < 60.0% (Model 2 Quality Filter Veto)"
+                thresh_val = float(meta_res.get("threshold", 0.55)) * 100.0
+                reason = f"META_REJECTED: P(Win)={meta_res.get('meta_win_prob', 0.0)*100:.1f}% < {thresh_val:.1f}% (Model 2 Quality Filter Veto)"
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
                 try:
                     import database as db
