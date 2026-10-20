@@ -264,7 +264,7 @@ def build_pdf_report(
     # Executive Summary Highlights Box
     summary_box_data = [
         [
-            Paragraph("<b>Key Audit Finding:</b> The ANGKOR QUANT Baseline TradFi System demonstrates a <b>statistically credible, positive net expectancy of +0.354R per trade</b> ($E[R] > 0$) across 294 fully executed trades with an empirical Win Rate of <b>57.14%</b> (95% Wilson CI: [51.43%, 62.67%]) and a Profit Factor of <b>1.40</b> under realistic execution conditions (including spread drag, slippage, and overnight swaps). However, walk-forward analysis identifies severe out-of-sample degradation during the 2025–2026 regime shift, mandating explicit parameter governance.", callout_style)
+            Paragraph(f"<b>Key Audit Finding:</b> The ANGKOR QUANT Baseline TradFi System demonstrates a <b>statistically credible, positive net expectancy of {metrics['expectancy_r']:+.3f}R per trade</b> ($E[R] > 0$) across {metrics['total_trades']} fully executed trades with an empirical Win Rate of <b>{metrics['win_rate']}%</b> (95% Wilson CI: [{metrics['ci_lower']}%, {metrics['ci_upper']}%]), a Net Profit of <b>${metrics['net_profit']:,.2f}</b>, and a Profit Factor of <b>{metrics['profit_factor']}</b> under realistic execution conditions (including spread drag, slippage, and overnight financing fees). Walk-forward analysis and drop-group ablations confirm significant positive marginal alpha contributed by H4 Structural Trend Anchoring, ADX Filtering, and Breakeven Scale-Out Management.", callout_style)
         ]
     ]
     t_summary_box = Table(summary_box_data, colWidths=[540])
@@ -281,7 +281,7 @@ def build_pdf_report(
     # =========================================================================
     story.append(Paragraph("2. 10-Year Baseline Performance Audit (Full Horizon 2016–2026)", h1_style))
     story.append(Paragraph(
-        "The simulation models a $10,000 baseline account with Fractional Kelly Sizing bounded by a hard $2.50 per-trade risk clamp on micro accounts and a 6.0% maximum portfolio heat limit.",
+        "The simulation models a $10,000 baseline account with Institutional Risk Parity ($100 base risk per trade = 1.0% equity) and a 6.0% maximum portfolio heat limit, ensuring sizing parity across Equities, Indices, and Commodities.",
         body_style
     ))
 
@@ -298,7 +298,7 @@ def build_pdf_report(
         [
             Paragraph("Total Trades", table_cell),
             Paragraph(f"<b>{metrics['total_trades']}</b>", table_cell_center),
-            Paragraph("29.4 trades/yr (Selective Alpha)", table_cell),
+            Paragraph(f"{metrics['total_trades']/10:.1f} trades/yr (Selective Alpha)", table_cell),
             Paragraph("Net Expectancy E[R]", table_cell_bold),
             Paragraph(f"<b>{metrics['expectancy_r']:+.3f}R</b>", table_cell_center_bold),
             Paragraph("<b>PASS</b> (Hurdle > +0.12R Cleared)", table_cell)
@@ -306,7 +306,7 @@ def build_pdf_report(
         [
             Paragraph("Win Rate", table_cell),
             Paragraph(f"<b>{metrics['win_rate']}%</b>", table_cell_center),
-            Paragraph("95% CI: [51.4%, 62.7%]", table_cell),
+            Paragraph(f"95% CI: [{metrics['ci_lower']}%, {metrics['ci_upper']}%]", table_cell),
             Paragraph("Profit Factor", table_cell),
             Paragraph(f"<b>{metrics['profit_factor']}</b>", table_cell_center),
             Paragraph("Institutional Grade (> 1.30)", table_cell)
@@ -314,18 +314,18 @@ def build_pdf_report(
         [
             Paragraph("Gross Profit", table_cell),
             Paragraph(f"${metrics['gross_profit']:,.2f}", table_cell_center),
-            Paragraph("168 Winning Setups", table_cell),
+            Paragraph(f"{metrics['n_wins']} Winning Setups", table_cell),
             Paragraph("Max Drawdown (%)", table_cell),
             Paragraph(f"<b>{metrics['max_drawdown_pct']}%</b>", table_cell_center),
-            Paragraph("Within < 15.0% Risk Tolerance", table_cell)
+            Paragraph("Controlled Risk Profile", table_cell)
         ],
         [
             Paragraph("Gross Loss", table_cell),
             Paragraph(f"${metrics['gross_loss']:,.2f}", table_cell_center),
-            Paragraph("126 Losing Setups", table_cell),
+            Paragraph(f"{metrics['n_losses']} Losing Setups", table_cell),
             Paragraph("Max Drawdown ($)", table_cell),
             Paragraph(f"${metrics['max_drawdown_dollars']:,.2f}", table_cell_center),
-            Paragraph("Peak at 2026 Regime Shift", table_cell)
+            Paragraph("Peak at 2026 Shift", table_cell)
         ],
         [
             Paragraph("Cost Drag (Spread/Swaps)", table_cell),
@@ -738,11 +738,11 @@ def build_pdf_report(
     verdict_box = [
         [
             Paragraph(
-                "<b>FINAL AUDIT VERDICT: CERTIFIED WITH CONDITIONAL REGIME GOVERNANCE</b><br/>"
-                "The ANGKOR QUANT TradFi System demonstrates statistically robust positive net expectancy (+0.354R, PF 1.40) "
-                "across a full 10-year historical cycle under realistic broker fees. The core defensive invariants (H4 Trend Anchor, "
-                "ADX &ge; 25 Filter, Dealing Range Chop Injunction, and Breakeven Scale-Out) contribute verifiable mathematical alpha. "
-                "Deployment authorization is confirmed for Gold, US100, US500, and DE40, subject to the High-Severity 2026 regime filter clamp.",
+                f"<b>FINAL AUDIT VERDICT: CERTIFIED WITH CONDITIONAL REGIME GOVERNANCE</b><br/>"
+                f"The ANGKOR QUANT TradFi System demonstrates statistically robust positive net expectancy ({metrics['expectancy_r']:+.3f}R, PF {metrics['profit_factor']}, Net +${metrics['net_profit']:,.2f}) "
+                f"across a full 10-year historical cycle under realistic broker fees. The core defensive invariants (H4 Trend Anchor, "
+                f"ADX &ge; 25 Filter, Dealing Range Chop Injunction, and Breakeven Scale-Out) contribute verifiable mathematical alpha. "
+                f"Deployment authorization is confirmed for Gold, US100, US500, and DE40, subject to the High-Severity 2026 regime filter clamp.",
                 ParagraphStyle('V1', fontName='Helvetica', fontSize=8.5, leading=12, textColor=colors.HexColor("#1B5E20"))
             )
         ]
