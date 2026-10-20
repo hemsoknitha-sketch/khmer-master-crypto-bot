@@ -178,7 +178,100 @@ def fetch_usd_economic_events(force_refresh: bool = False) -> List[Dict[str, Any
     # Sort events by timestamp
     events.sort(key=lambda x: x["timestamp"])
 
-    _CALENDAR_CACHE["events"] = (now, events)
+    if events:
+        _CALENDAR_CACHE["events"] = (now, events)
+        try:
+            _persist_calendar_events_to_db(events)
+        except Exception as e_p:
+            logger.debug(f"Calendar DB persist note: {e_p}")
+        return events
+    else:
+        # Fallback 1: Return memory cache if available (< 24h old)
+        cached_ts, cached_events = _CALENDAR_CACHE.get("events", (0.0, []))
+        if cached_events and (now - cached_ts) < 86400.0:
+            logger.warning("⚠️ [ECONOMIC CALENDAR] Network fetch returned no events; using 24h RAM cache.")
+            return cached_events
+        # Fallback 2: Load from SQLite database
+        db_events = _load_calendar_events_from_db()
+        if db_events:
+            logger.warning("⚠️ [ECONOMIC CALENDAR] Network fetch returned no events; recovered from DB store.")
+            _CALENDAR_CACHE["events"] = (now, db_events)
+            return db_events
+        return []
+
+
+def _persist_calendar_events_to_db(events: List[Dict[str, Any]]) -> None:
+    """Persists fetched economic events to bot_database.db for offline fail-safe recovery."""
+    if not events:
+        return
+    try:
+        import sqlite3
+        conn = sqlite3.connect("bot_database.db", timeout=5.0)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS economic_calendar_events (
+                key TEXT PRIMARY KEY,
+                title TEXT,
+                impact TEXT,
+                timestamp REAL,
+                date_str TEXT,
+                updated_at REAL
+            )
+        """)
+        now_ts = time.time()
+        for ev in events:
+            ev_ts = float(ev.get("timestamp", 0.0))
+            key = f"{ev.get('title', '')[:30]}_{int(ev_ts)}"
+            cursor.execute("""
+                INSERT OR REPLACE INTO economic_calendar_events (key, title, impact, timestamp, date_str, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (key, ev.get("title", ""), ev.get("impact", "High"), ev_ts, str(ev.get("date_str", "")), now_ts))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.debug(f"Calendar DB persist exception: {e}")
+
+
+def _load_calendar_events_from_db() -> List[Dict[str, Any]]:
+    """Loads cached economic events from bot_database.db for offline fail-safe recovery."""
+    events: List[Dict[str, Any]] = []
+    try:
+        import sqlite3
+        conn = sqlite3.connect("bot_database.db", timeout=5.0)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS economic_calendar_events (
+                key TEXT PRIMARY KEY,
+                title TEXT,
+                impact TEXT,
+                timestamp REAL,
+                date_str TEXT,
+                updated_at REAL
+            )
+        """)
+        now_ts = time.time()
+        # Fetch events from the last 2 days up to the next 7 days
+        min_ts = now_ts - 172800.0
+        max_ts = now_ts + 604800.0
+        cursor.execute("""
+            SELECT title, impact, timestamp, date_str FROM economic_calendar_events
+            WHERE timestamp >= ? AND timestamp <= ?
+            ORDER BY timestamp ASC
+        """, (min_ts, max_ts))
+        rows = cursor.fetchall()
+        conn.close()
+        for r in rows:
+            title, impact, ts, date_str = r
+            dt_utc = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc)
+            events.append({
+                "title": title,
+                "impact": impact,
+                "datetime_utc": dt_utc,
+                "timestamp": ts,
+                "date_str": date_str
+            })
+    except Exception as e:
+        logger.debug(f"Calendar DB load exception: {e}")
     return events
 
 
@@ -231,9 +324,29 @@ def check_red_folder_blackout() -> Dict[str, Any]:
     3. POST_EVENT: 15 minutes post-release spread cooling and reaction window.
     """
     now_utc = datetime.datetime.now(datetime.timezone.utc)
-    now_ts = now_utc.timestamp()
-
     events = fetch_usd_economic_events()
+    if not events:
+        is_weekday = now_utc.weekday() < 5
+        in_macro_hour = (12 <= now_utc.hour < 15) and (20 <= now_utc.minute or now_utc.hour >= 13)
+        if is_weekday and in_macro_hour:
+            return {
+                "is_blackout": True,
+                "phase": "FAIL_SAFE_ECONOMIC_STANDBY",
+                "event_name": "US Macro Economic Window (Feed Offline Guard)",
+                "minutes_remaining": 30.0,
+                "datetime_utc": now_utc,
+                "event_time_utc": now_utc.strftime("%H:%M UTC"),
+                "reason": "Economic calendar feed offline during prime US release window (12:20-14:45 UTC). Standby engaged to preserve capital."
+            }
+        return {
+            "is_blackout": False,
+            "phase": "NORMAL",
+            "event_name": "",
+            "minutes_remaining": 0.0,
+            "reason": "Normal trading regime (No Red Folder economic events active)"
+        }
+
+    now_ts = now_utc.timestamp()
     for ev in events:
         ev_ts = ev["timestamp"]
         diff_sec = ev_ts - now_ts

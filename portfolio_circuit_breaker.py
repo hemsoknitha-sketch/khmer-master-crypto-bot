@@ -187,7 +187,94 @@ def apply_cross_asset_correlation_clamp(proposed_epic: str, base_size: float, op
                 logger.info(f"🛡️ [CORRELATION CLAMP] {prop_u}: {reason}")
                 return clamped, reason
 
-    return base_size, "Normal sizing (No systemic correlation overlap)"
+
+# Cross-Asset Correlation Portfolio Risk Limits (AQ80 Risk Pillar & Institutional Risk Armor)
+CORRELATION_GROUP_LIMITS = {
+    "TECH_EQUITIES": {
+        "basket": {"US100", "NASDAQ", "US500", "SP500", "DE40", "GERMANY40", "NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"},
+        "max_concurrent": 2,
+        "name": "US Tech & Equities"
+    },
+    "PRECIOUS_METALS": {
+        "basket": {"GOLD", "XAUUSD", "SILVER", "XAGUSD"},
+        "max_concurrent": 1,
+        "name": "Precious Metals"
+    },
+    "ENERGY_COMMODITIES": {
+        "basket": {"OIL", "OIL_CRUDE", "GAS", "NATURALGAS"},
+        "max_concurrent": 1,
+        "name": "Energy Commodities"
+    }
+}
+MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS = 4
+
+
+def validate_cross_asset_portfolio_exposure(proposed_epic: str, open_epics: List[str]) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Validates cross-asset portfolio exposure to prevent correlated liquidation cascades:
+    1. Duplicate Epic Lock: Blocks opening if proposed asset already has an active position.
+    2. Tech/Equities Basket: Max 2 simultaneous open positions (e.g. US100 + NVDA).
+    3. Precious Metals Basket: Max 1 simultaneous open position (Gold OR Silver).
+    4. Energy Basket: Max 1 simultaneous open position.
+    5. Global TradFi Cap: Max 4 simultaneous open positions across all assets.
+    """
+    prop_u = str(proposed_epic or "").upper().strip()
+    existing_u = [str(e or "").upper().strip() for e in open_epics if e]
+
+    diag: Dict[str, Any] = {
+        "proposed_epic": prop_u,
+        "open_count": len(existing_u),
+        "existing_epics": existing_u,
+        "group_matched": None,
+        "current_group_count": 0,
+        "limit": None
+    }
+
+    # 1. Total TradFi position cap
+    if len(existing_u) >= MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS:
+        reason = f"Global TradFi position limit reached ({len(existing_u)}/{MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS} active). Cannot add {prop_u}."
+        logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+        return False, reason, diag
+
+    # 2. Duplicate Asset Lock (Universal deduplication)
+    for held in existing_u:
+        if prop_u == held or (prop_u in held and len(prop_u) >= 4) or (held in prop_u and len(held) >= 4):
+            reason = f"Duplicate asset protection: Already holding open position on {held}."
+            logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+            return False, reason, diag
+
+    # 3. Correlated Group Exposure Limits
+    for grp_key, grp_cfg in CORRELATION_GROUP_LIMITS.items():
+        basket = grp_cfg["basket"]
+        max_allowed = grp_cfg["max_concurrent"]
+        grp_name = grp_cfg["name"]
+
+        # Check if proposed asset belongs to this basket
+        is_prop_in_basket = any(x in prop_u for x in basket)
+        if not is_prop_in_basket:
+            continue
+
+        diag["group_matched"] = grp_key
+        diag["limit"] = max_allowed
+
+        # Count currently open assets in this basket
+        held_in_group = []
+        for held in existing_u:
+            if any(x in held for x in basket):
+                held_in_group.append(held)
+
+        diag["current_group_count"] = len(held_in_group)
+        diag["held_in_group"] = held_in_group
+
+        if len(held_in_group) >= max_allowed:
+            reason = (
+                f"{grp_name} correlation exposure cap reached ({len(held_in_group)}/{max_allowed} active: "
+                f"{', '.join(held_in_group)}). Entry on {prop_u} blocked to prevent systemic liquidation contagion."
+            )
+            logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+            return False, reason, diag
+
+    return True, "Portfolio correlation exposure limits cleared.", diag
 
 
 # ==============================================================================

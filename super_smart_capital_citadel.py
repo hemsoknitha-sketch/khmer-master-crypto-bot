@@ -594,9 +594,12 @@ class TradFiFairValueGapEngine:
         if not candles or len(candles) < 10:
             return []
         fvgs = []
-        n = len(candles)
-        highs = [float(c.get("high", 0.0)) for c in candles]
-        lows = [float(c.get("low", 0.0)) for c in candles]
+        # Look-Ahead Bias & Premature Formation Elimination:
+        # Strip incomplete/active forming bar (candles[-1]) to ensure all 3 bars of the FVG are 100% closed
+        eval_candles = candles[:-1] if len(candles) >= 12 else candles
+        n = len(eval_candles)
+        highs = [float(c.get("high", 0.0)) for c in eval_candles]
+        lows = [float(c.get("low", 0.0)) for c in eval_candles]
 
         for i in range(max(2, n - 20), n):
             # Bullish FVG (BISI)
@@ -1048,11 +1051,14 @@ class TradFiH4MarketStructureAnchor:
         ema50 = float(s_closes.ewm(span=50, adjust=False).mean().iloc[-1]) if len(closes) >= 20 else ema20
         ema200 = float(s_closes.ewm(span=200, adjust=False).mean().iloc[-1]) if len(closes) >= 40 else ema50
 
-        # Fractal Swings on H4
-        n = len(candles_h4)
-        w = 2 if n >= 25 else 1
-        shs = [highs[i] for i in range(w, n - w) if all(highs[i] >= highs[i - k] and highs[i] >= highs[i + k] for k in range(1, w + 1))]
-        sls = [lows[i] for i in range(w, n - w) if all(lows[i] <= lows[i - k] and lows[i] <= lows[i + k] for k in range(1, w + 1))]
+        # Fractal Swings on H4: Strip unclosed active H4 candle to prevent phantom pivots & look-ahead bias
+        closed_h4 = candles_h4[:-1] if len(candles_h4) >= 25 else candles_h4
+        n_closed = len(closed_h4)
+        h_closed = [float(c.get("high", 0.0)) for c in closed_h4]
+        l_closed = [float(c.get("low", 0.0)) for c in closed_h4]
+        w = 2 if n_closed >= 25 else 1
+        shs = [h_closed[i] for i in range(w, n_closed - w) if all(h_closed[i] >= h_closed[i - k] and h_closed[i] >= h_closed[i + k] for k in range(1, w + 1))]
+        sls = [l_closed[i] for i in range(w, n_closed - w) if all(l_closed[i] <= l_closed[i - k] and l_closed[i] <= l_closed[i + k] for k in range(1, w + 1))]
 
         has_hh = len(shs) >= 2 and shs[-1] > shs[-2]
         has_hl = len(sls) >= 2 and sls[-1] > sls[-2]
@@ -2396,11 +2402,13 @@ class SuperSmartCapitalCitadel:
         if not candles or len(candles) < 15:
             return []
         obs = []
-        n = len(candles)
-        opens = [float(c.get("open", 0.0)) for c in candles]
-        highs = [float(c.get("high", 0.0)) for c in candles]
-        lows = [float(c.get("low", 0.0)) for c in candles]
-        closes = [float(c.get("close", 0.0)) for c in candles]
+        # Strip unclosed active candle so order blocks are strictly formed from 100% closed price action
+        eval_candles = candles[:-1] if len(candles) >= 15 else candles
+        n = len(eval_candles)
+        opens = [float(c.get("open", 0.0)) for c in eval_candles]
+        highs = [float(c.get("high", 0.0)) for c in eval_candles]
+        lows = [float(c.get("low", 0.0)) for c in eval_candles]
+        closes = [float(c.get("close", 0.0)) for c in eval_candles]
 
         body_sizes = [abs(closes[i] - opens[i]) for i in range(n)]
         avg_body = np.mean(body_sizes[-20:]) if len(body_sizes) >= 20 else np.mean(body_sizes)
@@ -2504,15 +2512,17 @@ class SuperSmartCapitalCitadel:
         }
         if not candles or len(candles) < 20:
             return res
-        n = len(candles)
-        highs = [float(c.get("high", 0.0)) for c in candles]
-        lows = [float(c.get("low", 0.0)) for c in candles]
+        # Look-Ahead Bias Elimination: Evaluate fractal swings strictly on 100% closed candles
+        closed_candles = candles[:-1] if len(candles) >= 20 else candles
+        n_closed = len(closed_candles)
+        c_highs = [float(c.get("high", 0.0)) for c in closed_candles]
+        c_lows = [float(c.get("low", 0.0)) for c in closed_candles]
+
+        shs = [(i, c_highs[i]) for i in range(2, n_closed - 2) if c_highs[i] > c_highs[i-1] and c_highs[i] > c_highs[i-2] and c_highs[i] > c_highs[i+1] and c_highs[i] > c_highs[i+2]]
+        sls = [(i, c_lows[i]) for i in range(2, n_closed - 2) if c_lows[i] < c_lows[i-1] and c_lows[i] < c_lows[i-2] and c_lows[i] < c_lows[i+1] and c_lows[i] < c_lows[i+2]]
+
         closes = [float(c.get("close", 0.0)) for c in candles]
-
-        shs = [(i, highs[i]) for i in range(2, n - 2) if highs[i] > highs[i-1] and highs[i] > highs[i-2] and highs[i] > highs[i+1] and highs[i] > highs[i+2]]
-        sls = [(i, lows[i]) for i in range(2, n - 2) if lows[i] < lows[i-1] and lows[i] < lows[i-2] and lows[i] < lows[i+1] and lows[i] < lows[i+2]]
-
-        curr_close = closes[-1]
+        curr_close = closes[-1] if closes else 0.0
 
         # CHoCH (Trend Reversal)
         if len(shs) >= 2:

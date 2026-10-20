@@ -191,6 +191,34 @@ DEFAULT_CAPITAL_PASSWORD = "Vipheavy@2297!"
 # Global In-Memory Shared RAM Cache for TradFi Quotes (< 0.05ms)
 _SHARED_PRICE_CACHE: Dict[str, Dict[str, Any]] = {}
 
+def get_fresh_cached_market(epic: str, max_age_seconds: float = 5.0) -> Optional[Dict[str, Any]]:
+    """
+    Pillar Data Integrity: Retrieves live market quote from _SHARED_PRICE_CACHE.
+    Strictly rejects quotes older than max_age_seconds (default: 5.0s) to eliminate stale quote execution.
+    """
+    resolved = EPIC_MAP.get(str(epic).upper(), str(epic).upper())
+    cached = _SHARED_PRICE_CACHE.get(resolved)
+    if not cached:
+        return None
+    now_ts = time.time()
+    quote_ts = float(cached.get("timestamp", 0.0))
+    if (now_ts - quote_ts) > max_age_seconds:
+        return None
+    return cached.get("data")
+
+# In-Memory Cross-Engine Asset Execution Mutex Locks (Zero Concurrent Order Double-Fill)
+_ASSET_EXECUTION_MUTEX = threading.Lock()
+_ASSET_LOCKS: Dict[str, threading.Lock] = {}
+
+def _get_asset_lock(epic: str) -> threading.Lock:
+    """Returns a thread lock dedicated to a specific asset epic."""
+    resolved = EPIC_MAP.get(str(epic).upper(), str(epic).upper())
+    with _ASSET_EXECUTION_MUTEX:
+        if resolved not in _ASSET_LOCKS:
+            _ASSET_LOCKS[resolved] = threading.Lock()
+        return _ASSET_LOCKS[resolved]
+
+
 # ==============================================================================
 # UNIVERSAL IN-MEMORY 45-MINUTE POST-SL QUARANTINE LOCK (INVARIANT 35 & AQ80 PILLAR 3)
 # ==============================================================================
@@ -1009,6 +1037,49 @@ class CapitalComEngine:
     ) -> Dict[str, Any]:
         """
         Executes a Market CFD order on Capital.com with full risk protection.
+        Guarantees cross-engine mutex isolation against concurrent double execution on the same epic.
+        """
+        resolved_epic = EPIC_MAP.get(str(epic).upper(), str(epic).upper())
+        asset_lock = _get_asset_lock(resolved_epic)
+        if not asset_lock.acquire(blocking=False):
+            logger.warning(f"🛑 [MUTEX ORDER LOCK] Concurrent order rejected: Another order is in-flight for {resolved_epic}")
+            return {
+                "success": False,
+                "error": f"CONCURRENT_ORDER_LOCK: Another order is currently being executed on {resolved_epic}."
+            }
+        try:
+            return self._place_position_core(
+                epic=epic,
+                direction=direction,
+                size=size,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                guaranteed_stop=guaranteed_stop,
+                max_allowed_spread=max_allowed_spread,
+                bypass_citadel=bypass_citadel,
+                stop_level=stop_level,
+                profit_level=profit_level,
+                **kwargs
+            )
+        finally:
+            asset_lock.release()
+
+    def _place_position_core(
+        self,
+        epic: str,
+        direction: str,
+        size: float,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        guaranteed_stop: bool = False,
+        max_allowed_spread: Optional[float] = None,
+        bypass_citadel: bool = False,
+        stop_level: Optional[float] = None,
+        profit_level: Optional[float] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Executes a Market CFD order on Capital.com with full risk protection.
         
         Parameters:
         - epic: Instrument symbol (e.g. 'GOLD', 'US500', 'BTCUSD')
@@ -1057,6 +1128,28 @@ class CapitalComEngine:
                 "error": f"QUARANTINE_BLOCKED: {resolved_epic} is quarantined ({int(rem_q)}s remaining) after recent stop-loss to eliminate revenge trading and knife loops."
             }
 
+        # Step 0.4: Cross-Asset Correlation Exposure Cap (AQ80 Risk Pillar & Institutional Risk Armor)
+        try:
+            import portfolio_circuit_breaker
+            open_pos = self.get_open_positions()
+            current_open_epics = [
+                p.get("epic") or p.get("market", {}).get("epic")
+                for p in open_pos if (p.get("epic") or p.get("market", {}).get("epic"))
+            ]
+            is_corr_ok, corr_reason, corr_diag = portfolio_circuit_breaker.validate_cross_asset_portfolio_exposure(
+                proposed_epic=resolved_epic,
+                open_epics=current_open_epics
+            )
+            if not is_corr_ok:
+                logger.warning(f"🛑 [PORTFOLIO RISK GUARD] {resolved_epic} blocked: {corr_reason}")
+                return {
+                    "success": False,
+                    "error": f"PORTFOLIO_EXPOSURE_BLOCKED: {corr_reason}",
+                    "diagnostics": corr_diag
+                }
+        except Exception as e_corr:
+            logger.debug(f"Portfolio exposure check note: {e_corr}")
+
         # Step 0b: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
         if getattr(self, "_custom_chat_id", None) and self._custom_chat_id > 0:
             try:
@@ -1089,11 +1182,31 @@ class CapitalComEngine:
                 "error": f"Market {resolved_epic} is currently {status} (TradFi markets closed on weekends/holidays)."
             }
 
-        spread = market_info.get("spread", 0.0)
-        if max_allowed_spread and spread > max_allowed_spread:
+        # Mandatory Default Spread Guard (Institutional Protection)
+        spread = float(market_info.get("spread", 0.0) or 0.0)
+        current_bid = float(market_info.get("bid", 0.0) or 0.0)
+        effective_max_spread = max_allowed_spread
+        if effective_max_spread is None:
+            up_epic = resolved_epic.upper()
+            if "GOLD" in up_epic or "XAU" in up_epic:
+                effective_max_spread = 0.85
+            elif "US100" in up_epic or "NAS100" in up_epic:
+                effective_max_spread = 2.80
+            elif "US500" in up_epic or "SPX" in up_epic:
+                effective_max_spread = 0.80
+            elif "DE40" in up_epic or "GERMANY" in up_epic:
+                effective_max_spread = 2.50
+            elif "OIL" in up_epic:
+                effective_max_spread = 0.08
+            elif "SILVER" in up_epic or "XAG" in up_epic:
+                effective_max_spread = 0.06
+            elif current_bid > 0:
+                effective_max_spread = round(current_bid * 0.0015, 3)
+
+        if effective_max_spread and spread > effective_max_spread:
             return {
                 "success": False,
-                "error": f"Spread Guard rejection: Current spread {spread} exceeds max limit {max_allowed_spread}."
+                "error": f"Spread Guard rejection: Current spread {spread} exceeds max limit {effective_max_spread}."
             }
 
         # Step 1b: Super Smart Capital Citadel Institutional Gatekeeper Lock
@@ -1462,11 +1575,31 @@ class CapitalComEngine:
                 "error": f"Market {resolved_epic} is currently {status} (TradFi markets closed on weekends/holidays)."
             }
 
-        spread = market_info.get("spread", 0.0)
-        if max_allowed_spread and spread > max_allowed_spread:
+        # Mandatory Default Spread Guard (Institutional Protection)
+        spread = float(market_info.get("spread", 0.0) or 0.0)
+        current_bid = float(market_info.get("bid", 0.0) or 0.0)
+        effective_max_spread = max_allowed_spread
+        if effective_max_spread is None:
+            up_epic = resolved_epic.upper()
+            if "GOLD" in up_epic or "XAU" in up_epic:
+                effective_max_spread = 0.85
+            elif "US100" in up_epic or "NAS100" in up_epic:
+                effective_max_spread = 2.80
+            elif "US500" in up_epic or "SPX" in up_epic:
+                effective_max_spread = 0.80
+            elif "DE40" in up_epic or "GERMANY" in up_epic:
+                effective_max_spread = 2.50
+            elif "OIL" in up_epic:
+                effective_max_spread = 0.08
+            elif "SILVER" in up_epic or "XAG" in up_epic:
+                effective_max_spread = 0.06
+            elif current_bid > 0:
+                effective_max_spread = round(current_bid * 0.0015, 3)
+
+        if effective_max_spread and spread > effective_max_spread:
             return {
                 "success": False,
-                "error": f"Spread Guard rejection: Current spread {spread} exceeds max limit {max_allowed_spread}."
+                "error": f"Spread Guard rejection: Current spread {spread} exceeds max limit {effective_max_spread}."
             }
 
         # Step 1b: Super Smart Capital Citadel Institutional Gatekeeper Lock
@@ -3855,7 +3988,7 @@ class CapitalAutonomousEngine:
 
             # Compute real current market price and spread
             current_price = entry_level + (upl / size) if direction == "BUY" else entry_level - (upl / size)
-            cached_market = _SHARED_PRICE_CACHE.get(epic_u, {}).get("data", {})
+            cached_market = get_fresh_cached_market(epic_u, max_age_seconds=5.0) or {}
             spread = cached_market.get("spread", 0.0)
             if spread <= 0:
                 spread = 0.60 if "GOLD" in epic_u else (0.05 if "OIL" in epic_u else 1.0)
@@ -5954,7 +6087,7 @@ class CapitalLeadLagArbitrageEngine:
         telemetry_pairs = {}
         for binance_sym, capital_epic in self.BINANCE_TO_CAPITAL_MAP.items():
             binance_px = websocket_engine.get_fast_price(binance_sym)
-            cap_cached = _SHARED_PRICE_CACHE.get(capital_epic, {}).get("data", {})
+            cap_cached = get_fresh_cached_market(capital_epic, max_age_seconds=5.0) or {}
             cap_mid = cap_cached.get("mid", 0.0)
             cap_bid = cap_cached.get("bid", 0.0)
             cap_ask = cap_cached.get("ask", 0.0)
@@ -6158,14 +6291,14 @@ class CapitalOpeningRangeBreakoutEngine:
         engine = get_capital_engine(is_demo=False)
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
 
-        # Fetch recent 5m candles (last 15 candles)
-        candles = engine.get_historical_prices(resolved_epic, resolution="MINUTE_5", max_bars=15)
+        # Fetch 5m candles (fetching 36 candles = 3 hours to cover session opening reliably)
+        candles = engine.get_historical_prices(resolved_epic, resolution="MINUTE_5", max_bars=36)
         if not candles or len(candles) < 3:
             return None
 
         # Determine start hour and minute for the opening range
-        # Supports both Broker UTC (08:00 London, 13:30 NY) and Local ICT (15:00 London, 20:30 NY)
-        target_hours = [8, 15] if session_name == "LONDON" else [13, 20]
+        # Supports both Broker UTC (07:00/08:00 London DST/Winter, 13:30/14:30 NY DST/Winter) and Local ICT (14:00/15:00 London, 20:30/21:30 NY)
+        target_hours = [7, 8, 14, 15] if session_name == "LONDON" else [13, 14, 20, 21]
         target_min = 0 if session_name == "LONDON" else 30
 
         or_candles = []
@@ -6183,9 +6316,10 @@ class CapitalOpeningRangeBreakoutEngine:
                     except ValueError:
                         pass
 
-        # Fallback to the 3 candles preceding current moment if timestamp filter didn't catch
+        # Data Integrity Guard: Require at least 2 valid session-opening candles.
+        # Eliminate arbitrary fallback to mid-day candles to prevent phantom breakouts.
         if len(or_candles) < 2:
-            or_candles = candles[-3:]
+            return None
 
         highs = [c["high"] for c in or_candles if c.get("high", 0) > 0]
         lows = [c["low"] for c in or_candles if c.get("low", 0) > 0]
@@ -7062,8 +7196,11 @@ class CapitalOpeningRangeBreakoutEngine:
             self._session_trades.add(trade_key)
             self._stats["total_breakouts_detected"] += 1
 
-            # Query live spread from cache
-            cached_mkt = _SHARED_PRICE_CACHE.get(resolved_epic.upper(), {}).get("data", {})
+            # Query live spread with freshness validation (< 5.0s stale quote guard)
+            cached_mkt = get_fresh_cached_market(resolved_epic.upper(), max_age_seconds=5.0)
+            if not cached_mkt:
+                mkt_fresh = engine.get_market_details(resolved_epic, force_refresh=True)
+                cached_mkt = mkt_fresh if (mkt_fresh and mkt_fresh.get("success")) else {}
             spread_val = cached_mkt.get("spread", 0.0)
             if spread_val <= 0:
                 spread_val = 0.60 if "GOLD" in resolved_epic.upper() else (0.05 if "OIL" in resolved_epic.upper() else 1.0)
