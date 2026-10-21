@@ -132,16 +132,17 @@ def dsr_with_moments(returns: np.ndarray, total_trials: int = 700) -> Dict[str, 
         ku = 3.0
 
     trials = max(2, total_trials)
-    # Conservative DSR Variant: sr_star = sqrt(2*ln(trials)/n) without scaling by denom.
+    # Conservative DSR Variant: sr_star = sqrt(2*ln(trials)/(n-1)) using unbiased estimator degrees of freedom df = n - 1.
     # Note: When denom < 1.0 (as with negative skew/fat tails, denom=0.8550), unscaled sr_star
     # produces a strictly higher threshold hurdle (~1.17x stricter) than Standard Bailey-Lopez de Prado
     # where sr_star = denom * sqrt(2*ln(trials)/(n-1)).
-    sr_star = float(np.sqrt(2.0 * np.log(trials) / n))
+    df = max(1, n - 1)
+    sr_star = float(np.sqrt(2.0 * np.log(trials) / df))
     denom = float(np.sqrt(max(1e-9, 1.0 - sk * sr + ((ku - 1.0) / 4.0) * (sr ** 2))))
     if denom <= 0:
         return {"dsr": 0.0, "sr": sr, "sr_star": sr_star, "skew": sk, "kurt": ku, "denom": 1.0}
 
-    z = (sr - sr_star) * np.sqrt(max(1, n - 1)) / denom
+    z = (sr - sr_star) * np.sqrt(df) / denom
     dsr = float(norm.cdf(z))
     return {
         "dsr": float(np.clip(dsr, 0.0, 1.0)),
@@ -184,7 +185,9 @@ def required_sample_for_dsr(
     kurt: Optional[float] = None,
     denom_mode: str = "recomputed_at_sr",
     conservative_variant: bool = True,
-    rounding_mode: str = "ceil_buffer"
+    rounding_mode: str = "exact_root",
+    df_mode: str = "n_minus_1",
+    min_z_margin: float = 0.0010
 ) -> int:
     """
     Computes minimum sample size N required for DSR >= target_dsr.
@@ -195,20 +198,24 @@ def required_sample_for_dsr(
     distributions with fat tails and serial dependence, N_req is a calibrated fiduciary
     estimate rather than an exact distribution-free invariant.
 
+    df_mode:
+      - "n_minus_1" (default, Bailey & Lopez de Prado 2014): Explicit df = N - 1.
+      - "n": df = N.
+
     denom_mode:
       - "recomputed_at_sr": Recomputes denom dynamically at per_trade_sr using skewness and kurt.
                             This is epistemologically rigorous when testing counterfactual lower-SR bounds.
       - "point_estimate": Keeps the input denom constant regardless of per_trade_sr.
 
     conservative_variant:
-      - True (default): sr_star = sqrt(2*ln(trials)/N), producing a stricter fiduciary buffer
+      - True (default): sr_star = sqrt(2*ln(trials)/(N-1)), producing a stricter fiduciary buffer
                         (~1.25x larger N when denom < 1.0).
       - False (Standard Bailey-Lopez de Prado 2014): sr_star is scaled by denom.
 
     rounding_mode:
-      - "ceil_buffer" (default): Adds +1 fiduciary safety buffer to the crossing root (e.g., 543 -> 544,
-                                710 -> 711) ensuring strict over-compliance under discrete trade arrivals.
-      - "exact_root": Returns the exact minimum integer N where the condition holds (e.g., 543, 710).
+      - "exact_root" (default): Returns the exact minimum integer N where the condition holds
+                               (e.g., N=544 for Primary Lower 1-sigma, N=711 for Ultra-Safe Lower 90%).
+      - "ceil_buffer": Adds +1 safety buffer to the crossing root if z_margin < min_z_margin.
     """
     if per_trade_sr <= 0:
         return 99999
@@ -223,18 +230,30 @@ def required_sample_for_dsr(
         d = max(1e-9, float(denom))
 
     lo, hi = 30, 100000
-    for _ in range(80):
+    while lo < hi:
         mid = (lo + hi) // 2
+        df = max(1, mid - 1) if df_mode == "n_minus_1" else max(1, mid)
         if conservative_variant:
-            sr_star = a / np.sqrt(mid)
-            z_obs = (per_trade_sr - sr_star) * np.sqrt(mid - 1) / d
+            sr_star = a / np.sqrt(df)
+            z_obs = (per_trade_sr - sr_star) * np.sqrt(df) / d
         else:
-            z_obs = (per_trade_sr * np.sqrt(mid - 1) / d) - a
+            z_obs = (per_trade_sr * np.sqrt(df) / d) - a
         if z_obs >= z_target:
             hi = mid
         else:
-            lo = mid
-    return int(hi + 1) if rounding_mode == "ceil_buffer" else int(hi)
+            lo = mid + 1
+
+    root_n = int(hi)
+    if rounding_mode == "ceil_buffer":
+        df = max(1, root_n - 1) if df_mode == "n_minus_1" else max(1, root_n)
+        if conservative_variant:
+            sr_star = a / np.sqrt(df)
+            z_obs = (per_trade_sr - sr_star) * np.sqrt(df) / d
+        else:
+            z_obs = (per_trade_sr * np.sqrt(df) / d) - a
+        if (z_obs - z_target) < min_z_margin:
+            return root_n + 1
+    return root_n
 
 
 def bootstrap_mdd(
