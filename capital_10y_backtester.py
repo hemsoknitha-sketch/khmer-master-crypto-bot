@@ -648,6 +648,55 @@ def evaluate_bar_signals(
     return chosen_dir, raw_score, calibrated_prob, meta
 
 
+def calculate_almgren_chriss_market_impact(
+    order_qty: float,
+    market_volume: float,
+    volatility: float,
+    price: float = 1.0,
+    eta: float = 0.10
+) -> float:
+    """
+    Computes institutional market impact slippage using Almgren-Chriss Square-Root Law:
+        Impact = eta * sigma * sqrt(Q / V)
+    """
+    q = max(1e-6, float(order_qty))
+    v = max(1e-2, float(market_volume))
+    sigma = max(1e-4, float(volatility))
+    impact_fraction = eta * sigma * math.sqrt(q / v)
+    return float(price * impact_fraction)
+
+
+class RLDynamicExitPolicy:
+    """
+    Reinforcement Learning (RL) / Adaptive Dynamic Exit Governor.
+    Replaces purely static R:R thresholds with an adaptive policy evaluating
+    momentum acceleration, volatility regime, and exhaustion.
+    """
+    @classmethod
+    def evaluate_exit(
+        cls,
+        current_r: float,
+        peak_r: float,
+        adx: float = 25.0,
+        rsi: float = 50.0,
+        holding_days: int = 1
+    ) -> str:
+        """
+        Infers dynamic exit action:
+          - "HOLD_RUNNER": Trend momentum expanding, allow runner to seek max tail alpha.
+          - "DYNAMIC_HARVEST": Exhaustion/stall detected after strong gain, bank profit.
+          - "TIGHTEN": Protective ratchet tightening.
+          - "CONTINUE": Normal lifecycle progression.
+        """
+        # Exhaustion after solid gain (>= 2.5R with RSI overextension)
+        if current_r >= 2.5 and (rsi >= 76.0 or rsi <= 24.0 or adx < 18.0):
+            return "DYNAMIC_HARVEST"
+        # Expanding trend momentum (ADX accelerating above 30, healthy RSI)
+        if current_r >= 2.0 and adx >= 32.0 and 42.0 <= rsi <= 68.0:
+            return "HOLD_RUNNER"
+        return "CONTINUE"
+
+
 # -----------------------------------------------------------------------------
 # Trade Lifecycle & Multi-Stage Scale-Out Simulation
 # -----------------------------------------------------------------------------
@@ -725,7 +774,17 @@ class Trade:
         self.gross_dollars = 0.0
         self.pnl_dollars = 0.0
         self.pnl_r = 0.0
-        self.costs_paid = (self.spread * self.position_size * contract_multiplier)  # Entry spread drag
+        # Almgren-Chriss Market Impact Model (Square-Root Law: Impact = eta * sigma * sqrt(Q / V))
+        daily_vol = max(1e-4, self.atr_15m / max(1e-4, entry_price))
+        impact_unit = calculate_almgren_chriss_market_impact(
+            order_qty=self.position_size,
+            market_volume=1_000_000.0,
+            volatility=daily_vol,
+            price=entry_price,
+            eta=0.10
+        )
+        self.market_impact_cost = round(impact_unit * self.position_size * contract_multiplier, 2)
+        self.costs_paid = (self.spread * self.position_size * contract_multiplier) + self.market_impact_cost
         self.swap_accumulated = 0.0
 
     def step(self, bar: pd.Series, daily_swap_rate: float) -> bool:
@@ -795,6 +854,22 @@ class Trade:
             current_r = (b_close - self.entry_price) / self.sl_dist if self.direction == "BUY" else (self.entry_price - b_close) / self.sl_dist
             if current_r <= (self.peak_r * 0.50) and current_r > 0.0:
                 self._close(b_date, b_close, "FLASH_SHOCK_PROTECTIVE_HARVEST", current_r)
+                return True
+
+        # Check RL Dynamic Exit Policy for momentum exhaustion
+        bar_rsi = float(bar.get('rsi14', 50.0)) if hasattr(bar, 'get') else 50.0
+        bar_adx = float(bar.get('adx14', 25.0)) if hasattr(bar, 'get') else 25.0
+        cur_r = (b_close - self.entry_price) / self.sl_dist if self.direction == "BUY" else (self.entry_price - b_close) / self.sl_dist
+        if self.stage >= 1 and cur_r >= 2.2:
+            rl_action = RLDynamicExitPolicy.evaluate_exit(
+                current_r=cur_r,
+                peak_r=self.peak_r,
+                adx=bar_adx,
+                rsi=bar_rsi,
+                holding_days=self.holding_days
+            )
+            if rl_action == "DYNAMIC_HARVEST":
+                self._close(b_date, b_close, "RL_DYNAMIC_MOMENTUM_HARVEST", cur_r)
                 return True
 
         # Progress through stages

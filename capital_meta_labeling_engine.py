@@ -501,6 +501,52 @@ class CapitalMetaLabelingEngine:
                 f"(Avoided false breakout / negative expectancy)"
             )
 
+        # 1. Probabilistic Regime Evaluation (Gaussian HMM 4 States)
+        regime_beliefs = {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
+        try:
+            from portfolio_hrp_regime_allocator import get_global_regime_hmm
+            hmm_model = get_global_regime_hmm()
+            vix_f = float(features.get("vix", 20.0))
+            dxy_f = float(features.get("dxy_change", 0.0)) / 100.0
+            regime_beliefs = hmm_model.predict_regime_probabilities(np.array([vix_f, dxy_f]))
+        except Exception as e_hmm:
+            logger.debug(f"HMM regime prediction note: {e_hmm}")
+
+        p_crash = float(regime_beliefs.get("CRASH", 0.0))
+        p_chop = float(regime_beliefs.get("CHOP", 0.0))
+        if p_crash >= 0.28:
+            is_approved = False
+            sizing_mult = 0.0
+            verdict = "META_REJECTED"
+            reason = f"BLOCKED_HMM_CRASH_VOLATILITY_REGIME: P(Crash)={p_crash*100:.1f}% >= 28.0% (Macro Tail Risk Guard)"
+        elif p_chop >= 0.65 and is_approved:
+            # High chop regime: damp sizing unless meta conviction is elite
+            if meta_win_prob < 0.70:
+                sizing_mult = round(sizing_mult * 0.60, 2)
+
+        # 2. Options Implied Volatility Surface: VIX / VIX3M Backwardation Check
+        vix_term_structure = float(features.get("vix_term_structure", 1.0))
+        dir_num = float(features.get("direction_num", 1.0))
+        if vix_term_structure > 1.05 and dir_num == 1.0 and is_approved:
+            # Short-term panic: near-term implied vol exceeds 3-month vol (Backwardation)
+            meta_win_prob = max(0.10, meta_win_prob - 0.08)
+            if meta_win_prob < threshold:
+                is_approved = False
+                sizing_mult = 0.0
+                verdict = "META_REJECTED"
+                reason = f"BLOCKED_VIX_TERM_STRUCTURE_BACKWARDATION: VIX/VIX3M={vix_term_structure:.2f} > 1.05 (Inverted Panic Surface Veto)"
+
+        # 3. NLP Financial News / Fed Macro Sentiment Adjustment
+        nlp_sentiment = float(features.get("nlp_sentiment", 0.0))
+        if is_approved and abs(nlp_sentiment) >= 0.20:
+            if dir_num == 1.0 and nlp_sentiment < -0.40:
+                meta_win_prob = max(0.10, meta_win_prob - 0.05)
+                if meta_win_prob < threshold:
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = f"BLOCKED_NLP_NEGATIVE_NEWS_SENTIMENT: Sentiment={nlp_sentiment:.2f} < -0.40 (Bearish Macro Wire Veto)"
+
         return {
             "is_approved": is_approved,
             "meta_win_prob": float(meta_win_prob),
@@ -509,6 +555,9 @@ class CapitalMetaLabelingEngine:
             "verdict": verdict,
             "reason": reason,
             "is_ml_inferred": is_ml_inferred,
+            "regime_beliefs": regime_beliefs,
+            "vix_term_structure": vix_term_structure,
+            "nlp_sentiment": nlp_sentiment,
             "features": features
         }
 
@@ -1047,4 +1096,31 @@ def predict_meta_edge(features: Dict[str, float], threshold: float = 0.60) -> Di
 def calculate_conviction_sizing(meta_win_prob: float, threshold: float = 0.60) -> float:
     """Module-level helper to calculate conviction sizing."""
     return CapitalMetaLabelingEngine.calculate_conviction_sizing(meta_win_prob, threshold=threshold)
+
+
+def get_nlp_financial_sentiment(query: str = "") -> Dict[str, Any]:
+    """
+    NLP Financial News & Fed Macro Sentiment Engine.
+    Parses global financial news headlines and macroeconomic bulletins
+    to generate a normalized sentiment score in [-1.0, +1.0].
+    """
+    try:
+        from ai_news_engine import BULLISH_KEYWORDS, BEARISH_KEYWORDS
+        text = (query or "").lower()
+        bull_hits = sum(1 for kw in BULLISH_KEYWORDS if kw in text)
+        bear_hits = sum(1 for kw in BEARISH_KEYWORDS if kw in text)
+        total = bull_hits + bear_hits
+        if total == 0:
+            score = 0.0
+        else:
+            score = float(np.clip((bull_hits - bear_hits) / float(total), -1.0, 1.0))
+        return {
+            "sentiment_score": round(score, 3),
+            "bullish_indicators": bull_hits,
+            "bearish_indicators": bear_hits,
+            "status": "BULLISH" if score > 0.20 else ("BEARISH" if score < -0.20 else "NEUTRAL")
+        }
+    except Exception:
+        return {"sentiment_score": 0.0, "status": "NEUTRAL"}
+
 

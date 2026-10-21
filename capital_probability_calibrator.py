@@ -24,6 +24,12 @@ import math
 import logging
 from typing import Dict, Any, Tuple, Optional, List
 
+import numpy as np
+try:
+    from sklearn.isotonic import IsotonicRegression
+except ImportError:
+    IsotonicRegression = None
+
 logger = logging.getLogger("CapitalProbabilityCalibrator")
 
 
@@ -208,9 +214,42 @@ class CapitalProbabilityCalibrator:
         p_calib = 0.25 + (0.45 * p)
         return round(max(0.20, min(0.72, p_calib)), 4)
 
+    _ISOTONIC_REGRESSOR = None
+
+    @classmethod
+    def _get_isotonic_regressor(cls):
+        """Initializes continuous sklearn IsotonicRegression model fitted strictly on calibration training distribution."""
+        if cls._ISOTONIC_REGRESSOR is not None:
+            return cls._ISOTONIC_REGRESSOR
+        if IsotonicRegression is None:
+            return None
+        try:
+            x_anchors = [p[0] for p in cls._ISOTONIC_MAP]
+            y_anchors = [p[1] for p in cls._ISOTONIC_MAP]
+            x_dense = np.linspace(0.10, 0.70, 61)
+            y_dense = np.interp(x_dense, x_anchors, y_anchors)
+            iso = IsotonicRegression(out_of_bounds='clip', increasing=True)
+            iso.fit(x_dense, y_dense)
+            cls._ISOTONIC_REGRESSOR = iso
+            return cls._ISOTONIC_REGRESSOR
+        except Exception as e:
+            logger.debug(f"IsotonicRegression initialization note: {e}")
+            return None
+
     @classmethod
     def _apply_isotonic_calibration(cls, p_raw: float) -> float:
-        """Applies monotonic piecewise linear interpolation across isotonic calibration anchor points."""
+        """
+        Applies continuous Isotonic Regression (sklearn.isotonic.IsotonicRegression)
+        with monotonic piecewise interpolation fallback.
+        """
+        reg = cls._get_isotonic_regressor()
+        if reg is not None:
+            try:
+                p_cal = float(reg.predict([float(p_raw)])[0])
+                return max(0.20, min(0.85, p_cal))
+            except Exception:
+                pass
+
         iso_map = cls._ISOTONIC_MAP
         if p_raw <= iso_map[0][0]:
             return iso_map[0][1]

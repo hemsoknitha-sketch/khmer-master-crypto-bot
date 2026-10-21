@@ -78,3 +78,50 @@ def get_best_bid_ask(symbol: str) -> tuple[float, float]:
             return float(depth["bids"][0][0]), float(depth["asks"][0][0])
     return 0.0, 0.0
 
+
+def calculate_almgren_chriss_impact(
+    order_qty: float,
+    market_volume: float,
+    price_volatility: float,
+    price: float = 1.0,
+    eta: float = 0.10
+) -> dict:
+    """
+    Almgren-Chriss Square-Root Law of Institutional Market Impact:
+        Permanent/Temporary Price Impact = eta * sigma * sqrt(Q / V)
+    
+    Args:
+        order_qty (Q): Size of the incoming order (contracts or shares)
+        market_volume (V): Total market volume over execution interval
+        price_volatility (sigma): Asset price volatility (standard deviation of returns or ATR/Price)
+        price (P0): Reference price of asset
+        eta: Institutional market impact scaling constant (default 0.10)
+    
+    Returns:
+        dict:
+            - impact_pct: Market impact as a percentage of price
+            - impact_dollars: Dollar impact per unit
+            - total_impact_cost: Total additional slippage cost across entire order
+            - participation_rate: Q / V
+    """
+    q = max(1e-6, float(order_qty))
+    v = max(1e-3, float(market_volume))
+    sigma = max(1e-4, float(price_volatility))
+    p0 = max(1e-4, float(price))
+
+    participation = q / v
+    # Square-root law of market impact (Barra, Almgren-Chriss 2000)
+    impact_fraction = eta * sigma * (participation ** 0.5)
+    impact_pct = impact_fraction * 100.0
+    impact_dollars = p0 * impact_fraction
+    total_cost = impact_dollars * q
+
+    return {
+        "impact_pct": round(impact_pct, 4),
+        "impact_dollars": round(impact_dollars, 4),
+        "total_impact_cost": round(total_cost, 2),
+        "participation_rate": round(participation, 6),
+        "formula": "Impact = eta * sigma * sqrt(Q / V)"
+    }
+
+
