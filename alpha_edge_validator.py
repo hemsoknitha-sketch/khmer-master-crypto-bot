@@ -174,18 +174,23 @@ def multi_testing_deflated_sharpe(
 def required_sample_for_dsr(
     target_dsr: float = 0.95,
     per_trade_sr: float = 0.26,
-    total_trials: int = 700
+    total_trials: int = 700,
+    denom: float = 1.0
 ) -> int:
-    """Computes minimum sample size N required for DSR >= target_dsr."""
+    """
+    Computes minimum sample size N required for DSR >= target_dsr.
+    Incorporates variance denominator factor denom = sqrt(1 - skew*SR + (kurt-1)/4 * SR^2).
+    """
     if per_trade_sr <= 0:
         return 99999
     z_target = float(norm.ppf(target_dsr))
     a = np.sqrt(2.0 * np.log(max(2, total_trials)))
+    d = max(1e-9, float(denom))
     lo, hi = 30, 100000
     for _ in range(80):
         mid = (lo + hi) // 2
         sr_star = a / np.sqrt(mid)
-        z_obs = (per_trade_sr - sr_star) * np.sqrt(mid - 1)
+        z_obs = (per_trade_sr - sr_star) * np.sqrt(mid - 1) / d
         if z_obs >= z_target:
             hi = mid
         else:
@@ -480,10 +485,14 @@ def full_verification(ledger: VerifiedLedger, total_trials: int = 700) -> Dict[s
     returns = ledger.weighted_returns()
     realized = ledger.realized_r()
     p_hats = ledger.p_hats()
-    dsr, sr, sr_star = verified_dsr(returns, total_trials)
+    dsr_info = dsr_with_moments(returns, total_trials)
+    dsr = dsr_info["dsr"]
+    sr = dsr_info["sr"]
+    sr_star = dsr_info["sr_star"]
+    denom = dsr_info.get("denom", 1.0)
     n = ledger.size()
     per_trade_sr = sr if sr > 0 else 0.0
-    required_n = required_sample_for_dsr(0.95, per_trade_sr, total_trials) if per_trade_sr > 0 else 99999
+    required_n = required_sample_for_dsr(0.95, per_trade_sr, total_trials, denom=denom) if per_trade_sr > 0 else 99999
     deciles = win_rate_by_decile(p_hats, realized)
 
     mean_alloc = float(np.mean([t.allocation_pct for t in ledger.trades])) if ledger.trades else 0.01
