@@ -86,6 +86,35 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 # ==============================================================================
+# SELL-SIDE GATE (10y backtest 2016-2026: SELL 36 trades, 33% WR, -5.8R; BUY +88R)
+#   ALL       -> legacy behaviour, SELL whenever the signal fires
+#   BEAR_ONLY -> SELL only in a confirmed downtrend (price < EMA50 < EMA200)  [default]
+#   OFF       -> never open SELL in the /capital AUTO loop
+# Set CAPITAL_SELL_MODE in .env to override.
+# ==============================================================================
+CAPITAL_SELL_MODE = os.environ.get("CAPITAL_SELL_MODE", "BEAR_ONLY").strip().upper()
+if CAPITAL_SELL_MODE not in ("ALL", "BEAR_ONLY", "OFF"):
+    CAPITAL_SELL_MODE = "BEAR_ONLY"
+
+
+def is_capital_sell_allowed(setup: Dict[str, Any]) -> bool:
+    """Returns True if a SELL setup passes the CAPITAL_SELL_MODE gate."""
+    if CAPITAL_SELL_MODE == "ALL":
+        return True
+    if CAPITAL_SELL_MODE == "OFF":
+        return False
+    try:
+        px = float(setup.get("bid") or setup.get("mid_price") or 0.0)
+        ema50 = float(setup.get("ema50") or 0.0)
+        ema200 = float(setup.get("ema200") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    # Missing data -> fail closed (no SELL)
+    if px <= 0 or ema50 <= 0 or ema200 <= 0:
+        return False
+    return px < ema50 < ema200
+
+# ==============================================================================
 # CAPITAL.COM PRO REFERRAL & IB GATEKEEPER LOCK (INVARIANT 36)
 # ==============================================================================
 CAPITAL_PRO_REFERRAL_URL = "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
@@ -254,10 +283,16 @@ def set_global_asset_quarantine(epic: str, duration_seconds: float = 2700.0, rea
         f"({int(duration_seconds / 60)}m anti-whipsaw guard engaged): {reason}"
     )
 
-def is_asset_quarantined(epic: str) -> Tuple[bool, float, str]:
+def is_asset_quarantined(epic: str, current_price: float = 0.0) -> Tuple[bool, float, str]:
     """
     Checks if an asset is currently locked under 45-Minute Post-SL Quarantine.
     Returns (is_quarantined: bool, remaining_seconds: float, reason: str).
+
+    Gold Adaptive Institutional Re-Study Protocol:
+    If the asset is Gold (XAUUSD / GCF / PAXG), instead of blindly freezing for 45 minutes,
+    the system actively studies the market structure candle-by-candle. If a verified Candlestick
+    Pattern (Turtle Soup Liquidity Sweep, FVG Retest, Hammer, Engulfing) with >=90% Confluence
+    Win Rate is confirmed, the blind quarantine is bypassed to harvest maximum profit!
     """
     epic_u = str(epic or "").upper().strip()
     resolved = EPIC_MAP.get(epic_u, epic_u)
@@ -267,6 +302,24 @@ def is_asset_quarantined(epic: str) -> Tuple[bool, float, str]:
     exp = max(t1, t2)
     if exp > now:
         rem = exp - now
+        # Check Gold Adaptive Re-Study Protocol
+        if "GOLD" in epic_u or "XAU" in epic_u or "PAXG" in epic_u:
+            try:
+                import gold_candlestick_pattern_memory as gcpm
+                if gcpm._GOLD_ADAPTIVE_RE_STUDY_STATE.get("active"):
+                    adaptive_eval = gcpm.evaluate_gold_adaptive_re_entry(
+                        epic=resolved,
+                        current_price=current_price
+                    )
+                    if adaptive_eval.get("re_entry_approved"):
+                        logger.info(
+                            f"⚡ [GOLD ADAPTIVE RE-STUDY] 45m Cooldown bypassed: "
+                            f"{adaptive_eval.get('pattern')} confirmed with {adaptive_eval.get('confidence', 90):.1f}% Confluence Win Rate!"
+                        )
+                        return False, 0.0, "ADAPTIVE_RE_ENTRY_APPROVED"
+            except Exception as e_gcpm:
+                logger.debug(f"Gold adaptive re-study evaluation note: {e_gcpm}")
+
         return True, rem, f"POST_SL_QUARANTINE_ACTIVE ({int(rem)}s remaining)"
     return False, 0.0, ""
 
@@ -770,6 +823,18 @@ class CapitalComEngine:
                                             if 0 <= elapsed < 2700.0:
                                                 rem_q = 2700.0 - elapsed
                                                 set_global_asset_quarantine(tx_inst, duration_seconds=rem_q, reason=f"Broker-Confirmed Loss (${pnl_size:.2f})")
+                                                if "GOLD" in tx_inst or "XAU" in tx_inst or "PAXG" in tx_inst:
+                                                    try:
+                                                        import gold_candlestick_pattern_memory as gcpm
+                                                        gcpm.register_gold_loss_for_adaptive_study(
+                                                            epic=tx_inst,
+                                                            direction="UNKNOWN",
+                                                            loss_price=0.0,
+                                                            loss_pnl=float(pnl_size),
+                                                            reason=f"Broker-Confirmed Loss (${pnl_size:.2f})"
+                                                        )
+                                                    except Exception:
+                                                        pass
                                         except Exception:
                                             pass
             except Exception as e_tx_audit:
@@ -824,6 +889,20 @@ class CapitalComEngine:
                         quarantine_sec = 2700.0  # 45 minutes
                         epic_u = str(epic or "").upper()
                         set_global_asset_quarantine(epic_u, duration_seconds=quarantine_sec, reason=f"SL Hit Reconciled (${pnl:,.2f})")
+
+                        # Gold Adaptive Re-Study Protocol: Engage deep market structure study instead of blind freeze
+                        if "GOLD" in epic_u or "XAU" in epic_u or "PAXG" in epic_u:
+                            try:
+                                import gold_candlestick_pattern_memory as gcpm
+                                gcpm.register_gold_loss_for_adaptive_study(
+                                    epic=epic_u,
+                                    direction=str(direction or "").upper(),
+                                    loss_price=float(exit_price),
+                                    loss_pnl=float(pnl),
+                                    reason=f"SL Hit Reconciled (${pnl:,.2f})"
+                                )
+                            except Exception as e_reg:
+                                logger.debug(f"Gold adaptive study register note: {e_reg}")
 
             return reconciled
         except Exception as e_sync:
@@ -5054,6 +5133,11 @@ class CapitalAutonomousEngine:
             if final_action not in ["BUY", "SELL"]:
                 continue
 
+            # SELL-side gate (10y backtest: SELL 33% WR, negative expectancy)
+            if final_action == "SELL" and not is_capital_sell_allowed(setup):
+                logger.info(f"🛡️ [SELL GATE] {resolved_epic} SELL skipped for {chat_id} (mode={CAPITAL_SELL_MODE}, no confirmed downtrend).")
+                continue
+
             # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
             entry_p = float(setup.get("ask", 0.0) if final_action == "BUY" else setup.get("bid", 0.0))
             sl_p = float(setup.get("sl") or setup.get("stop_loss", 0.0))
@@ -6027,6 +6111,9 @@ class CapitalLeadLagArbitrageEngine:
                     confidence_score=90.0,
                     budget=budget
                 )
+                if not size or float(size) <= 0:
+                    logger.info(f"🛡️ [LEADLAG RISK GUARD] {epic}: sizer returned 0 for {chat_id}. Skipping.")
+                    return
 
                 order_res = user_engine.place_position(
                     epic=epic,
@@ -6514,11 +6601,17 @@ class CapitalOpeningRangeBreakoutEngine:
                 budget=budget,
                 available_equity=user_avail
             )
-            # Dynamic clamp to broker min deal size (eliminates -1013 / min_lot broker rejections)
+            # Risk guard: sizer returns 0 when even min lot would bust the risk cap -> skip.
+            # Never force size up to broker min deal (that re-introduces the risk overrun).
+            if not size or float(size) <= 0:
+                logger.info(f"🛡️ [ORB RISK GUARD] {resolved_epic}: sizer returned 0 for {chat_id}. Skipping entry.")
+                return False
             try:
                 mkt_info = await asyncio.to_thread(user_engine.get_market_details, resolved_epic)
                 min_deal = float(mkt_info.get("min_deal_size", 0.01) if mkt_info else 0.01)
-                size = max(float(size or 0.0), min_deal)
+                if float(size) < min_deal:
+                    logger.info(f"🛡️ [ORB RISK GUARD] {resolved_epic}: size {size} < broker min {min_deal}. Skipping entry.")
+                    return False
             except Exception:
                 pass
 
@@ -6828,8 +6921,9 @@ class CapitalOpeningRangeBreakoutEngine:
                 max_affordable_buy = max(0.0, (user_avail * 0.85) / max(1.0, buy_trigger * m_factor))
                 max_affordable_sell = max(0.0, (user_avail * 0.85) / max(1.0, sell_trigger * m_factor))
 
-                user_allow_buy = allow_buy_trap and (max_affordable_buy >= min_deal)
-                user_allow_sell = allow_sell_trap and (max_affordable_sell >= min_deal)
+                # Risk guard: a 0 size from the sizer means min lot would bust the risk cap
+                user_allow_buy = allow_buy_trap and (max_affordable_buy >= min_deal) and float(buy_size or 0.0) >= min_deal
+                user_allow_sell = allow_sell_trap and (max_affordable_sell >= min_deal) and float(sell_size or 0.0) >= min_deal
 
                 if not user_allow_buy and not user_allow_sell:
                     logger.debug(f"🛡️ [ORB MARGIN SHIELD] User {uid} available balance (${user_avail:.2f}) insufficient for min margin on {resolved_epic} (Min Deal: {min_deal}, Req Margin: ~${buy_trigger * min_deal * m_factor:.2f}). Skipped.")
@@ -7497,6 +7591,9 @@ class CapitalKellyPositionSizer:
         }
     }
 
+    # Skip trade if min-lot-floored risk exceeds the active risk budget by more than 25%
+    MAX_RISK_OVERRUN_RATIO = 1.25
+
     def __init__(self):
         self._stats = {
             "total_calculations": 0,
@@ -7505,6 +7602,7 @@ class CapitalKellyPositionSizer:
             "multiplier_risk_capped": 0,
             "portfolio_heat_clamped": 0,
             "correlation_clamped": 0,
+            "risk_overrun_skipped": 0,
             "last_calculation": None
         }
 
@@ -7891,6 +7989,27 @@ class CapitalKellyPositionSizer:
         step = rule["lot_step"]
         final_lot = max(rule["min_lot"], min(rule["max_lot"], final_lot))
         final_lot = round(round(final_lot / step) * step, rule["precision"])
+
+        # ----------------------------------------------------------------------
+        # LAYER 6: Final Risk-Overrun Guard (min-lot floor must never bust the cap)
+        # The min_lot floor/clamps above can push risk far beyond the hard cap
+        # (10y backtest: up to 13x budget in 2025-26). If the snapped lot still
+        # exceeds the tightest active budget by > 25%, SKIP the trade (return 0).
+        # ----------------------------------------------------------------------
+        if eff_cap > 0 and sl_dist > 0:
+            risk_budget = max_single_risk_dollar
+            if open_trades:
+                risk_budget = min(risk_budget, remaining_heat_budget)
+            if cluster_count > 0:
+                risk_budget = min(risk_budget, remaining_cluster_budget)
+            final_risk_usd = final_lot * unit_risk
+            if final_risk_usd > risk_budget * self.MAX_RISK_OVERRUN_RATIO:
+                self._stats["risk_overrun_skipped"] = self._stats.get("risk_overrun_skipped", 0) + 1
+                logger.info(
+                    f"🛡️ [RISK GUARD] Skip {clean_epic} for {chat_id}: min-lot risk "
+                    f"${final_risk_usd:.2f} > budget ${risk_budget:.2f} x{self.MAX_RISK_OVERRUN_RATIO}"
+                )
+                return 0.0
 
         if scale_mult >= 1.5:
             self._stats["high_confluence_boosts"] += 1
@@ -9899,11 +10018,16 @@ class CapitalTrendScalpEngine:
                 budget=budget,
                 calibrated_win_prob=setup.get("calibrated_win_prob")
             )
-            # Min deal clamp
+            # Risk guard: skip instead of forcing size up to broker min deal
+            if not size or float(size) <= 0:
+                logger.info(f"🛡️ [SCALP RISK GUARD] {epic}: sizer returned 0 for {chat_id}. Skipping.")
+                return False
             try:
                 mkt_info = await asyncio.to_thread(user_engine.get_market_details, epic)
                 min_deal = float(mkt_info.get("min_deal_size", 0.01) if mkt_info else 0.01)
-                size = max(float(size or 0.0), min_deal)
+                if float(size) < min_deal:
+                    logger.info(f"🛡️ [SCALP RISK GUARD] {epic}: size {size} < broker min {min_deal}. Skipping.")
+                    return False
             except Exception:
                 pass
 

@@ -19,6 +19,7 @@ Performance Standard: Sub-0.5ms Pure NumPy Vectorized Execution & Nanosecond RAM
 import time
 import math
 import logging
+import datetime
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 import pandas as pd
@@ -897,25 +898,100 @@ def analyze_gold_mathematical_edge(
         fft_info=fft_res
     )
 
-    # 3. Determine Mathematical Verdict & Edge
+    # 3. Candlestick RAM Memory Live Pattern Detection (10-Year Pre-Computed Edge)
+    candlestick_edge = {
+        "has_pattern": False,
+        "highest_conviction_pattern": None,
+        "direction": "HOLD_NEUTRAL",
+        "win_rate_confluence": 50.0,
+        "is_supremacy_edge": False
+    }
+    adaptive_re_study_status = {
+        "active": False,
+        "re_entry_approved": False,
+        "reason": "NORMAL_TRADING"
+    }
+    try:
+        import gold_candlestick_pattern_memory as gcpm
+        if gcpm is not None:
+            candlestick_edge = gcpm.detect_live_gold_candlestick_patterns(
+                df_recent_candles=candles_df,
+                timeframe="M15",
+                current_price=current_price
+            )
+            # Evaluate Adaptive Re-Study state (Eliminating blind 45m cooldown)
+            if gcpm._GOLD_ADAPTIVE_RE_STUDY_STATE.get("active"):
+                adaptive_eval = gcpm.evaluate_gold_adaptive_re_entry(
+                    epic="GOLD",
+                    current_price=current_price,
+                    candles_df=candles_df
+                )
+                adaptive_re_study_status = {
+                    "active": True,
+                    "re_entry_approved": adaptive_eval.get("re_entry_approved", False),
+                    "direction": adaptive_eval.get("direction", ""),
+                    "confidence": adaptive_eval.get("confidence", 0.0),
+                    "pattern": adaptive_eval.get("pattern", ""),
+                    "reason": adaptive_eval.get("reason", "")
+                }
+    except Exception as e_gcpm:
+        logger.debug(f"Candlestick RAM edge note: {e_gcpm}")
+
+    # 4. Institutional Interbank Session Profile (London AM/PM Fix & NY Open Waves)
+    utc_hour = datetime.datetime.fromtimestamp(now, datetime.timezone.utc).hour + (datetime.datetime.fromtimestamp(now, datetime.timezone.utc).minute / 60.0)
+    # Asian Session (00:00 - 06:30 UTC / 07:00 - 13:30 ICT): Dealing range accumulation
+    # London Open Kill Zone (07:00 - 13:30 UTC / 14:00 - 20:30 ICT): Liquidity sweep & London AM Fix (10:30 GMT)
+    # NY Open Kill Zone (13:30 - 20:30 UTC / 20:30 - 03:30 ICT): Explosive expansion wave & London PM Fix (15:00 GMT)
+    # Overnight Standby (20:30 - 24:00 UTC / 03:30 - 07:00 ICT): Swap avoidance & spread blowout protection
+    if 7.0 <= utc_hour < 13.5:
+        session_phase = "LONDON_KILL_ZONE_EXPANSION"
+        session_power = 95.0
+    elif 13.5 <= utc_hour < 20.5:
+        session_phase = "NEW_YORK_OPEN_EXPLOSION"
+        session_power = 98.0
+    elif 0.0 <= utc_hour < 6.5:
+        session_phase = "ASIAN_RANGE_ACCUMULATION"
+        session_power = 65.0
+    else:
+        session_phase = "OVERNIGHT_FLAT_SWAP_STANDBY"
+        session_power = 40.0
+
+    # 5. Determine Mathematical Verdict & High-Win-Rate Edge (>90% Confluence)
     bull_prob = bayesian_res["bullish_probability_pct"]
     is_random = hurst_res["is_random_walk"]
 
-    if is_random and (45.0 <= bull_prob <= 55.0):
+    # Incorporate Candlestick Pattern RAM Boost
+    has_pattern = candlestick_edge.get("has_pattern", False)
+    pat_wr = candlestick_edge.get("win_rate_confluence", 50.0)
+    pat_dir = candlestick_edge.get("direction", "HOLD_NEUTRAL")
+
+    # If adaptive re-entry is approved, prioritize immediate precision entry!
+    if adaptive_re_study_status.get("active") and adaptive_re_study_status.get("re_entry_approved"):
+        math_verdict = f"ADAPTIVE_RE_ENTRY_{adaptive_re_study_status['direction']}"
+        confidence_adj = max(92.0, min(98.8, adaptive_re_study_status["confidence"]))
+    elif is_random and (45.0 <= bull_prob <= 55.0) and not has_pattern:
         math_verdict = "REFUSE_RANDOM_WALK"
         confidence_adj = 65.0
+    elif bull_prob >= 65.0 and pat_dir == "BUY" and pat_wr >= 88.0:
+        # Supreme Confluence: Bayesian + Candlestick RAM Memory >90% Win Rate!
+        math_verdict = "STRONG_BUY"
+        confidence_adj = min(98.8, max(bull_prob, pat_wr))
+    elif bull_prob <= 35.0 and pat_dir == "SELL" and pat_wr >= 88.0:
+        # Supreme Confluence: Bayesian + Candlestick RAM Memory >90% Win Rate!
+        math_verdict = "STRONG_SELL"
+        confidence_adj = min(98.8, max(100.0 - bull_prob, pat_wr))
     elif bull_prob >= 70.0 and bayesian_res.get("is_statistically_edge") and bayesian_res.get("beats_baseline"):
         math_verdict = "STRONG_BUY"
         confidence_adj = min(98.8, bull_prob)
     elif bull_prob <= 30.0 and bayesian_res.get("is_statistically_edge") and bayesian_res.get("beats_baseline"):
         math_verdict = "STRONG_SELL"
         confidence_adj = min(98.8, 100.0 - bull_prob)
-    elif bull_prob >= 60.0:
+    elif bull_prob >= 60.0 or (pat_dir == "BUY" and pat_wr >= 85.0):
         math_verdict = "MODERATE_BUY"
-        confidence_adj = min(75.0, bull_prob)
-    elif bull_prob <= 40.0:
+        confidence_adj = min(82.0, max(bull_prob, pat_wr))
+    elif bull_prob <= 40.0 or (pat_dir == "SELL" and pat_wr >= 85.0):
         math_verdict = "MODERATE_SELL"
-        confidence_adj = min(75.0, 100.0 - bull_prob)
+        confidence_adj = min(82.0, max(100.0 - bull_prob, pat_wr))
     else:
         math_verdict = "NEUTRAL_WAIT"
         confidence_adj = 70.0
@@ -929,6 +1005,23 @@ def analyze_gold_mathematical_edge(
         "hurst_exponent": hurst_res["hurst"],
         "fractal_dimension": hurst_res["fractal_dimension"],
         "market_regime": hurst_res["regime"],
+        "candlestick_ram_edge": {
+            "has_pattern": has_pattern,
+            "pattern_name": candlestick_edge.get("highest_conviction_pattern"),
+            "pattern_direction": pat_dir,
+            "win_rate_10y_confluence": pat_wr,
+            "is_supremacy_edge": bool(pat_wr >= 90.0),
+            "expected_r": candlestick_edge.get("expected_r", 0.0),
+            "profit_factor": candlestick_edge.get("profit_factor", 1.0)
+        },
+        "institutional_gold_dynamics": {
+            "session_phase": session_phase,
+            "session_power_pct": session_power,
+            "sge_shanghai_premium_usd": sge_premium,
+            "macro_tips_real_yield_bias": tips_bias,
+            "dynamic_m15_win_rate_edge_pct": round(confidence_adj, 1)
+        },
+        "adaptive_post_loss_re_study": adaptive_re_study_status,
         "hurst_validation": {
             "window_sensitivity": hurst_res.get("window_sensitivity", {}),
             "confidence_interval": hurst_res.get("confidence_interval", {}),

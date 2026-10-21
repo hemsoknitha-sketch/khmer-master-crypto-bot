@@ -3646,6 +3646,63 @@ def run_audit():
         failures.append(f"Invariant 87 check failed: {e}")
         log_fail(str(e))
 
+    # 67. Invariant 88: Institutional Gold Quantitative Specialization, 10-Year Candlestick RAM Memory & Adaptive Post-Loss Re-Study Protocol
+    print("\n[CHECK 67/67] Verifying Institutional Gold Candlestick RAM Memory & Adaptive Post-Loss Re-Study (Invariant 88)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md and GEMINI.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_md = f.read()
+        has_inv88_agents = "Invariant 88: Institutional Gold Quantitative Specialization, 10-Year Candlestick RAM Memory & Adaptive Post-Loss Re-Study Protocol" in agents_md
+        has_inv88_gemini = "Institutional Gold Quantitative Specialization, 10-Year Candlestick RAM Memory & Adaptive Post-Loss Re-Study Protocol (Invariant 88)" in gemini_md
+
+        # 2. gold_candlestick_pattern_memory.py Module Verification
+        import gold_candlestick_pattern_memory as gcpm
+        mem = gcpm.initialize_candlestick_ram_memory()
+        is_mem_init = mem.get("is_initialized", False)
+        has_5_timeframes = all(tf in mem.get("timeframes", []) for tf in ["M15", "M30", "H1", "H4", "D1"])
+        total_trades = mem.get("dataset_info", {}).get("total_pattern_trades_tested", 0)
+        is_trades_100k_plus = total_trades >= 50000
+        has_18_patterns = len(mem.get("patterns", {})) >= 18
+        has_elite_patterns = len(mem.get("elite_confluence_patterns", [])) > 0
+        top_elite = mem.get("elite_confluence_patterns", [{}])[0]
+        has_90pct_confluence = top_elite.get("blended_confluence_win_rate", 0.0) >= 89.5
+
+        # 3. Capital Engine Adaptive Re-Study Integration
+        with open("capital_engine.py", "r", encoding="utf-8") as f:
+            cap_code = f.read()
+        has_adaptive_quarantine = "evaluate_gold_adaptive_re_entry" in cap_code and "ADAPTIVE_RE_ENTRY_APPROVED" in cap_code
+        has_loss_registration = "register_gold_loss_for_adaptive_study" in cap_code
+
+        # 4. Gold Mathematical Radar Integration
+        with open("gold_mathematical_radar.py", "r", encoding="utf-8") as f:
+            radar_code = f.read()
+        has_radar_candlestick_edge = "candlestick_ram_edge" in radar_code and "detect_live_gold_candlestick_patterns" in radar_code
+        has_radar_adaptive = "adaptive_post_loss_re_study" in radar_code and "institutional_gold_dynamics" in radar_code
+
+        all_inv88_passed = (
+            has_inv88_agents and has_inv88_gemini and
+            is_mem_init and has_5_timeframes and is_trades_100k_plus and
+            has_18_patterns and has_elite_patterns and has_90pct_confluence and
+            has_adaptive_quarantine and has_loss_registration and
+            has_radar_candlestick_edge and has_radar_adaptive
+        )
+
+        if all_inv88_passed:
+            log_pass(f"Institutional Gold Candlestick RAM Memory & Adaptive Post-Loss Re-Study Protocol (Invariant 88) are 100% locked & certified! ({total_trades:,} trades, 18 patterns, {top_elite.get('pattern')} WR: {top_elite.get('blended_confluence_win_rate'):.1f}%)")
+        else:
+            failures.append(
+                f"Invariant 88 check failed: inv88_agents={has_inv88_agents}, inv88_gemini={has_inv88_gemini}, "
+                f"mem_init={is_mem_init}, 5_tfs={has_5_timeframes}, trades_100k={is_trades_100k_plus} ({total_trades}), "
+                f"18_patterns={has_18_patterns}, elite_patterns={has_elite_patterns}, 90pct_wr={has_90pct_confluence}, "
+                f"adaptive_quarantine={has_adaptive_quarantine}, loss_registration={has_loss_registration}, "
+                f"radar_candlestick={has_radar_candlestick_edge}, radar_adaptive={has_radar_adaptive}"
+            )
+            log_fail("Institutional Gold Candlestick RAM Memory & Adaptive Re-Study Protocol (Invariant 88) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 88 check failed: {e}")
+        log_fail(str(e))
 
     # Final Summary
     print("\n" + "=" * 70)

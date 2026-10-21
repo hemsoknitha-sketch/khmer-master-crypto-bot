@@ -53,6 +53,16 @@ logger = logging.getLogger("Capital10YBacktester")
 # Quantitative Architecture Constants
 WARMUP_BARS = 200  # Strict warm-up period (~1 calendar year): zero trading or signals allowed
 
+# Skip any trade whose min-lot-floored risk exceeds budget by more than this ratio
+MAX_RISK_OVERRUN_RATIO = 1.25
+
+# SELL-side gate. 10y ledger: SELL 36 trades, 33% WR, -5.8R (BUY +88R).
+#   "ALL"       -> SELL allowed whenever the strategy signals it (legacy behaviour)
+#   "BEAR_ONLY" -> SELL only when close < EMA50 < EMA200 (confirmed downtrend)
+#   "OFF"       -> no SELL trades
+# Override with env CAPITAL_BT_SELL_MODE to compare variants walk-forward.
+SELL_MODE = os.environ.get("CAPITAL_BT_SELL_MODE", "BEAR_ONLY").strip().upper()
+
 # -----------------------------------------------------------------------------
 # Asset Specifications & Realistic Broker Cost Table (Capital.com Institutional)
 # -----------------------------------------------------------------------------
@@ -678,12 +688,16 @@ class Trade:
         # Normalized Institutional Risk Parity ($100 base risk = 1.0% of $10,000 equity)
         # Scaled dynamically by Meta-Model conviction multiplier (Invariant 85)
         target_risk_dollars = 100.0 * max(0.50, min(2.0, self.sizing_multiplier))
+        self.target_risk_dollars = target_risk_dollars
         raw_size = target_risk_dollars / max(1e-4, self.sl_dist * contract_multiplier)
         if contract_multiplier == 1.0:
             self.position_size = max(0.1, round(raw_size, 2))
         else:
             self.position_size = max(0.01, round(raw_size, 3))
         self.initial_risk_dollars = self.position_size * self.sl_dist * contract_multiplier
+        # Risk-overrun guard: the min-lot floor can inflate risk far above budget
+        # (observed up to 13x in 2025-26). Caller must skip such trades.
+        self.risk_overrun = self.initial_risk_dollars > target_risk_dollars * MAX_RISK_OVERRUN_RATIO
 
         # Multi-Target Scale-Out Plan (Pillar 4 / Invariant 74)
         if ablation_mode == "DROP_SCALE_OUT":
@@ -984,6 +998,14 @@ def run_backtest_simulation(
                 if macro_info['vix'] > 28.0:
                     regime = "VOLATILITY_SHOCK"
 
+                # SELL-side gate (see SELL_MODE). Uses EMA structure directly, not the
+                # VIX-overridden regime label, so shock days still require a downtrend.
+                if dir_signal == "SELL":
+                    if SELL_MODE == "OFF":
+                        continue
+                    if SELL_MODE == "BEAR_ONLY" and not (curr_row['close'] < curr_row['ema50'] < curr_row['ema200']):
+                        continue
+
                 trade_counter += 1
                 ablation_mode = "DROP_SCALE_OUT" if ablation_flags.get("drop_scale_out", False) else "BASELINE"
                 meta_label = meta.get("meta_label", {})
@@ -1004,6 +1026,10 @@ def run_backtest_simulation(
                     ablation_mode=ablation_mode,
                     sizing_multiplier=sz_mult
                 )
+                if new_trade.risk_overrun:
+                    # Min-lot floor would risk far more than budget: skip, don't force it
+                    trade_counter -= 1
+                    continue
                 trades.append(new_trade)
                 open_trades[epic] = new_trade
                 current_heat += new_trade.initial_risk_dollars
