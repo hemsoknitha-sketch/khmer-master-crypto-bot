@@ -180,22 +180,37 @@ def required_sample_for_dsr(
     per_trade_sr: float = 0.26,
     total_trials: int = 700,
     denom: float = 1.0,
+    skewness: Optional[float] = None,
+    kurt: Optional[float] = None,
+    denom_mode: str = "recomputed_at_sr",
     conservative_variant: bool = True
 ) -> int:
     """
     Computes minimum sample size N required for DSR >= target_dsr.
     Incorporates variance denominator factor denom = sqrt(1 - skew*SR + (kurt-1)/4 * SR^2).
 
-    If conservative_variant=True (default): sr_star = sqrt(2*ln(trials)/N), producing a stricter
-    fiduciary hurdle buffer (~1.25x larger N when denom < 1.0).
-    If conservative_variant=False (Standard Bailey-Lopez de Prado 2014):
-    sr_star is scaled by denom, yielding N - 1 = ((z_target + a) * denom / per_trade_sr)^2.
+    denom_mode:
+      - "recomputed_at_sr": Recomputes denom dynamically at per_trade_sr using skewness and kurt.
+                            This is epistemologically rigorous when testing counterfactual lower-SR bounds.
+      - "point_estimate": Keeps the input denom constant regardless of per_trade_sr.
+
+    conservative_variant:
+      - True (default): sr_star = sqrt(2*ln(trials)/N), producing a stricter fiduciary buffer
+                        (~1.25x larger N when denom < 1.0).
+      - False (Standard Bailey-Lopez de Prado 2014): sr_star is scaled by denom.
     """
     if per_trade_sr <= 0:
         return 99999
     z_target = float(norm.ppf(target_dsr))
     a = np.sqrt(2.0 * np.log(max(2, total_trials)))
-    d = max(1e-9, float(denom))
+
+    if denom_mode == "recomputed_at_sr" and skewness is not None and kurt is not None:
+        sk = float(skewness)
+        ku = float(kurt)
+        d = float(np.sqrt(max(1e-9, 1.0 - sk * per_trade_sr + ((ku - 1.0) / 4.0) * (per_trade_sr ** 2))))
+    else:
+        d = max(1e-9, float(denom))
+
     lo, hi = 30, 100000
     for _ in range(80):
         mid = (lo + hi) // 2
@@ -503,9 +518,13 @@ def full_verification(ledger: VerifiedLedger, total_trials: int = 700) -> Dict[s
     sr = dsr_info["sr"]
     sr_star = dsr_info["sr_star"]
     denom = dsr_info.get("denom", 1.0)
+    skew_val = dsr_info.get("skew", 0.0)
+    kurt_val = dsr_info.get("kurt", 3.0)
     n = ledger.size()
     per_trade_sr = sr if sr > 0 else 0.0
-    required_n = required_sample_for_dsr(0.95, per_trade_sr, total_trials, denom=denom) if per_trade_sr > 0 else 99999
+    required_n = required_sample_for_dsr(
+        0.95, per_trade_sr, total_trials, denom=denom, skewness=skew_val, kurt=kurt_val, denom_mode="recomputed_at_sr"
+    ) if per_trade_sr > 0 else 99999
     deciles = win_rate_by_decile(p_hats, realized)
 
     mean_alloc = float(np.mean([t.allocation_pct for t in ledger.trades])) if ledger.trades else 0.01
