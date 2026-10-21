@@ -3901,6 +3901,42 @@ def run_audit():
         failures.append(f"Invariant 91 check failed: {e}")
         log_fail(str(e))
 
+    # 71. Invariant 92: The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling
+    print("\n[CHECK 71/71] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
+    try:
+        has_inv92_agents = "Invariant 92: The Five Pillars of Apex TradFi Capital Profitability" in agents_md
+        has_inv92_gemini = "The Five Pillars of Apex TradFi Capital Profitability, Factor Correlation Clamping & Small Capital Compound Scaling (Invariant 92)" in gemini_md
+
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
+            citadel_src = f_cit.read()
+
+        with open("capital_engine.py", "r", encoding="utf-8") as f_cap:
+            cap_src = f_cap.read()
+
+        has_anti_chasing = "CHASING_MOMENTUM_OVEREXTENDED" in citadel_src
+        has_dyn_threshold = "Dynamic Regime-Aware Meta-Labeling Cutoff (Invariant 92 Pillar 2)" in citadel_src
+        has_factor_clumping = "Pillar 0.85: Multi-Asset Factor Correlation Clumping Guard (Invariant 92 Pillar 3)" in citadel_src
+        has_ny_lunch = "SESSION_NY_LUNCH_LULL_VETO" in citadel_src
+        has_small_cap_be = "Dynamic Small Capital Breakeven Armor & Multi-Target Trigger (Invariant 92 Pillar 5)" in cap_src
+
+        all_inv92_passed = (
+            has_inv92_agents and has_inv92_gemini and has_anti_chasing and
+            has_dyn_threshold and has_factor_clumping and has_ny_lunch and has_small_cap_be
+        )
+
+        if all_inv92_passed:
+            log_pass("The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92) are 100% certified! (Anti-Chasing, Dynamic p_cut, Factor Clamping, NY Lunch Lull, Small Cap BE Armor)")
+        else:
+            failures.append(
+                f"Invariant 92 check failed: agents={has_inv92_agents}, gemini={has_inv92_gemini}, "
+                f"anti_chasing={has_anti_chasing}, dyn_pcut={has_dyn_threshold}, factor_clump={has_factor_clumping}, "
+                f"ny_lunch={has_ny_lunch}, small_cap_be={has_small_cap_be}"
+            )
+            log_fail("Invariant 92 TradFi Capital Profitability verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 92 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

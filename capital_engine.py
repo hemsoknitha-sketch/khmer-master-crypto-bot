@@ -4394,7 +4394,9 @@ class CapitalAutonomousEngine:
                 is_runner = True
                 ratchet_pct = 0.85
 
-            if r_gain >= 2.00 and scale_tier < 1 and upl >= 2.00:
+            # Dynamic Small Capital Breakeven Armor & Multi-Target Trigger (Invariant 92 Pillar 5)
+            is_tp1_ready = (r_gain >= 1.50 and upl >= max(0.60, spread * 1.5)) or (r_gain >= 2.00 and upl >= 0.50) or (upl >= 2.00 and r_gain >= 1.20)
+            if is_tp1_ready and scale_tier < 1:
                 if tranche_id == "TP1_50":
                     logger.info(f"🎯 [MULTI-TARGET TP1 HARVEST] Banking 50% Tranche on {epic} ({direction}) @ +{r_gain:.2f}R (+${upl:+.2f})!")
                     close_res = engine.close_position(deal_id=deal_id)
@@ -4459,7 +4461,7 @@ class CapitalAutonomousEngine:
                                 except Exception:
                                     pass
 
-            elif r_gain >= 4.00 and scale_tier < 2 and upl >= 3.50:
+            elif ((r_gain >= 3.50 and upl >= max(1.50, spread * 2.0)) or (r_gain >= 4.00 and upl >= 1.00) or (upl >= 3.50 and r_gain >= 2.50)) and scale_tier < 2:
                 if tranche_id == "TP2_30":
                     logger.info(f"💎 [MULTI-TARGET TP2 HARVEST] Banking 30% Tranche on {epic} ({direction}) @ +{r_gain:.2f}R (+${upl:+.2f})!")
                     close_res = engine.close_position(deal_id=deal_id)
@@ -4567,14 +4569,14 @@ class CapitalAutonomousEngine:
             # Full Asymmetric Moonshot target (Requires minimum institutional dollar floor >= $4.50 / $10.00)
             asymmetric_target_reached = ((roi_pct >= 60.0 and upl >= 12.0) or upl >= 25.0) if is_runner else ((roi_pct >= 25.0 and upl >= 4.50) or upl >= 10.0)
 
-            # Volatility Shock & Flash Reversal Protective Early Harvest (Invariant 74 Pillar 3)
-            # If position achieved Peak UPL >= +$2.50 (or Peak ROI >= 8.0%) and then retraces >= 50% from peak,
-            # execute an immediate market harvest to protect +50% of gains before falling into the red.
+            # Volatility Shock & Flash Reversal Protective Early Harvest (Invariant 92 Pillar 5)
+            # If position achieved Peak R >= +1.5R, Peak UPL >= max(1.50, spread * 2.0), or Peak ROI >= 6.0%
+            # and then retraces >= 50% from peak, execute instant market harvest before trade turns into a loss!
             shock_early_harvest = (
-                (peak_upl >= 2.50 or roi_pct >= 8.0) and
+                (peak_upl >= max(1.50, spread * 2.0) or roi_pct >= 6.0 or r_gain >= 1.5) and
                 peak_upl > 0 and
                 (upl <= peak_upl * 0.50) and
-                (upl >= max(1.25, spread * 2.0))
+                (upl >= max(0.50, spread * 1.2))
             )
 
             # Reinforcement Learning (RL) Dynamic Exit Policy Harvest (Invariant 86)

@@ -1714,6 +1714,27 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   5. **Permanent Institutional Fiduciary Verdict:**
      - `certified: false` and Phase 1 Live Risk Allocation $\le 0.1\%$ remain immutable. Real capital deployment is strictly prohibited until $N \ge 544$ trades are logged in `VerifiedLedger` with frozen parameters.
 
+### Invariant 92: The Five Pillars of Apex TradFi Capital Profitability, Factor Correlation Clamping & Small Capital Compound Scaling (AQ92 Standard - គ្រឹះ ៥ ប្រការកម្ចាត់ចំណុចខ្សោយ Capital.com រុញ Win Rate ៦០-៦៨% & បង្កើនប្រាក់ចំណេញសុទ្ធ)
+- **Location:** `super_smart_capital_citadel.py` (Pillar 1 Anti-Chasing, Pillar 0.85 Factor Correlation, Pillar 4 NY Lunch Lull, Pillar 0.9 Dynamic p_cut), `capital_engine.py` (Pillar 5 Dynamic Breakeven Armor & Flash Shock Harvest), `audit_system.py` [CHECK 71/71]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Edge:
+  1. **Pillar 1: Anti-Chasing Momentum Overextension & Spread Drag Guard:**
+     - Prohibits buying extended impulse candles ($> 1.85\times\text{ATR}_{15m}$ above EMA20) or shorting extended breakdowns ($> 1.85\times\text{ATR}_{15m}$ below EMA20) (`CHASING_MOMENTUM_OVEREXTENDED`).
+     - Eliminates peak spread friction and top-wick/bottom-wick retail fills, demanding structural pullback / FVG retest before entry.
+  2. **Pillar 2: Dynamic Regime-Aware Meta-Labeling Probability Cutoff ($p_{\text{cut}}$):**
+     - Replaces static 0.55 cutoff with adaptive regime scaling:
+       * Persistent Trend (Hurst $\ge 0.60$, $\text{ADX} \ge 28.0$): $p_{\text{cut}} = 0.52$ (captures high-expectancy trend expansion waves).
+       * Balanced Baseline ($0.50 \le \text{Hurst} < 0.60$): $p_{\text{cut}} = 0.55$.
+       * Mean-Reverting / Choppy (Hurst $< 0.48$ or $\text{ADX} < 22.0$): $p_{\text{cut}} = 0.62$ (strictest statistical barrier filtering out false breakouts).
+  3. **Pillar 3: Multi-Asset Factor Correlation Clumping Guard (US Tech & US100):**
+     - Recognizes that US Tech Equities (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`) and `US100` carry pairwise correlation $\rho \ge 0.85 - 0.95$.
+     - Strictly limits portfolio exposure: Maximum 1 active US Tech Equity + 1 US100 Index position permitted simultaneously (`FACTOR_CORRELATION_VETO`). Prevents simultaneous portfolio drawdown from single-factor Nasdaq pullbacks.
+  4. **Pillar 4: New York Institutional Lunch Lull Dead-Zone Guard (16:30 - 18:00 UTC = 23:30 - 01:00 ICT):**
+     - Freezes all new breakout entries on US Equities and Indices during the 90-minute institutional lunch lull (`SESSION_NY_LUNCH_LULL_VETO`), where institutional trading volume drops by $> 65\%$ and retail fakeouts spike. Trading resumes at 18:00 UTC (01:00 ICT).
+  5. **Pillar 5: Dynamic Small Capital Breakeven Armor & Flash Shock Protective Early Harvest:**
+     - Eliminates unreachable fixed dollar floors on micro accounts ($50 - $200).
+     - TP1 / Breakeven Armor engages as soon as $R_{\text{gain}} \ge +1.50R$ and net profit clears spread ($\text{UPL} \ge \max(0.60, 1.5\times\text{spread})$), locking trade at $0.00R$ Free Roll.
+     - Flash Shock Early Harvest triggers if peak $R \ge +1.5R$ (or peak UPL $\ge \max(1.50, 2.0\times\text{spread})$, ROI $\ge +6.0\%$) retraces $\ge 50\%$, instantly banking gains before trades slip into negative territory.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

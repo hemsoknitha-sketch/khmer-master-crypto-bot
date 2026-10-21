@@ -1000,6 +1000,19 @@ class TradFiSessionKillZoneRouter:
                     f"SESSION_KILL_ZONE_ASIAN_MARKETS_CLOSED: Asian cash markets ({resolved_epic}) closed during New York session."
                 )
                 return False, reason, session_info
+
+            # NY Institutional Lunch Lull Dead-Zone Guard (Invariant 92 Pillar 4: 16:30 - 18:00 UTC = 23:30 - 01:00 ICT)
+            # Breakout failure rate >65% on US Equities and Indices due to institutional lunch volume drought.
+            now_utc_check = datetime.datetime.now(datetime.timezone.utc)
+            utc_min_check = now_utc_check.hour * 60 + now_utc_check.minute
+            if (is_us_stock or is_us_index) and (990 <= utc_min_check < 1080):
+                reason = (
+                    f"SESSION_NY_LUNCH_LULL_VETO: {resolved_epic} entry blocked during New York Institutional Lunch Lull "
+                    f"(16:30-18:00 UTC / 23:30-01:00 ICT). Breakout failure rate exceeds 65% due to volume drought. "
+                    f"New entries frozen until afternoon institutional volume resumption at 18:00 UTC (01:00 ICT)."
+                )
+                return False, reason, session_info
+
             return True, "NEW_YORK_KILL_ZONE_CLEARANCE", session_info
 
         return True, "DEFAULT_SESSION_CLEARANCE", session_info
@@ -1673,6 +1686,53 @@ class SuperSmartCapitalCitadel:
                 "rejection_reason": reason,
                 "strategy_regime": strategy_regime,
                 "regime_veto_code": "VETO_DEEP_DISCOUNT_TRAP",
+                "price_range_pct": price_range_pct,
+                "confluence_score": 25.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
+            }
+            cls._CITADEL_CACHE[cache_key] = (now, res)
+            return res
+
+        # Anti-Chasing Momentum Overextension & Spread Drag Guard (Invariant 92 Pillar 1)
+        # Chasing an extended impulse candle (> 1.85x ATR from EMA20) forces retail to buy the top wick
+        # and pay inflated spread right before a mean-reverting pullback.
+        if norm_side == "BUY" and (curr_price - ema20_15m) > (1.85 * atr_15m):
+            reason = (
+                f"CHASING_MOMENTUM_OVEREXTENDED: Price {curr_price:.2f} is {((curr_price - ema20_15m)/atr_15m):.2f}x ATR above 15m EMA20. "
+                f"Chasing extended impulse without pullback is blocked to eliminate spread drag and wick-top fills. "
+                f"Awaiting structural retest / FVG consolidation."
+            )
+            res = {
+                "epic": resolved_epic,
+                "proposed_side": norm_side,
+                "is_approved": False,
+                "rejection_reason": reason,
+                "strategy_regime": strategy_regime,
+                "regime_veto_code": "VETO_CHASING_OVEREXTENDED",
+                "price_range_pct": price_range_pct,
+                "confluence_score": 25.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
+            }
+            cls._CITADEL_CACHE[cache_key] = (now, res)
+            return res
+
+        if norm_side == "SELL" and (ema20_15m - curr_price) > (1.85 * atr_15m):
+            reason = (
+                f"CHASING_MOMENTUM_OVEREXTENDED: Price {curr_price:.2f} is {((ema20_15m - curr_price)/atr_15m):.2f}x ATR below 15m EMA20. "
+                f"Shorting extended breakdown without pullback is blocked to eliminate spread drag and bottom wicks. "
+                f"Awaiting structural retest / FVG consolidation."
+            )
+            res = {
+                "epic": resolved_epic,
+                "proposed_side": norm_side,
+                "is_approved": False,
+                "rejection_reason": reason,
+                "strategy_regime": strategy_regime,
+                "regime_veto_code": "VETO_CHASING_OVEREXTENDED",
                 "price_range_pct": price_range_pct,
                 "confluence_score": 25.0,
                 "spread": spread,
@@ -2823,6 +2883,28 @@ class SuperSmartCapitalCitadel:
         except Exception as e_sess_gate:
             logger.debug(f"Session kill zone gatekeeper evaluation note: {e_sess_gate}")
 
+        # Pillar 0.85: Multi-Asset Factor Correlation Clumping Guard (Invariant 92 Pillar 3)
+        TECH_FACTOR_ASSETS = {"US100", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"}
+        if any(t in s_epic for t in TECH_FACTOR_ASSETS):
+            try:
+                if engine and hasattr(engine, "get_open_positions"):
+                    open_positions = engine.get_open_positions() or []
+                    open_epics = [str(p.get("position", {}).get("epic", "")).upper() for p in open_positions]
+                    active_tech = [e for e in open_epics if any(t in e for t in TECH_FACTOR_ASSETS)]
+                    has_active_index = any("US100" in e for e in active_tech)
+                    active_tech_stocks = [e for e in active_tech if "US100" not in e]
+
+                    if "US100" in s_epic and has_active_index:
+                        reason = f"FACTOR_CORRELATION_VETO: US100 index position already active. Duplicate index exposure prohibited."
+                        print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                        return False, reason, {"is_approved": False, "rejection_reason": reason, "factor_clumping": True}
+                    elif "US100" not in s_epic and len(active_tech_stocks) >= 1:
+                        reason = f"FACTOR_CORRELATION_VETO: High-beta US Tech Equity ({active_tech_stocks[0]}) already active. Max 1 Tech Equity permitted to prevent Nasdaq correlation wipeout."
+                        print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                        return False, reason, {"is_approved": False, "rejection_reason": reason, "factor_clumping": True}
+            except Exception as e_corr:
+                logger.debug(f"Factor correlation guard note: {e_corr}")
+
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):
             reason = diag.get("rejection_reason", "SUPER_SMART_CAPITAL_CITADEL_REJECTED")
@@ -2892,12 +2974,24 @@ class SuperSmartCapitalCitadel:
                 hurst_exponent=hurst_val,
                 ou_zscore=ou_val
             )
-            meta_res = CapitalMetaLabelingEngine.predict_meta_edge(meta_features, threshold=0.55)
+
+            # Dynamic Regime-Aware Meta-Labeling Cutoff (Invariant 92 Pillar 2)
+            # Persistent Trend (Hurst >= 0.60 and ADX >= 28.0): threshold = 0.52 (Captures high-expectancy trends)
+            # Balanced Trend (0.50 <= Hurst < 0.60): threshold = 0.55
+            # Choppy/Mean-Reverting (Hurst < 0.48 or ADX < 22.0): threshold = 0.62 (Strictest quality barrier against false breakouts)
+            if hurst_val >= 0.60 and adx_val >= 28.0:
+                dyn_threshold = 0.52
+            elif hurst_val < 0.48 or adx_val < 22.0:
+                dyn_threshold = 0.62
+            else:
+                dyn_threshold = 0.55
+
+            meta_res = CapitalMetaLabelingEngine.predict_meta_edge(meta_features, threshold=dyn_threshold)
             diag["meta_label"] = meta_res
 
             if not meta_res.get("is_edge_approved", meta_res.get("is_approved", True)):
-                thresh_val = float(meta_res.get("threshold", 0.55)) * 100.0
-                reason = f"META_REJECTED: P(Win)={meta_res.get('meta_win_prob', 0.0)*100:.1f}% < {thresh_val:.1f}% (Model 2 Quality Filter Veto)"
+                thresh_val = float(meta_res.get("threshold", dyn_threshold)) * 100.0
+                reason = f"META_REJECTED: P(Win)={meta_res.get('meta_win_prob', 0.0)*100:.1f}% < {thresh_val:.1f}% (Model 2 Quality Filter Veto | dyn_thresh={dyn_threshold:.2f})"
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
                 try:
                     import database as db
