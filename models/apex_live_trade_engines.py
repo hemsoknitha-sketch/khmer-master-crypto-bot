@@ -325,9 +325,10 @@ class LiveTradeExecutionEngine:
         """
         Fractional Kelly sizing: f* = (p - (1-p)/b) * kelly_fraction.
         """
-        if not (0.0 < p_win < 1.0) or payoff_ratio <= 0.0:
+        p_clamped = max(0.0, min(0.999, float(p_win)))
+        if p_clamped <= 0.0 or payoff_ratio <= 0.0:
             return 0.0
-        f = p_win - (1.0 - p_win) / payoff_ratio
+        f = p_clamped - (1.0 - p_clamped) / payoff_ratio
         return max(0.0, min(1.0, f)) * self.kelly_fraction
 
     def _drawdown(self) -> float:

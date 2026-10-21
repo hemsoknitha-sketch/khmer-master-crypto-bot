@@ -3782,6 +3782,89 @@ def run_audit():
         failures.append(f"Invariant 89 check failed: {e}")
         log_fail(str(e))
 
+    # 69. Invariant 90: Institutional Memory Lock of Brutal Engineering Honesty, Deterministic APEX Trade Engines & Fiduciary Mathematical Ground Truth
+    print("\n[CHECK 69/69] Verifying Institutional Memory Lock of Brutal Engineering Honesty & APEX Trade Engines (Invariant 90)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md and GEMINI.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_md = f.read()
+        has_inv90_agents = "Invariant 90: Institutional Memory Lock of Brutal Engineering Honesty, Deterministic APEX Trade Engines" in agents_md
+        has_inv90_gemini = "Institutional Memory Lock of Brutal Engineering Honesty, Deterministic APEX Trade Engines & Fiduciary Mathematical Ground Truth (Invariant 90)" in gemini_md
+
+        # 2. Static Code Verification in apex_live_trade_engines.py and models/apex_live_trade_engines.py
+        with open("apex_live_trade_engines.py", "r", encoding="utf-8") as f:
+            apex_code = f.read()
+        with open("models/apex_live_trade_engines.py", "r", encoding="utf-8") as f:
+            models_apex_code = f.read()
+
+        has_no_skeleton = "pass # (កូដដំណើរការនៅទីនេះ)" not in apex_code and "pass # (កូដដំណើរការនៅទីនេះ)" not in models_apex_code
+        has_mev_engine = "class MEVFlashLoanEngine:" in apex_code and "def build_liquidity_graph" in apex_code and "def execute_if_profitable" in apex_code
+        has_canonical_rotation = "cycle[idx:] + cycle[:idx]" in apex_code and "cycle[idx:] + cycle[:idx]" in models_apex_code
+        has_whale_tracker = "def scan_insider_activity" in apex_code and "def build_onchain_graph" in apex_code and "pagerank" in apex_code
+        has_execution_engine = "class LiveTradeExecutionEngine:" in apex_code and "def fuse_signals" in apex_code and "def kelly_size" in apex_code
+        has_drawdown_guard = "def check_drawdown_and_liquidate" in apex_code and "kill_switch" in apex_code and "max_drawdown_pct" in apex_code
+
+        # 3. Dynamic Unit Test: MEV Bounded Cycle Arbitrage & Rotation
+        import apex_live_trade_engines as apex
+        mev_test = apex.MEVFlashLoanEngine(min_profit_wei=1000)
+        test_pools = [
+            {"from": "ETH", "to": "USDC", "rate": 3000.0, "fee_bps": 5, "depth_wei": 10**22},
+            {"from": "USDC", "to": "DAI", "rate": 1.002, "fee_bps": 1, "depth_wei": 10**22},
+            {"from": "DAI", "to": "ETH", "rate": 1.0/3000.0 * 1.01, "fee_bps": 5, "depth_wei": 10**22}
+        ]
+        mev_test.build_liquidity_graph(test_pools)
+        arbs = mev_test.find_arbitrage("ETH", max_hops=3)
+        mev_unit_ok = len(arbs) > 0 and arbs[0]["cycle"][0] == "ETH"
+        mev_exec = mev_test.execute_if_profitable("ETH", 10**18, gas_price_gwei=10.0, eth_price_usd=3000.0)
+        mev_exec_ok = mev_exec is not None and mev_exec.get("net_profit_wei", 0) > 0
+
+        # 4. Dynamic Unit Test: Whale Tracker PageRank & Inflow
+        test_transfers = [
+            {"from": "0xWhale1", "to": "0xTokenA", "value": 500000},
+            {"from": "0xRetail1", "to": "0xTokenA", "value": 10000},
+            {"from": "0xWhale2", "to": "0xTokenA", "value": 750000}
+        ]
+        G_test = apex.build_onchain_graph(test_transfers)
+        whale_scan = apex.scan_insider_activity(G_test, ["0xWhale1", "0xWhale2"], "0xTokenA")
+        whale_unit_ok = whale_scan.get("signal") == 1 and whale_scan.get("confidence", 0.0) >= 0.80
+
+        # 5. Dynamic Unit Test: Signal Fusion & Kelly Sizer & Kill Switch
+        exec_test = apex.LiveTradeExecutionEngine(testnet=True, max_drawdown_pct=0.05)
+        f_sig, f_conf = exec_test.fuse_signals({"m1": {"signal": 1, "confidence": 0.8}, "m2": {"signal": 1, "confidence": 0.7}})
+        fusion_unit_ok = f_sig == 1 and f_conf >= 0.70
+        k_val = exec_test.kelly_size(f_conf, payoff_ratio=2.5)
+        kelly_unit_ok = 0.10 < k_val <= 0.50
+
+        # Drawdown Kill Switch test
+        exec_test.update_equity(10000.0)
+        exec_test.update_equity(9400.0)  # 6% drawdown > 5% max
+        dd_kill_ok = exec_test.kill_switch is True
+
+        all_inv90_passed = (
+            has_inv90_agents and has_inv90_gemini and
+            has_no_skeleton and has_mev_engine and has_canonical_rotation and
+            has_whale_tracker and has_execution_engine and has_drawdown_guard and
+            mev_unit_ok and mev_exec_ok and whale_unit_ok and fusion_unit_ok and
+            kelly_unit_ok and dd_kill_ok
+        )
+
+        if all_inv90_passed:
+            log_pass(f"Institutional Memory Lock of Brutal Engineering Honesty & APEX Trade Engines (Invariant 90) are 100% certified! (MEV Profit: {mev_exec['net_profit_wei']} WEI, Whale Conf: {whale_scan['confidence']:.2f}, Kelly: {k_val:.4f}, Kill-Switch: Verified)")
+        else:
+            failures.append(
+                f"Invariant 90 check failed: inv90_agents={has_inv90_agents}, inv90_gemini={has_inv90_gemini}, "
+                f"no_skeleton={has_no_skeleton}, mev_eng={has_mev_engine}, rotation={has_canonical_rotation}, "
+                f"whale_tracker={has_whale_tracker}, exec_eng={has_execution_engine}, dd_guard={has_drawdown_guard}, "
+                f"mev_unit={mev_unit_ok}, mev_exec={mev_exec_ok}, whale_unit={whale_unit_ok}, "
+                f"fusion_unit={fusion_unit_ok}, kelly_unit={kelly_unit_ok}, dd_kill={dd_kill_ok}"
+            )
+            log_fail("Institutional Memory Lock of Brutal Engineering Honesty & APEX Trade Engines (Invariant 90) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 90 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

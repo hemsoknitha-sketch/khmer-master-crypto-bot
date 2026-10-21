@@ -1653,6 +1653,41 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 90: Institutional Memory Lock of Brutal Engineering Honesty, Deterministic APEX Trade Engines & Fiduciary Mathematical Ground Truth (AQ90)
+**(គ្រឹះស្មោះត្រង់វិស្វកម្ម & ការចងចាំច្បាប់គណិតវិទ្យា APEX មិនប្រែប្រួល - កម្ចាត់កូដគ្រោងឆ្អឹងទទេ ១០០% ស្របតាមសច្ចធម៌វិជ្ជាជីវៈ)**
+- **Authority:** Absolute Architectural Ground Truth, Immutable Fiduciary Memory Lock & Permanent System Specification.
+- **Location:** pex_live_trade_engines.py, models/apex_live_trade_engines.py, udit_system.py [CHECK 69/69].
+- **Core Pillars & Non-Negotiable Mathematical Mechanics:**
+  1. **Permanent Invalidation of Fake Skeletons & Unmodeled Code:**
+     - Writing, committing, or retaining empty placeholder skeletons (pass), stub objects, or unmodeled engines is strictly classified as **Technical Treason & Capital Sabotage**.
+     - No engine is permitted to exist without explicit friction modeling (spread drag, swap, slippage, gas, and broker fees), deterministic risk controls, and non-empty mathematical decision logic.
+  2. **MEV & Flash Loan Arbitrage Engine with Canonical Cycle Rotation (MEVFlashLoanEngine):**
+     - Directed liquidity graph using NetworkX DiGraph bounded by hop depth $ (simple_cycles length bound $\le H + 1$).
+     - **Canonical Cycle Rotation Standard:** Bypasses NetworkX internal arbitrary cycle starting node sorting by dynamically locating ase_token and rotating the sequence (cycle = cycle[idx:] + cycle[:idx]), guaranteeing 100% capture of all profitable cycles beginning and ending with the trade base asset.
+     - **Full Friction & Cost Modeling:** Exact net profit calculation in WEI:
+       \\text{Net Profit (WEI)} = \\text{Gross Profit} - \\text{Flash Loan Fee (9 bps)} - \\text{Swap Fees (bps)} - \\text{Gas Cost (WEI)}
+       Execution is strictly rejected if $\\text{Net Profit} < \\text{min\\_profit\\_wei}$ (^{15}$ WEI), permanently preventing trades that are nominally positive but net negative after fees.
+  3. **Insider Wallet & Whale Tracker Engine (scan_insider_activity):**
+     - Directed transfer graph with exponential temporal decay weighting ( = \\text{val}_i \\times \\text{decay}^{n - 1 - idx}$, where $\\text{decay} = 0.5$).
+     - Smart money clustering analysis fusing PageRank centrality ($\\alpha = 0.85$) with smart money inflow ratio ($\\frac{\\text{smart\\_inflow}}{\\text{total\\_inflow}}$).
+     - Directional edge: Emits Accumulation Signal $+1$ when $\\text{ratio} > 0.70$ and $\\text{confidence} \\ge 0.60$; emits Distribution Signal $-1$ when $\\text{ratio} < 0.30$ and $\\text{confidence} \\ge 0.60$; emits Neutral $ otherwise.
+  4. **Deterministic Live Trade Execution Engine (LiveTradeExecutionEngine):**
+     - **Confidence-Weighted Signal Fusion:** (M)$ time and (1)$ space consensus over all available model outputs:
+       \\text{Score} = \\frac{\\sum_{m} \\text{confidence}_m \\times \\text{signal}_m}{\\sum_{m} \\text{confidence}_m}
+       Dead-band at $|\\text{Score}| \\le 0.55$ suppresses noisy, low-conviction signals.
+     - **Fractional Kelly Position Sizing:**
+       f^* = \\text{clamp}\\left(p - \\frac{1 - p}{b}, 0.0, 1.0\\right) \\times \\text{kelly\\_fraction}
+       Strictly capped at maximum single-position ceiling $\\le 20\\%$ of account equity ($\\text{max\\_position\\_pct} = 0.20$).
+     - **Slippage Guard & CCXT Exception Armor:** Pre-flight quote verification rejects execution if $\\text{slippage} > 50\\text{ bps}$. All exchange I/O is wrapped in explicit ccxt exception handlers (NetworkError, ExchangeError, InsufficientFunds), returning structured telemetry dictionaries.
+     - **Dynamic Trailing Stops & Entry Stop Floor:**
+       \\text{Stop Price} = \\max(\\text{Peak Price} \\times (1 - \\text{trailing\\_pct}), \\text{Entry Price} \\times (1 - \\text{trailing\\_pct}))
+       Evaluated at every tick; ratchets upward with peak price advances and never loosens.
+     - **Maximum Portfolio Drawdown Kill-Switch:**
+       \\text{Drawdown} = \\frac{\\text{Peak Equity} - \\text{Current Equity}}{\\text{Peak Equity}}
+       If $\\text{Drawdown} \\ge 5.0\\%$ ($\\text{max\\_drawdown\\_pct} = 0.05$), kill_switch engages immediately, emergency liquidates all open positions, and permanently bars new entries.
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.

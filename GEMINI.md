@@ -51,6 +51,10 @@
 
 ---
 
+- **Institutional Memory Lock of Brutal Engineering Honesty, Deterministic APEX Trade Engines & Fiduciary Mathematical Ground Truth (Invariant 90):** Absolute prohibition against placeholder skeletons (pass), stub mocks, or unmodeled engines. MEVFlashLoanEngine features directed graph cycle enumeration with Canonical Cycle Rotation (bypassing NetworkX node ordering traps) and exact WEI net profit modeling deducting flash loan fees (9 bps), swap fees, and gas. Insider Wallet & Whale Tracker uses time-decayed flow graphs (=0.5$) and PageRank centrality to detect smart money accumulation (+1) or distribution (-1). LiveTradeExecutionEngine features confidence-weighted signal fusion ((M)$ time, (1)$ space), fractional Kelly sizing clamped at $\le 20\%$ equity, slippage guards (	ext{ bps}$), dynamic trailing stops, and portfolio drawdown kill-switch ($\le 5.0\%$). Permanent architectural ground truth across all AI sessions.
+
+---
+
 ## 3. DUAL-TIER INTELLECTUAL PROPERTY PROTECTION (AQ76 INVARIANT 79)
 - **Public VIP Tier (`is_admin=False`):** Focus solely on User Benefits, Ease of Use, Capital Protection, and 1-Tap Copyable Presets. Never leak mathematical formulas, exact threshold numbers, or Invariant IDs.
 - **Admin Tier (`is_admin=True`):** Full technical depth, telemetry, formulas, and diagnostics.
