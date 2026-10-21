@@ -248,6 +248,7 @@ DEFAULT_CAPITAL_PASSWORD = ""
 
 # Global In-Memory Shared RAM Cache for TradFi Quotes (< 0.05ms)
 _SHARED_PRICE_CACHE: Dict[str, Dict[str, Any]] = {}
+_SHARED_CANDLE_CACHE: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 
 def get_fresh_cached_market(epic: str, max_age_seconds: float = 5.0) -> Optional[Dict[str, Any]]:
     """
@@ -1105,34 +1106,56 @@ class CapitalComEngine:
         """
         Fetches historical OHLCV bars for technical indicator calculation.
         Resolutions: MINUTE, MINUTE_5, MINUTE_15, MINUTE_30, HOUR, HOUR_4, DAY.
+        Features 401 re-authentication recovery, transient retry, and in-memory fallback cache.
         """
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        cache_key = f"{resolved_epic}:{resolution}"
+
         if not self.ensure_session():
+            cached = _SHARED_CANDLE_CACHE.get(cache_key)
+            if cached and cached[1]:
+                return list(cached[1])
             return []
 
         url = f"{self.base_url}/prices/{resolved_epic}"
         params = {"resolution": resolution, "max": max_bars}
-        
-        try:
-            res = self.session.get(url, headers=self.get_auth_headers(), params=params, timeout=10)
-            if res.status_code == 200:
-                data = res.json()
-                prices = data.get("prices", [])
-                candles = []
-                for p in prices:
-                    candles.append({
-                        "snapshotTime": p.get("snapshotTime"),
-                        "open": float(p.get("openPrice", {}).get("bid", 0.0)),
-                        "high": float(p.get("highPrice", {}).get("bid", 0.0)),
-                        "low": float(p.get("lowPrice", {}).get("bid", 0.0)),
-                        "close": float(p.get("closePrice", {}).get("bid", 0.0)),
-                        "volume": float(p.get("lastTradedVolume", 0.0))
-                    })
-                return candles
-            return []
-        except Exception as e:
-            logger.error(f"Error fetching historical prices: {e}")
-            return []
+
+        for attempt in range(2):
+            try:
+                res = self.session.get(url, headers=self.get_auth_headers(), params=params, timeout=10)
+                if res.status_code == 401 and attempt == 0:
+                    self.authenticate()
+                    continue
+                if res.status_code == 200:
+                    data = res.json()
+                    prices = data.get("prices", [])
+                    candles = []
+                    for p in prices:
+                        candles.append({
+                            "snapshotTime": p.get("snapshotTime"),
+                            "open": float(p.get("openPrice", {}).get("bid", 0.0)),
+                            "high": float(p.get("highPrice", {}).get("bid", 0.0)),
+                            "low": float(p.get("lowPrice", {}).get("bid", 0.0)),
+                            "close": float(p.get("closePrice", {}).get("bid", 0.0)),
+                            "volume": float(p.get("lastTradedVolume", 0.0))
+                        })
+                    if candles:
+                        _SHARED_CANDLE_CACHE[cache_key] = (time.time(), candles)
+                        return candles
+                elif res.status_code in (429, 502, 503, 504) and attempt == 0:
+                    time.sleep(0.25)
+                    continue
+            except Exception as e:
+                logger.error(f"Error fetching historical prices (attempt {attempt + 1}): {e}")
+                if attempt == 0:
+                    time.sleep(0.2)
+                    continue
+
+        cached = _SHARED_CANDLE_CACHE.get(cache_key)
+        if cached and cached[1]:
+            logger.info(f"🔄 [CANDLE CACHE FALLBACK] Using cached candles for {resolved_epic} ({len(cached[1])} bars).")
+            return list(cached[1])
+        return []
 
     # --------------------------------------------------------------------------
     # Trading & Position Management (Demo & Live Protected)
@@ -6080,6 +6103,14 @@ class CapitalLeadLagArbitrageEngine:
         Runs entirely in-memory (< 0.05ms) without blocking the WebSocket loop.
         """
         if not self._is_active:
+            return
+
+        # Invariant 80: Capital.com Crypto CFDs are disabled by default.
+        # Bypass tick processing and execution when crypto is disabled.
+        try:
+            if not db.is_capital_crypto_enabled():
+                return
+        except Exception:
             return
 
         sym_upper = str(symbol).upper().strip()

@@ -1450,6 +1450,10 @@ class SuperSmartCapitalCitadel:
         pat_d1 = htf_patterns_eval.get("D1", {})
 
         if not candles_15m or len(candles_15m) < 25:
+            # Fallback retry with max_bars=50 in case max_bars=220 was throttled or timed out
+            candles_15m = engine.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=50)
+
+        if not candles_15m or len(candles_15m) < 25:
             # Fallback to shared RAM price cache or basic validation if API prices temporarily unavailable
             prec = _get_tradfi_precision(resolved_epic, curr_price)
             bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
@@ -1465,7 +1469,7 @@ class SuperSmartCapitalCitadel:
                 "invalidation_sl": sl_def,
                 "details": f"Historical bars ({len(candles_15m) if candles_15m else 0}) below required minimum 25."
             }
-            cls._CITADEL_CACHE[cache_key] = (now, res)
+            cls._CITADEL_CACHE[cache_key] = (now - 27.0, res)
             return res
 
         opens = [float(c.get("open", 0.0)) for c in candles_15m]

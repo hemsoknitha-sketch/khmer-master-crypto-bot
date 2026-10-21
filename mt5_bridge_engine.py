@@ -1700,7 +1700,12 @@ class MT5BridgeEngine:
         rej_key = f"rej_{account_id}_{retcode}"
         if (now_ts - self._last_auth_log.get(rej_key, 0.0)) >= 600.0:
             self._last_auth_log[rej_key] = now_ts
-            admin_chat_id = 537186806
+            admin_chat_ids = {859271875, 537186806}
+            with self._clients_lock:
+                s_cli = self.clients.get(account_id)
+                if s_cli and getattr(s_cli, "chat_id", 0):
+                    admin_chat_ids.add(int(getattr(s_cli, "chat_id")))
+
             if retcode == 10017:
                 self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 3600.0
                 self._account_trade_disabled_until[str(account_id)] = now_ts + 1800.0
@@ -1722,7 +1727,8 @@ class MT5BridgeEngine:
                     f"2. <b>ទុនតិចពេក (Insufficient Margin) ៖</b> បើទុនសល់តិច ({bal_str}) មិនគ្រប់ Margin បើក 0.01 Lot ឡើយ។ សូម Top-up បន្ថែម $10–$50។\n"
                     "3. <b>Algo Trading ៖</b> ត្រូវចុចបើកប៊ូតុង Algo Trading (ពណ៌បៃតង) លើ MT5។"
                 )
-                _dispatch_telegram_alert(admin_chat_id, help_text)
+                for cid in admin_chat_ids:
+                    _dispatch_telegram_alert(cid, help_text)
             elif retcode == 10019:
                 self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 900.0
                 help_text = (
@@ -1734,7 +1740,8 @@ class MT5BridgeEngine:
                     "━━━━━━━━━━━━\n"
                     "👉 សូមបញ្ចូលទុនបន្ថែម (Top-up) ទៅក្នុងគណនី MT5 ដើម្បីបន្តដំណើរការ Trade!"
                 )
-                _dispatch_telegram_alert(admin_chat_id, help_text)
+                for cid in admin_chat_ids:
+                    _dispatch_telegram_alert(cid, help_text)
             elif retcode == 10006:
                 clean_sym = normalize_mt5_symbol(symbol)
                 # If symbol had a broker suffix (.C, c, etc.) and was rejected with 10006:
@@ -3067,11 +3074,30 @@ class MT5BridgeEngine:
             return {"success": False, "reason": "Account is in cooling off due to Prop Firm / Risk limit breach."}
 
         now_ts = time.time()
+        # Check Account-Level Trade Disabled Lock (e.g. Retcode 10017 Investor Password / Algo Trading Disabled)
+        acct_trade_disabled_ts = self._account_trade_disabled_until.get(str(account_id), 0.0)
+        if acct_trade_disabled_ts > now_ts:
+            remain_min = int((acct_trade_disabled_ts - now_ts) / 60) + 1
+            logger.warning(f"🛑 [REACHSEY GOLD TRADE DISABLED BLOCKED] Account #{account_id} trade disabled by broker/terminal ({remain_min}m remaining).")
+            return {
+                "success": False,
+                "reason": (
+                    f"Account #{account_id} Trade Disabled by Broker/Terminal (Retcode 10017): "
+                    f"សូមពិនិត្យមើល MT5 (Login Master Password, បើក Algo Trading និង Check Allow Algo Trading ក្នុង F7 Common) "
+                    f"({remain_min} នាទីទៀត)!"
+                )
+            }
+
+        sym_clean = "XAUUSD"
+        adapted_sym = self.adapt_symbol_for_session(sym_clean, session)
+
         # Invariant 35 & 48: Strict 45-Minute Post-Loss Circuit Breaker (Quarantine Lock)
         streak_key = f"{account_id}_XAUUSD"
+        adapted_key = f"{account_id}_{adapted_sym}"
         all_key = f"{account_id}_ALL"
         lockout_ts = max(
             self._symbol_lockout_until.get(streak_key, 0.0),
+            self._symbol_lockout_until.get(adapted_key, 0.0),
             self._symbol_lockout_until.get(all_key, 0.0)
         )
         if lockout_ts > now_ts:
