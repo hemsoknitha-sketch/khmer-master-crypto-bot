@@ -3865,6 +3865,42 @@ def run_audit():
         failures.append(f"Invariant 90 check failed: {e}")
         log_fail(str(e))
 
+    # 70. Invariant 91: Institutional DSR Degrees of Freedom N-1, True Minimum Roots & Fiduciary Z-Margin Standard
+    print("\n[CHECK 70/70] Verifying Institutional DSR Degrees of Freedom N-1, True Minimum Roots & Fiduciary Z-Margin (Invariant 91)...")
+    try:
+        from alpha_edge_validator import required_sample_for_dsr, dsr_with_moments
+
+        has_inv91_agents = "Invariant 91: Institutional Deflated Sharpe Ratio (DSR) Degrees of Freedom N-1" in agents_md
+        has_inv91_gemini = "Institutional Deflated Sharpe Ratio Degrees of Freedom N-1, True Minimum Roots & Fiduciary Z-Margin Standard (Invariant 91)" in gemini_md
+
+        # Test True Minimum Roots at K=2800
+        n_544 = required_sample_for_dsr(per_trade_sr=0.2342, total_trials=2800, skewness=0.9708, kurt=3.0233)
+        n_711 = required_sample_for_dsr(per_trade_sr=0.2056, total_trials=2800, skewness=0.9708, kurt=3.0233)
+        n_464 = required_sample_for_dsr(per_trade_sr=0.2342, total_trials=2800, skewness=0.9708, kurt=3.0233, conservative_variant=False)
+        n_618 = required_sample_for_dsr(per_trade_sr=0.2056, total_trials=2800, skewness=0.9708, kurt=3.0233, conservative_variant=False)
+
+        # Test K Sensitivity
+        n_579 = required_sample_for_dsr(per_trade_sr=0.2342, total_trials=5600, skewness=0.9708, kurt=3.0233)
+        n_599 = required_sample_for_dsr(per_trade_sr=0.2342, total_trials=8400, skewness=0.9708, kurt=3.0233)
+
+        roots_ok = (n_544 == 544 and n_711 == 711 and n_464 == 464 and n_618 == 618)
+        k_sens_ok = (n_579 == 579 and n_599 == 599)
+
+        all_inv91_passed = has_inv91_agents and has_inv91_gemini and roots_ok and k_sens_ok
+
+        if all_inv91_passed:
+            log_pass(f"Institutional DSR Degrees of Freedom N-1 & True Minimum Roots (Invariant 91) are 100% certified! (N=544 Primary Root, N=711 Floor, K5600=579, K8400=599)")
+        else:
+            failures.append(
+                f"Invariant 91 check failed: inv91_agents={has_inv91_agents}, inv91_gemini={has_inv91_gemini}, "
+                f"roots_ok={roots_ok} (544={n_544}, 711={n_711}, 464={n_464}, 618={n_618}), "
+                f"k_sens_ok={k_sens_ok} (579={n_579}, 599={n_599})"
+            )
+            log_fail("Institutional DSR Degrees of Freedom N-1 & True Minimum Roots (Invariant 91) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 91 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

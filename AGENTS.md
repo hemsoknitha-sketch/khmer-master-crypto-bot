@@ -1686,6 +1686,34 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
        \\text{Drawdown} = \\frac{\\text{Peak Equity} - \\text{Current Equity}}{\\text{Peak Equity}}
        If $\\text{Drawdown} \\ge 5.0\\%$ ($\\text{max\\_drawdown\\_pct} = 0.05$), kill_switch engages immediately, emergency liquidates all open positions, and permanently bars new entries.
 
+### Invariant 91: Institutional Deflated Sharpe Ratio (DSR) Degrees of Freedom N-1, True Minimum Roots & Fiduciary Z-Margin Standard (AQ91 Standard - គ្រឹះចងចាំគណិតវិទ្យា DSR N-1 & True Minimum Integer Roots 544 & 618)
+- **Location:** `alpha_edge_validator.py` (`required_sample_for_dsr`, `dsr_with_moments`, `verified_dsr`), `purged_cv_deflated_sharpe.py` (`compute_deflated_sharpe_ratio`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **Strict Degrees of Freedom N-1 Standard (Bailey & López de Prado 2014):**
+     - In calculating the maximum expected Sharpe ratio threshold hurdle $SR^*$ and the variance denominator factor, degrees of freedom must strictly enforce $df = N - 1$ instead of $N$:
+       $$SR^* = \sqrt{\frac{2\ln K}{N - 1}}$$
+     - Eliminates optimistic underestimation of the required sample threshold (~0.5% lower sample size defect caused by using $N$).
+  2. **Eradication of Flawed Roots & Locked True Minimum Integer Roots ($K = 2,800$ Trials):**
+     - $N = 543$ and $N = 617$ are mathematically invalid and permanently eradicated from the system.
+     - **Primary Lower 1-sigma ($SR = 0.2342, \text{denom} = 0.894644$):**
+       * At $N = 543$: $z = 1.64096 < z_\alpha = 1.644854$ ($\Delta z = -0.00389$, FAILS).
+       * At $N = 544$: $z = 1.64658 \ge z_\alpha = 1.644854$ ($\Delta z = +0.00173$ / $+0.0018$, PASSES).
+       * True Minimum Integer Root is strictly locked at **$N = 544$ Trades**.
+     - **Standard Lower 90% ($SR = 0.2056, \text{denom} = 0.906524$):**
+       * At $N = 617$: $z = 1.64473 < z_\alpha = 1.644854$ ($\Delta z = -0.00013$, FAILS).
+       * At $N = 618$: $z = 1.64929 \ge z_\alpha = 1.644854$ ($\Delta z = +0.00444$, PASSES).
+       * True Minimum Integer Root is strictly locked at **$N = 618$ Trades**.
+     - **Conservative Lower 90% Floor:** True Minimum Integer Root is strictly locked at **$N = 711$ Trades** ($\Delta z = +0.00462$).
+  3. **Search Space Sensitivity ($K \in \{2800, 5600, 8400\}$) Exact Integer Scaling:**
+     - $K = 2,800$: Standard [464, 618], Conservative [544, 711].
+     - $K = 5,600$: Standard [492, 655], Conservative [579, 756] (at $N = 578$, $\Delta z = -0.00057$ fails; corrected to **579** directly).
+     - $K = 8,400$: Standard [509, 677], Conservative [599, 782] (at $N = 598$, $\Delta z = -0.00036$ fails; corrected to **599** directly).
+  4. **Production Code Architecture & Explicit Parameterization:**
+     - `alpha_edge_validator.py` enforces `df_mode="n_minus_1"` and `min_z_margin=0.0010` as explicit default parameters.
+     - `required_sample_for_dsr` uses discrete binary search to converge onto exact minimum integer roots with zero floating-point slippage.
+  5. **Permanent Institutional Fiduciary Verdict:**
+     - `certified: false` and Phase 1 Live Risk Allocation $\le 0.1\%$ remain immutable. Real capital deployment is strictly prohibited until $N \ge 544$ trades are logged in `VerifiedLedger` with frozen parameters.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
