@@ -2834,23 +2834,25 @@ class MT5BridgeEngine:
         # Eliminates opposite losing positions fighting each other.
         # Single spread friction only. When Gold pushes, all 5 positions bank profit together!
         is_extreme_skew = bool(kwargs.get("extreme_skew", False))
-        ratio_label = "5:0 Unidirectional"
-        if action == "BUY":
-            plan = [
-                ("BUY", "R5_LEG_1", 0.0, 0.0),
-                ("BUY", "R5_LEG_2", 0.0, 0.0),
-                ("BUY", "R5_LEG_3", 0.0, 0.0),
-                ("BUY", "R5_LEG_4", 0.0, 0.0),
-                ("BUY", "R5_LEG_5", 0.0, 0.0)
-            ]
+        # Invariants 8, 44 & 48: Dynamically adapt leg count to actual account margin
+        # Prevents broker Retcode 10019 (not enough money) rejections on micro-capital accounts
+        if is_cent:
+            if raw_bal < 20000.0:
+                num_legs = 2
+            elif raw_bal < 60000.0:
+                num_legs = 3
+            else:
+                num_legs = 5
         else:
-            plan = [
-                ("SELL", "R5_LEG_1", 0.0, 0.0),
-                ("SELL", "R5_LEG_2", 0.0, 0.0),
-                ("SELL", "R5_LEG_3", 0.0, 0.0),
-                ("SELL", "R5_LEG_4", 0.0, 0.0),
-                ("SELL", "R5_LEG_5", 0.0, 0.0)
-            ]
+            if real_usd < 100.0:
+                num_legs = 2
+            elif real_usd < 300.0:
+                num_legs = 3
+            else:
+                num_legs = 5
+
+        ratio_label = f"{num_legs}:0 Unidirectional"
+        plan = [(action, f"R5_LEG_{i+1}", 0.0, 0.0) for i in range(num_legs)]
 
         is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
