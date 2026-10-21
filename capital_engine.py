@@ -196,15 +196,18 @@ EPIC_MAP = {
     "IT40": "IT40",             # Italy FTSE MIB
     "ES35": "ES35",             # Spain IBEX 35
     "NL25": "NL25",             # Netherlands AEX
-    "JP225": "JP225",           # Japan Nikkei 225
-    "NIKKEI": "JP225",          # Japan Nikkei 225
+    "JP225": "J225",            # Japan Nikkei 225 (Capital.com canonical epic)
+    "J225": "J225",             # Japan Nikkei 225
+    "NIKKEI": "J225",           # Japan Nikkei 225
     "HK50": "HK50",             # Hong Kong Hang Seng Index
     "HSI": "HK50",              # Hong Kong Hang Seng Index
     "CN50": "CN50",             # China A50 Index
     "CHINA50": "CN50",          # China A50 Index
-    "AUS200": "AUS200",         # Australia ASX 200
-    "ASX200": "AUS200",         # Australia ASX 200
-    "SG30": "SG30",             # Singapore Straits Times
+    "AUS200": "AU200",          # Australia ASX 200 (Capital.com canonical epic)
+    "AU200": "AU200",           # Australia ASX 200
+    "ASX200": "AU200",          # Australia ASX 200
+    "SG30": "SG25",             # Singapore Straits Times / SG25 (Capital.com canonical epic)
+    "SG25": "SG25",             # Singapore Straits Times / SG25
     "TW30": "TW30",             # Taiwan Index
     # US Mega-Cap Stocks
     "META": "META",             # Meta Platforms Inc
@@ -1381,13 +1384,25 @@ class CapitalComEngine:
             elif "US500" in up_epic or "SPX" in up_epic:
                 effective_max_spread = 0.80
             elif "DE40" in up_epic or "GERMANY" in up_epic:
-                effective_max_spread = 2.50
+                effective_max_spread = 3.50
+            elif "US30" in up_epic or "WALLSTREET" in up_epic:
+                effective_max_spread = 8.0
+            elif any(k in up_epic for k in ["J225", "JP225", "NIKKEI"]):
+                effective_max_spread = 15.0
+            elif "CN50" in up_epic:
+                effective_max_spread = 15.0
+            elif any(k in up_epic for k in ["HK50", "HSI"]):
+                effective_max_spread = 12.0
+            elif any(k in up_epic for k in ["AU200", "AUS200", "ASX200"]):
+                effective_max_spread = 8.0
+            elif any(k in up_epic for k in ["SG25", "SG30"]):
+                effective_max_spread = 1.50
             elif "OIL" in up_epic:
                 effective_max_spread = 0.08
             elif "SILVER" in up_epic or "XAG" in up_epic:
                 effective_max_spread = 0.06
             elif current_bid > 0:
-                effective_max_spread = round(current_bid * 0.0015, 3)
+                effective_max_spread = max(2.0, round(current_bid * 0.0035, 3))
 
         if effective_max_spread and spread > effective_max_spread:
             return {
@@ -1774,13 +1789,25 @@ class CapitalComEngine:
             elif "US500" in up_epic or "SPX" in up_epic:
                 effective_max_spread = 0.80
             elif "DE40" in up_epic or "GERMANY" in up_epic:
-                effective_max_spread = 2.50
+                effective_max_spread = 3.50
+            elif "US30" in up_epic or "WALLSTREET" in up_epic:
+                effective_max_spread = 8.0
+            elif any(k in up_epic for k in ["J225", "JP225", "NIKKEI"]):
+                effective_max_spread = 15.0
+            elif "CN50" in up_epic:
+                effective_max_spread = 15.0
+            elif any(k in up_epic for k in ["HK50", "HSI"]):
+                effective_max_spread = 12.0
+            elif any(k in up_epic for k in ["AU200", "AUS200", "ASX200"]):
+                effective_max_spread = 8.0
+            elif any(k in up_epic for k in ["SG25", "SG30"]):
+                effective_max_spread = 1.50
             elif "OIL" in up_epic:
                 effective_max_spread = 0.08
             elif "SILVER" in up_epic or "XAG" in up_epic:
                 effective_max_spread = 0.06
             elif current_bid > 0:
-                effective_max_spread = round(current_bid * 0.0015, 3)
+                effective_max_spread = max(2.0, round(current_bid * 0.0035, 3))
 
         if effective_max_spread and spread > effective_max_spread:
             return {
@@ -2101,12 +2128,30 @@ class CapitalComEngine:
             "SILVER": 0.08,
             "US500": 1.20,
             "US100": 3.50,
+            "US30": 8.0,
+            "DE40": 4.5,
+            "UK100": 4.5,
+            "FR40": 4.0,
+            "EU50": 4.0,
+            "J225": 15.0,
+            "JP225": 15.0,
+            "HK50": 12.0,
+            "CN50": 15.0,
+            "AU200": 8.0,
+            "AUS200": 8.0,
+            "SG25": 1.5,
+            "SG30": 1.5,
             "OIL_CRUDE": 0.08,
             "BTCUSD": 80.0,
             "ETHUSD": 10.0,
             "SOLUSD": 1.0
         }
-        max_spread = max_spreads.get(resolved_epic, 2.0)
+        if resolved_epic in max_spreads:
+            max_spread = max_spreads[resolved_epic]
+        elif mid_price > 0:
+            max_spread = round(max(2.0, mid_price * 0.0035), 2)
+        else:
+            max_spread = 2.0
         if spread > max_spread:
             return {
                 "success": True,
@@ -8256,16 +8301,34 @@ class CapitalSpreadDragManager:
 
     BENCHMARK_SPREADS = {
         "GOLD": 0.60,
+        "SILVER": 0.03,
         "NATURALGAS": 0.008,
         "US500": 0.80,
         "US100": 1.50,
+        "US30": 4.0,
         "OIL_CRUDE": 0.04,
         "DE40": 2.0,
         "GERMANY40": 2.0,
         "DAX": 2.0,
+        "UK100": 2.5,
+        "FR40": 2.5,
+        "EU50": 2.5,
+        "J225": 10.0,
+        "JP225": 10.0,
+        "HK50": 6.0,
+        "CN50": 10.0,
+        "AU200": 4.0,
+        "AUS200": 4.0,
+        "SG25": 0.30,
+        "SG30": 0.30,
         "BTCUSD": 55.0,
         "ETHUSD": 3.50,
         "SOLUSD": 0.60,
+        "NVDA": 0.30,
+        "TSLA": 0.30,
+        "AAPL": 0.25,
+        "MSFT": 0.30,
+        "AMZN": 0.30,
         "META": 0.30,
         "GOOGL": 0.25,
         "EURUSD": 0.00012,
@@ -8459,7 +8522,12 @@ class CapitalSpreadDragManager:
         Validates live spread against baseline and checks for liquidity blowout.
         """
         resolved_epic = epic.upper().replace(".PRO", "").strip()
-        benchmark = self.BENCHMARK_SPREADS.get(resolved_epic, 1.0)
+        benchmark = self.BENCHMARK_SPREADS.get(resolved_epic)
+        if benchmark is None:
+            if atr > 0:
+                benchmark = max(1.0, round(atr * 0.12, 3))
+            else:
+                benchmark = max(1.0, current_spread)
 
         # Check spread blowout
         if current_spread > benchmark * max_expansion_mult:
@@ -10455,8 +10523,11 @@ class CapitalSkyNet360Radar:
     """
 
     MAX_SPREADS = {
-        "GOLD": 0.90, "US500": 1.20, "US100": 1.80, "OIL_CRUDE": 0.08,
-        "NVDA": 0.50, "TSLA": 0.50, "AAPL": 0.40, "MSFT": 0.50, "AMZN": 0.50,
+        "GOLD": 0.90, "US500": 1.20, "US100": 2.80, "US30": 8.0, "DE40": 3.50,
+        "J225": 15.0, "JP225": 15.0, "HK50": 12.0, "CN50": 15.0,
+        "AU200": 8.0, "AUS200": 8.0, "SG25": 1.5, "SG30": 1.5,
+        "UK100": 4.5, "FR40": 4.0, "EU50": 4.0, "OIL_CRUDE": 0.08, "SILVER": 0.06,
+        "NVDA": 0.60, "TSLA": 0.60, "AAPL": 0.50, "MSFT": 0.60, "AMZN": 0.60,
         "BTCUSD": 60.0, "ETHUSD": 4.0, "SOLUSD": 0.60
     }
 
@@ -10571,7 +10642,13 @@ class CapitalSkyNet360Radar:
             return False, f"Market Closed: {resolved_epic} is {mkt.get('market_status')}", {"layer": "MARKET_HOURS"}
 
         spread = mkt.get("spread", 0.0)
-        max_sp = self.MAX_SPREADS.get(resolved_epic, 2.0)
+        max_sp = self.MAX_SPREADS.get(resolved_epic)
+        if max_sp is None:
+            bid_val = float(mkt.get("bid") or 0.0)
+            if bid_val > 0:
+                max_sp = round(max(2.0, bid_val * 0.0035), 2)
+            else:
+                max_sp = 2.0
         if spread > max_sp:
             return False, f"Spread Guard Exceeded: Current {spread:.2f} > Max {max_sp:.2f}", {"layer": "SPREAD_GUARD", "spread": spread, "max_allowed": max_sp}
 

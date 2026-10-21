@@ -357,7 +357,7 @@ COMMODITY_EPICS_SET: Set[str] = {"GOLD", "SILVER", "OIL_CRUDE", "OIL_BRENT", "NA
 INDEX_EPICS_SET: Set[str] = {
     "US100", "US500", "US30", "US2000",
     "DE40", "UK100", "FR40", "EU50", "SWI20", "IT40", "ES35", "NL25",
-    "JP225", "HK50", "CN50", "AUS200", "SG30", "TW30"
+    "JP225", "J225", "HK50", "CN50", "AUS200", "AU200", "SG30", "SG25", "TW30"
 }
 EQUITY_EPICS_SET: Set[str] = ALL_TRI_REGIONAL_EPICS_SET - (COMMODITY_EPICS_SET | INDEX_EPICS_SET)
 
@@ -480,7 +480,7 @@ class TriRegionalSessionRouter:
             return True, "EUROPEAN_SESSION_CLEARANCE"
 
         # Asian Equities & Indices
-        if epic_u in TOP_100_ASIA_SET or any(a in epic_u for a in ["JP225", "HK50", "CN50", "AUS200", "SG30", "TW30"]):
+        if epic_u in TOP_100_ASIA_SET or any(a in epic_u for a in ["JP225", "J225", "HK50", "CN50", "AUS200", "AU200", "SG30", "SG25", "TW30"]):
             if sess != "ASIAN_SESSION":
                 return False, f"SESSION_GATED: Asian instrument {epic_u} active only during Asian Session (07:00-14:00 ICT)."
             return True, "ASIAN_SESSION_CLEARANCE"
