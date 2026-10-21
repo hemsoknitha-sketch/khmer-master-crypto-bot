@@ -1,9 +1,9 @@
 {
   "project": "ANGKOR QUANT \u2014 Institutional TradFi 10-Year Backtesting & Validation Project",
-  "generated_at": "2026-10-21T11:44:17.716239",
+  "generated_at": "2026-10-21T13:15:40.492106",
   "period": "2016-10-20 to 2026-10-20 (10 Full Years)",
   "data_manifest": {
-    "verified_at": "2026-10-21T11:40:51.464842",
+    "verified_at": "2026-10-21T13:11:43.043970",
     "data_directory": "data/tradfi_10y_dna",
     "assets_count": 10,
     "macro_count": 3,
