@@ -1,5 +1,5 @@
 {
-  "verified_at": "2026-10-21T00:13:32.077776",
+  "verified_at": "2026-10-21T10:38:39.740933",
   "data_directory": "data/tradfi_10y_dna",
   "assets_count": 10,
   "macro_count": 3,
@@ -154,5 +154,27 @@
       "status": "VERIFIED_VALID"
     }
   },
-  "integrity_status": "ALL_13_SERIES_VERIFIED_100_PERCENT"
+  "integrity_status": "ALL_REQUIRED_SERIES_VERIFIED_100_PERCENT",
+  "optional_macro_missing": [
+    [
+      "TIPS_10Y",
+      "data/tradfi_10y_dna\\DFII10_1d_10y.csv"
+    ],
+    [
+      "YIELD_CURVE_2S10S",
+      "data/tradfi_10y_dna\\T10Y2Y_1d_10y.csv"
+    ],
+    [
+      "CREDIT_SPREAD_HY",
+      "data/tradfi_10y_dna\\BAMLH0A0HYM2_1d_10y.csv"
+    ],
+    [
+      "PUT_CALL_RATIO",
+      "data/tradfi_10y_dna\\CPC_1d_10y.csv"
+    ],
+    [
+      "VIX3M",
+      "data/tradfi_10y_dna\\VIX3M_1d_10y.csv"
+    ]
+  ]
 }
