@@ -197,24 +197,39 @@ def bootstrap_mdd(
     realized_r: np.ndarray,
     target_n: int,
     allocation_pct: float,
+    block_length: int = 5,
     B: int = BOOTSTRAP_B,
     seed: int = 42
 ) -> Dict[str, float]:
     """
     Resamples trade sequences with replacement B=10,000 times to construct
     the distribution of expected maximum drawdown over target_n trades.
+    Uses Circular Block Bootstrap (Politis & Romano) when block_length > 1
+    to preserve autocorrelation and volatility clustering, avoiding optimistic tail bias.
     """
     rng = np.random.default_rng(seed)
     r_arr = np.asarray(realized_r, dtype=float).ravel()
     r_clean = r_arr[~(np.isnan(r_arr) | np.isinf(r_arr))]
-    if len(r_clean) == 0 or target_n <= 0:
+    n_src = len(r_clean)
+    if n_src == 0 or target_n <= 0:
         return {"mdd_mean": 0.0, "mdd_median": 0.0, "mdd_95": 0.0, "mdd_99": 0.0}
 
+    blk = max(1, int(block_length))
+    n_blocks = int(np.ceil(target_n / blk))
     mdds = np.empty(B, dtype=float)
-    n_src = len(r_clean)
+
     for b_idx in range(B):
-        idx = rng.integers(0, n_src, size=target_n)
-        sample = r_clean[idx]
+        if blk == 1:
+            idx = rng.integers(0, n_src, size=target_n)
+            sample = r_clean[idx]
+        else:
+            starts = rng.integers(0, n_src, size=n_blocks)
+            sample_list = []
+            for s in starts:
+                for k in range(blk):
+                    sample_list.append(r_clean[(s + k) % n_src])
+            sample = np.array(sample_list[:target_n], dtype=float)
+
         equity = np.cumprod(1.0 + sample * allocation_pct)
         peak = np.maximum.accumulate(equity)
         dd = (equity - peak) / peak
@@ -225,22 +240,25 @@ def bootstrap_mdd(
         "mdd_median": float(np.median(mdds)) * 100.0,
         "mdd_95": float(np.percentile(mdds, 5)) * 100.0,
         "mdd_99": float(np.percentile(mdds, 1)) * 100.0,
+        "block_length": blk,
     }
 
 
 def scaled_risk_budget(
-    mdd_95_pct: float,
+    mdd_pct: float,
     hard_cap_pct: float = 15.0,
-    max_risk_pct: float = 2.0
+    max_risk_pct: float = 2.0,
+    validation_stress_multiplier: float = 1.0
 ) -> float:
     """
-    Dynamically clamps position risk so that expected 95th percentile drawdown
-    over target_n trades does not exceed hard_cap_pct (15.0%).
+    Dynamically clamps position risk so that expected drawdown over target_n trades
+    does not exceed hard_cap_pct (15.0%). Supports validation stress multiplier
+    to account for regime differences between validation and holdout periods.
     """
-    mdd_95_abs = abs(mdd_95_pct)
-    if mdd_95_abs <= 0:
+    mdd_abs = abs(mdd_pct) * max(1.0, float(validation_stress_multiplier))
+    if mdd_abs <= 0:
         return max_risk_pct
-    scaled = (hard_cap_pct / mdd_95_abs) * max_risk_pct
+    scaled = (hard_cap_pct / mdd_abs) * max_risk_pct
     return float(min(max_risk_pct, scaled))
 
 
@@ -335,15 +353,41 @@ def deploy_decision(
     holdout_p_hats: np.ndarray,
     regimes: Optional[np.ndarray] = None,
     total_trials: int = 700,
-    target_n: int = 350
+    target_n: int = 350,
+    block_length: int = 5,
+    percentile_anchor: str = "mdd_95",
+    validation_stress_multiplier: float = 1.0
 ) -> Dict[str, Any]:
     """
     Master Institutional Fiduciary Deployment Decision Governor.
     Certifies whether strategy can scale beyond 0.1% capital.
+    Enforces strict input shape invariance and robust block-resampled drawdown metrics.
     """
+    # Strict Input Shape Invariance Validation
+    n_ret = len(holdout_returns)
+    n_real = len(holdout_realized_r)
+    n_p = len(holdout_p_hats)
+    if not (n_ret == n_real == n_p and n_real > 0):
+        raise ValueError(
+            f"Shape Invariant Violation in deploy_decision: holdout_returns({n_ret}), "
+            f"holdout_realized_r({n_real}), holdout_p_hats({n_p}) must have identical positive lengths."
+        )
+    if regimes is not None and len(regimes) != n_real:
+        raise ValueError(
+            f"Shape Invariant Violation in deploy_decision: regimes length ({len(regimes)}) "
+            f"does not match realized_r length ({n_real})."
+        )
+
     dsr_info = dsr_with_moments(holdout_returns, total_trials)
-    mdd_info = bootstrap_mdd(holdout_realized_r, target_n, allocation_pct=0.01)
-    risk_budget = scaled_risk_budget(mdd_info["mdd_95"], hard_cap_pct=15.0, max_risk_pct=2.0)
+    mdd_info = bootstrap_mdd(holdout_realized_r, target_n, allocation_pct=0.01, block_length=block_length)
+    
+    anchor_metric = mdd_info["mdd_99"] if percentile_anchor == "mdd_99" else mdd_info["mdd_95"]
+    risk_budget = scaled_risk_budget(
+        anchor_metric,
+        hard_cap_pct=15.0,
+        max_risk_pct=2.0,
+        validation_stress_multiplier=validation_stress_multiplier
+    )
     alpha_info = paired_kelly_alpha_test(
         holdout_realized_r, holdout_p_hats,
         kappa=0.25, p_breakeven=0.50,
@@ -360,6 +404,7 @@ def deploy_decision(
     return {
         "dsr": dsr_info,
         "bootstrap_mdd": mdd_info,
+        "percentile_anchor": percentile_anchor,
         "scaled_risk_budget_pct": round(risk_budget, 4),
         "kelly_alpha": alpha_info,
         "regime_attribution": reg_attr,
