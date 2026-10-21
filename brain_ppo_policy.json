@@ -1,5 +1,10 @@
 {
   "algorithm": "PPO-Proximal-Policy-Optimization",
+  "futures_leverage_range": [
+    3,
+    20
+  ],
+  "spot_leverage": 1.0,
   "optimal_leverage_range": [
     3,
     20

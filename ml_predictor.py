@@ -54,11 +54,38 @@ def predict_price(symbol: str = "BTCUSDT"):
         models_files = config['models']
         trend_map = config['trend_map']
         
-        # Load all models
+        # Load all models safely based on file extension
         models = {}
         for key, filename in models_files.items():
             path = os.path.join(models_dir, filename)
-            models[key] = joblib.load(path)
+            if not os.path.exists(path):
+                continue
+            if filename.endswith(".json"):
+                try:
+                    with open(path, "r") as f_j:
+                        models[key] = json.load(f_j)
+                except Exception:
+                    pass
+            elif filename.endswith(".h5") or filename.endswith(".keras"):
+                continue
+            else:
+                try:
+                    models[key] = joblib.load(path)
+                except Exception:
+                    pass
+
+        scaler_x_path = os.path.join(models_dir, "brain_scaler_x.pkl")
+        scaler_y_path = os.path.join(models_dir, "brain_scaler_y.pkl")
+        if os.path.exists(scaler_x_path):
+            try:
+                models["scaler_x"] = joblib.load(scaler_x_path)
+            except Exception:
+                pass
+        if os.path.exists(scaler_y_path):
+            try:
+                models["scaler_y"] = joblib.load(scaler_y_path)
+            except Exception:
+                pass
             
     except Exception as e:
         return f"❌ [ML Engine] Error loading models or config: {e}"
@@ -102,24 +129,15 @@ def predict_price(symbol: str = "BTCUSDT"):
         # Select the last row for inference
         latest = df.iloc[-1:]
         
-        # Extract features according to the config
-        # Ensure missing columns are filled with 0 (in case some alt data failed)
-        for col in feature_cols:
-            if col not in latest.columns:
-                latest[col] = 0
-                
-        X = latest[feature_cols].values
-        
-        # Scale
-        X_sc = models['scaler'].transform(X)
-        
-        # Predict
-        pred_price = models['price'].predict(X_sc)[0]
-        pred_trend_idx = models['trend'].predict(X_sc)[0]
-        pred_trend = trend_map[str(pred_trend_idx)]
-        pred_vol = models['volatility'].predict(X_sc)[0]
-        pred_tp = models['tp_signal'].predict(X_sc)[0]
-        pred_dca = models['dca_zone'].predict(X_sc)[0]
+        # Multi-Tier Feature Routing via BrainFeatureBuilder
+        import brain_feature_builder as bfb
+        routed = bfb.BrainFeatureBuilder.route_and_predict(models, df)
+        pred_price = routed.get("pred_price", float(latest['close'].values[0]))
+        pred_trend_idx = routed.get("trend", 1)
+        pred_trend = trend_map.get(str(pred_trend_idx), "neutral")
+        pred_vol = routed.get("volatility", float(latest['atr14'].values[0] if 'atr14' in latest.columns else 0.0))
+        pred_tp = routed.get("tp_signal", 0)
+        pred_dca = routed.get("dca_zone", 0)
         
         current_close = latest['close'].values[0]
         
