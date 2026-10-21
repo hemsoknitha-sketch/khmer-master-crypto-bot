@@ -7,8 +7,9 @@ Institutional Framework for Verifying Alpha Signal Predictive Power:
 2. Deflated Sharpe Ratio (Bailey & López de Prado 2014) with Multi-Testing Corrections
 3. Continuous Kelly Fraction & Dynamic Expectancy (f(p_hat))
 4. Asymmetric Exit Simulation (Right-Tail Harvest with Trailing Stops)
-5. Frozen Threshold Ledger for Selection Bias Prevention
-6. Certification Sample Size Calculator (required_sample_for_dsr)
+5. Verified Ledger & Strict Freeze Protocol (TradeRecord, VerifiedLedger)
+6. Decile Analysis, True Geometric MDD, & Flat 1% Benchmarking
+7. Certification Target & Full Verification Suite (full_verification)
 
 Founder: HEM SINATH | Institutional Quantitative Governance
 """
@@ -24,25 +25,49 @@ BPS = 10000.0
 
 
 @dataclass
-class FrozenThresholdLedger:
+class TradeRecord:
+    timestamp_utc: str
+    symbol: str
+    p_hat: float
+    realized_r: float
+    allocation_pct: float
+    exit_reason: str
+
+
+@dataclass
+class VerifiedLedger:
     """
-    Prevents post-hoc threshold selection bias.
+    Prevents post-hoc threshold selection bias and enforces risk limits.
     All trades recorded must have timestamp strictly greater than freeze_date_utc.
     """
-    threshold: float
     freeze_date_utc: str
-    trades: List[Dict] = field(default_factory=list)
+    kappa: float = 0.25
+    max_risk_pct: float = 0.02
+    threshold_p_hat: float = 0.50
+    trades: List[TradeRecord] = field(default_factory=list)
 
-    def record(self, trade: Dict) -> None:
-        if trade.get("timestamp_utc", "") <= self.freeze_date_utc:
+    def record(self, trade: TradeRecord) -> None:
+        if trade.timestamp_utc <= self.freeze_date_utc:
             raise ValueError("Integrity Breach: Trade predates freeze date")
+        if trade.allocation_pct > self.max_risk_pct + 1e-12:
+            raise ValueError(f"Risk Cap Breach: allocation {trade.allocation_pct:.4f} exceeds max_risk_pct {self.max_risk_pct:.4f}")
         self.trades.append(trade)
 
-    def realized_r_multiples(self) -> np.ndarray:
-        return np.array([t.get("r_multiple", 0.0) for t in self.trades], dtype=float)
+    def weighted_returns(self) -> np.ndarray:
+        return np.array([t.realized_r * t.allocation_pct for t in self.trades], dtype=float)
 
-    def sample_size(self) -> int:
+    def realized_r(self) -> np.ndarray:
+        return np.array([t.realized_r for t in self.trades], dtype=float)
+
+    def p_hats(self) -> np.ndarray:
+        return np.array([t.p_hat for t in self.trades], dtype=float)
+
+    def size(self) -> int:
         return len(self.trades)
+
+
+# Backward compatibility alias
+FrozenThresholdLedger = VerifiedLedger
 
 
 def p_breakeven(payoff_ratio: float) -> float:
@@ -61,23 +86,60 @@ def break_even_payoff_at_win_rate(win_rate: float) -> float:
 
 def continuous_kelly_fraction(
     p_hat: float,
-    payoff_ratio: float,
+    payoff_ratio: float = 2.01,
     kappa: float = 0.25,
-    max_risk_pct: float = 0.02
+    max_risk_pct: float = 0.02,
+    p_cut: Optional[float] = None
 ) -> float:
     """
     Continuous sizing function replacing destructive binary filter:
-      f(p_hat) = kappa * max(0, (p_hat - p_be) / (1 - p_be))
-    Retains 100% of signals with edge while sizing smoothly according to conviction.
+      f(p_hat) = kappa * max(0, (p_hat - p_base) / (1 - p_base))
+    where p_base is max(p_breakeven, p_cut).
+    Clamped strictly to max_risk_pct.
     """
     if payoff_ratio <= 0 or p_hat <= 0:
         return 0.0
     pb = p_breakeven(payoff_ratio)
-    if p_hat <= pb:
+    p_base = max(pb, p_cut) if p_cut is not None else pb
+    if p_hat <= p_base:
         return 0.0
-    edge_fraction = (p_hat - pb) / (1.0 - pb)
+    edge_fraction = (p_hat - p_base) / (1.0 - p_base)
     raw = kappa * edge_fraction
     return float(min(raw, max_risk_pct))
+
+
+def verified_dsr(returns: np.ndarray, total_trials: int = 700) -> Tuple[float, float, float]:
+    """
+    Computes Deflated Sharpe Ratio (DSR) under true search-space trial count.
+    Returns: (dsr, sample_sr, sr_star)
+    """
+    ret_arr = np.asarray(returns, dtype=float).ravel()
+    ret_arr = ret_arr[~(np.isnan(ret_arr) | np.isinf(ret_arr))]
+    n = len(ret_arr)
+    if n < 30:
+        return 0.0, 0.0, 0.0
+
+    mean_r = float(np.mean(ret_arr))
+    std_r = float(np.std(ret_arr, ddof=1))
+    if std_r <= 1e-12:
+        return 0.0, 0.0, 0.0
+
+    sr = mean_r / std_r
+    centered = (ret_arr - mean_r) / std_r
+    skew = float(np.mean(centered ** 3))
+    kurt = float(np.mean(centered ** 4))
+    if kurt < 1.0:
+        kurt = 3.0
+
+    trials = max(2, total_trials)
+    sr_star = float(np.sqrt(2.0 * np.log(trials) / n))
+    denom = float(np.sqrt(max(1e-9, 1.0 - skew * sr + ((kurt - 1.0) / 4.0) * (sr ** 2))))
+    if denom <= 0:
+        return 0.0, sr, sr_star
+
+    z = (sr - sr_star) * np.sqrt(max(1, n - 1)) / denom
+    dsr = float(norm.cdf(z))
+    return float(np.clip(dsr, 0.0, 1.0)), sr, sr_star
 
 
 def multi_testing_deflated_sharpe(
@@ -89,35 +151,13 @@ def multi_testing_deflated_sharpe(
     total_trials: Optional[int] = None
 ) -> Tuple[float, float]:
     """
-    Computes Deflated Sharpe Ratio (DSR) under true search-space trial count.
-    Total trials = thresholds * models * symbols * timeframes.
+    Wrapper for multi-testing DSR declaring explicit search space dimensions.
     """
-    ret_arr = np.asarray(returns, dtype=float).ravel()
-    ret_arr = ret_arr[~(np.isnan(ret_arr) | np.isinf(ret_arr))]
-    n = len(ret_arr)
-    if n < 30:
-        trials = total_trials or (num_thresholds_scanned * num_models_scanned * num_symbols_scanned * num_timeframes_scanned)
-        return 0.0, float(trials)
-
-    sr = float(np.mean(ret_arr) / max(np.std(ret_arr, ddof=1), 1e-12))
-    centered = (ret_arr - np.mean(ret_arr)) / max(np.std(ret_arr, ddof=1), 1e-12)
-    skew = float(np.mean(centered ** 3))
-    kurt = float(np.mean(centered ** 4))
-    if kurt < 1.0:
-        kurt = 3.0
-
     trials = total_trials if total_trials is not None else max(
         1, num_thresholds_scanned * num_models_scanned * num_symbols_scanned * num_timeframes_scanned
     )
-
-    sr_star = float(np.sqrt(2.0 * np.log(max(2, trials)) / n))
-    denom = float(np.sqrt(max(1e-9, 1.0 - skew * sr + ((kurt - 1.0) / 4.0) * (sr ** 2))))
-    if denom <= 0:
-        return 0.0, float(trials)
-
-    z = (sr - sr_star) * np.sqrt(max(1, n - 1)) / denom
-    dsr = float(norm.cdf(z))
-    return float(np.clip(dsr, 0.0, 1.0)), float(trials)
+    dsr, sr, _ = verified_dsr(returns, total_trials=trials)
+    return dsr, float(trials)
 
 
 def required_sample_for_dsr(
@@ -129,6 +169,8 @@ def required_sample_for_dsr(
     Computes minimum out-of-sample sample size N required for DSR >= target_dsr
     under multiple testing penalty of total_trials.
     """
+    if per_trade_sr <= 0:
+        return 99999
     z_target = float(norm.ppf(target_dsr))
     a = np.sqrt(2.0 * np.log(max(2, total_trials)))
     lo, hi = 30, 100000
@@ -141,6 +183,101 @@ def required_sample_for_dsr(
         else:
             lo = mid
     return int(hi)
+
+
+def win_rate_by_decile(
+    p_hats: np.ndarray,
+    realized_r: np.ndarray,
+    n_deciles: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Validates monotonic calibration of meta-model predictions against trade outcomes.
+    """
+    if len(p_hats) < n_deciles * 5:
+        return []
+    order = np.argsort(p_hats)
+    sorted_p = p_hats[order]
+    sorted_r = realized_r[order]
+    deciles = []
+    chunk = len(sorted_p) // n_deciles
+    for i in range(n_deciles):
+        lo = i * chunk
+        hi = (i + 1) * chunk if i < n_deciles - 1 else len(sorted_p)
+        subset_p = sorted_p[lo:hi]
+        subset_r = sorted_r[lo:hi]
+        wins = subset_r > 0
+        if len(subset_r) == 0:
+            continue
+        wr = float(np.mean(wins))
+        avg_win = float(np.mean(subset_r[wins])) if wins.any() else 0.0
+        avg_loss = float(np.mean(subset_r[~wins])) if (~wins).any() else 0.0
+        er = wr * avg_win + (1.0 - wr) * avg_loss
+        deciles.append({
+            "decile": i + 1,
+            "n": int(len(subset_r)),
+            "p_hat_min": float(np.min(subset_p)),
+            "p_hat_max": float(np.max(subset_p)),
+            "p_hat_mean": float(np.mean(subset_p)),
+            "win_rate_pct": round(wr * 100.0, 2),
+            "avg_win_r": round(avg_win, 2),
+            "avg_loss_r": round(avg_loss, 2),
+            "expected_r": round(er, 4),
+        })
+    return deciles
+
+
+def max_drawdown(returns: np.ndarray, allocation_pct: float) -> float:
+    """Computes true geometric maximum peak-to-trough drawdown."""
+    if len(returns) == 0:
+        return 0.0
+    equity = np.cumprod(1.0 + returns * allocation_pct)
+    peak = np.maximum.accumulate(equity)
+    dd = (equity - peak) / peak
+    return float(np.min(dd))
+
+
+def flat_sizing_benchmark(
+    realized_r: np.ndarray,
+    allocation_pct: float = 0.01
+) -> Dict[str, Any]:
+    """Computes reference performance under fixed uncalibrated 1% sizing."""
+    if len(realized_r) == 0:
+        return {"total_return_pct": 0.0, "max_dd_pct": 0.0}
+    equity = np.cumprod(1.0 + realized_r * allocation_pct)
+    total_ret = float(equity[-1] - 1.0) * 100.0
+    peak = np.maximum.accumulate(equity)
+    dd = float(np.min((equity - peak) / peak)) * 100.0
+    return {"total_return_pct": round(total_ret, 2), "max_dd_pct": round(dd, 2)}
+
+
+def full_verification(ledger: VerifiedLedger, total_trials: int = 700) -> Dict[str, Any]:
+    """
+    Executes 360-degree statistical edge audit on an active ledger.
+    """
+    returns = ledger.weighted_returns()
+    realized = ledger.realized_r()
+    p_hats = ledger.p_hats()
+    dsr, sr, sr_star = verified_dsr(returns, total_trials)
+    n = ledger.size()
+    per_trade_sr = sr if sr > 0 else 0.0
+    required_n = required_sample_for_dsr(0.95, per_trade_sr, total_trials) if per_trade_sr > 0 else 99999
+    deciles = win_rate_by_decile(p_hats, realized)
+
+    mean_alloc = float(np.mean([t.allocation_pct for t in ledger.trades])) if ledger.trades else 0.01
+    mdd = max_drawdown(realized, mean_alloc)
+    flat = flat_sizing_benchmark(realized, 0.01)
+
+    return {
+        "n_trades": n,
+        "dsr": round(dsr, 4),
+        "per_trade_sr": round(per_trade_sr, 4),
+        "sr_star": round(sr_star, 4),
+        "required_n_for_dsr_095": int(required_n),
+        "certified": bool(dsr >= 0.95 and n >= required_n),
+        "max_drawdown_pct": round(mdd * 100.0, 2),
+        "flat_1pct_benchmark": flat,
+        "decile_analysis": deciles,
+    }
 
 
 @dataclass
@@ -212,11 +349,11 @@ def information_coefficient(predicted: np.ndarray, realized: np.ndarray) -> floa
 
 def deflated_sharpe_ratio(
     returns: np.ndarray,
-    num_trials: int = 100,
+    num_trials: int = 700,
     annualization_factor: float = 1.0
 ) -> float:
     """Computes Deflated Sharpe Ratio."""
-    dsr, _ = multi_testing_deflated_sharpe(returns, total_trials=num_trials)
+    dsr, _, _ = verified_dsr(returns, total_trials=num_trials)
     return dsr
 
 
@@ -237,62 +374,3 @@ def edge_verdict(ic: float, dsr: float, expected_r_value: float) -> str:
     if dsr < 0.95:
         return "NOT_STATISTICALLY_SIGNIFICANT"
     return "EDGE_CONFIRMED"
-
-
-def evaluate_signal_dataset(
-    predictions: np.ndarray,
-    realized_returns: np.ndarray,
-    num_trials: int = 700,
-    min_confidence_filter: Optional[float] = None
-) -> Dict[str, Any]:
-    """Runs full quantitative edge audit with multi-testing DSR."""
-    p_all = np.asarray(predictions, dtype=float).ravel()
-    r_all = np.asarray(realized_returns, dtype=float).ravel()
-
-    if min_confidence_filter is not None:
-        mask = p_all >= float(min_confidence_filter)
-        p = p_all[mask]
-        r = r_all[mask]
-    else:
-        p = p_all
-        r = r_all
-
-    n_samples = len(r)
-    if n_samples == 0:
-        return {
-            "n_samples": 0,
-            "rank_ic": 0.0,
-            "win_rate_pct": 0.0,
-            "avg_win_r": 0.0,
-            "avg_loss_r": 0.0,
-            "expected_r": 0.0,
-            "sharpe_ratio": 0.0,
-            "deflated_sharpe_ratio": 0.0,
-            "verdict": "NO_EDGE_SIGNAL_DEAD"
-        }
-
-    ic = information_coefficient(p, r)
-    wins = r[r > 0]
-    losses = r[r <= 0]
-    wr = float(len(wins) / n_samples)
-    avg_w = float(np.mean(wins)) if len(wins) > 0 else 0.0
-    avg_l = float(np.abs(np.mean(losses))) if len(losses) > 0 else 1.0
-    e_r = expected_r(wr, avg_w, avg_l)
-
-    std_r = float(np.std(r, ddof=1)) if n_samples > 1 else 0.0
-    sr = float(np.mean(r) / std_r) if std_r > 1e-9 else 0.0
-    dsr, total_t = multi_testing_deflated_sharpe(r, total_trials=num_trials)
-    verd = edge_verdict(ic, dsr, e_r)
-
-    return {
-        "n_samples": n_samples,
-        "rank_ic": round(ic, 4),
-        "win_rate_pct": round(wr * 100.0, 2),
-        "avg_win_r": round(avg_w, 2),
-        "avg_loss_r": round(avg_l, 2),
-        "expected_r": round(e_r, 4),
-        "sharpe_ratio": round(sr, 4),
-        "deflated_sharpe_ratio": round(dsr, 4),
-        "total_trials": int(total_t),
-        "verdict": verd
-    }
