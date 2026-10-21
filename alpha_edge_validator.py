@@ -183,11 +183,17 @@ def required_sample_for_dsr(
     skewness: Optional[float] = None,
     kurt: Optional[float] = None,
     denom_mode: str = "recomputed_at_sr",
-    conservative_variant: bool = True
+    conservative_variant: bool = True,
+    rounding_mode: str = "ceil_buffer"
 ) -> int:
     """
     Computes minimum sample size N required for DSR >= target_dsr.
     Incorporates variance denominator factor denom = sqrt(1 - skew*SR + (kurt-1)/4 * SR^2).
+
+    Note: denom(SR) is an Asymptotic Taylor Approximation (Bailey & Lopez de Prado 2014)
+    derived under large-sample assumptions and finite 4th moments. For empirical crypto
+    distributions with fat tails and serial dependence, N_req is a calibrated fiduciary
+    estimate rather than an exact distribution-free invariant.
 
     denom_mode:
       - "recomputed_at_sr": Recomputes denom dynamically at per_trade_sr using skewness and kurt.
@@ -198,6 +204,11 @@ def required_sample_for_dsr(
       - True (default): sr_star = sqrt(2*ln(trials)/N), producing a stricter fiduciary buffer
                         (~1.25x larger N when denom < 1.0).
       - False (Standard Bailey-Lopez de Prado 2014): sr_star is scaled by denom.
+
+    rounding_mode:
+      - "ceil_buffer" (default): Adds +1 fiduciary safety buffer to the crossing root (e.g., 543 -> 544,
+                                710 -> 711) ensuring strict over-compliance under discrete trade arrivals.
+      - "exact_root": Returns the exact minimum integer N where the condition holds (e.g., 543, 710).
     """
     if per_trade_sr <= 0:
         return 99999
@@ -223,7 +234,7 @@ def required_sample_for_dsr(
             hi = mid
         else:
             lo = mid
-    return int(hi)
+    return int(hi + 1) if rounding_mode == "ceil_buffer" else int(hi)
 
 
 def bootstrap_mdd(
