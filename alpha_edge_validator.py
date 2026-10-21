@@ -4,12 +4,13 @@ ANGKOR QUANT - ALPHA EDGE VALIDATOR & STATISTICAL AUDITOR
 =========================================================
 Institutional Framework for Verifying Alpha Signal Predictive Power:
 1. Information Coefficient (Rank IC / Spearman Correlation)
-2. Deflated Sharpe Ratio (Bailey & López de Prado 2014) with Multi-Testing Corrections
+2. Deflated Sharpe Ratio with Unbiased Moments & Multi-Testing Corrections
 3. Continuous Kelly Fraction & Dynamic Expectancy (f(p_hat))
 4. Asymmetric Exit Simulation (Right-Tail Harvest with Trailing Stops)
 5. Verified Ledger & Strict Freeze Protocol (TradeRecord, VerifiedLedger)
-6. Decile Analysis, True Geometric MDD, & Flat 1% Benchmarking
-7. Certification Target & Full Verification Suite (full_verification)
+6. Bootstrap MDD Distribution (B=10000 paths) & Scaled Risk Budget Rule
+7. Paired Bootstrap Test for Kelly Alpha (95% CI)
+8. Multi-Regime Attribution & Institutional Deployment Decision Governor
 
 Founder: HEM SINATH | Institutional Quantitative Governance
 """
@@ -17,11 +18,12 @@ Founder: HEM SINATH | Institutional Quantitative Governance
 import math
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, spearmanr
+from scipy.stats import norm, spearmanr, skew, kurtosis
 from typing import Dict, List, Any, Tuple, Optional, Union
 from dataclasses import dataclass, field
 
 BPS = 10000.0
+BOOTSTRAP_B = 10000
 
 
 @dataclass
@@ -92,7 +94,7 @@ def continuous_kelly_fraction(
     p_cut: Optional[float] = None
 ) -> float:
     """
-    Continuous sizing function replacing destructive binary filter:
+    Continuous sizing function:
       f(p_hat) = kappa * max(0, (p_hat - p_base) / (1 - p_base))
     where p_base is max(p_breakeven, p_cut).
     Clamped strictly to max_risk_pct.
@@ -108,38 +110,49 @@ def continuous_kelly_fraction(
     return float(min(raw, max_risk_pct))
 
 
-def verified_dsr(returns: np.ndarray, total_trials: int = 700) -> Tuple[float, float, float]:
+def dsr_with_moments(returns: np.ndarray, total_trials: int = 700) -> Dict[str, float]:
     """
-    Computes Deflated Sharpe Ratio (DSR) under true search-space trial count.
-    Returns: (dsr, sample_sr, sr_star)
+    Computes Deflated Sharpe Ratio (DSR) using unbiased sample moments (skewness and kurtosis).
     """
     ret_arr = np.asarray(returns, dtype=float).ravel()
     ret_arr = ret_arr[~(np.isnan(ret_arr) | np.isinf(ret_arr))]
     n = len(ret_arr)
     if n < 30:
-        return 0.0, 0.0, 0.0
+        return {"dsr": 0.0, "sr": 0.0, "sr_star": 0.0, "skew": 0.0, "kurt": 0.0, "denom": 1.0}
 
     mean_r = float(np.mean(ret_arr))
     std_r = float(np.std(ret_arr, ddof=1))
     if std_r <= 1e-12:
-        return 0.0, 0.0, 0.0
+        return {"dsr": 0.0, "sr": 0.0, "sr_star": 0.0, "skew": 0.0, "kurt": 0.0, "denom": 1.0}
 
     sr = mean_r / std_r
-    centered = (ret_arr - mean_r) / std_r
-    skew = float(np.mean(centered ** 3))
-    kurt = float(np.mean(centered ** 4))
-    if kurt < 1.0:
-        kurt = 3.0
+    sk = float(skew(ret_arr, bias=False))
+    ku = float(kurtosis(ret_arr, fisher=False, bias=False))
+    if ku < 1.0:
+        ku = 3.0
 
     trials = max(2, total_trials)
     sr_star = float(np.sqrt(2.0 * np.log(trials) / n))
-    denom = float(np.sqrt(max(1e-9, 1.0 - skew * sr + ((kurt - 1.0) / 4.0) * (sr ** 2))))
+    denom = float(np.sqrt(max(1e-9, 1.0 - sk * sr + ((ku - 1.0) / 4.0) * (sr ** 2))))
     if denom <= 0:
-        return 0.0, sr, sr_star
+        return {"dsr": 0.0, "sr": sr, "sr_star": sr_star, "skew": sk, "kurt": ku, "denom": 1.0}
 
     z = (sr - sr_star) * np.sqrt(max(1, n - 1)) / denom
     dsr = float(norm.cdf(z))
-    return float(np.clip(dsr, 0.0, 1.0)), sr, sr_star
+    return {
+        "dsr": float(np.clip(dsr, 0.0, 1.0)),
+        "sr": sr,
+        "sr_star": sr_star,
+        "skew": sk,
+        "kurt": ku,
+        "denom": denom,
+    }
+
+
+def verified_dsr(returns: np.ndarray, total_trials: int = 700) -> Tuple[float, float, float]:
+    """Computes Deflated Sharpe Ratio (DSR) under true search-space trial count."""
+    info = dsr_with_moments(returns, total_trials=total_trials)
+    return info["dsr"], info["sr"], info["sr_star"]
 
 
 def multi_testing_deflated_sharpe(
@@ -150,14 +163,12 @@ def multi_testing_deflated_sharpe(
     num_timeframes_scanned: int = 1,
     total_trials: Optional[int] = None
 ) -> Tuple[float, float]:
-    """
-    Wrapper for multi-testing DSR declaring explicit search space dimensions.
-    """
+    """Wrapper for multi-testing DSR declaring explicit search space dimensions."""
     trials = total_trials if total_trials is not None else max(
         1, num_thresholds_scanned * num_models_scanned * num_symbols_scanned * num_timeframes_scanned
     )
-    dsr, sr, _ = verified_dsr(returns, total_trials=trials)
-    return dsr, float(trials)
+    info = dsr_with_moments(returns, total_trials=trials)
+    return info["dsr"], float(trials)
 
 
 def required_sample_for_dsr(
@@ -165,10 +176,7 @@ def required_sample_for_dsr(
     per_trade_sr: float = 0.26,
     total_trials: int = 700
 ) -> int:
-    """
-    Computes minimum out-of-sample sample size N required for DSR >= target_dsr
-    under multiple testing penalty of total_trials.
-    """
+    """Computes minimum sample size N required for DSR >= target_dsr."""
     if per_trade_sr <= 0:
         return 99999
     z_target = float(norm.ppf(target_dsr))
@@ -185,14 +193,186 @@ def required_sample_for_dsr(
     return int(hi)
 
 
+def bootstrap_mdd(
+    realized_r: np.ndarray,
+    target_n: int,
+    allocation_pct: float,
+    B: int = BOOTSTRAP_B,
+    seed: int = 42
+) -> Dict[str, float]:
+    """
+    Resamples trade sequences with replacement B=10,000 times to construct
+    the distribution of expected maximum drawdown over target_n trades.
+    """
+    rng = np.random.default_rng(seed)
+    r_arr = np.asarray(realized_r, dtype=float).ravel()
+    r_clean = r_arr[~(np.isnan(r_arr) | np.isinf(r_arr))]
+    if len(r_clean) == 0 or target_n <= 0:
+        return {"mdd_mean": 0.0, "mdd_median": 0.0, "mdd_95": 0.0, "mdd_99": 0.0}
+
+    mdds = np.empty(B, dtype=float)
+    n_src = len(r_clean)
+    for b_idx in range(B):
+        idx = rng.integers(0, n_src, size=target_n)
+        sample = r_clean[idx]
+        equity = np.cumprod(1.0 + sample * allocation_pct)
+        peak = np.maximum.accumulate(equity)
+        dd = (equity - peak) / peak
+        mdds[b_idx] = float(np.min(dd))
+
+    return {
+        "mdd_mean": float(np.mean(mdds)) * 100.0,
+        "mdd_median": float(np.median(mdds)) * 100.0,
+        "mdd_95": float(np.percentile(mdds, 5)) * 100.0,
+        "mdd_99": float(np.percentile(mdds, 1)) * 100.0,
+    }
+
+
+def scaled_risk_budget(
+    mdd_95_pct: float,
+    hard_cap_pct: float = 15.0,
+    max_risk_pct: float = 2.0
+) -> float:
+    """
+    Dynamically clamps position risk so that expected 95th percentile drawdown
+    over target_n trades does not exceed hard_cap_pct (15.0%).
+    """
+    mdd_95_abs = abs(mdd_95_pct)
+    if mdd_95_abs <= 0:
+        return max_risk_pct
+    scaled = (hard_cap_pct / mdd_95_abs) * max_risk_pct
+    return float(min(max_risk_pct, scaled))
+
+
+def paired_kelly_alpha_test(
+    realized_r: np.ndarray,
+    p_hats: np.ndarray,
+    kappa: float = 0.25,
+    p_breakeven: float = 0.50,
+    max_risk_pct: float = 0.02,
+    flat_pct: float = 0.01,
+    B: int = BOOTSTRAP_B,
+    seed: int = 42
+) -> Dict[str, float]:
+    """
+    Performs Paired Bootstrap hypothesis test comparing Kelly allocation vs Flat 1% sizing.
+    Computes 95% Confidence Interval [alpha_ci_low, alpha_ci_high].
+    """
+    rng = np.random.default_rng(seed)
+    r_arr = np.asarray(realized_r, dtype=float).ravel()
+    p_arr = np.asarray(p_hats, dtype=float).ravel()
+    n = len(r_arr)
+    if n < 10:
+        return {
+            "alpha_point_pct": 0.0,
+            "alpha_ci_low_pct": 0.0,
+            "alpha_ci_high_pct": 0.0,
+            "kelly_total_pct": 0.0,
+            "flat_total_pct": 0.0,
+            "p_positive_alpha": 0.0,
+        }
+
+    kelly_alloc = np.zeros(n, dtype=float)
+    for i in range(n):
+        p = float(p_arr[i])
+        if p <= p_breakeven:
+            kelly_alloc[i] = 0.0
+        else:
+            raw = kappa * (p - p_breakeven) / (1.0 - p_breakeven)
+            kelly_alloc[i] = min(raw, max_risk_pct)
+
+    kelly_returns = r_arr * kelly_alloc
+    flat_returns = r_arr * flat_pct
+    kelly_total = float(np.prod(1.0 + kelly_returns) - 1.0)
+    flat_total = float(np.prod(1.0 + flat_returns) - 1.0)
+
+    diffs = np.empty(B, dtype=float)
+    for b_idx in range(B):
+        idx = rng.integers(0, n, size=n)
+        k = float(np.prod(1.0 + kelly_returns[idx]) - 1.0)
+        f = float(np.prod(1.0 + flat_returns[idx]) - 1.0)
+        diffs[b_idx] = k - f
+
+    return {
+        "alpha_point_pct": round((kelly_total - flat_total) * 100.0, 2),
+        "alpha_ci_low_pct": round(float(np.percentile(diffs, 2.5)) * 100.0, 2),
+        "alpha_ci_high_pct": round(float(np.percentile(diffs, 97.5)) * 100.0, 2),
+        "kelly_total_pct": round(kelly_total * 100.0, 2),
+        "flat_total_pct": round(flat_total * 100.0, 2),
+        "p_positive_alpha": round(float(np.mean(diffs > 0)) * 100.0, 2),
+    }
+
+
+def regime_attribution(realized_r: np.ndarray, regimes: np.ndarray) -> List[Dict[str, Any]]:
+    """Segment trade expectancy and outcomes across market regimes."""
+    r_arr = np.asarray(realized_r, dtype=float).ravel()
+    reg_arr = np.asarray(regimes).ravel()
+    out = []
+    for r in sorted(set(reg_arr.tolist())):
+        mask = reg_arr == r
+        subset = r_arr[mask]
+        if len(subset) == 0:
+            continue
+        wins = subset > 0
+        wr = float(np.mean(wins))
+        avg_win = float(np.mean(subset[wins])) if wins.any() else 0.0
+        avg_loss = float(np.abs(np.mean(subset[~wins]))) if (~wins).any() else 0.0
+        er = wr * avg_win - (1.0 - wr) * avg_loss
+        out.append({
+            "regime": str(r),
+            "n": int(len(subset)),
+            "win_rate_pct": round(wr * 100.0, 2),
+            "avg_win_r": round(avg_win, 2),
+            "avg_loss_r": round(avg_loss, 2),
+            "expected_r": round(er, 4),
+        })
+    return out
+
+
+def deploy_decision(
+    holdout_returns: np.ndarray,
+    holdout_realized_r: np.ndarray,
+    holdout_p_hats: np.ndarray,
+    regimes: Optional[np.ndarray] = None,
+    total_trials: int = 700,
+    target_n: int = 350
+) -> Dict[str, Any]:
+    """
+    Master Institutional Fiduciary Deployment Decision Governor.
+    Certifies whether strategy can scale beyond 0.1% capital.
+    """
+    dsr_info = dsr_with_moments(holdout_returns, total_trials)
+    mdd_info = bootstrap_mdd(holdout_realized_r, target_n, allocation_pct=0.01)
+    risk_budget = scaled_risk_budget(mdd_info["mdd_95"], hard_cap_pct=15.0, max_risk_pct=2.0)
+    alpha_info = paired_kelly_alpha_test(
+        holdout_realized_r, holdout_p_hats,
+        kappa=0.25, p_breakeven=0.50,
+        max_risk_pct=0.02, flat_pct=0.01,
+    )
+    reg_attr = regime_attribution(holdout_realized_r, regimes) if regimes is not None else []
+
+    is_certified = bool(
+        dsr_info["dsr"] >= 0.95 and
+        risk_budget > 0.0 and
+        alpha_info["alpha_ci_low_pct"] > 0.0
+    )
+
+    return {
+        "dsr": dsr_info,
+        "bootstrap_mdd": mdd_info,
+        "scaled_risk_budget_pct": round(risk_budget, 4),
+        "kelly_alpha": alpha_info,
+        "regime_attribution": reg_attr,
+        "certified": is_certified,
+    }
+
+
 def win_rate_by_decile(
     p_hats: np.ndarray,
     realized_r: np.ndarray,
     n_deciles: int = 10
 ) -> List[Dict[str, Any]]:
-    """
-    Validates monotonic calibration of meta-model predictions against trade outcomes.
-    """
+    """Validates monotonic calibration of meta-model predictions against trade outcomes."""
     if len(p_hats) < n_deciles * 5:
         return []
     order = np.argsort(p_hats)
@@ -210,8 +390,8 @@ def win_rate_by_decile(
             continue
         wr = float(np.mean(wins))
         avg_win = float(np.mean(subset_r[wins])) if wins.any() else 0.0
-        avg_loss = float(np.mean(subset_r[~wins])) if (~wins).any() else 0.0
-        er = wr * avg_win + (1.0 - wr) * avg_loss
+        avg_loss = float(np.abs(np.mean(subset_r[~wins]))) if (~wins).any() else 0.0
+        er = wr * avg_win - (1.0 - wr) * avg_loss
         deciles.append({
             "decile": i + 1,
             "n": int(len(subset_r)),
@@ -251,9 +431,7 @@ def flat_sizing_benchmark(
 
 
 def full_verification(ledger: VerifiedLedger, total_trials: int = 700) -> Dict[str, Any]:
-    """
-    Executes 360-degree statistical edge audit on an active ledger.
-    """
+    """Executes 360-degree statistical edge audit on an active ledger."""
     returns = ledger.weighted_returns()
     realized = ledger.realized_r()
     p_hats = ledger.p_hats()
@@ -300,9 +478,7 @@ def simulate_asymmetric_exit(
     stop_price: float,
     cfg: AsymmetricExitConfig
 ) -> Tuple[float, str]:
-    """
-    Simulates asymmetric trailing exit with conservative stop-first precedence.
-    """
+    """Simulates asymmetric trailing exit with conservative stop-first precedence."""
     stop_dist = abs(entry - stop_price)
     if stop_dist <= 1e-9:
         return 0.0, "invalid_stop"
@@ -312,7 +488,6 @@ def simulate_asymmetric_exit(
         hi_r = (hi - entry) / stop_dist
         lo_r = (lo - entry) / stop_dist
 
-        # Conservative intrabar precedence: check stop loss first
         if lo_r <= -cfg.stop_r:
             return -cfg.stop_r, "stop"
 
@@ -353,8 +528,8 @@ def deflated_sharpe_ratio(
     annualization_factor: float = 1.0
 ) -> float:
     """Computes Deflated Sharpe Ratio."""
-    dsr, _, _ = verified_dsr(returns, total_trials=num_trials)
-    return dsr
+    info = dsr_with_moments(returns, total_trials=num_trials)
+    return info["dsr"]
 
 
 def expected_r(win_rate: float, avg_win_r: float, avg_loss_r: float) -> float:
