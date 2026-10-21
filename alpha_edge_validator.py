@@ -132,6 +132,10 @@ def dsr_with_moments(returns: np.ndarray, total_trials: int = 700) -> Dict[str, 
         ku = 3.0
 
     trials = max(2, total_trials)
+    # Conservative DSR Variant: sr_star = sqrt(2*ln(trials)/n) without scaling by denom.
+    # Note: When denom < 1.0 (as with negative skew/fat tails, denom=0.8550), unscaled sr_star
+    # produces a strictly higher threshold hurdle (~1.17x stricter) than Standard Bailey-Lopez de Prado
+    # where sr_star = denom * sqrt(2*ln(trials)/(n-1)).
     sr_star = float(np.sqrt(2.0 * np.log(trials) / n))
     denom = float(np.sqrt(max(1e-9, 1.0 - sk * sr + ((ku - 1.0) / 4.0) * (sr ** 2))))
     if denom <= 0:
@@ -175,11 +179,17 @@ def required_sample_for_dsr(
     target_dsr: float = 0.95,
     per_trade_sr: float = 0.26,
     total_trials: int = 700,
-    denom: float = 1.0
+    denom: float = 1.0,
+    conservative_variant: bool = True
 ) -> int:
     """
     Computes minimum sample size N required for DSR >= target_dsr.
     Incorporates variance denominator factor denom = sqrt(1 - skew*SR + (kurt-1)/4 * SR^2).
+
+    If conservative_variant=True (default): sr_star = sqrt(2*ln(trials)/N), producing a stricter
+    fiduciary hurdle buffer (~1.25x larger N when denom < 1.0).
+    If conservative_variant=False (Standard Bailey-Lopez de Prado 2014):
+    sr_star is scaled by denom, yielding N - 1 = ((z_target + a) * denom / per_trade_sr)^2.
     """
     if per_trade_sr <= 0:
         return 99999
@@ -189,8 +199,11 @@ def required_sample_for_dsr(
     lo, hi = 30, 100000
     for _ in range(80):
         mid = (lo + hi) // 2
-        sr_star = a / np.sqrt(mid)
-        z_obs = (per_trade_sr - sr_star) * np.sqrt(mid - 1) / d
+        if conservative_variant:
+            sr_star = a / np.sqrt(mid)
+            z_obs = (per_trade_sr - sr_star) * np.sqrt(mid - 1) / d
+        else:
+            z_obs = (per_trade_sr * np.sqrt(mid - 1) / d) - a
         if z_obs >= z_target:
             hi = mid
         else:
