@@ -807,10 +807,27 @@ class TradFiSessionKillZoneRouter:
          - 100% Ring-fenced for continuous 24/7 Crypto CFDs (BTCUSD, ETHUSD, SOLUSD).
     """
 
-    US_EQUITIES = {"NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"}
-    US_INDICES = {"US100", "US500", "WALLSTREET", "US30", "DJ30"}
-    EUROPEAN_INDICES = {"DE40", "GERMANY40", "UK100", "FR40"}
-    COMMODITIES = {"GOLD", "XAUUSD", "SILVER", "XAGUSD", "OIL", "OIL_CRUDE", "BRENT"}
+    try:
+        import capital_tri_regional_universe as ctru
+        _EXTRA_US = ctru.TOP_100_US_SET - {"US100", "US500", "US30", "US2000", "GOLD", "SILVER", "OIL_CRUDE"}
+        _EXTRA_EU = ctru.TOP_100_EU_SET - {"DE40", "GERMANY40", "UK100", "FR40", "EU50", "SWI20", "IT40", "ES35", "NL25", "GOLD", "SILVER", "OIL_CRUDE", "OIL_BRENT"}
+        _EXTRA_ASIA = ctru.TOP_100_ASIA_SET - {"JP225", "HK50", "CN50", "AUS200", "SG30", "TW30", "GOLD", "SILVER", "OIL_CRUDE"}
+        _EXTRA_EU_INDICES = {"UK100", "FR40", "EU50", "SWI20", "IT40", "ES35", "NL25"}
+        _EXTRA_ASIA_INDICES = {"JP225", "HK50", "CN50", "AUS200", "SG30", "TW30"}
+    except Exception:
+        _EXTRA_US = set()
+        _EXTRA_EU = set()
+        _EXTRA_ASIA = set()
+        _EXTRA_EU_INDICES = set()
+        _EXTRA_ASIA_INDICES = set()
+
+    US_EQUITIES = {"NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"} | _EXTRA_US
+    US_INDICES = {"US100", "US500", "WALLSTREET", "US30", "DJ30", "US2000"}
+    EUROPEAN_INDICES = {"DE40", "GERMANY40", "UK100", "FR40"} | _EXTRA_EU_INDICES
+    EUROPEAN_EQUITIES = _EXTRA_EU
+    ASIAN_INDICES = {"JP225", "HK50", "CN50", "AUS200", "SG30", "TW30"} | _EXTRA_ASIA_INDICES
+    ASIAN_EQUITIES = _EXTRA_ASIA
+    COMMODITIES = {"GOLD", "XAUUSD", "SILVER", "XAGUSD", "OIL", "OIL_CRUDE", "BRENT", "OIL_BRENT", "NATURALGAS", "GAS"}
     CRYPTO_CFDS = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD", "BTC", "ETH", "SOL"}
 
     @classmethod
@@ -935,6 +952,9 @@ class TradFiSessionKillZoneRouter:
         is_us_stock = any(s == resolved_epic or s in resolved_epic for s in cls.US_EQUITIES)
         is_us_index = any(idx == resolved_epic or idx in resolved_epic for idx in cls.US_INDICES)
         is_eu_index = any(de == resolved_epic or de in resolved_epic for de in cls.EUROPEAN_INDICES)
+        is_eu_stock = any(es == resolved_epic or es in resolved_epic for es in getattr(cls, "EUROPEAN_EQUITIES", set()))
+        is_asian_index = any(ai == resolved_epic or ai in resolved_epic for ai in getattr(cls, "ASIAN_INDICES", set()))
+        is_asian_stock = any(as_ == resolved_epic or as_ in resolved_epic for as_ in getattr(cls, "ASIAN_EQUITIES", set()))
 
         # Asian Session (07:00 - 13:30 / 14:00 ICT = 00:00 - 07:00 UTC)
         if sess_code == "ASIAN_SESSION":
@@ -946,12 +966,14 @@ class TradFiSessionKillZoneRouter:
                     f"Session routing strictly prioritizes GOLD (XAUUSD), Commodities, and Crypto."
                 )
                 return False, reason, session_info
-            if is_eu_index:
+            if is_eu_index or is_eu_stock:
                 reason = (
-                    f"SESSION_KILL_ZONE_ASIAN_DE40_CLOSED: European indices (DE40/DAX) are closed during Asian Session. "
+                    f"SESSION_KILL_ZONE_ASIAN_DE40_CLOSED: European indices & equities (DE40/DAX) are closed during Asian Session. "
                     f"European open begins at 14:00 ICT (07:00 UTC)."
                 )
                 return False, reason, session_info
+            if is_asian_stock or is_asian_index:
+                return True, "ASIAN_SESSION_EQUITIES_CLEARANCE", session_info
             return True, "ASIAN_SESSION_COMMODITY_CLEARANCE", session_info
 
         # London Open Kill Zone (14:00 - 18:30 / 20:30 ICT = 07:00 - 13:30 UTC)
@@ -963,10 +985,21 @@ class TradFiSessionKillZoneRouter:
                     f"US Cash Equities ({resolved_epic}) are locked until New York Open."
                 )
                 return False, reason, session_info
+            if is_asian_stock:
+                reason = (
+                    f"SESSION_KILL_ZONE_ASIAN_MARKETS_CLOSED: Asian cash markets ({resolved_epic}) closed after 14:00 ICT. "
+                    f"London Open Kill Zone strictly focuses on GOLD (XAUUSD) and European Equities/Indices."
+                )
+                return False, reason, session_info
             return True, "LONDON_KILL_ZONE_CLEARANCE", session_info
 
         # New York Open Kill Zone (20:30 - 01:30 / 03:30 ICT = 13:30 - 20:30 UTC)
         if sess_code == "NEW_YORK_KILL_ZONE":
+            if is_asian_stock:
+                reason = (
+                    f"SESSION_KILL_ZONE_ASIAN_MARKETS_CLOSED: Asian cash markets ({resolved_epic}) closed during New York session."
+                )
+                return False, reason, session_info
             return True, "NEW_YORK_KILL_ZONE_CLEARANCE", session_info
 
         return True, "DEFAULT_SESSION_CLEARANCE", session_info

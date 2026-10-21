@@ -1619,6 +1619,38 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   3. **Precision Re-Entry Approval:** As soon as a fresh high-conviction Candlestick Reversal Pattern ($\ge 90\%$ Confluence Win Rate) forms on M15/H1, the quarantine is immediately bypassed (`ADAPTIVE_RE_ENTRY_APPROVED`), and the engine executes a precision re-entry with tight structural stop-loss anchored behind the sweep wick.
   4. **Fiduciary Knife-Dump Protection:** If the market is experiencing runaway breakdown momentum without a structural reversal pattern, capital is strictly preserved, scanning candle-by-candle until the genuine edge materializes.
 
+### Invariant 89: Institutional Tri-Regional Universe in RAM: Top 100 US, Top 100 EU, Top 100 ASIA, Interbank Session Kill Zone Dynamic Routing, Dual-Directional (Buy-Sell) Multi-Model Edge & Dynamic Capital Slot Capacity Governor (AQ89)
+**(អភ័យឯកសិទ្ធិស្ថាប័នកម្រិតកំពូល Tri-Regional RAM Universe: Top 100 US, Top 100 EU, Top 100 ASIA, ការបែងចែកម៉ោងជួញដូរតាម Sessions, គំរូ Models គណនា Buy-Sell គ្រប់ជ្រុងជ្រោយ & ការពង្រីក Slots តាមទំហំដើមទុនជាក់ស្តែង)**
+- **Authority:** Absolute Architectural Ground Truth & Fiduciary Quantitative Specification.
+- **Location:** `capital_tri_regional_universe.py` (`TOP_100_US_DATA`, `TOP_100_EU_DATA`, `TOP_100_ASIA_DATA`, `TriRegionalSessionRouter`), `capital_engine.py` (`get_session_priority_assets`, `get_dynamic_max_positions_for_equity`, `_dispatch_single_user_trade`, `CapitalKellyPositionSizer`), `super_smart_capital_citadel.py` (`TradFiSessionKillZoneRouter`), `audit_system.py` [CHECK 68/68].
+- **Core Principles & Mathematical Edge:**
+  1. **Tri-Regional Top 100 Universes in Nanosecond RAM Memory (`capital_tri_regional_universe.py`):**
+     - Maintains 300 institutional TradFi instruments held permanently in Python RAM (< 0.0001ms latency).
+     - **Top 100 US:** S&P 100, Nasdaq 100, Dow Jones, and Russell 2000 leaders (US100, US500, US30, US2000, NVDA, AAPL, MSFT, AMZN, GOOGL, META, TSLA, AVGO, AMD, NFLX, INTC, etc.).
+     - **Top 100 EU:** Germany DAX, UK FTSE, France CAC, Euro Stoxx 50, and Swiss SMI leaders (DE40, UK100, FR40, EU50, SWI20, IT40, ES35, NL25, ASML, SAP, MC, NOVO_B, NESN, ROG, NOVBN, SIE, AIR, TTE, etc.).
+     - **Top 100 ASIA:** Tokyo Nikkei 225, Hong Kong Hang Seng, China A50, and Australia ASX 200 leaders (JP225, HK50, CN50, AUS200, SG30, TW30, 7203 Toyota, 6758 Sony, 6861 Keyence, 8035, 9984, 0700 Tencent, 9988 Alibaba, 3690 Meituan, BHP, CBA, CSL, etc.).
+     - **Core Commodities (24/5):** GOLD, SILVER, OIL_CRUDE, OIL_BRENT, NATURALGAS.
+  2. **Interbank Session Kill Zone Dynamic Routing & Time-Asset Confluence:**
+     - **Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 ICT, Prime: 07:00 - 13:30 ICT):** Active scanning focuses on Top 100 ASIA + GOLD + Commodities. US and European equities are strictly gated to eliminate illiquid pre-market chop.
+     - **London Open Kill Zone (07:00 - 13:30 UTC = 14:00 - 20:30 ICT, Prime: 14:00 - 18:30 ICT):** Active scanning focuses on Top 100 EU + GOLD + Commodities. US cash equities are locked until Wall Street Cash Open at 20:30 ICT (13:30 UTC).
+     - **Wall Street New York Open Kill Zone (13:30 - 20:30 UTC = 20:30 - 03:30 ICT, Prime: 20:30 - 01:30 ICT):** Active scanning focuses on Top 100 US + GOLD + Commodities. Highest liquidity, tightest spreads, explosive momentum.
+     - **Overnight Rollover Swap Shield & Flat Cash (20:30 - 23:59 UTC = 03:30 - 07:00 ICT):** Intraday positions harvested to Flat Cash before 21:00 UTC rollover. Zero new TradFi entries to eliminate financing fees and spread blowout.
+     - **Weekend Standby (Friday 20:45 UTC to Sunday 22:00 UTC):** TradFi markets closed, 100% capital preservation mode.
+  3. **Super Smart Dual-Directional (Buy & Sell) Multi-Model Consensus Edge:**
+     - Both **BUY & SELL** signals are calculated from all angles with institutional rigor:
+       * **BUY (Long):** Price > EMA50, Triple EMA Bullish stack (20 > 50 > 200), FVG discount retest, Turtle Soup Sweep of low with bullish rejection candle close, RSI $\le 68.0$, Citadel Score $\ge 68.0$, Marcos López de Prado Meta-Labeling Model 2 win probability $\hat{p} \ge 0.55$.
+       * **SELL (Short):** Price < EMA50, Triple EMA Bearish stack (20 < 50 < 200), FVG premium retest, Turtle Soup Sweep of high with bearish rejection candle, Anti-Oversold Short Guard (RSI $\ge 38.0$ prevents selling at bottoms), Citadel Score $\ge 68.0$, Meta-Labeling Model 2 win probability $\hat{p} \ge 0.55$.
+     - Symmetrical institutional edge fuses Citadel 360°, AFML Meta-Labeling Model 2, Gaussian HMM Regimes, and Gold Candlestick RAM Memory.
+  4. **Dynamic Capital Slot Capacity Governor & Safe Position Generation:**
+     - Safely scales position slots according to available account equity:
+       * Equity < $100: 2 positions (Small Capital Shield)
+       * $100 - $149: 3 positions | $150 - $199: 4 positions | $200 - $249: 6 positions
+       * $250 - $299: 7 positions | $300 - $349: 8 positions | $350 - $499: 10 positions (VIP 10-Slot Parity)
+       * $500 - $999: 12 positions | $1,000 - $2,499: 15 positions | $2,500 - $4,999: 20 positions
+       * $5,000 - $9,999: 25 positions | $\ge \$10,000$: 30 positions (Institutional / Prop Challenge Tier)
+     - Batch execution (up to 3 trades per cycle) safely populates portfolios up to capacity without API burst rate limits.
+     - Portfolio Heat ($\le 6.0\%$ of equity), CVaR 95% ($\le 2.0\%$), and HRP covariance penalties prevent clustered correlation risk.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

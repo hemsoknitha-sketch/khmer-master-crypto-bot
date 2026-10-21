@@ -174,13 +174,38 @@ EPIC_MAP = {
     "NATGAS": "NATURALGAS",     # US Natural Gas
     "NATURALGAS": "NATURALGAS", # US Natural Gas
     "GAS": "NATURALGAS",        # US Natural Gas
-    # Indices
+    # Indices & Regional Benchmarks
     "SP500": "US500",           # S&P 500 Index
     "NASDAQ": "US100",          # Nasdaq 100 Tech Index
     "DOW": "US30",              # Dow Jones Industrial Average
+    "US30": "US30",             # Dow Jones Industrial Average
+    "DJ30": "US30",             # Dow Jones Industrial Average
+    "WALLSTREET": "US30",       # Dow Jones Industrial Average
+    "US2000": "US2000",         # Russell 2000 Small-Cap
+    "RUT": "US2000",            # Russell 2000 Small-Cap
     "DAX": "DE40",              # German DAX 40 (Capital.com canonical epic)
     "GERMANY40": "DE40",        # German DAX 40
     "DE40": "DE40",             # German DAX 40
+    "UK100": "UK100",           # UK FTSE 100
+    "FTSE100": "UK100",         # UK FTSE 100
+    "FR40": "FR40",             # France CAC 40
+    "CAC40": "FR40",            # France CAC 40
+    "EU50": "EU50",             # Euro Stoxx 50
+    "STOXX50": "EU50",          # Euro Stoxx 50
+    "SWI20": "SWI20",           # Swiss SMI 20
+    "IT40": "IT40",             # Italy FTSE MIB
+    "ES35": "ES35",             # Spain IBEX 35
+    "NL25": "NL25",             # Netherlands AEX
+    "JP225": "JP225",           # Japan Nikkei 225
+    "NIKKEI": "JP225",          # Japan Nikkei 225
+    "HK50": "HK50",             # Hong Kong Hang Seng Index
+    "HSI": "HK50",              # Hong Kong Hang Seng Index
+    "CN50": "CN50",             # China A50 Index
+    "CHINA50": "CN50",          # China A50 Index
+    "AUS200": "AUS200",         # Australia ASX 200
+    "ASX200": "AUS200",         # Australia ASX 200
+    "SG30": "SG30",             # Singapore Straits Times
+    "TW30": "TW30",             # Taiwan Index
     # US Mega-Cap Stocks
     "META": "META",             # Meta Platforms Inc
     "GOOGL": "GOOGL",           # Alphabet Inc (Google) Class A
@@ -335,19 +360,34 @@ except ImportError:
 # ==============================================================================
 def get_dynamic_max_positions_for_equity(equity: float, user_override: Optional[int] = None) -> int:
     """
-    Dynamic Capital Slot Allocator for 24/7 SMC Citadel Autonomous Engine (Invariant 53):
+    Dynamic Capital Slot Allocator for 24/7 SMC Citadel Autonomous Engine (Invariant 53 & Invariant 89):
     - Equity < $100: 2 positions (Small Capital Shield)
     - $100 - $149: 3 positions concurrently
     - $150 - $199: 4 positions concurrently
     - $200 - $249: 6 positions concurrently (User Anchor Specification)
     - $250 - $299: 7 positions concurrently
     - $300 - $349: 8 positions concurrently
-    - >= $350: 10 positions concurrently
+    - $350 - $499: 10 positions concurrently (VIP 10-Slot Parity)
+    - $500 - $999: 12 positions concurrently
+    - $1,000 - $2,499: 15 positions concurrently
+    - $2,500 - $4,999: 20 positions concurrently
+    - $5,000 - $9,999: 25 positions concurrently
+    - >= $10,000: 30 positions concurrently (Institutional / Prop Challenge Tier)
     """
     if user_override is not None and user_override > 2:
         return user_override
     eq = float(equity or 0.0)
-    if eq >= 350.0:
+    if eq >= 10000.0:
+        return 30
+    elif eq >= 5000.0:
+        return 25
+    elif eq >= 2500.0:
+        return 20
+    elif eq >= 1000.0:
+        return 15
+    elif eq >= 500.0:
+        return 12
+    elif eq >= 350.0:
         return 10
     elif eq >= 300.0:
         return 8
@@ -3765,11 +3805,21 @@ class CapitalAutonomousEngine:
         # Wall Street NY Session (13:30 - 20:30 UTC = 20:30 - 03:30 Phnom Penh) - Prime US Mega-Cap Equities & Indices
         if 810 <= utc_min < 1230:
             raw_assets = ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "GERMANY40"]
+            try:
+                import capital_tri_regional_universe as ctru
+                raw_assets.extend([a for a in ctru.TOP_100_US_EPICS if a not in raw_assets])
+            except Exception:
+                pass
             if crypto_allowed:
                 raw_assets.append("BTCUSD")
         # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh) - Prime Focus on GOLD & DE40 (DAX)
         elif 420 <= utc_min < 810:
             raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER"]
+            try:
+                import capital_tri_regional_universe as ctru
+                raw_assets.extend([a for a in ctru.TOP_100_EU_EPICS if a not in raw_assets])
+            except Exception:
+                pass
             if forex_allowed:
                 raw_assets.extend(["EURUSD", "GBPUSD"])
             if crypto_allowed:
@@ -3777,6 +3827,11 @@ class CapitalAutonomousEngine:
         # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh) - Prime Focus on GOLD & Commodities
         elif 0 <= utc_min < 420:
             raw_assets = ["GOLD", "SILVER", "OIL_CRUDE"]
+            try:
+                import capital_tri_regional_universe as ctru
+                raw_assets.extend([a for a in ctru.TOP_100_ASIA_EPICS if a not in raw_assets])
+            except Exception:
+                pass
             if forex_allowed:
                 raw_assets.extend(["USDJPY", "AUDUSD"])
             if crypto_allowed:
@@ -5153,6 +5208,11 @@ class CapitalAutonomousEngine:
                     return False
                 candidate_setups = filtered_cands
 
+        # Track executed trades in this cycle to safely open maximum positions up to capital capacity
+        executed_this_cycle = 0
+        user_open_count = len(user_open_positions)
+        max_batch_entries = min(3, max(1, max_pos - user_open_count))
+
         # Iterate through candidate setups descending by rank score.
         # If candidate #1 fails pre-flight verification (e.g. spread spike, blackout, RSI guard),
         # continue to the next candidate setup instead of aborting the user's entire cycle!
@@ -5452,7 +5512,23 @@ class CapitalAutonomousEngine:
                             logger.warning(f"[Capital.com] User {chat_id} has blocked the bot in Telegram; skipped notification.")
                         else:
                             logger.error(f"Failed to send Capital Auto notification: {notif_err}")
-                return True
+
+                executed_this_cycle += 1
+                user_open_count += 1
+                user_epics.add(resolved_epic.upper())
+                try:
+                    import capital_tri_regional_universe as ctru
+                    leverage_calc = 5.0 if ctru.is_equity_asset(resolved_epic) else 20.0
+                except Exception:
+                    leverage_calc = 20.0
+                approx_margin = (entry_px * executed_size) / leverage_calc if (entry_px > 0 and executed_size > 0) else min_required_margin
+                user_avail = max(0.0, user_avail - approx_margin)
+
+                # Cap max position generation per cycle to 3 trades to prevent API burst rate limiting
+                if user_open_count >= max_pos or executed_this_cycle >= max_batch_entries or user_avail < min_required_margin:
+                    return True
+                # Continue loop to safely fill next available position slot with top-ranked setup
+                continue
             else:
                 err_msg = str(trade_res.get('error') or '')
                 logger.warning(f"Order rejected for {resolved_epic} {final_action} (User {chat_id}): {err_msg}. Trying next candidate.")
@@ -5460,7 +5536,7 @@ class CapitalAutonomousEngine:
                     self._user_rejection_cooldowns[chat_id] = now + 120.0
                 continue
 
-        return False
+        return (executed_this_cycle > 0)
 
     async def _dispatch_single_prop_trade(
         self,
@@ -7938,7 +8014,11 @@ class CapitalKellyPositionSizer:
         scale_mult = kelly_res["scale_multiplier"]
 
         # Dynamic Target Margin Sizing: Allocates full $10.00 - $15.00 actual margin per trade
-        is_stock = any(s in clean_epic for s in ["NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"])
+        try:
+            import capital_tri_regional_universe as ctru
+            is_stock = ctru.is_equity_asset(clean_epic) or any(s in clean_epic for s in ["NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"])
+        except Exception:
+            is_stock = any(s in clean_epic for s in ["NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"])
         is_crypto = any(c in clean_epic for c in ["BTC", "ETH", "SOL", "XRP"])
         leverage = 5.0 if is_stock else (2.0 if is_crypto else 20.0)
         contract_mult = self._get_contract_multiplier(clean_epic)
