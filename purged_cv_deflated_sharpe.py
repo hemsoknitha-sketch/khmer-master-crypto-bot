@@ -62,9 +62,13 @@ class PurgedKFold:
         dates_entry = pd.to_datetime(trades_df[entry_col]).values
         dates_exit = pd.to_datetime(trades_df[exit_col]).values
 
-        test_size = n_samples // self.n_splits
-        embargo_samples = int(math.ceil(n_samples * self.pct_embargo))
+        # Compute empirical maximum holding duration to prevent any overlap leakage
+        durations = (dates_exit - dates_entry).astype('timedelta64[D]').astype(int)
+        max_holding_days = int(np.max(durations)) if len(durations) > 0 else 45
+        embargo_days = max(int(math.ceil(3650 * self.pct_embargo)), max_holding_days)
+        embargo_delta = np.timedelta64(embargo_days, 'D')
 
+        test_size = n_samples // self.n_splits
         for k in range(self.n_splits):
             test_start_idx = k * test_size
             test_end_idx = n_samples if k == self.n_splits - 1 else (k + 1) * test_size
@@ -73,6 +77,7 @@ class PurgedKFold:
             # Test period boundary
             t_test_start = dates_entry[test_idx[0]]
             t_test_end = np.max(dates_exit[test_idx])
+            t_embargo_limit = t_test_end + embargo_delta
 
             # Purge any training trade whose holding period overlaps with [t_test_start, t_test_end]
             purged_train = []
@@ -87,10 +92,9 @@ class PurgedKFold:
                 if not (t_exit < t_test_start or t_entry > t_test_end):
                     continue  # Overlaps test period -> PURGE
 
-                # Embargo check: if sample comes after test period, must be outside embargo window
-                if t_entry > t_test_end:
-                    if idx < test_end_idx + embargo_samples:
-                        continue  # In embargo window -> EMBARGO
+                # Embargo check: if sample comes after test period, must be outside maximum holding embargo
+                if t_test_end < t_entry <= t_embargo_limit:
+                    continue  # In maximum holding embargo window -> EMBARGO
 
                 purged_train.append(idx)
 
@@ -128,10 +132,17 @@ class CombinatorialPurgedCV:
             end = n_samples if i == self.n_splits - 1 else (i + 1) * split_size
             bucket_indices.append(indices[start:end])
 
+        # Compute empirical maximum holding duration to prevent any overlap leakage
+        durations = (dates_exit - dates_entry).astype('timedelta64[D]').astype(int)
+        max_holding_days = int(np.max(durations)) if len(durations) > 0 else 45
+        embargo_days = max(int(math.ceil(3650 * self.pct_embargo)), max_holding_days)
+        embargo_delta = np.timedelta64(embargo_days, 'D')
+
         for combo in self.get_combinations():
             test_idx = np.concatenate([bucket_indices[b] for b in combo])
             t_test_start = np.min(dates_entry[test_idx])
             t_test_end = np.max(dates_exit[test_idx])
+            t_embargo_limit = t_test_end + embargo_delta
 
             purged_train = []
             test_set = set(test_idx)
@@ -141,6 +152,8 @@ class CombinatorialPurgedCV:
                 t_entry = dates_entry[idx]
                 t_exit = dates_exit[idx]
                 if not (t_exit < t_test_start or t_entry > t_test_end):
+                    continue
+                if t_test_end < t_entry <= t_embargo_limit:
                     continue
                 purged_train.append(idx)
 

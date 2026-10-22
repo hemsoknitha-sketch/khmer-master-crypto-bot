@@ -72,6 +72,7 @@ class CapitalExecutionBridge:
         self.session_expiry: float = 0.0
         self.active_account_id: Optional[str] = None
         self.processed_client_order_ids: set = set()
+        self._order_sequence_counter: int = 0
 
         # Resilient HTTP Session with institutional retry policy
         self.session = requests.Session()
@@ -86,6 +87,11 @@ class CapitalExecutionBridge:
 
         self.audit_log_path = os.path.join(os.path.dirname(__file__), "data", "capital_execution_audit.csv")
         self._init_audit_file()
+
+    def _next_sequence(self) -> int:
+        """Thread-safe monotonic counter for collision-proof order IDs."""
+        self._order_sequence_counter += 1
+        return self._order_sequence_counter
 
     def _init_audit_file(self):
         """Initializes execution audit CSV ledger if not present."""
@@ -110,9 +116,9 @@ class CapitalExecutionBridge:
         """
         Invariant 91 Fiduciary Gate:
         While verified trades N < 544, certification status is strictly certified: false.
-        Live capital risk is clamped to <= 0.1% equity.
+        - LIVE Account: Completely REJECTED (REJECTED_UNCERTIFIED). Zero live capital permitted.
+        - DEMO / Paper Account: APPROVED with allocation clamped to <= 0.10% virtual equity.
         """
-        # Default state: uncertified until N >= 544
         is_certified = False
         n_verified_trades = 72
 
@@ -129,10 +135,12 @@ class CapitalExecutionBridge:
 
         if not self.is_demo and not is_certified:
             msg = (
-                f"UNCERTIFIED_PHASE_1_LOCK: N={n_verified_trades} trades is below required root N=544. "
-                f"Live allocation strictly clamped to <= 0.10% capital."
+                f"REJECTED_UNCERTIFIED: N={n_verified_trades} trades is below required root N=544. "
+                f"Live account orders are 100% blocked under Invariant 91."
             )
             return False, msg
+
+        return True, "CERTIFIED_OR_DEMO_APPROVED"
 
         return True, "CERTIFIED_OR_DEMO_APPROVED"
 
@@ -210,7 +218,7 @@ class CapitalExecutionBridge:
         direction_clean = direction.upper().strip()
 
         # Idempotency check: prevent duplicate placement on network retries
-        order_key = client_order_id or f"{epic}_{direction_clean}_{int(t_start*1000)}"
+        order_key = client_order_id or f"{epic}_{direction_clean}_{int(t_start*1000)}_{self._next_sequence()}_{uuid.uuid4().hex[:6]}"
         if order_key in self.processed_client_order_ids:
             return {
                 "success": False,
