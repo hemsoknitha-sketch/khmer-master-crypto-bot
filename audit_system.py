@@ -3902,7 +3902,7 @@ def run_audit():
         log_fail(str(e))
 
     # 71. Invariant 92: The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling
-    print("\n[CHECK 71/76] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
+    print("\n[CHECK 71/77] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
     try:
         has_inv92_agents = "Invariant 92: The Five Pillars of Apex TradFi Capital Profitability" in agents_md
         has_inv92_gemini = "The Five Pillars of Apex TradFi Capital Profitability, Factor Correlation Clamping & Small Capital Compound Scaling (Invariant 92)" in gemini_md
@@ -3938,7 +3938,7 @@ def run_audit():
         log_fail(str(e))
 
     # 72. Invariant 93: Capital.com Execution Bridge, Slippage Auditor, and HMM Regime Filter Fiduciary Gates
-    print("\n[CHECK 72/76] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
+    print("\n[CHECK 72/77] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
     try:
         with open("capital_execution_bridge.py", "r", encoding="utf-8") as f_br:
             bridge_src = f_br.read()
@@ -3967,7 +3967,7 @@ def run_audit():
         log_fail(str(e))
 
     # 73. Invariant 94: Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix
-    print("\n[CHECK 73/76] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
+    print("\n[CHECK 73/77] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
     try:
         with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
             cit_src = f_cit.read()
@@ -4039,7 +4039,7 @@ def run_audit():
         log_fail(str(e))
 
     # 74. Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge
-    print("\n[CHECK 74/76] Verifying Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)...")
+    print("\n[CHECK 74/77] Verifying Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)...")
     try:
         has_inv95_agents = "Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module" in agents_md
         has_inv95_gemini = "Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)" in gemini_md
@@ -4170,7 +4170,7 @@ def run_audit():
         log_fail(str(e))
 
     # 75. Invariant 96: Institutional Multi-Model Stacking Classifier Meta-Labeling Framework
-    print("\n[CHECK 75/76] Verifying Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)...")
+    print("\n[CHECK 75/77] Verifying Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)...")
     try:
         has_inv96_agents = "Invariant 96: Institutional Multi-Model Stacking Classifier Meta-Labeling Framework" in agents_md
         has_inv96_gemini = "Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)" in gemini_md
@@ -4270,7 +4270,7 @@ def run_audit():
         log_fail(str(e))
 
     # 76. Invariant 97: CVD Microstructure Proxy & Large Spread Limit Working Orders
-    print("\n[CHECK 76/76] Verifying CVD Microstructure Proxy & Large Spread Limit Working Orders (Invariant 97)...")
+    print("\n[CHECK 76/77] Verifying CVD Microstructure Proxy & Large Spread Limit Working Orders (Invariant 97)...")
     try:
         has_inv97_agents = "Invariant 97: CVD Microstructure Proxy & Large Spread Limit Working Orders" in agents_md
         has_inv97_gemini = "CVD Microstructure Proxy & Large Spread Limit Working Orders (Invariant 97)" in gemini_md
@@ -4379,6 +4379,116 @@ def run_audit():
         failures.append(f"Invariant 97 check failed: {e}")
         log_fail(str(e))
 
+    # 77. Invariant 98: Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor
+    print("\n[CHECK 77/77] Verifying Institutional Structural SL Anchor, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor (Invariant 98)...")
+    try:
+        has_inv98_agents = "Invariant 98: Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor" in agents_md
+        has_inv98_gemini = "Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor (Invariant 98)" in gemini_md
+
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
+            cit_src = f_cit.read()
+        with open("capital_engine.py", "r", encoding="utf-8") as f_cap:
+            cap_src = f_cap.read()
+
+        has_scaleout_mgr = "class TradFiMultiTargetScaleOutManager:" in cit_src
+        has_calc_scaleout = "def calculate_scale_out_plan(" in cit_src
+        has_eval_lifecycle = "def evaluate_scale_out_lifecycle(" in cit_src
+        has_phase1_sl = "phase1_sl" in cit_src
+        has_phase1_action = "PHASE_1_RISK_REDUCTION" in cit_src
+        has_phase2_action = "STAGE_1_BREAKEVEN_ARMOR" in cit_src
+        has_phase3_action = "STAGE_2_PROFIT_LOCK" in cit_src
+        has_phase4_action = "PHASE_4_PARABOLIC_HARVEST" in cit_src
+
+        has_cap_dollar_clamp = "max_single_risk_dollar = min(max_single_risk_dollar, 2.50)" in cap_src
+        has_cap_parabolic = "parabolic_85_harvest" in cap_src and "is_parabolic_exhaustion" in cap_src
+
+        # Dynamic Unit Test
+        from super_smart_capital_citadel import TradFiMultiTargetScaleOutManager
+        from capital_engine import CapitalKellyPositionSizer, PropFirmRiskManager
+
+        # 1. Scale-out plan computation
+        plan = TradFiMultiTargetScaleOutManager.calculate_scale_out_plan(
+            epic="GOLD",
+            direction="BUY",
+            entry_price=2650.0,
+            sl_price=2640.0,
+            total_size=1.0,
+            spread=0.40,
+            tp1_r=1.80,
+            tp2_r=3.50,
+            runner_r=8.00,
+            atr_15m=4.0
+        )
+        unit_plan_ok = (
+            plan["tp1_r"] == 1.80 and
+            plan["tp2_r"] == 3.50 and
+            plan["runner_r"] == 8.00 and
+            plan["tp1_price"] == 2668.0 and
+            plan["tp2_price"] == 2685.0 and
+            plan["tp3_price"] == 2730.0 and
+            plan["phase1_sl"] == 2648.0
+        )
+
+        # 2. Phase 1 Risk Reduction (+1.2R)
+        res_p1 = TradFiMultiTargetScaleOutManager.evaluate_scale_out_lifecycle(
+            epic="US100", direction="BUY", entry_price=20000.0, current_price=20120.0,
+            sl_dist=100.0, spread=1.50, upl=12.0, peak_upl=12.0, scale_tier=0.0, atr_15m=30.0
+        )
+        unit_p1_ok = (res_p1["action"] == "PHASE_1_RISK_REDUCTION" and res_p1["new_sl"] == 19985.0)
+
+        # 3. Phase 2 Breakeven Armor (+1.8R)
+        res_p2 = TradFiMultiTargetScaleOutManager.evaluate_scale_out_lifecycle(
+            epic="US100", direction="BUY", entry_price=20000.0, current_price=20185.0,
+            sl_dist=100.0, spread=1.50, upl=18.5, peak_upl=18.5, scale_tier=0.5, atr_15m=30.0
+        )
+        unit_p2_ok = (res_p2["action"] == "STAGE_1_BREAKEVEN_ARMOR" and res_p2["new_scale_tier"] == 1)
+
+        # 4. Phase 3 Profit Floor (+3.5R)
+        res_p3 = TradFiMultiTargetScaleOutManager.evaluate_scale_out_lifecycle(
+            epic="US100", direction="BUY", entry_price=20000.0, current_price=20360.0,
+            sl_dist=100.0, spread=1.50, upl=36.0, peak_upl=36.0, scale_tier=1, atr_15m=30.0
+        )
+        unit_p3_ok = (res_p3["action"] == "STAGE_2_PROFIT_LOCK" and res_p3["new_sl"] == 20200.0)
+
+        # 5. Phase 4 Parabolic Exhaustion Harvest (RSI > 80.0)
+        res_p4 = TradFiMultiTargetScaleOutManager.evaluate_scale_out_lifecycle(
+            epic="NVDA", direction="BUY", entry_price=130.0, current_price=137.0,
+            sl_dist=2.0, spread=0.05, upl=8.0, peak_upl=10.0, scale_tier=2, rsi_15m=83.5
+        )
+        unit_p4_ok = (res_p4["action"] == "PHASE_4_PARABOLIC_HARVEST" and res_p4["should_close_tranche"] is True)
+
+        # 6. Small capital dollar risk clamp (<= $2.50)
+        guardian = PropFirmRiskManager()
+        lot_prop = guardian.calculate_prop_position_size(equity=250.0, risk_pct=1.5, entry_price=2650.0, sl_price=2640.0, epic="GOLD")
+        sizer = CapitalKellyPositionSizer()
+        lot_kelly = sizer.calculate_lot_size(chat_id=12345, epic="GOLD", entry_price=2650.0, sl_price=2640.0, tp_price=2680.0, confidence_score=75.0, budget=250.0, available_equity=250.0)
+        unit_clamp_ok = (lot_prop <= 0.25 and lot_kelly <= 0.25)
+
+        all_inv98_passed = (
+            has_inv98_agents and has_inv98_gemini and
+            has_scaleout_mgr and has_calc_scaleout and has_eval_lifecycle and
+            has_phase1_sl and has_phase1_action and has_phase2_action and
+            has_phase3_action and has_phase4_action and
+            has_cap_dollar_clamp and has_cap_parabolic and
+            unit_plan_ok and unit_p1_ok and unit_p2_ok and unit_p3_ok and unit_p4_ok and unit_clamp_ok
+        )
+
+        if all_inv98_passed:
+            log_pass(
+                "Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor (Invariant 98) "
+                "are 100% certified! (Structural SL + 1.5x Spread Buffer, $2.50 Dollar Risk Clamp on <$500, "
+                "TP1 +1.8R 50% Bank, TP2 +3.5R 30% Bank, Runner +8.0R 20%, Phase 1 Risk Reduction, Breakeven Armor Free Roll, Parabolic 85% Harvest)"
+            )
+        else:
+            failures.append(
+                f"Invariant 98 check failed: agents={has_inv98_agents}, gemini={has_inv98_gemini}, "
+                f"mgr={has_scaleout_mgr}, plan={unit_plan_ok}, p1={unit_p1_ok}, p2={unit_p2_ok}, "
+                f"p3={unit_p3_ok}, p4={unit_p4_ok}, clamp={unit_clamp_ok}"
+            )
+            log_fail("Invariant 98 Structural SL Anchor & 4-Phase Breakeven Armor verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 98 check failed: {e}")
+        log_fail(str(e))
 
     # Final Summary
 

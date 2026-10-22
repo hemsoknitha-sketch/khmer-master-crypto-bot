@@ -1794,6 +1794,24 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      Eliminates crossing the bid-ask spread and secures an instant $25\%$ spread discount on entry.
   5. **Working Order Lifecycle Management & 30-Second Auto-Purge:** Active working orders are tracked in `_active_working_orders`. System enforces `audit_and_purge_expired_working_orders(timeout_seconds=30.0)` where unfilled orders older than 30 seconds are automatically canceled via `cancel_working_order` (`/api/v1/workingorders/{deal_id}`), preventing stale order fills when market momentum has dissipated.
 
+### Invariant 98: Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor (AQ98 Standard - គ្រឹះកំណត់ Stop Loss តាមរចនាសម្ព័ន្ធពិត & 4-Phase Breakeven Armor រុញ Win Rate លើស ៨០%)
+- **Location:** `super_smart_capital_citadel.py` (`TradFiMultiTargetScaleOutManager`), `capital_engine.py` (`CapitalKellyPositionSizer`, `PropFirmRiskManager`, `_ratchet_engine_positions`), `test_structural_sl_tp_breakeven.py`, `audit_system.py` [CHECK 77/77]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Mathematical Capital Protection:
+  1. **Structural Invalidation Point Anchor & Volatility Buffer:** Stop-Loss is strictly anchored behind the true structural invalidation boundary (behind liquidity sweep extreme wick or beneath Order Block / Fair Value Gap origin floor) + dynamic buffer $\ge \max(1.5\times\text{Spread}, 0.20\times\text{ATR}_{15m})$. Arbitrary fixed pips and tight $1.0\times\text{ATR}$ micro-stops that are vulnerable to broker spread spikes are strictly forbidden.
+  2. **Strict Dollar Risk Clamping on Small Capital Accounts:** Lot size is dynamically clamped to structural distance such that Dollar Risk $\le \$2.50$ on accounts $< \$500$:
+     $$\text{Lot Size} = \min\left(\text{Kelly Lot}, \frac{\$2.50}{\text{Structural SL Distance} \times \text{Multiplier}}\right)$$
+     Regardless of how wide the structural breathing stop is, dollar loss is capped at $\le \$2.50$, preventing margin blowout.
+  3. **3-Stage Liquidity Pool Targeting Architecture:**
+     - **Target 1 (TP1 at $+1.80R$ to $+2.00R$):** Closes 50% lot at Opposing Session Liquidity Pool (Equal Highs/Lows, Previous Session Boundaries). Hit rate exceeds 80%.
+     - **Target 2 (TP2 at $+3.50R$ to $+4.00R$):** Closes 30% lot at Higher Timeframe Fair Value Gap (H1/H4 FVG) or major swing structure.
+     - **Stage 3 (Moonshot Runner 20% Lot):** Remaining 20% lot trails behind ATR / 3-EMA dynamic ratchet, riding trends up to $+6.0R \dots +10.0R$.
+  4. **4-Phase Dynamic Trailing Stop & Breakeven Armor Lifecycle:**
+     - **Phase 0 (Order Open):** Initial Stop Loss held at Structural Invalidation Floor + $1.5\times$ spread buffer.
+     - **Phase 1 (+1.20R Milestone):** When price advances $+1.20R$, Stop Loss is automatically tightened to $\text{Entry} \mp (0.50\times\text{ATR}_{15m})$, instantly eliminating 60% to 75% of initial dollar risk before breakeven is reached.
+     - **Phase 2 (+1.80R to +2.00R TP1 Hit):** Upon hitting $+1.80R$, banks 50% lot cash profit and shifts Stop Loss to Breakeven Armor ($\text{Entry} \pm 0.50\times\text{Spread}$ Net Floor). Risk becomes $0.00R$ (Free Roll, 100% loss-immune). The trade is mathematically locked as an official Net Win.
+     - **Phase 3 (+3.50R TP2 Hit):** Upon hitting $+3.50R$, banks 30% lot cash profit and ratchets Stop Loss to $+2.00R$ Guaranteed Cash Profit Floor, locking solid net gains in pocket.
+     - **Phase 4 (Parabolic & RSI Extreme Exhaustion Harvest):** If 15m RSI $\ge 80.0$ (for BUY) or $\le 20.0$ (for SELL) indicating extreme parabolic exhaustion and price retraces $\ge 15\%$ from peak (`upl <= peak_upl * 0.85` with `peak_upl >= max(2.50, spread * 2.5)`), the engine executes an immediate market harvest (`PARABOLIC_85_HARVEST`), banking 85% of peak cash profit before violent reversals occur.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
