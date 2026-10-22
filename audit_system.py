@@ -3902,7 +3902,7 @@ def run_audit():
         log_fail(str(e))
 
     # 71. Invariant 92: The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling
-    print("\n[CHECK 71/73] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
+    print("\n[CHECK 71/74] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
     try:
         has_inv92_agents = "Invariant 92: The Five Pillars of Apex TradFi Capital Profitability" in agents_md
         has_inv92_gemini = "The Five Pillars of Apex TradFi Capital Profitability, Factor Correlation Clamping & Small Capital Compound Scaling (Invariant 92)" in gemini_md
@@ -3938,7 +3938,7 @@ def run_audit():
         log_fail(str(e))
 
     # 72. Invariant 93: Capital.com Execution Bridge, Slippage Auditor, and HMM Regime Filter Fiduciary Gates
-    print("\n[CHECK 72/73] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
+    print("\n[CHECK 72/74] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
     try:
         with open("capital_execution_bridge.py", "r", encoding="utf-8") as f_br:
             bridge_src = f_br.read()
@@ -3967,7 +3967,7 @@ def run_audit():
         log_fail(str(e))
 
     # 73. Invariant 94: Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix
-    print("\n[CHECK 73/73] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
+    print("\n[CHECK 73/74] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
     try:
         with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
             cit_src = f_cit.read()
@@ -4036,6 +4036,137 @@ def run_audit():
             log_fail("Invariant 94 Asset-Specific H4, Bayesian Updater, Latency-Aware Routing & Correlation Matrix verification failed!")
     except Exception as e:
         failures.append(f"Invariant 94 check failed: {e}")
+        log_fail(str(e))
+
+    # 74. Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge
+    print("\n[CHECK 74/74] Verifying Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)...")
+    try:
+        has_inv95_agents = "Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module" in agents_md
+        has_inv95_gemini = "Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)" in gemini_md
+
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
+            cit_src = f_cit.read()
+
+        has_turtle_engine_cls = "class TradFiTurtleSoupEngine:" in cit_src
+        has_turtle_detect_fn = "def detect_turtle_soup_liquidity_sweep(" in cit_src
+        has_citadel_detect_fn = "def detect_turtle_soup_reversal(" in cit_src
+        has_turtle_boost = "TURTLE_SOUP_BULLISH_REVERSAL" in cit_src and "TURTLE_SOUP_BEARISH_REVERSAL" in cit_src
+        has_turtle_payload = '"turtle_soup": turtle_soup_res' in cit_src
+
+        # Dynamic Unit Test for Turtle Soup Liquidity Sweep Engine
+        from super_smart_capital_citadel import TradFiTurtleSoupEngine, SuperSmartCapitalCitadel
+        import numpy as np
+
+        # Generate synthetic range-bound 15m candles
+        candles_test = []
+        for i in range(40):
+            candles_test.append({
+                "open": 2000.0 + np.sin(i) * 10,
+                "high": 2015.0 + np.sin(i) * 8,
+                "low": 1985.0 + np.sin(i) * 8,
+                "close": 2000.0 + np.cos(i) * 10,
+                "volume": 1500.0
+            })
+
+        prior_lows = [c["low"] for c in candles_test[-35:-3]]
+        swing_low_test = min(prior_lows)
+        atr_test = 12.0
+        spread_test = 0.50
+
+        # Inject Bullish SSL Sweep Spring Candle
+        candles_bull = list(candles_test)
+        candles_bull.append({
+            "open": swing_low_test + 2.0,
+            "high": swing_low_test + 5.0,
+            "low": swing_low_test - (0.45 * atr_test),  # pierces swing_low by 0.45x ATR
+            "close": swing_low_test + 3.0,
+            "volume": 3200.0
+        })
+        candles_bull.append({
+            "open": swing_low_test + 3.0,
+            "high": swing_low_test + 8.0,
+            "low": swing_low_test + 2.5,
+            "close": swing_low_test + 7.0,
+            "volume": 1600.0
+        })
+
+        bull_res = TradFiTurtleSoupEngine.detect_turtle_soup_liquidity_sweep(
+            candles_15m=candles_bull,
+            current_price=swing_low_test + 7.0,
+            atr_15m=atr_test,
+            spread=spread_test,
+            lookback=35
+        )
+
+        bull_unit_passed = (
+            bull_res.get("has_turtle_soup") is True and
+            bull_res.get("has_ssl_sweep") is True and
+            bull_res.get("direction") == "BUY" and
+            bull_res.get("setup_type") == "BULLISH_TURTLE_SOUP_SSL" and
+            bull_res.get("structural_sl") < bull_res.get("swept_level") and
+            bull_res.get("risk_reward_tp1") >= 0.8 and
+            bull_res.get("risk_reward_tp2") >= 2.0
+        )
+
+        # Inject Bearish BSL Sweep Upthrust Candle
+        prior_highs = [c["high"] for c in candles_test[-35:-3]]
+        swing_high_test = max(prior_highs)
+        candles_bear = list(candles_test)
+        candles_bear.append({
+            "open": swing_high_test - 2.0,
+            "high": swing_high_test + (0.50 * atr_test),  # pierces swing_high by 0.50x ATR
+            "low": swing_high_test - 6.0,
+            "close": swing_high_test - 3.5,
+            "volume": 3500.0
+        })
+        candles_bear.append({
+            "open": swing_high_test - 3.5,
+            "high": swing_high_test - 1.0,
+            "low": swing_high_test - 8.0,
+            "close": swing_high_test - 7.5,
+            "volume": 1700.0
+        })
+
+        bear_res = SuperSmartCapitalCitadel.detect_turtle_soup_reversal(
+            candles_15m=candles_bear,
+            current_price=swing_high_test - 7.5,
+            atr_15m=atr_test,
+            spread=spread_test,
+            lookback=35
+        )
+
+        bear_unit_passed = (
+            bear_res.get("has_turtle_soup") is True and
+            bear_res.get("has_bsl_sweep") is True and
+            bear_res.get("direction") == "SELL" and
+            bear_res.get("setup_type") == "BEARISH_TURTLE_SOUP_BSL" and
+            bear_res.get("structural_sl") > bear_res.get("swept_level") and
+            bear_res.get("risk_reward_tp1") >= 0.8 and
+            bear_res.get("risk_reward_tp2") >= 2.0
+        )
+
+        all_inv95_passed = (
+            has_inv95_agents and has_inv95_gemini and
+            has_turtle_engine_cls and has_turtle_detect_fn and
+            has_citadel_detect_fn and has_turtle_boost and
+            has_turtle_payload and bull_unit_passed and bear_unit_passed
+        )
+
+        if all_inv95_passed:
+            log_pass(
+                "Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95) "
+                "are 100% certified! (BSL/SSL Detection, 0.06-1.95x ATR Penetration, >=40% Wick Absorption, Structural SL Behind Sweep Extreme, Asymmetric TP1/TP2)"
+            )
+        else:
+            failures.append(
+                f"Invariant 95 check failed: agents={has_inv95_agents}, gemini={has_inv95_gemini}, "
+                f"engine_cls={has_turtle_engine_cls}, detect_fn={has_turtle_detect_fn}, "
+                f"citadel_fn={has_citadel_detect_fn}, boost={has_turtle_boost}, "
+                f"payload={has_turtle_payload}, bull_unit={bull_unit_passed}, bear_unit={bear_unit_passed}"
+            )
+            log_fail("Invariant 95 Institutional Turtle Soup Liquidity Sweep Reversal verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 95 check failed: {e}")
         log_fail(str(e))
 
 

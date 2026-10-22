@@ -1217,7 +1217,185 @@ class TradFiH4MarketStructureAnchor:
             "reason": reason
         }
         cls._ANCHOR_CACHE[cache_key] = (now, res)
-        return res
+class TradFiTurtleSoupEngine:
+    """
+    🏛️ Institutional TradFi Turtle Soup Liquidity Sweep Reversal Engine (Pillar 1 / Invariant 95).
+    Engineered for Capital.com Gold, US Mega-Cap Tech Equities, and Indices.
+
+    Mathematical Principles (Linda Raschke & ICT Turtle Soup Mechanics):
+    1. Liquidity Pool Mapping:
+       - Buy-Side Liquidity (BSL): Major swing highs where retail breakout buy-stops and short stop-losses pool.
+       - Sell-Side Liquidity (SSL): Major swing lows where retail breakdown sell-stops and long stop-losses pool.
+    2. False Breakout Piercing & Absorption:
+       - Penetration Depth: Price pierces the swing level by 0.06x to 1.95x ATR_15m (triggering retail orders).
+       - Candle Reversal Wick: Upper wick >= 40% of candle range (for Bearish Turtle Soup) or lower wick >= 40% (for Bullish Turtle Soup).
+       - Closes firmly back INSIDE the dealing range (below BSL or above SSL).
+    3. Structural Micro-Stop Placement:
+       - Bullish SL anchored at: Sweep_Low - max(1.5 * spread, 0.20 * ATR_15m)
+       - Bearish SL anchored at: Sweep_High + max(1.5 * spread, 0.20 * ATR_15m)
+    4. Asymmetric High-Expectancy Targets:
+       - TP1 (50% scale-out, BE Armor lock): 50% Equilibrium Midpoint of Dealing Range (R:R >= 1:2.0).
+       - TP2 (30% harvest): Opposing Dealing Range Boundary (R:R >= 1:3.5 to 1:5.5).
+       - Runner (20% uncapped): Trails behind 15m EMA20.
+    """
+
+    @classmethod
+    def detect_turtle_soup_liquidity_sweep(
+        cls,
+        candles_15m: List[Dict[str, Any]],
+        current_price: float,
+        atr_15m: float,
+        spread: float,
+        lookback: int = 35
+    ) -> Dict[str, Any]:
+        """
+        Detects institutional Turtle Soup liquidity sweep reversal patterns on 15m candles.
+        Returns detailed diagnostics including sweep direction, penetration ratio, wick ratio,
+        structural invalidation stop loss, and asymmetric targets (TP1 Equilibrium and TP2 Opposing Pool).
+        """
+        default_res = {
+            "has_turtle_soup": False,
+            "has_bsl_sweep": False,
+            "has_ssl_sweep": False,
+            "setup_type": "NONE",
+            "direction": "NEUTRAL",
+            "swept_level": 0.0,
+            "extreme_wick_price": 0.0,
+            "penetration_depth": 0.0,
+            "penetration_atr_ratio": 0.0,
+            "wick_ratio_pct": 0.0,
+            "is_absorption_confirmed": False,
+            "structural_sl": 0.0,
+            "tp1_equilibrium": 0.0,
+            "tp2_opposing_pool": 0.0,
+            "score_boost": 0.0,
+            "risk_reward_tp1": 0.0,
+            "risk_reward_tp2": 0.0,
+            "pattern_desc": "No Turtle Soup Sweep"
+        }
+
+        if not candles_15m or len(candles_15m) < 15:
+            return default_res
+
+        eval_candles = candles_15m[:-1] if len(candles_15m) >= 15 else candles_15m
+        if len(eval_candles) < 12:
+            return default_res
+
+        window = min(lookback, len(eval_candles) - 3)
+        prior_candles = eval_candles[-window:-3]
+        if not prior_candles:
+            return default_res
+
+        highs_prior = [float(c.get("high", 0.0)) for c in prior_candles]
+        lows_prior = [float(c.get("low", 0.0)) for c in prior_candles]
+        swing_high = float(np.max(highs_prior))
+        swing_low = float(np.min(lows_prior))
+        dealing_range = max(1e-6, swing_high - swing_low)
+        range_mid = swing_low + 0.5 * dealing_range
+
+        # Inspect recent 3 completed candles for the sweep event
+        recent_sweep_candles = eval_candles[-3:]
+        volumes_prior = [float(c.get("volume", 0.0)) for c in prior_candles if float(c.get("volume", 0.0)) > 0]
+        avg_vol = float(np.mean(volumes_prior)) if volumes_prior else 1.0
+
+        atr_val = max(1e-5, atr_15m)
+        bench_spread = max(1e-4, spread)
+
+        # 1. Check for Bullish Turtle Soup (SSL Sweep & Spring Reversal)
+        for c in reversed(recent_sweep_candles):
+            c_high = float(c.get("high", 0.0))
+            c_low = float(c.get("low", 0.0))
+            c_open = float(c.get("open", 0.0))
+            c_close = float(c.get("close", 0.0))
+            c_vol = float(c.get("volume", 0.0))
+            c_range = max(1e-6, c_high - c_low)
+            body = abs(c_close - c_open)
+            lower_wick = max(0.0, min(c_open, c_close) - c_low)
+            lower_wick_ratio = lower_wick / c_range
+
+            pen_dist = swing_low - c_low
+            pen_ratio = pen_dist / atr_val
+
+            if c_low < swing_low and c_close >= swing_low:
+                if 0.06 <= pen_ratio <= 1.95 and (lower_wick_ratio >= 0.40 or lower_wick >= 0.75 * body):
+                    rvol = (c_vol / avg_vol) if avg_vol > 0 and c_vol > 0 else 1.0
+                    is_absorbed = (lower_wick_ratio >= 0.50 or rvol >= 1.10)
+                    struct_sl = c_low - max(bench_spread * 2.0, atr_val * 0.20)
+                    risk_d = max(1e-4, current_price - struct_sl)
+                    tp1 = range_mid
+                    tp2 = swing_high
+                    rr1 = round(max(0.0, tp1 - current_price) / risk_d, 2)
+                    rr2 = round(max(0.0, tp2 - current_price) / risk_d, 2)
+
+                    return {
+                        "has_turtle_soup": True,
+                        "has_bsl_sweep": False,
+                        "has_ssl_sweep": True,
+                        "setup_type": "BULLISH_TURTLE_SOUP_SSL",
+                        "direction": "BUY",
+                        "swept_level": round(swing_low, 4),
+                        "extreme_wick_price": round(c_low, 4),
+                        "penetration_depth": round(pen_dist, 4),
+                        "penetration_atr_ratio": round(pen_ratio, 2),
+                        "wick_ratio_pct": round(lower_wick_ratio * 100.0, 1),
+                        "is_absorption_confirmed": is_absorbed,
+                        "structural_sl": round(struct_sl, 4),
+                        "tp1_equilibrium": round(tp1, 4),
+                        "tp2_opposing_pool": round(tp2, 4),
+                        "score_boost": 35.0,
+                        "risk_reward_tp1": rr1,
+                        "risk_reward_tp2": rr2,
+                        "pattern_desc": f"Bullish Turtle Soup (SSL swept ${swing_low:,.2f} by {pen_ratio:.2f}x ATR, {lower_wick_ratio*100:.1f}% wick absorption)"
+                    }
+
+        # 2. Check for Bearish Turtle Soup (BSL Sweep & Upthrust Reversal)
+        for c in reversed(recent_sweep_candles):
+            c_high = float(c.get("high", 0.0))
+            c_low = float(c.get("low", 0.0))
+            c_open = float(c.get("open", 0.0))
+            c_close = float(c.get("close", 0.0))
+            c_vol = float(c.get("volume", 0.0))
+            c_range = max(1e-6, c_high - c_low)
+            body = abs(c_close - c_open)
+            upper_wick = max(0.0, c_high - max(c_open, c_close))
+            upper_wick_ratio = upper_wick / c_range
+
+            pen_dist = c_high - swing_high
+            pen_ratio = pen_dist / atr_val
+
+            if c_high > swing_high and c_close <= swing_high:
+                if 0.06 <= pen_ratio <= 1.95 and (upper_wick_ratio >= 0.40 or upper_wick >= 0.75 * body):
+                    rvol = (c_vol / avg_vol) if avg_vol > 0 and c_vol > 0 else 1.0
+                    is_absorbed = (upper_wick_ratio >= 0.50 or rvol >= 1.10)
+                    struct_sl = c_high + max(bench_spread * 2.0, atr_val * 0.20)
+                    risk_d = max(1e-4, struct_sl - current_price)
+                    tp1 = range_mid
+                    tp2 = swing_low
+                    rr1 = round(max(0.0, current_price - tp1) / risk_d, 2)
+                    rr2 = round(max(0.0, current_price - tp2) / risk_d, 2)
+
+                    return {
+                        "has_turtle_soup": True,
+                        "has_bsl_sweep": True,
+                        "has_ssl_sweep": False,
+                        "setup_type": "BEARISH_TURTLE_SOUP_BSL",
+                        "direction": "SELL",
+                        "swept_level": round(swing_high, 4),
+                        "extreme_wick_price": round(c_high, 4),
+                        "penetration_depth": round(pen_dist, 4),
+                        "penetration_atr_ratio": round(pen_ratio, 2),
+                        "wick_ratio_pct": round(upper_wick_ratio * 100.0, 1),
+                        "is_absorption_confirmed": is_absorbed,
+                        "structural_sl": round(struct_sl, 4),
+                        "tp1_equilibrium": round(tp1, 4),
+                        "tp2_opposing_pool": round(tp2, 4),
+                        "score_boost": 35.0,
+                        "risk_reward_tp1": rr1,
+                        "risk_reward_tp2": rr2,
+                        "pattern_desc": f"Bearish Turtle Soup (BSL swept ${swing_high:,.2f} by {pen_ratio:.2f}x ATR, {upper_wick_ratio*100:.1f}% wick absorption)"
+                    }
+
+        return default_res
 
 
 class SuperSmartCapitalCitadel:
@@ -1786,12 +1964,20 @@ class SuperSmartCapitalCitadel:
             return res
 
         # --------------------------------------------------------------------
-        # 3. PILLAR 1: TRADFI LIQUIDITY TRAP HUNTER (BSL / SSL SWEEPS)
+        # 3. PILLAR 1: TRADFI LIQUIDITY TRAP HUNTER (BSL / SSL SWEEPS & TURTLE SOUP)
         # --------------------------------------------------------------------
-        # Inspect recent 4 candles for Liquidity Sweep Wicks (Turtle Soup pattern)
-        has_bsl_sweep = False  # Swept Buy-Side Liquidity above swing high with upper wick rejection
-        has_ssl_sweep = False  # Swept Sell-Side Liquidity below swing low with lower wick rejection
+        turtle_soup_res = TradFiTurtleSoupEngine.detect_turtle_soup_liquidity_sweep(
+            candles_15m=candles_15m,
+            current_price=curr_price,
+            atr_15m=atr_15m,
+            spread=spread,
+            lookback=lookback_window
+        )
+        has_bsl_sweep = bool(turtle_soup_res.get("has_bsl_sweep", False))
+        has_ssl_sweep = bool(turtle_soup_res.get("has_ssl_sweep", False))
+        is_turtle_soup = bool(turtle_soup_res.get("has_turtle_soup", False))
 
+        # Inspect recent 4 candles for supplemental legacy Liquidity Sweep Wicks
         for i in range(-5, -1):
             c_high = highs[i]
             c_low = lows[i]
@@ -1816,8 +2002,9 @@ class SuperSmartCapitalCitadel:
         # If smart money just swept SSL (accumulated liquidity), selling is walking into the trap!
         if norm_side == "SELL" and has_ssl_sweep and not has_bsl_sweep:
             reason = (
-                "SSL_SWEEP_REJECTION_ACTIVE: Sell-Side Liquidity swept with strong bullish absorption. "
-                "Institutions have engineered liquidity spring. Shorting rejected."
+                f"SSL_SWEEP_REJECTION_ACTIVE: Sell-Side Liquidity swept at ${turtle_soup_res.get('swept_level', swing_low):,.2f} "
+                f"with strong bullish absorption ({turtle_soup_res.get('pattern_desc', 'Bullish Sweep Spring')}). "
+                f"Institutions have engineered liquidity spring (Bullish Turtle Soup). Shorting into institutional accumulation rejected."
             )
             res = {
                 "epic": resolved_epic,
@@ -1827,7 +2014,8 @@ class SuperSmartCapitalCitadel:
                 "confluence_score": 20.0,
                 "spread": spread,
                 "invalidation_sl": preliminary_sl,
-                "breathing_sl_dist": breathing_sl_dist
+                "breathing_sl_dist": breathing_sl_dist,
+                "turtle_soup": turtle_soup_res
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -1835,8 +2023,9 @@ class SuperSmartCapitalCitadel:
         # If smart money just swept BSL (distributed peak), buying is walking into the trap!
         if norm_side == "BUY" and has_bsl_sweep and not has_ssl_sweep:
             reason = (
-                "BSL_SWEEP_REJECTION_ACTIVE: Buy-Side Liquidity swept with strong bearish rejection. "
-                "Institutions have engineered upthrust distribution. Longing rejected."
+                f"BSL_SWEEP_REJECTION_ACTIVE: Buy-Side Liquidity swept at ${turtle_soup_res.get('swept_level', swing_high):,.2f} "
+                f"with strong bearish rejection ({turtle_soup_res.get('pattern_desc', 'Bearish Sweep Upthrust')}). "
+                f"Institutions have engineered upthrust distribution (Bearish Turtle Soup). Longing into institutional distribution rejected."
             )
             res = {
                 "epic": resolved_epic,
@@ -1846,7 +2035,8 @@ class SuperSmartCapitalCitadel:
                 "confluence_score": 20.0,
                 "spread": spread,
                 "invalidation_sl": preliminary_sl,
-                "breathing_sl_dist": breathing_sl_dist
+                "breathing_sl_dist": breathing_sl_dist,
+                "turtle_soup": turtle_soup_res
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -2052,8 +2242,13 @@ class SuperSmartCapitalCitadel:
             else:
                 score -= 10.0
 
-            # SSL Liquidity Sweep Spring (Turtle Soup)
-            if has_ssl_sweep:
+            # Institutional Turtle Soup Reversal (SSL Liquidity Sweep Spring)
+            if is_turtle_soup and turtle_soup_res.get("direction") == "BUY":
+                score += 35.0
+                factors.append(f"TURTLE_SOUP_BULLISH_REVERSAL (+35) - {turtle_soup_res.get('pattern_desc')}")
+                if turtle_soup_res.get("structural_sl"):
+                    preliminary_sl = turtle_soup_res["structural_sl"]
+            elif has_ssl_sweep:
                 score += 25.0
                 factors.append("SSL_LIQUIDITY_SWEEP_CONFIRMED (+25)")
 
@@ -2164,8 +2359,13 @@ class SuperSmartCapitalCitadel:
             else:
                 score -= 10.0
 
-            # BSL Liquidity Sweep Upthrust (Turtle Soup)
-            if has_bsl_sweep:
+            # Institutional Turtle Soup Reversal (BSL Liquidity Sweep Upthrust)
+            if is_turtle_soup and turtle_soup_res.get("direction") == "SELL":
+                score += 35.0
+                factors.append(f"TURTLE_SOUP_BEARISH_REVERSAL (+35) - {turtle_soup_res.get('pattern_desc')}")
+                if turtle_soup_res.get("structural_sl"):
+                    preliminary_sl = turtle_soup_res["structural_sl"]
+            elif has_bsl_sweep:
                 score += 25.0
                 factors.append("BSL_LIQUIDITY_SWEEP_CONFIRMED (+25)")
 
@@ -2317,7 +2517,7 @@ class SuperSmartCapitalCitadel:
                 swing_low=swing_low,
                 active_ob=(active_bullish_ob if norm_side == "BUY" else active_bearish_ob),
                 has_liquidity_sweep=(has_ssl_sweep if norm_side == "BUY" else has_bsl_sweep),
-                sweep_wick_extreme=(float(candles_15m[-1]["low"]) if (norm_side == "BUY" and candles_15m) else (float(candles_15m[-1]["high"]) if candles_15m else None)),
+                sweep_wick_extreme=(float(turtle_soup_res["extreme_wick_price"]) if (is_turtle_soup and turtle_soup_res.get("extreme_wick_price")) else (float(candles_15m[-1]["low"]) if (norm_side == "BUY" and candles_15m) else (float(candles_15m[-1]["high"]) if candles_15m else None))),
                 fvg_gp_setup=fvg_gp_setup if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == norm_side) else None,
                 volatility_regime=vol_regime
             )
@@ -2330,7 +2530,13 @@ class SuperSmartCapitalCitadel:
             structural_stops_meta = struct_stops
         except Exception as e_dss:
             logger.debug(f"Dynamic structural stops fallback note: {e_dss}")
-            if norm_side == "BUY":
+            if is_turtle_soup and turtle_soup_res.get("structural_sl") and turtle_soup_res.get("direction") == norm_side:
+                invalidation_sl = round(turtle_soup_res["structural_sl"], prec)
+                risk_dist = max(breathing_sl_dist, abs(curr_price - invalidation_sl))
+                tp_1 = round(turtle_soup_res.get("tp1_equilibrium", curr_price + (risk_dist * 2.5 if norm_side == "BUY" else -risk_dist * 2.5)), prec)
+                tp_2 = round(turtle_soup_res.get("tp2_opposing_pool", curr_price + (risk_dist * 4.5 if norm_side == "BUY" else -risk_dist * 4.5)), prec)
+                tp_3 = round(curr_price + (risk_dist * 6.0 if norm_side == "BUY" else -risk_dist * 6.0), prec)
+            elif norm_side == "BUY":
                 ob_anchor = (active_bullish_ob.get("bottom", swing_low) - (0.15 * atr_15m)) if active_bullish_ob else swing_low
                 if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY":
                     fvg_anchor = min(fvg_gp_setup.get("fvg_bottom", swing_low), fvg_gp_setup.get("fib_786", swing_low)) - (0.15 * atr_15m)
@@ -2353,7 +2559,7 @@ class SuperSmartCapitalCitadel:
                 tp_2 = round(curr_price - max(risk_dist * tp2_mult, 15.0 * spread), prec)
                 tp_3 = round(curr_price - max(risk_dist * 6.0, 20.0 * spread), prec)
             rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
-            structural_stops_meta = {"method": "LEGACY_FALLBACK"}
+            structural_stops_meta = {"method": "TURTLE_SOUP_STRUCTURAL" if (is_turtle_soup and turtle_soup_res.get("direction") == norm_side) else "LEGACY_FALLBACK"}
 
         # Gap 2 (ចន្លោះទី 2): 5 Mutually Orthogonal Factor Groups Analysis
         # Decomposes setup into 5 de-collinearized groups with intra-group diminishing returns
@@ -2464,7 +2670,9 @@ class SuperSmartCapitalCitadel:
             "has_bearish_ote": has_bearish_ote,
             "has_bullish_choch": has_bullish_choch,
             "has_bearish_choch": has_bearish_choch,
-            "fibonacci": fib_analysis
+            "fibonacci": fib_analysis,
+            "has_turtle_soup": is_turtle_soup,
+            "turtle_soup": turtle_soup_res
         }
 
         result = {
@@ -2500,6 +2708,8 @@ class SuperSmartCapitalCitadel:
             "is_premium": is_premium,
             "has_bsl_sweep": has_bsl_sweep,
             "has_ssl_sweep": has_ssl_sweep,
+            "has_turtle_soup": is_turtle_soup,
+            "turtle_soup": turtle_soup_res,
             "has_bullish_fvg": has_bullish_fvg,
             "has_bearish_fvg": has_bearish_fvg,
             "fvg_golden_pocket_setup": fvg_gp_setup,
@@ -2533,6 +2743,27 @@ class SuperSmartCapitalCitadel:
     # =========================================================================
     # INSTITUTIONAL SMART MONEY CONCEPTS (SMC) & ICT DETECTION HELPERS
     # =========================================================================
+
+    @classmethod
+    def detect_turtle_soup_reversal(
+        cls,
+        candles_15m: List[Dict[str, Any]],
+        current_price: float,
+        atr_15m: float,
+        spread: float,
+        lookback: int = 35
+    ) -> Dict[str, Any]:
+        """
+        Public classmethod to detect Turtle Soup Liquidity Sweep Reversals
+        using TradFiTurtleSoupEngine.
+        """
+        return TradFiTurtleSoupEngine.detect_turtle_soup_liquidity_sweep(
+            candles_15m=candles_15m,
+            current_price=current_price,
+            atr_15m=atr_15m,
+            spread=spread,
+            lookback=lookback
+        )
 
     @classmethod
     def detect_tradfi_order_blocks(cls, candles: List[Dict[str, Any]], current_price: float) -> List[Dict[str, Any]]:

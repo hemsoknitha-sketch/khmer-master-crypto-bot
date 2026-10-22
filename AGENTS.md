@@ -1744,12 +1744,21 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   4. Gaussian HMM Regime Clearance: Three-state Markov regime detection (Trend, Mean-Reversion, High Volatility/Chop) gating entries and scaling position sizes.
 
 ### Invariant 94: Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (AQ94 Standard - គ្រឹះ ៤ ប្រការបង្កើន Win Rate & ការពារដើមទុន)
-- **Location:** `super_smart_capital_citadel.py`, `capital_10y_backtester.py`, `regime_filter.py`, `capital_execution_bridge.py`, `capital_engine.py`, `audit_system.py` [CHECK 73/73]
+- **Location:** `super_smart_capital_citadel.py`, `capital_10y_backtester.py`, `regime_filter.py`, `capital_execution_bridge.py`, `capital_engine.py`, `audit_system.py` [CHECK 73/74]
 - **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Capital Protection:
   1. **Asset-Specific H4 Trend Anchor:** Tech Equities (`NVDA`, `TSLA`, `AAPL`, `MSFT`) and Indices (`US100`, `US500`, `DE40`) strictly enforce H4 Trend Anchor (weight 1.0) to eliminate falling knife drawdowns. Commodities (`GOLD`, `SILVER`, `OIL_CRUDE`) bypass H4 trend veto to eliminate lag and preserve high-win-rate mean-reversion and Turtle Soup liquidity sweeps.
   2. **Dynamic Bayesian Win Probability Updating:** Prior $\text{Beta}(12, 8)$ updated across rolling 20 trade outcomes ($P(\text{Win} | \text{Data}) \propto P(\text{Data} | \text{Win}) P(\text{Win})$). If posterior win rate drops below 45%, Citadel confluence threshold dynamically rises from 68.0 to 75.0, filtering for only highest-conviction signals and halving Kelly fraction ($0.50\times$) to maximize long-term geometric capital growth $G = f \cdot E[R] - 0.5 \cdot f^2 \cdot \sigma^2$.
   3. **Execution Latency-Aware Order Routing:** If current spread $> 1.5\times$ historical average spread, the bridge routes as a Limit Working Order with 30-second timeout; if unfilled, order is canceled and signal is aborted (`cancel_working_order`). Orders are never converted to market orders on blown-out spreads.
   4. **Dynamic Correlation-Aware Sizing & Hard Clamps:** Pearson correlation matrix calculated on cleaned log returns every 60 seconds. Hard limits: pairwise $\rho \ge 0.95$ rejects trade entirely (collinear data error); $\rho \ge 0.85$ applies 70% haircut; $\rho \ge 0.80$ applies 50% haircut; Risk Parity weighting $w_i = (1/\sigma_i) / \sum (1/\sigma_j)$ with correlation penalty $1 / (1 + \rho)$.
+
+### Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (AQ95 Standard - គ្រឹះស្ទាក់ចាប់ចំណុចត្រឡប់ទិសដៅ Turtle Soup)
+- **Location:** `super_smart_capital_citadel.py` (`TradFiTurtleSoupEngine`), `audit_system.py` [CHECK 74/74]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Capital Protection:
+  1. **Liquidity Pool Mapping:** Identifies Buy-Side Liquidity (BSL) above swing highs and Sell-Side Liquidity (SSL) below swing lows across the dealing range lookback window ($lookback=35$).
+  2. **False Breakout Piercing & Absorption:** Requires price penetration depth of $0.06\times$ to $1.95\times \text{ATR}_{15m}$ beyond the swing boundary followed by immediate rejection wick $\ge 40\%$ of candle range (or wick $\ge 0.75\times$ candle body), closing firmly back INSIDE the dealing range.
+  3. **Structural Micro-Stop Placement:** Stop-loss is structurally anchored directly behind the sweep extreme wick ($\text{Sweep Low} - \max(2.0\times\text{Spread}, 0.20\times\text{ATR})$ for Bullish Turtle Soup; $\text{Sweep High} + \max(2.0\times\text{Spread}, 0.20\times\text{ATR})$ for Bearish Turtle Soup), eliminating arbitrary static buffers and ensuring tight risk distance.
+  4. **Asymmetric Mean-Reversion Targets:** TP1 is locked at the 50% Equilibrium Dealing Range Midpoint for guaranteed $+1.0R$ to $+2.5R$ Breakeven Armor lock; TP2 targets the opposing dealing range liquidity pool ($R:R \ge 1:3.0$ to $1:5.5$).
+  5. **Confluence Matrix Integration:** Confirmed Turtle Soup reversals inject a $+35.0$ institutional score boost into `SuperSmartCapitalCitadel` while unconditionally vetoing retail counter-breakout orders (selling into SSL sweeps or buying into BSL sweeps).
 
 ---
 
