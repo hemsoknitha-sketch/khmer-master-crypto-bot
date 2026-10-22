@@ -61,7 +61,10 @@ MAX_RISK_OVERRUN_RATIO = 1.25
 from capital_10y_backtester import (
     ASSET_SPECS,
     calculate_almgren_chriss_market_impact,
-    calculate_performance_metrics
+    calculate_performance_metrics,
+    Trade,
+    compute_indicators,
+    evaluate_bar_signals
 )
 from capital_probability_calibrator import CapitalProbabilityCalibrator
 
@@ -289,23 +292,8 @@ class DecadalForwardMarketEngine:
                     "volume": volumes,
                     "regime": regimes
                 })
-                # Precompute technical indicators
-                df_asset["ema20"] = df_asset["close"].ewm(span=20, adjust=False).mean()
-                df_asset["ema50"] = df_asset["close"].ewm(span=50, adjust=False).mean()
-                df_asset["ema200"] = df_asset["close"].ewm(span=200, adjust=False).mean()
-                # ATR14
-                tr1 = df_asset["high"] - df_asset["low"]
-                tr2 = (df_asset["high"] - df_asset["close"].shift(1)).abs()
-                tr3 = (df_asset["low"] - df_asset["close"].shift(1)).abs()
-                tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-                df_asset["atr14"] = tr.rolling(14).mean().bfill()
-                # RSI14
-                delta = df_asset["close"].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-                rs = gain / (loss + 1e-9)
-                df_asset["rsi14"] = 100 - (100 / (1 + rs)).bfill()
-
+                # Precompute institutional technical indicators
+                df_asset = compute_indicators(df_asset)
                 assets_data[key] = df_asset
 
             else:
@@ -350,7 +338,6 @@ def run_forward_strategy_simulation(
     """
     from capital_10y_backtester import Trade, calculate_performance_metrics
 
-    calibrator = CapitalProbabilityCalibrator()
     sample_asset = next(iter(assets_data.values()))
     dates = sample_asset['Date'].tolist()
     n_days = len(dates)
@@ -364,6 +351,8 @@ def run_forward_strategy_simulation(
     trade_id_counter = 1
 
     regime_names = {0: "SECULAR_BULL", 1: "RECESSION_CRISIS", 2: "SIDEWAYS_CHOP"}
+    tech_symbols = {"NVDA", "TSLA", "AAPL", "MSFT"}
+    index_symbols = {"US100", "US500", "DE40"}
 
     for t_idx in range(50, n_days):  # 50 days warm-up for forward simulation
         current_date = dates[t_idx]
@@ -387,108 +376,7 @@ def run_forward_strategy_simulation(
 
         open_trades = new_open_trades
 
-        # 2. Evaluate New Signals (Day Close)
-        dxy_bar = macro_data["DXY"].iloc[t_idx]
-        vix_bar = macro_data["VIX"].iloc[t_idx]
-        tnx_bar = macro_data["TNX"].iloc[t_idx]
-
-        for sym, spec in ASSET_SPECS.items():
-            # Check maximum concurrent positions per asset
-            if any(tr.symbol == sym for tr in open_trades):
-                continue
-            if len(open_trades) >= 10:  # Max 10 positions capacity
-                break
-
-            df_asset = assets_data[sym]
-            c_bar = df_asset.iloc[t_idx]
-            p_bar = df_asset.iloc[t_idx - 1]
-
-            close_p = float(c_bar['close'])
-            ema20 = float(c_bar['ema20'])
-            ema50 = float(c_bar['ema50'])
-            ema200 = float(c_bar['ema200'])
-            rsi = float(c_bar['rsi14'])
-            atr = float(c_bar['atr14'])
-
-            # -----------------------------------------------------------------
-            # Institutional 360° Citadel Gatekeepers (Invariants 16, 58, 76)
-            # -----------------------------------------------------------------
-            # Anti-Oversold Short Guard & Anti-Overbought Peak Guard
-            oversold_blocked = rsi <= 36.0
-            overbought_blocked = rsi >= 70.0
-
-            # VIX backwardation guard
-            vix_val = float(vix_bar['close'])
-            if vix_val >= 38.0:
-                continue  # Extreme panic blackout
-
-            # Trend bias
-            is_bullish_stack = close_p > ema50 > ema200
-            is_bearish_stack = close_p < ema50 < ema200
-
-            # Dealing Range Equilibrium Chop Injunction (35%-65% filter)
-            rolling_high_20 = float(df_asset['high'].iloc[max(0, t_idx-20):t_idx].max())
-            rolling_low_20 = float(df_asset['low'].iloc[max(0, t_idx-20):t_idx].min())
-            d_range = rolling_high_20 - rolling_low_20
-            if d_range > 0:
-                pos_in_range = (close_p - rolling_low_20) / d_range
-                if 0.35 <= pos_in_range <= 0.65:
-                    continue  # Equilibrium chop zone blocked!
-
-            # Directional Entry Evaluation
-            signal_direction = None
-            if is_bullish_stack and not overbought_blocked and (c_bar['close'] > p_bar['high']):
-                signal_direction = "BUY"
-            elif is_bearish_stack and not oversold_blocked and (c_bar['close'] < p_bar['low']):
-                signal_direction = "SELL"
-
-            if signal_direction is None:
-                continue
-
-            # Breathing Stop Loss Calculation (Invariant 35)
-            spread = spec["spread"]
-            sl_dist = max(spec["atr_sl_mult"] * atr, spread * 3.5, close_p * 0.0035)
-            sl_p = (close_p - sl_dist) if signal_direction == "BUY" else (close_p + sl_dist)
-
-            # Meta-Model Calibration Probability
-            cal_res = calibrator.calibrate_probability(
-                raw_confluence_score=78.5,
-                is_discount_or_premium=True,
-                has_liquidity_sweep=True,
-                has_order_block=True,
-                has_fvg_golden_pocket=True,
-                is_triple_ema_aligned=True,
-                adx_15m=32.0,
-                rsi_15m=rsi
-            )
-            cal_prob = float(cal_res.get("calibrated_win_prob", 0.65))
-            raw_score = 78.5
-
-            # Dynamic Kelly conviction sizing multiplier
-            conviction_mult = max(0.75, min(1.50, 1.0 + (cal_prob - 0.55) * 2.0))
-
-            trade = Trade(
-                trade_id=trade_id_counter,
-                symbol=sym,
-                direction=signal_direction,
-                entry_date=current_date.date(),
-                entry_price=close_p,
-                sl_price=sl_p,
-                atr_15m=atr,
-                spread=spread,
-                calibrated_prob=cal_prob,
-                raw_score=raw_score,
-                contract_multiplier=spec["contract_multiplier"],
-                regime=regime_label,
-                ablation_mode="BASELINE",
-                sizing_multiplier=conviction_mult
-            )
-
-            if not trade.risk_overrun:
-                open_trades.append(trade)
-                trade_id_counter += 1
-
-        # Track Daily Portfolio Equity
+        # 2. Portfolio Equity & Drawdown tracking
         unrealized_pnl = sum(
             ((float(assets_data[tr.symbol].iloc[t_idx]['close']) - tr.entry_price) * tr.position_size * tr.contract_multiplier)
             if tr.direction == "BUY" else
@@ -496,6 +384,7 @@ def run_forward_strategy_simulation(
             for tr in open_trades
         )
         total_daily_equity = current_equity + unrealized_pnl
+        peak_equity = max(peak_equity, total_daily_equity)
         drawdown_pct = ((peak_equity - total_daily_equity) / peak_equity) * 100.0 if peak_equity > 0 else 0.0
 
         daily_equity_history.append({
@@ -508,6 +397,107 @@ def run_forward_strategy_simulation(
             "open_positions": len(open_trades),
             "regime": regime_label
         })
+
+        # Circuit Breaker Check: 15.0% cap halts new entries
+        if drawdown_pct >= 15.0:
+            continue
+
+        # Check total portfolio heat (max 6.0%)
+        current_heat = sum(t.initial_risk_dollars for t in open_trades)
+        if current_heat >= total_daily_equity * 0.06:
+            continue
+
+        # Macro info
+        dxy_close = float(macro_data["DXY"].iloc[t_idx]['close'])
+        dxy_prev = float(macro_data["DXY"].iloc[t_idx-1]['close'])
+        macro_info = {
+            "dxy_change": ((dxy_close - dxy_prev) / max(1e-4, dxy_prev)) * 100.0,
+            "vix": float(macro_data["VIX"].iloc[t_idx]['close'])
+        }
+
+        # Count open factor clusters
+        open_tech = sum(1 for tr in open_trades if tr.symbol in tech_symbols)
+        open_idx = sum(1 for tr in open_trades if tr.symbol in index_symbols)
+
+        # 3. Evaluate New Signals (Day Close)
+        for sym, spec in ASSET_SPECS.items():
+            if any(tr.symbol == sym for tr in open_trades):
+                continue
+            if len(open_trades) >= 10:
+                break
+
+            # Invariant 92: Factor Clamping
+            if sym in tech_symbols and open_tech >= 1:
+                continue
+            if sym in index_symbols and open_idx >= 1:
+                continue
+
+            df_asset = assets_data[sym]
+            curr_row = df_asset.iloc[t_idx]
+            prev_rows = df_asset.iloc[max(0, t_idx-35):t_idx]
+
+            # Invariant 92 Pillar 1: Anti-Chasing Impulse Overextension (> 1.85 ATR)
+            close_p = float(curr_row['close'])
+            ema20 = float(curr_row['ema20'])
+            atr = float(curr_row['atr14'])
+            if atr > 0 and abs(close_p - ema20) > 1.85 * atr:
+                continue
+
+            # Evaluate Bar Signals via Citadel 360
+            dir_signal, raw_score, calib_p, meta = evaluate_bar_signals(
+                row=curr_row,
+                prev_rows=prev_rows,
+                spec=spec,
+                macro_row=macro_info,
+                ablation_flags={}
+            )
+
+            # Invariant 58 & 92: Macro Crisis & High-Beta Equity Shield
+            if regime_label == "RECESSION_CRISIS" and spec["type"] == "EQUITY" and dir_signal == "BUY":
+                continue  # Never catch falling knife tech stocks during macroeconomic recession crisis!
+
+            if spec["type"] == "EQUITY":
+                if raw_score < 70.0:
+                    continue  # Equities require institutional conviction score >= 70.0
+                if dir_signal == "SELL" and not (curr_row['close'] < curr_row['ema50'] < curr_row['ema200']):
+                    continue  # Never short equities unless in confirmed triple-EMA downtrend!
+
+            if dir_signal is not None and t_idx + 1 < n_days:
+                next_bar = df_asset.iloc[t_idx + 1]
+                entry_p = float(next_bar['open'])
+                entry_date = dates[t_idx + 1].date()
+
+                spread = spec["spread"]
+                sl_mult = 2.60 if spec["type"] == "EQUITY" else spec["atr_sl_mult"]
+                sl_dist = max(sl_mult * atr, spread * 3.5, entry_p * 0.0035)
+                sl_p = entry_p - sl_dist if dir_signal == "BUY" else entry_p + sl_dist
+
+                sz_mult = max(0.75, min(1.50, 1.0 + (calib_p - 0.55) * 2.0))
+
+                trade = Trade(
+                    trade_id=trade_id_counter,
+                    symbol=sym,
+                    direction=dir_signal,
+                    entry_date=entry_date,
+                    entry_price=entry_p,
+                    sl_price=sl_p,
+                    atr_15m=atr,
+                    spread=spread,
+                    calibrated_prob=calib_p,
+                    raw_score=raw_score,
+                    contract_multiplier=spec["contract_multiplier"],
+                    regime=regime_label,
+                    ablation_mode="BASELINE",
+                    sizing_multiplier=sz_mult
+                )
+
+                if not trade.risk_overrun:
+                    open_trades.append(trade)
+                    trade_id_counter += 1
+                    if sym in tech_symbols:
+                        open_tech += 1
+                    if sym in index_symbols:
+                        open_idx += 1
 
     df_equity = pd.DataFrame(daily_equity_history)
     metrics = calculate_performance_metrics(closed_trades, df_equity)

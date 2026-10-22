@@ -838,19 +838,21 @@ class Trade:
         # Check SL hit first on ambiguous bars
         if sl_hit and (tp1_hit or tp2_hit):
             # Collision: Stop Loss hit first!
-            exit_r = 0.0 if self.stage == 1 else (2.0 if self.stage == 2 else -1.0)
+            # Stage 1: 50% banked at +2.0R, 50% stopped at 0.0R (BE) = +1.0R realized net
+            # Stage 2: 50% at +2.0R, 30% at +4.0R, 20% stopped at +2.0R = +2.6R realized net
+            exit_r = 1.0 if self.stage == 1 else (2.6 if self.stage == 2 else -1.0)
             reason = "BE_SL_HIT" if self.stage == 1 else ("TP2_LOCKED_SL_HIT" if self.stage == 2 else "INITIAL_SL_COLLISION")
             self._close(b_date, self.current_sl, reason, exit_r)
             return True
 
         if sl_hit:
-            exit_r = 0.0 if self.stage == 1 else (2.0 if self.stage == 2 else -1.0)
+            exit_r = 1.0 if self.stage == 1 else (2.6 if self.stage == 2 else -1.0)
             reason = "BE_SL_HIT" if self.stage == 1 else ("TP2_LOCKED_SL_HIT" if self.stage == 2 else "INITIAL_SL")
             self._close(b_date, self.current_sl, reason, exit_r)
             return True
 
-        # Check Flash Shock Exit: if peak R >= 1.0 and retraced >= 50% from peak
-        if self.peak_r >= 1.0:
+        # Check Flash Shock Exit: if peak R >= 1.8 and retraced >= 50% from peak (Invariant 92 Pillar 5)
+        if self.peak_r >= 1.8:
             current_r = (b_close - self.entry_price) / self.sl_dist if self.direction == "BUY" else (self.entry_price - b_close) / self.sl_dist
             if current_r <= (self.peak_r * 0.50) and current_r > 0.0:
                 self._close(b_date, b_close, "FLASH_SHOCK_PROTECTIVE_HARVEST", current_r)
