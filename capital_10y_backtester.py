@@ -119,6 +119,63 @@ ASSET_SPECS = {
     }
 }
 
+# -----------------------------------------------------------------------------
+# Capital.com CFD Specifications for Retail & VIP Accounts ($1,000 baseline)
+# -----------------------------------------------------------------------------
+CAPITAL_COM_CFD_SPECS = {
+    "GOLD": {
+        "csv": "GCF_1d_10y.csv", "name": "Gold (Spot/Futures)", "type": "COMMODITY",
+        "spread": 0.35, "slippage": 0.10, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.01,
+        "daily_swap_long": -0.00015, "daily_swap_short": -0.00008, "atr_sl_mult": 2.50
+    },
+    "US100": {
+        "csv": "NQF_1d_10y.csv", "name": "US Tech 100 (Nasdaq)", "type": "INDEX",
+        "spread": 2.00, "slippage": 0.50, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.01,
+        "daily_swap_long": -0.00022, "daily_swap_short": 0.00005, "atr_sl_mult": 2.20
+    },
+    "US500": {
+        "csv": "ESF_1d_10y.csv", "name": "US 500 (S&P 500)", "type": "INDEX",
+        "spread": 0.45, "slippage": 0.15, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.01,
+        "daily_swap_long": -0.00020, "daily_swap_short": 0.00004, "atr_sl_mult": 2.20
+    },
+    "DE40": {
+        "csv": "GDAXI_1d_10y.csv", "name": "Germany 40 (DAX)", "type": "INDEX",
+        "spread": 1.50, "slippage": 0.40, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.01,
+        "daily_swap_long": -0.00018, "daily_swap_short": 0.00002, "atr_sl_mult": 2.20
+    },
+    "OIL": {
+        "csv": "CLF_1d_10y.csv", "name": "Crude Oil (WTI)", "type": "COMMODITY",
+        "spread": 0.04, "slippage": 0.02, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.10,
+        "daily_swap_long": -0.00025, "daily_swap_short": -0.00010, "atr_sl_mult": 2.50
+    },
+    "SILVER": {
+        "csv": "SIF_1d_10y.csv", "name": "Silver (XAGUSD)", "type": "COMMODITY",
+        "spread": 0.03, "slippage": 0.01, "precision": 3, "contract_multiplier": 1.0, "min_deal_size": 0.10,
+        "daily_swap_long": -0.00018, "daily_swap_short": -0.00008, "atr_sl_mult": 2.50
+    },
+    "NVDA": {
+        "csv": "NVDA_1d_10y.csv", "name": "NVIDIA Corp", "type": "EQUITY",
+        "spread": 0.05, "slippage": 0.02, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.10,
+        "daily_swap_long": -0.00028, "daily_swap_short": 0.00008, "atr_sl_mult": 2.20
+    },
+    "TSLA": {
+        "csv": "TSLA_1d_10y.csv", "name": "Tesla Inc", "type": "EQUITY",
+        "spread": 0.08, "slippage": 0.04, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.10,
+        "daily_swap_long": -0.00028, "daily_swap_short": 0.00008, "atr_sl_mult": 2.20
+    },
+    "AAPL": {
+        "csv": "AAPL_1d_10y.csv", "name": "Apple Inc", "type": "EQUITY",
+        "spread": 0.04, "slippage": 0.02, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.10,
+        "daily_swap_long": -0.00026, "daily_swap_short": 0.00006, "atr_sl_mult": 2.20
+    },
+    "MSFT": {
+        "csv": "MSFT_1d_10y.csv", "name": "Microsoft Corp", "type": "EQUITY",
+        "spread": 0.05, "slippage": 0.02, "precision": 2, "contract_multiplier": 1.0, "min_deal_size": 0.10,
+        "daily_swap_long": -0.00026, "daily_swap_short": 0.00006, "atr_sl_mult": 2.20
+    }
+}
+
+
 
 def load_dataset_clean(
     data_dir: str = "data/tradfi_10y_dna",
@@ -718,7 +775,9 @@ class Trade:
         contract_multiplier: float,
         regime: str,
         ablation_mode: str = "BASELINE",
-        sizing_multiplier: float = 1.0
+        sizing_multiplier: float = 1.0,
+        base_risk_dollars: float = 100.0,
+        min_deal_size: Optional[float] = None
     ):
         self.trade_id = trade_id
         self.symbol = symbol
@@ -735,14 +794,17 @@ class Trade:
         self.regime = regime
         self.ablation_mode = ablation_mode
         self.sizing_multiplier = float(sizing_multiplier)
+        self.base_risk_dollars = float(base_risk_dollars)
 
         # Normalized Institutional Risk Parity ($100 base risk = 1.0% of $10,000 equity)
         # Scaled dynamically by Meta-Model conviction multiplier (Invariant 85)
-        target_risk_dollars = 100.0 * max(0.50, min(2.0, self.sizing_multiplier))
+        target_risk_dollars = self.base_risk_dollars * max(0.50, min(2.0, self.sizing_multiplier))
         self.target_risk_dollars = target_risk_dollars
         raw_size = target_risk_dollars / max(1e-4, self.sl_dist * contract_multiplier)
-        if contract_multiplier == 1.0:
-            self.position_size = max(0.1, round(raw_size, 2))
+        if min_deal_size is not None:
+            self.position_size = max(min_deal_size, round(raw_size, 3 if min_deal_size < 0.1 else 2))
+        elif contract_multiplier == 1.0:
+            self.position_size = max(0.01 if self.base_risk_dollars <= 25.0 else 0.1, round(raw_size, 2))
         else:
             self.position_size = max(0.01, round(raw_size, 3))
         self.initial_risk_dollars = self.position_size * self.sl_dist * contract_multiplier
@@ -922,13 +984,20 @@ def run_backtest_simulation(
     macro_data: Dict[str, pd.DataFrame],
     ablation_flags: Optional[Dict[str, bool]] = None,
     start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
+    initial_equity: float = 10000.0,
+    base_risk_dollars: Optional[float] = None,
+    specs_override: Optional[Dict[str, Dict[str, Any]]] = None
 ) -> Tuple[List[Trade], pd.DataFrame, Dict[str, Any]]:
     """
     Simulates the strategy across all instruments chronologically day-by-day.
     """
     if ablation_flags is None:
         ablation_flags = {}
+
+    active_specs = specs_override if specs_override is not None else ASSET_SPECS
+    portfolio_equity = float(initial_equity)
+    effective_base_risk = base_risk_dollars if base_risk_dollars is not None else (portfolio_equity * 0.01)
 
     # Pre-compute indicators on all assets
     processed_assets = {}
@@ -967,7 +1036,6 @@ def run_backtest_simulation(
     trade_counter = 0
 
     # Portfolio Tracking
-    portfolio_equity = 10000.0  # Institutional baseline $10,000 balance
     equity_curve = []
 
     logger.info(f"Running simulation: {len(all_dates)} trading days, {len(processed_assets)} assets...")
@@ -982,7 +1050,7 @@ def run_backtest_simulation(
             idx_sym = date_idx_maps[epic].get(current_date)
             if idx_sym is not None:
                 bar = df_sym.iloc[idx_sym]
-                swap_rate = ASSET_SPECS[epic]["daily_swap_long"] if tr.direction == "BUY" else ASSET_SPECS[epic]["daily_swap_short"]
+                swap_rate = active_specs[epic]["daily_swap_long"] if tr.direction == "BUY" else active_specs[epic]["daily_swap_short"]
                 was_closed = tr.step(bar, swap_rate)
                 if was_closed:
                     daily_pnl += tr.pnl_dollars
@@ -1044,7 +1112,7 @@ def run_backtest_simulation(
             dir_signal, raw_score, calib_p, meta = evaluate_bar_signals(
                 row=curr_row,
                 prev_rows=prev_rows,
-                spec=ASSET_SPECS[epic],
+                spec=active_specs[epic],
                 macro_row=macro_info,
                 ablation_flags=ablation_flags
             )
@@ -1065,8 +1133,8 @@ def run_backtest_simulation(
 
                 # Dynamic breathing stop distance
                 atr_val = float(curr_row['atr14'])
-                sp_val = float(ASSET_SPECS[epic]['spread'])
-                min_dist = max(ASSET_SPECS[epic]['atr_sl_mult'] * atr_val, 3.5 * sp_val, entry_p * 0.0035)
+                sp_val = float(active_specs[epic]['spread'])
+                min_dist = max(active_specs[epic]['atr_sl_mult'] * atr_val, 3.5 * sp_val, entry_p * 0.0035)
 
                 sl_p = entry_p - min_dist if dir_signal == "BUY" else entry_p + min_dist
 
@@ -1100,10 +1168,12 @@ def run_backtest_simulation(
                     spread=sp_val,
                     calibrated_prob=calib_p,
                     raw_score=raw_score,
-                    contract_multiplier=ASSET_SPECS[epic]['contract_multiplier'],
+                    contract_multiplier=active_specs[epic]['contract_multiplier'],
                     regime=regime,
                     ablation_mode=ablation_mode,
-                    sizing_multiplier=sz_mult
+                    sizing_multiplier=sz_mult,
+                    base_risk_dollars=effective_base_risk,
+                    min_deal_size=active_specs[epic].get('min_deal_size')
                 )
                 if new_trade.risk_overrun:
                     # Min-lot floor would risk far more than budget: skip, don't force it
@@ -1264,7 +1334,10 @@ def calculate_performance_metrics(trades: List[Trade], df_equity: pd.DataFrame) 
 # -----------------------------------------------------------------------------
 def run_anchored_walk_forward(
     assets_data: Dict[str, pd.DataFrame],
-    macro_data: Dict[str, pd.DataFrame]
+    macro_data: Dict[str, pd.DataFrame],
+    initial_equity: float = 10000.0,
+    base_risk_dollars: Optional[float] = None,
+    specs_override: Optional[Dict[str, Dict[str, Any]]] = None
 ) -> List[Dict[str, Any]]:
     """
     Runs 5-fold anchored walk-forward validation:
@@ -1294,7 +1367,10 @@ def run_anchored_walk_forward(
             assets_data=assets_data,
             macro_data=macro_data,
             start_date=f['test'][0],
-            end_date=f['test'][1]
+            end_date=f['test'][1],
+            initial_equity=initial_equity,
+            base_risk_dollars=base_risk_dollars,
+            specs_override=specs_override
         )
         res_entry = {
             "fold": f["fold"],
@@ -1319,7 +1395,10 @@ def run_anchored_walk_forward(
 # -----------------------------------------------------------------------------
 def run_strategy_ablations(
     assets_data: Dict[str, pd.DataFrame],
-    macro_data: Dict[str, pd.DataFrame]
+    macro_data: Dict[str, pd.DataFrame],
+    initial_equity: float = 10000.0,
+    base_risk_dollars: Optional[float] = None,
+    specs_override: Optional[Dict[str, Dict[str, Any]]] = None
 ) -> List[Dict[str, Any]]:
     """
     Evaluates Full System vs 6 Controlled Drop-Group Ablations:
@@ -1349,7 +1428,10 @@ def run_strategy_ablations(
         trades, df_eq, m = run_backtest_simulation(
             assets_data=assets_data,
             macro_data=macro_data,
-            ablation_flags=ab["flags"]
+            ablation_flags=ab["flags"],
+            initial_equity=initial_equity,
+            base_risk_dollars=base_risk_dollars,
+            specs_override=specs_override
         )
 
         if idx == 0:
@@ -1384,7 +1466,9 @@ def generate_chart_figures(
     walk_forward_res: List[Dict[str, Any]],
     ablation_matrix: List[Dict[str, Any]],
     trades: List[Trade],
-    output_dir: str = "data"
+    output_dir: str = "data",
+    initial_equity: float = 10000.0,
+    prefix: str = "capital_10y_"
 ) -> Dict[str, str]:
     """
     Renders high-resolution publication-quality PNG charts for the PDF report.
@@ -1405,10 +1489,10 @@ def generate_chart_figures(
     running_max = np.maximum.accumulate(eq)
     dd = (eq - running_max) / running_max * 100.0
 
-    ax1.plot(dates, eq, color='#00E676', linewidth=1.8, label='Portfolio Net Equity ($10k Base)')
+    ax1.plot(dates, eq, color='#00E676', linewidth=1.8, label=f'Portfolio Net Equity (${initial_equity:,.0f} Base)')
     ax1.plot(dates, running_max, color='#888888', linestyle='--', linewidth=0.8, alpha=0.6, label='High Water Mark')
     ax1.fill_between(dates, eq, running_max, color='#FF5252', alpha=0.15)
-    ax1.set_title('ANGKOR QUANT — 10-Year Institutional Cumulative Equity Curve (2016–2026)', fontsize=12, fontweight='bold', pad=10, color='#FFFFFF')
+    ax1.set_title(f'ANGKOR QUANT — 10-Year Institutional Cumulative Equity Curve (${initial_equity:,.0f} Capital, 2016–2026)', fontsize=12, fontweight='bold', pad=10, color='#FFFFFF')
     ax1.set_ylabel('Equity ($ USD)', fontsize=10, color='#CCCCCC')
     ax1.grid(True, linestyle=':', alpha=0.3, color='#555555')
     ax1.legend(loc='upper left', framealpha=0.3)
@@ -1422,7 +1506,7 @@ def generate_chart_figures(
     ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
 
     plt.tight_layout()
-    chart1_path = os.path.join(output_dir, "capital_10y_equity_drawdown.png")
+    chart1_path = os.path.join(output_dir, f"{prefix}equity_drawdown.png")
     fig.savefig(chart1_path, dpi=200)
     plt.close(fig)
     generated_charts["equity_drawdown"] = chart1_path
@@ -1444,7 +1528,7 @@ def generate_chart_figures(
     ax.legend(loc='upper right', framealpha=0.4)
 
     plt.tight_layout()
-    chart2_path = os.path.join(output_dir, "capital_10y_walk_forward.png")
+    chart2_path = os.path.join(output_dir, f"{prefix}walk_forward.png")
     fig.savefig(chart2_path, dpi=200)
     plt.close(fig)
     generated_charts["walk_forward"] = chart2_path
@@ -1474,7 +1558,7 @@ def generate_chart_figures(
     ax.legend(loc='upper left', framealpha=0.4)
 
     plt.tight_layout()
-    chart3_path = os.path.join(output_dir, "capital_10y_calibration_curve.png")
+    chart3_path = os.path.join(output_dir, f"{prefix}calibration_curve.png")
     fig.savefig(chart3_path, dpi=200)
     plt.close(fig)
     generated_charts["calibration"] = chart3_path
@@ -1497,7 +1581,7 @@ def generate_chart_figures(
         ax.text(v + 0.01, i, f"{v:+.3f}R", va='center', fontsize=9, color='#FFFFFF', fontweight='bold')
 
     plt.tight_layout()
-    chart4_path = os.path.join(output_dir, "capital_10y_ablation_comparison.png")
+    chart4_path = os.path.join(output_dir, f"{prefix}ablation_comparison.png")
     fig.savefig(chart4_path, dpi=200)
     plt.close(fig)
     generated_charts["ablation"] = chart4_path
@@ -1509,17 +1593,36 @@ def generate_chart_figures(
 # Main Execution Pipeline
 # -----------------------------------------------------------------------------
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Angkor Quant 10-Year Institutional Backtester")
+    parser.add_argument("--capital", type=float, default=10000.0, help="Initial capital in USD (default: 10000.0)")
+    parser.add_argument("--cfd", action="store_true", help="Force Capital.com CFD specifications")
+    args, _ = parser.parse_known_args()
+
+    initial_equity = float(args.capital)
+    use_cfd = args.cfd or (initial_equity <= 5000.0)
+    active_specs = CAPITAL_COM_CFD_SPECS if use_cfd else ASSET_SPECS
+    effective_base_risk = initial_equity * 0.01
+
+    is_1k = abs(initial_equity - 1000.0) < 1e-4
+    file_suffix = "_1000usd" if is_1k else ("" if abs(initial_equity - 10000.0) < 1e-4 else f"_{int(initial_equity)}usd")
+    prefix = f"capital_10y{file_suffix}_" if file_suffix else "capital_10y_"
+
     print("=" * 78)
-    print("  ANGKOR QUANT — 10-YEAR INSTITUTIONAL TRADFI BACKTESTING & VALIDATION")
-    print("  Version: 1.0.0 (The 84 Pillars Institutional Audit & Ablation Suite)")
+    print(f"  ANGKOR QUANT — 10-YEAR INSTITUTIONAL TRADFI BACKTESTING & VALIDATION")
+    print(f"  Capital: ${initial_equity:,.2f} | Mode: {'Capital.com CFD Specs' if use_cfd else 'Institutional Multi-Asset'}")
+    print(f"  Version: 1.0.0 (The 84 Pillars Institutional Audit & Ablation Suite)")
     print("=" * 78)
 
     # 1. Load & Verify Data with Dataset Manifest (Priority 2)
     assets_data, macro_data, data_manifest = load_dataset_clean()
 
     # 2. Baseline Full System Simulation (10 Full Years: 2016–2026)
-    logger.info(">>> STAGE 1: Simulating Baseline Full System (2016–2026)...")
-    trades, df_equity, full_metrics = run_backtest_simulation(assets_data, macro_data)
+    logger.info(f">>> STAGE 1: Simulating Full System (2016–2026, Capital: ${initial_equity:,.2f})...")
+    trades, df_equity, full_metrics = run_backtest_simulation(
+        assets_data, macro_data, initial_equity=initial_equity,
+        base_risk_dollars=effective_base_risk, specs_override=active_specs
+    )
 
     print("\n--- BASELINE FULL SYSTEM 10-YEAR AUDIT RESULTS ---")
     for k, v in full_metrics.items():
@@ -1547,15 +1650,21 @@ def main():
 
     # 3. Anchored Walk-Forward Validation
     logger.info(">>> STAGE 3: Running Anchored Walk-Forward Validation (5 Folds)...")
-    wf_results = run_anchored_walk_forward(assets_data, macro_data)
+    wf_results = run_anchored_walk_forward(
+        assets_data, macro_data, initial_equity=initial_equity,
+        base_risk_dollars=effective_base_risk, specs_override=active_specs
+    )
 
     # 4. Strategy Ablation Matrix
     logger.info(">>> STAGE 4: Running Strategy Drop-Group Ablation Matrix (7 Experiments)...")
-    ablation_matrix = run_strategy_ablations(assets_data, macro_data)
+    ablation_matrix = run_strategy_ablations(
+        assets_data, macro_data, initial_equity=initial_equity,
+        base_risk_dollars=effective_base_risk, specs_override=active_specs
+    )
 
     # 5. Asset Breakdown
     asset_breakdown = {}
-    for sym in ASSET_SPECS.keys():
+    for sym in active_specs.keys():
         sym_trades = [t for t in trades if t.symbol == sym]
         if sym_trades:
             sym_wins = [t for t in sym_trades if t.pnl_r > 0]
@@ -1585,7 +1694,10 @@ def main():
 
     # 7. Generate Visual Charts
     logger.info(">>> STAGE 5: Generating Publication-Grade Chart Artifacts...")
-    charts = generate_chart_figures(df_equity, wf_results, ablation_matrix, trades, output_dir="data")
+    charts = generate_chart_figures(
+        df_equity, wf_results, ablation_matrix, trades, output_dir="data",
+        initial_equity=initial_equity, prefix=prefix
+    )
 
     # 8. Export Trade-by-Trade Ledger
     ledger_records = []
@@ -1612,7 +1724,7 @@ def main():
             "regime": t.regime
         })
     df_ledger = pd.DataFrame(ledger_records)
-    ledger_path = "data/capital_10y_backtest_trade_ledger.csv"
+    ledger_path = f"data/capital_10y_backtest{file_suffix}_trade_ledger.csv"
     df_ledger.to_csv(ledger_path, index=False)
     logger.info(f"Saved Trade Ledger ({len(df_ledger)} trades) to {ledger_path}")
 
@@ -1621,6 +1733,8 @@ def main():
         "project": "ANGKOR QUANT — Institutional TradFi 10-Year Backtesting & Validation Project",
         "generated_at": datetime.datetime.now().isoformat(),
         "period": "2016-10-20 to 2026-10-20 (10 Full Years)",
+        "initial_capital": initial_equity,
+        "specifications": "Capital.com CFD Specs" if use_cfd else "Institutional Multi-Asset",
         "data_manifest": data_manifest,
         "full_metrics": full_metrics,
         "chronological_splits": {
@@ -1634,19 +1748,20 @@ def main():
         "regime_breakdown": regime_breakdown,
         "charts": charts
     }
-    summary_path = "data/capital_10y_backtest_summary.json"
+    summary_path = f"data/capital_10y_backtest{file_suffix}_summary.json"
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2)
     logger.info(f"Saved Backtest Summary JSON to {summary_path}")
 
     print("\n" + "=" * 78)
-    print("  >>> [CERTIFIED] 10-YEAR INSTITUTIONAL BACKTEST COMPLETE! <<<")
+    print(f"  >>> [CERTIFIED] 10-YEAR INSTITUTIONAL BACKTEST COMPLETE (${initial_equity:,.0f})! <<<")
     print(f"  Total Trades     : {full_metrics['total_trades']}")
     print(f"  Win Rate         : {full_metrics['win_rate']}% (95% CI: [{full_metrics['ci_lower']}%, {full_metrics['ci_upper']}%])")
     print(f"  Realized R:R     : 1:{full_metrics['realized_rr']}")
     print(f"  Expectancy E[R]  : {full_metrics['expectancy_r']:+.3f}R per trade")
     print(f"  Profit Factor    : {full_metrics['profit_factor']}")
     print(f"  Net Profit       : ${full_metrics['net_profit']:,.2f}")
+    print(f"  Final Equity     : ${initial_equity + full_metrics['net_profit']:,.2f} (+{((full_metrics['net_profit'])/initial_equity)*100:.2f}%)")
     print(f"  Max Drawdown     : {full_metrics['max_drawdown_pct']}% (${full_metrics['max_drawdown_dollars']:,.2f})")
     print(f"  Sharpe Ratio     : {full_metrics['sharpe_ratio']}")
     print(f"  Brier Score      : {full_metrics['brier_score']}")

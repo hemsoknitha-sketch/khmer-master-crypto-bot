@@ -60,6 +60,7 @@ MAX_RISK_OVERRUN_RATIO = 1.25
 # Import asset specifications from 10y backtester
 from capital_10y_backtester import (
     ASSET_SPECS,
+    CAPITAL_COM_CFD_SPECS,
     calculate_almgren_chriss_market_impact,
     calculate_performance_metrics,
     Trade,
@@ -330,13 +331,18 @@ def run_forward_strategy_simulation(
     assets_data: Dict[str, pd.DataFrame],
     macro_data: Dict[str, pd.DataFrame],
     regimes: np.ndarray,
-    initial_equity: float = INITIAL_EQUITY
+    initial_equity: float = INITIAL_EQUITY,
+    base_risk_dollars: Optional[float] = None,
+    specs_override: Optional[Dict[str, Dict[str, Any]]] = None
 ) -> Tuple[List[Any], pd.DataFrame, Dict[str, Any]]:
     """
     Executes the identical institutional /capital strategy across the 2026-2036
     forward market realization, tracking every trade in an auditable ledger.
     """
     from capital_10y_backtester import Trade, calculate_performance_metrics
+
+    active_specs = specs_override if specs_override is not None else ASSET_SPECS
+    effective_base_risk = base_risk_dollars if base_risk_dollars is not None else (initial_equity * 0.01)
 
     sample_asset = next(iter(assets_data.values()))
     dates = sample_asset['Date'].tolist()
@@ -362,7 +368,7 @@ def run_forward_strategy_simulation(
         # 1. Update Open Trades
         new_open_trades = []
         for tr in open_trades:
-            sym_spec = ASSET_SPECS[tr.symbol]
+            sym_spec = active_specs[tr.symbol]
             bar = assets_data[tr.symbol].iloc[t_idx]
             swap_rate = sym_spec["daily_swap_long"] if tr.direction == "BUY" else sym_spec["daily_swap_short"]
             is_closed = tr.step(bar, swap_rate)
@@ -420,7 +426,7 @@ def run_forward_strategy_simulation(
         open_idx = sum(1 for tr in open_trades if tr.symbol in index_symbols)
 
         # 3. Evaluate New Signals (Day Close)
-        for sym, spec in ASSET_SPECS.items():
+        for sym, spec in active_specs.items():
             if any(tr.symbol == sym for tr in open_trades):
                 continue
             if len(open_trades) >= 10:
@@ -488,7 +494,9 @@ def run_forward_strategy_simulation(
                     contract_multiplier=spec["contract_multiplier"],
                     regime=regime_label,
                     ablation_mode="BASELINE",
-                    sizing_multiplier=sz_mult
+                    sizing_multiplier=sz_mult,
+                    base_risk_dollars=effective_base_risk,
+                    min_deal_size=spec.get("min_deal_size")
                 )
 
                 if not trade.risk_overrun:
@@ -587,7 +595,9 @@ def generate_forward_chart_figures(
     df_equity: pd.DataFrame,
     mc_summary: Dict[str, Any],
     trades: List[Any],
-    output_dir: str = "data"
+    output_dir: str = "data",
+    initial_equity: float = INITIAL_EQUITY,
+    prefix: str = "capital_10y_forwardtest_"
 ) -> Dict[str, str]:
     """
     Generates publication-grade chart artifacts for the 10-year forward test.
@@ -606,8 +616,8 @@ def generate_forward_chart_figures(
     dates = pd.to_datetime(df_equity['Date'])
     ax1.plot(dates, df_equity['total_equity'], color='#00E676', linewidth=2, label='Angkor Quant Total Forward Equity ($)')
     ax1.plot(dates, df_equity['peak_equity'], color='#FFD700', linestyle='--', alpha=0.5, label='High-Water Mark')
-    ax1.axhline(y=INITIAL_EQUITY, color='#888888', linestyle=':', label='Initial Capital ($10,000)')
-    ax1.set_title('ANGKOR QUANT — 10-Year Forward-Test Equity Trajectory (2026–2036)', fontsize=12, fontweight='bold', pad=10)
+    ax1.axhline(y=initial_equity, color='#888888', linestyle=':', label=f'Initial Capital (${initial_equity:,.0f})')
+    ax1.set_title(f'ANGKOR QUANT — 10-Year Forward-Test Equity Trajectory (${initial_equity:,.0f} Capital, 2026–2036)', fontsize=12, fontweight='bold', pad=10)
     ax1.set_ylabel('Portfolio Equity (USD)', fontsize=10)
     ax1.grid(True, linestyle=':', alpha=0.3)
     ax1.legend(loc='upper left', framealpha=0.4)
@@ -621,7 +631,7 @@ def generate_forward_chart_figures(
     ax2.legend(loc='lower left', framealpha=0.4)
 
     plt.tight_layout()
-    chart1_path = os.path.join(output_dir, "capital_10y_forwardtest_equity.png")
+    chart1_path = os.path.join(output_dir, f"{prefix}equity.png")
     fig.savefig(chart1_path, dpi=200)
     plt.close(fig)
     generated["equity_curve"] = chart1_path
@@ -636,22 +646,22 @@ def generate_forward_chart_figures(
     p95 = mc_summary["terminal_95th_percentile"]
 
     x_years = np.linspace(2026, 2036, 11)
-    y_median = INITIAL_EQUITY * ((p50 / INITIAL_EQUITY) ** ((x_years - 2026) / 10.0))
-    y_upper = INITIAL_EQUITY * ((p95 / INITIAL_EQUITY) ** ((x_years - 2026) / 10.0))
-    y_lower = INITIAL_EQUITY * ((max(1.0, p5) / INITIAL_EQUITY) ** ((x_years - 2026) / 10.0))
+    y_median = initial_equity * ((p50 / initial_equity) ** ((x_years - 2026) / 10.0))
+    y_upper = initial_equity * ((p95 / initial_equity) ** ((x_years - 2026) / 10.0))
+    y_lower = initial_equity * ((max(1.0, p5) / initial_equity) ** ((x_years - 2026) / 10.0))
 
     ax.plot(x_years, y_median, color='#00E676', linewidth=2.5, label=f'Median Path (${p50:,.0f}, CAGR: {mc_summary["median_10y_cagr_pct"]}%)')
     ax.fill_between(x_years, y_lower, y_upper, color='#00E676', alpha=0.2, label=f'90% Confidence Corridor [${p5:,.0f} to ${p95:,.0f}]')
-    ax.axhline(y=INITIAL_EQUITY, color='#888888', linestyle='--', label='Initial Capital ($10,000)')
+    ax.axhline(y=initial_equity, color='#888888', linestyle='--', label=f'Initial Capital (${initial_equity:,.0f})')
 
-    ax.set_title('10,000-Path Monte Carlo Terminal Wealth Corridor (2026–2036)', fontsize=12, fontweight='bold', pad=12)
+    ax.set_title(f'10,000-Path Monte Carlo Terminal Wealth Corridor (${initial_equity:,.0f} Capital, 2026–2036)', fontsize=12, fontweight='bold', pad=12)
     ax.set_xlabel('Simulation Horizon (Calendar Year)', fontsize=10)
     ax.set_ylabel('Terminal Account Equity ($)', fontsize=10)
     ax.grid(True, linestyle=':', alpha=0.3)
     ax.legend(loc='upper left', framealpha=0.5)
 
     plt.tight_layout()
-    chart2_path = os.path.join(output_dir, "capital_10y_forwardtest_monte_carlo.png")
+    chart2_path = os.path.join(output_dir, f"{prefix}monte_carlo.png")
     fig.savefig(chart2_path, dpi=200)
     plt.close(fig)
     generated["monte_carlo"] = chart2_path
@@ -685,10 +695,10 @@ def generate_forward_chart_figures(
     ax.grid(True, linestyle=':', alpha=0.3)
 
     for i, v in enumerate(pnls):
-        ax.text(v + (50 if v >= 0 else -150), i, f"${v:,.2f}", va='center', fontsize=9, color='#FFFFFF', fontweight='bold')
+        ax.text(v + (max(10, abs(v)*0.05) if v >= 0 else -max(10, abs(v)*0.05)), i, f"${v:,.2f}", va='center', fontsize=9, color='#FFFFFF', fontweight='bold')
 
     plt.tight_layout()
-    chart3_path = os.path.join(output_dir, "capital_10y_forwardtest_regimes.png")
+    chart3_path = os.path.join(output_dir, f"{prefix}regimes.png")
     fig.savefig(chart3_path, dpi=200)
     plt.close(fig)
     generated["regimes"] = chart3_path
@@ -700,8 +710,24 @@ def generate_forward_chart_figures(
 # 6. Main Forward-Testing Pipeline
 # -----------------------------------------------------------------------------
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Angkor Quant 10-Year Institutional Forward-Tester")
+    parser.add_argument("--capital", type=float, default=10000.0, help="Initial capital in USD (default: 10000.0)")
+    parser.add_argument("--cfd", action="store_true", help="Force Capital.com CFD specifications")
+    args, _ = parser.parse_known_args()
+
+    initial_equity = float(args.capital)
+    use_cfd = args.cfd or (initial_equity <= 5000.0)
+    active_specs = CAPITAL_COM_CFD_SPECS if use_cfd else ASSET_SPECS
+    effective_base_risk = initial_equity * 0.01
+
+    is_1k = abs(initial_equity - 1000.0) < 1e-4
+    file_suffix = "_1000usd" if is_1k else ("" if abs(initial_equity - 10000.0) < 1e-4 else f"_{int(initial_equity)}usd")
+    prefix = f"capital_10y_forwardtest{file_suffix}_" if file_suffix else "capital_10y_forwardtest_"
+
     print("=" * 78)
-    print("  ANGKOR QUANT — 10-YEAR INSTITUTIONAL FORWARD-TESTING & RISK VALIDATION")
+    print(f"  ANGKOR QUANT — 10-YEAR INSTITUTIONAL FORWARD-TESTING & RISK VALIDATION")
+    print(f"  Capital: ${initial_equity:,.2f} | Mode: {'Capital.com CFD Specs' if use_cfd else 'Institutional Multi-Asset'}")
     print("  Version: 1.0.0 (Decadal Stochastic Monte Carlo Forward Engine 2026-2036)")
     print("=" * 78)
 
@@ -722,15 +748,23 @@ def main():
     assets_data, macro_data, regimes = market_engine.generate_10y_forward_universe(TOTAL_FORWARD_DAYS)
 
     # 4. Run Angkor Quant Forward Strategy Simulation
-    logger.info("Running Angkor Quant Strategy execution on forward universe...")
-    trades, df_equity, full_metrics = run_forward_strategy_simulation(assets_data, macro_data, regimes)
+    logger.info(f"Running Angkor Quant Strategy execution on forward universe (Capital: ${initial_equity:,.2f})...")
+    trades, df_equity, full_metrics = run_forward_strategy_simulation(
+        assets_data, macro_data, regimes,
+        initial_equity=initial_equity,
+        base_risk_dollars=effective_base_risk,
+        specs_override=active_specs
+    )
 
     # 5. Run 10,000-Path Monte Carlo Resampling
-    mc_summary = run_10000_monte_carlo_forward_resampling(trades, n_paths=10000)
+    mc_summary = run_10000_monte_carlo_forward_resampling(trades, n_paths=10000, initial_equity=initial_equity)
 
     # 6. Generate Publication Charts
     logger.info("Generating forward-test visual charts...")
-    charts = generate_forward_chart_figures(df_equity, mc_summary, trades, output_dir="data")
+    charts = generate_forward_chart_figures(
+        df_equity, mc_summary, trades, output_dir="data",
+        initial_equity=initial_equity, prefix=prefix
+    )
 
     # 7. Save Forward Trade Ledger
     ledger_records = []
@@ -755,7 +789,7 @@ def main():
             "regime": t.regime
         })
     df_ledger = pd.DataFrame(ledger_records)
-    ledger_path = "data/capital_10y_forwardtest_trade_ledger.csv"
+    ledger_path = f"data/capital_10y_forwardtest{file_suffix}_trade_ledger.csv"
     df_ledger.to_csv(ledger_path, index=False)
     logger.info(f"Saved Forward Trade Ledger ({len(df_ledger)} trades) to {ledger_path}")
 
@@ -764,18 +798,20 @@ def main():
         "project": "ANGKOR QUANT — Institutional TradFi 10-Year Forward-Testing Project (2026–2036)",
         "generated_at": datetime.datetime.now().isoformat(),
         "period": "2026-10-21 to 2036-10-21 (10 Future Years)",
+        "initial_capital": initial_equity,
+        "specifications": "Capital.com CFD Specs" if use_cfd else "Institutional Multi-Asset",
         "methodology": "Correlated Merton Jump-Diffusion & 3-State Markov Regime-Switching",
         "full_metrics": full_metrics,
         "monte_carlo_10000_paths": mc_summary,
         "charts": charts
     }
-    summary_path = "data/capital_10y_forwardtest_summary.json"
+    summary_path = f"data/capital_10y_forwardtest{file_suffix}_summary.json"
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2)
     logger.info(f"Saved Forward Summary JSON to {summary_path}")
 
     print("\n" + "=" * 78)
-    print("  >>> [CERTIFIED] 10-YEAR INSTITUTIONAL FORWARD-TEST COMPLETE! <<<")
+    print(f"  >>> [CERTIFIED] 10-YEAR INSTITUTIONAL FORWARD-TEST COMPLETE (${initial_equity:,.0f})! <<<")
     print(f"  Forward Horizon  : 2026-10-21 to 2036-10-21 (2,520 Trading Days)")
     print(f"  Total Trades     : {full_metrics['total_trades']}")
     print(f"  Win Rate         : {full_metrics['win_rate']}% (95% CI: [{full_metrics['ci_lower']}%, {full_metrics['ci_upper']}%])")
@@ -783,6 +819,7 @@ def main():
     print(f"  Expectancy E[R]  : {full_metrics['expectancy_r']:+.3f}R per trade")
     print(f"  Profit Factor    : {full_metrics['profit_factor']}")
     print(f"  Net Profit       : ${full_metrics['net_profit']:,.2f}")
+    print(f"  Final Equity     : ${initial_equity + full_metrics['net_profit']:,.2f} (+{((full_metrics['net_profit'])/initial_equity)*100:.2f}%)")
     print(f"  Max Drawdown     : {full_metrics['max_drawdown_pct']}% (${full_metrics['max_drawdown_dollars']:,.2f})")
     print(f"  Sharpe Ratio     : {full_metrics['sharpe_ratio']}")
     print(f"  Median 10Y Term  : ${mc_summary['terminal_median_equity']:,.2f} (CAGR: {mc_summary['median_10y_cagr_pct']}%)")
