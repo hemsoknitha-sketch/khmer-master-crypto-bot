@@ -7827,13 +7827,97 @@ class CapitalKellyPositionSizer:
             "last_calculation": None
         }
 
+    _DYNAMIC_CORR_MATRIX: Dict[Tuple[str, str], float] = {}
+    _LAST_CORR_COMPUTE_TIME: float = 0.0
+    _CORR_REFRESH_INTERVAL_SEC: float = 60.0
+
+    @classmethod
+    def compute_dynamic_correlation_matrix(cls, epics: Optional[List[str]] = None) -> Dict[Tuple[str, str], float]:
+        """
+        Computes rolling Pearson correlation matrix on cleaned log returns every 60 seconds.
+        Validates data completeness and flags pairwise correlations >= 0.95 as collinear risk/data errors.
+        """
+        now = time.time()
+        if (now - cls._LAST_CORR_COMPUTE_TIME) < cls._CORR_REFRESH_INTERVAL_SEC and cls._DYNAMIC_CORR_MATRIX:
+            return cls._DYNAMIC_CORR_MATRIX
+
+        if not epics:
+            epics = ["US100", "US500", "DE40", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "SILVER", "OIL_CRUDE"]
+
+        try:
+            from capital_engine import get_capital_engine
+            eng = get_capital_engine()
+            price_series = {}
+            for epic in epics:
+                try:
+                    c = eng.get_historical_prices(epic, resolution="MINUTE_15", max_bars=30)
+                    if c and len(c) >= 15:
+                        closes = []
+                        for b in c:
+                            cp = b.get("closePrice", {})
+                            val = cp.get("bid", 0.0) if isinstance(cp, dict) else cp
+                            try:
+                                closes.append(float(val or 0.0))
+                            except Exception:
+                                pass
+                        if len(closes) >= 15 and all(p > 0 for p in closes):
+                            rets = [math.log(closes[i] / closes[i-1]) for i in range(1, len(closes)) if closes[i-1] > 0 and closes[i] > 0]
+                            if len(rets) >= 12:
+                                price_series[epic] = rets
+                except Exception:
+                    continue
+
+            new_matrix = {}
+            keys = list(price_series.keys())
+            for i in range(len(keys)):
+                for j in range(len(keys)):
+                    e1, e2 = keys[i], keys[j]
+                    if i == j:
+                        new_matrix[(e1, e2)] = 1.0
+                        continue
+                    r1 = price_series[e1]
+                    r2 = price_series[e2]
+                    n = min(len(r1), len(r2))
+                    if n >= 10:
+                        v1 = r1[-n:]
+                        v2 = r2[-n:]
+                        m1 = sum(v1) / n
+                        m2 = sum(v2) / n
+                        cov = sum((x - m1) * (y - m2) for x, y in zip(v1, v2))
+                        var1 = sum((x - m1) ** 2 for x in v1)
+                        var2 = sum((y - m2) ** 2 for y in v2)
+                        denom = math.sqrt(var1 * var2)
+                        if denom > 1e-9:
+                            corr = max(-1.0, min(1.0, cov / denom))
+                            new_matrix[(e1, e2)] = round(corr, 4)
+                            new_matrix[(e2, e1)] = round(corr, 4)
+
+            if new_matrix:
+                cls._DYNAMIC_CORR_MATRIX.update(new_matrix)
+                cls._LAST_CORR_COMPUTE_TIME = now
+        except Exception as e:
+            logger.debug(f"[CORRELATION_MATRIX] Dynamic computation warning: {e}")
+
+        return cls._DYNAMIC_CORR_MATRIX
+
     @classmethod
     def get_pairwise_correlation(cls, epic1: str, epic2: str) -> float:
-        """Returns empirical correlation rho in [-1.0, 1.0] between two TradFi epics."""
+        """Returns empirical or dynamic correlation rho in [-1.0, 1.0] between two TradFi epics."""
         e1 = (epic1 or "").upper().strip()
         e2 = (epic2 or "").upper().strip()
         if e1 == e2:
             return 1.0
+
+        # Attempt to compute/refresh dynamic correlation matrix every 60s
+        if (time.time() - cls._LAST_CORR_COMPUTE_TIME) >= cls._CORR_REFRESH_INTERVAL_SEC:
+            cls.compute_dynamic_correlation_matrix()
+
+        # Check dynamic correlation cache
+        for (k1, k2), rho in cls._DYNAMIC_CORR_MATRIX.items():
+            if (k1 in e1 and k2 in e2) or (k2 in e1 and k1 in e2):
+                return rho
+
+        # Fallback to empirical Marcos López de Prado baseline matrix
         for (k1, k2), r in cls.PAIRWISE_CORRELATIONS.items():
             if (k1 in e1 and k2 in e2) or (k2 in e1 and k1 in e2):
                 return r
@@ -8090,6 +8174,12 @@ class CapitalKellyPositionSizer:
         )
 
         scale_mult = kelly_res["scale_multiplier"]
+        try:
+            from regime_filter import get_bayesian_threshold_and_kelly
+            _, bayesian_kelly_mult = get_bayesian_threshold_and_kelly()
+            scale_mult *= bayesian_kelly_mult
+        except Exception:
+            pass
 
         # Dynamic Target Margin Sizing: Allocates full $10.00 - $15.00 actual margin per trade
         try:
@@ -8132,16 +8222,36 @@ class CapitalKellyPositionSizer:
         cluster_open_trades = []
         cluster_open_risk_usd = 0.0
         total_pairwise_corr = 0.0
+        max_pairwise_corr = 0.0
         if open_trades:
             for t in open_trades:
-                rho = cls.get_pairwise_correlation(clean_epic, t.get("epic", ""))
+                other_epic = t.get("epic", "")
+                rho = self.get_pairwise_correlation(clean_epic, other_epic)
                 total_pairwise_corr += max(0.0, rho)
-                if target_cluster and self._find_correlation_cluster(t.get("epic", "")) == target_cluster:
+                max_pairwise_corr = max(max_pairwise_corr, rho)
+                if target_cluster and self._find_correlation_cluster(other_epic) == target_cluster:
                     cluster_open_trades.append(t)
                     cluster_open_risk_usd += self.calculate_trade_risk_usd(t)
 
         cluster_count = len(cluster_open_trades)
-        if total_pairwise_corr > 0.60:
+
+        # Hard Dynamic Correlation Clamping (Invariant 93):
+        if max_pairwise_corr >= 0.95:
+            # Pairwise correlation >= 0.95: Collinear data error / extreme risk, reject trade entirely
+            logger.warning(f"[CORRELATION_CLAMP] Max pairwise correlation {max_pairwise_corr:.2f} >= 0.95 between {clean_epic} and open trade. Collinear data error / extreme risk, rejecting trade.")
+            self._stats["risk_overrun_skipped"] += 1
+            return 0.0
+        elif max_pairwise_corr >= 0.85:
+            # Pairwise correlation >= 0.85: 70% haircut (position size scaled down to 30%)
+            scale_mult = min(scale_mult, 1.0) * 0.30
+            self._stats["correlation_clamped"] += 1
+            self._stats["hrp_covariance_adjusted"] = self._stats.get("hrp_covariance_adjusted", 0) + 1
+        elif max_pairwise_corr >= 0.80:
+            # Pairwise correlation >= 0.80 (e.g. NVDA vs US100): 50% haircut
+            scale_mult = min(scale_mult, 1.0) * 0.50
+            self._stats["correlation_clamped"] += 1
+            self._stats["hrp_covariance_adjusted"] = self._stats.get("hrp_covariance_adjusted", 0) + 1
+        elif total_pairwise_corr > 0.60:
             # HRP Covariance Haircut: Penalizes stacking correlated assets (e.g. NVDA + US100)
             hrp_cov_haircut = 1.0 / math.sqrt(1.0 + total_pairwise_corr)
             scale_mult = min(scale_mult, 1.0) * hrp_cov_haircut

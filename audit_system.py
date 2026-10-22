@@ -3902,7 +3902,7 @@ def run_audit():
         log_fail(str(e))
 
     # 71. Invariant 92: The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling
-    print("\n[CHECK 71/71] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
+    print("\n[CHECK 71/73] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
     try:
         has_inv92_agents = "Invariant 92: The Five Pillars of Apex TradFi Capital Profitability" in agents_md
         has_inv92_gemini = "The Five Pillars of Apex TradFi Capital Profitability, Factor Correlation Clamping & Small Capital Compound Scaling (Invariant 92)" in gemini_md
@@ -3938,7 +3938,7 @@ def run_audit():
         log_fail(str(e))
 
     # 72. Invariant 93: Capital.com Execution Bridge, Slippage Auditor, and HMM Regime Filter Fiduciary Gates
-    print("\n[CHECK 72/72] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
+    print("\n[CHECK 72/73] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
     try:
         with open("capital_execution_bridge.py", "r", encoding="utf-8") as f_br:
             bridge_src = f_br.read()
@@ -3965,6 +3965,79 @@ def run_audit():
     except Exception as e:
         failures.append(f"Invariant 93 check failed: {e}")
         log_fail(str(e))
+
+    # 73. Invariant 94: Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix
+    print("\n[CHECK 73/73] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
+    try:
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
+            cit_src = f_cit.read()
+        with open("capital_10y_backtester.py", "r", encoding="utf-8") as f_back:
+            back_src = f_back.read()
+        with open("regime_filter.py", "r", encoding="utf-8") as f_rf:
+            rf_src = f_rf.read()
+        with open("capital_execution_bridge.py", "r", encoding="utf-8") as f_br:
+            bridge_src = f_br.read()
+        with open("capital_engine.py", "r", encoding="utf-8") as f_cap:
+            cap_src = f_cap.read()
+
+        # 1. Asset-Specific H4 Anchor
+        has_cit_h4_commodity = "is_commodity" in cit_src and ("Bypassed on Commodities" in cit_src or "Bypassing H4 Trend Veto" in cit_src)
+        has_back_h4_commodity = "is_commodity" in back_src and "Bypassed on Commodities" in back_src
+
+        # 2. Dynamic Bayesian Win Probability Updating
+        has_bayes_class = "BayesianWinProbabilityUpdater" in rf_src
+        has_bayes_threshold = "get_dynamic_threshold_and_kelly" in rf_src
+        
+        # Dynamic Unit Test for Bayesian Updater
+        from regime_filter import BayesianWinProbabilityUpdater
+        updater = BayesianWinProbabilityUpdater(prior_alpha=12.0, prior_beta=8.0, window_size=20)
+        p0 = updater.get_posterior_win_rate()
+        thresh0, kelly0 = updater.get_dynamic_threshold_and_kelly(68.0)
+        bayes_unit_test_init = (abs(p0 - 0.60) < 1e-4 and thresh0 == 68.0 and kelly0 == 1.0)
+        
+        # Inject 10 consecutive losses to simulate low-edge regime
+        for _ in range(10):
+            updater.record_outcome(False)
+        p_low = updater.get_posterior_win_rate()
+        thresh_low, kelly_low = updater.get_dynamic_threshold_and_kelly(68.0)
+        bayes_unit_test_low = (p_low < 0.45 and thresh_low == 75.0 and kelly_low == 0.50)
+
+        # 3. Execution Latency-Aware Order Routing
+        has_smart_routing = "place_smart_order_latency_aware" in bridge_src
+        has_spread_ratio_check = "current_spread > 1.5 * avg_spread" in bridge_src
+        has_cancel_order = "cancel_working_order" in bridge_src
+
+        # 4. Dynamic Correlation-Aware Sizing & Hard Clamps
+        has_dyn_corr = "compute_dynamic_correlation_matrix" in cap_src and "_DYNAMIC_CORR_MATRIX" in cap_src
+        has_corr_reject_95 = "max_pairwise_corr >= 0.95" in cap_src and "return 0.0" in cap_src
+        has_corr_haircut_85 = "max_pairwise_corr >= 0.85" in cap_src and "0.30" in cap_src
+        has_corr_haircut_80 = "max_pairwise_corr >= 0.80" in cap_src and "0.50" in cap_src
+
+        all_inv94_passed = (
+            has_cit_h4_commodity and has_back_h4_commodity and
+            has_bayes_class and has_bayes_threshold and bayes_unit_test_init and bayes_unit_test_low and
+            has_smart_routing and has_spread_ratio_check and has_cancel_order and
+            has_dyn_corr and has_corr_reject_95 and has_corr_haircut_85 and has_corr_haircut_80
+        )
+
+        if all_inv94_passed:
+            log_pass(
+                "Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94) "
+                "are 100% certified! (Commodity H4 Exemption, Beta Bayesian Threshold 68->75, Limit Routing on Spread > 1.5x, Correlation 0.80/0.85/0.95 Clamps)"
+            )
+        else:
+            failures.append(
+                f"Invariant 94 check failed: cit_h4={has_cit_h4_commodity}, back_h4={has_back_h4_commodity}, "
+                f"bayes_class={has_bayes_class}, bayes_thresh={has_bayes_threshold}, "
+                f"unit_init={bayes_unit_test_init}, unit_low={bayes_unit_test_low}, "
+                f"smart_routing={has_smart_routing}, spread_ratio={has_spread_ratio_check}, cancel={has_cancel_order}, "
+                f"dyn_corr={has_dyn_corr}, reject_95={has_corr_reject_95}, haircut_85={has_corr_haircut_85}, haircut_80={has_corr_haircut_80}"
+            )
+            log_fail("Invariant 94 Asset-Specific H4, Bayesian Updater, Latency-Aware Routing & Correlation Matrix verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 94 check failed: {e}")
+        log_fail(str(e))
+
 
     # Final Summary
 

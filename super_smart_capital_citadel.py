@@ -1418,57 +1418,63 @@ class SuperSmartCapitalCitadel:
             logger.debug(f"Economic calendar trap evaluation note: {e_ecg}")
 
         # Step 1.2: H4 Top-Down Structural Directional Anchor (Wall Street Institutional Macro Tide Lock)
+        # Invariant 94: Asset-Specific H4 Logic (Strict on Equities/Indices, Bypassed on Commodities for Mean-Reversion)
         h4_anchor = {"h4_bias": "NEUTRAL", "veto_short": False, "veto_long": False}
+        is_commodity = any(k in resolved_epic.upper() for k in ["GOLD", "XAU", "SILVER", "XAG", "OIL", "CRUDE", "BRENT", "NATGAS"])
         try:
-            h4_anchor = TradFiH4MarketStructureAnchor.evaluate_h4_trend_anchor(engine, resolved_epic, curr_price)
-            prec = _get_tradfi_precision(resolved_epic, curr_price)
-            bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
-            sp_val = spread if spread > 0 else bench_sp
+            if not is_commodity:
+                h4_anchor = TradFiH4MarketStructureAnchor.evaluate_h4_trend_anchor(engine, resolved_epic, curr_price)
+                prec = _get_tradfi_precision(resolved_epic, curr_price)
+                bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
+                sp_val = spread if spread > 0 else bench_sp
 
-            if strategy_regime == "TREND_FOLLOWING":
-                if norm_side == "SELL" and h4_anchor.get("veto_short"):
-                    ema200_val = h4_anchor.get("ema200_h4", curr_price)
-                    reason = (
-                        f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BULLISH (Price ${curr_price:,.2f} >= "
-                        f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'HH-HL')}). "
-                        f"Selling/Shorting on 15m against the institutional H4 macro uptrend is strictly prohibited "
-                        f"by Wall Street Top-Down Anchor."
-                    )
-                    sl_default = round(curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
-                    res = {
-                        "epic": resolved_epic,
-                        "proposed_side": norm_side,
-                        "is_approved": False,
-                        "rejection_reason": reason,
-                        "confluence_score": 0.0,
-                        "spread": sp_val,
-                        "invalidation_sl": sl_default,
-                        "h4_trend_anchor": h4_anchor
-                    }
-                    cls._CITADEL_CACHE[cache_key] = (now, res)
-                    return res
+                if strategy_regime == "TREND_FOLLOWING":
+                    if norm_side == "SELL" and h4_anchor.get("veto_short"):
+                        ema200_val = h4_anchor.get("ema200_h4", curr_price)
+                        reason = (
+                            f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BULLISH (Price ${curr_price:,.2f} >= "
+                            f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'HH-HL')}). "
+                            f"Selling/Shorting on 15m against the institutional H4 macro uptrend is strictly prohibited "
+                            f"by Wall Street Top-Down Anchor."
+                        )
+                        sl_default = round(curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
+                        res = {
+                            "epic": resolved_epic,
+                            "proposed_side": norm_side,
+                            "is_approved": False,
+                            "rejection_reason": reason,
+                            "confluence_score": 0.0,
+                            "spread": sp_val,
+                            "invalidation_sl": sl_default,
+                            "h4_trend_anchor": h4_anchor
+                        }
+                        cls._CITADEL_CACHE[cache_key] = (now, res)
+                        return res
 
-                if norm_side == "BUY" and h4_anchor.get("veto_long"):
-                    ema200_val = h4_anchor.get("ema200_h4", curr_price)
-                    reason = (
-                        f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BEARISH (Price ${curr_price:,.2f} <= "
-                        f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'LH-LL')}). "
-                        f"Buying/Longing on 15m against the institutional H4 macro downtrend is strictly prohibited "
-                        f"by Wall Street Top-Down Anchor (Falling Knife Guard)."
-                    )
-                    sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5), prec)
-                    res = {
-                        "epic": resolved_epic,
-                        "proposed_side": norm_side,
-                        "is_approved": False,
-                        "rejection_reason": reason,
-                        "confluence_score": 0.0,
-                        "spread": sp_val,
-                        "invalidation_sl": sl_default,
-                        "h4_trend_anchor": h4_anchor
-                    }
-                    cls._CITADEL_CACHE[cache_key] = (now, res)
-                    return res
+                    if norm_side == "BUY" and h4_anchor.get("veto_long"):
+                        ema200_val = h4_anchor.get("ema200_h4", curr_price)
+                        reason = (
+                            f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BEARISH (Price ${curr_price:,.2f} <= "
+                            f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'LH-LL')}). "
+                            f"Buying/Longing on 15m against the institutional H4 macro downtrend is strictly prohibited "
+                            f"by Wall Street Top-Down Anchor (Falling Knife Guard)."
+                        )
+                        sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5), prec)
+                        res = {
+                            "epic": resolved_epic,
+                            "proposed_side": norm_side,
+                            "is_approved": False,
+                            "rejection_reason": reason,
+                            "confluence_score": 0.0,
+                            "spread": sp_val,
+                            "invalidation_sl": sl_default,
+                            "h4_trend_anchor": h4_anchor
+                        }
+                        cls._CITADEL_CACHE[cache_key] = (now, res)
+                        return res
+            else:
+                h4_anchor = {"h4_bias": "COMMODITY_MEAN_REVERSION", "veto_short": False, "veto_long": False}
+                logger.info(f"⚡ [COMMODITY ANCHOR] Bypassing H4 Trend Veto for {resolved_epic} (Preserving Mean-Reversion Edge).")
         except Exception as e_h4:
             logger.debug(f"H4 trend anchor evaluation note: {e_h4}")
 
@@ -2401,6 +2407,13 @@ class SuperSmartCapitalCitadel:
         except Exception as e_ofa:
             logger.debug(f"Orthogonal factor analysis fallback note: {e_ofa}")
 
+        # Dynamic Bayesian Confluence Threshold Updating (AQ93)
+        try:
+            from regime_filter import get_bayesian_threshold_and_kelly
+            dyn_threshold, _ = get_bayesian_threshold_and_kelly(68.0)
+        except Exception:
+            dyn_threshold = 68.0
+
         # Gap 1 (ចន្លោះទី 1): Calibrate Raw Confluence Score to Genuine Win Probability
         # Deflates multicollinearity (FVG + Golden Pocket + Order Block + Sweep + OTE) via L2-regularized
         # Platt Scaling and Isotonic Calibration to guarantee Predicted ~70% ~= Realized ~70% on OOS data.
@@ -2433,10 +2446,10 @@ class SuperSmartCapitalCitadel:
             conviction_tier = "STANDARD"
             conviction_badge = f"🛡️ [INSTITUTIONAL TRADFI CONVICTION {confluence_score:.1f}%]"
             shrinkage_deflation = 0.0
-            stat_approved = (confluence_score >= 68.0)
+            stat_approved = (confluence_score >= dyn_threshold)
 
-        # Statistical Clearance: requires raw threshold AND statistical calibrated win rate >= 50%
-        is_approved = bool(confluence_score >= 68.0 and stat_approved)
+        # Statistical Clearance: requires dynamic Bayesian threshold AND statistical calibrated win rate >= 50%
+        is_approved = bool(confluence_score >= dyn_threshold and stat_approved)
 
         smc_ict_payload = {
             "order_blocks": detected_obs,
@@ -2476,8 +2489,8 @@ class SuperSmartCapitalCitadel:
                 if is_approved
                 else (
                     f"LOW_CALIBRATED_WIN_PROBABILITY ({calibrated_win_prob_pct}% < 50.0%)"
-                    if confluence_score >= 68.0
-                    else f"CONFLUENCE_SCORE_BELOW_THRESHOLD ({confluence_score} < 68.0)"
+                    if confluence_score >= dyn_threshold
+                    else f"CONFLUENCE_SCORE_BELOW_THRESHOLD ({confluence_score} < {dyn_threshold:.1f})"
                 )
             ),
             "rsi_15m": rsi_15m,

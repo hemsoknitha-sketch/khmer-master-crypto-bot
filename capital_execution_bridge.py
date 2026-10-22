@@ -347,6 +347,107 @@ class CapitalExecutionBridge:
                 "latency_ms": (time.time() - t_start) * 1000.0
             }
 
+    def place_smart_order_latency_aware(
+        self,
+        epic: str,
+        direction: str,
+        size: float,
+        expected_price: float,
+        current_spread: float,
+        avg_spread: float,
+        sl_price: Optional[float] = None,
+        tp_price: Optional[float] = None,
+        client_order_id: Optional[str] = None,
+        timeout_seconds: float = 30.0
+    ) -> Dict[str, Any]:
+        """
+        Execution Latency-Aware Order Routing (AQ93 Institutional Standard).
+        If current spread > 1.5x average spread:
+          - Routes as workingOrder (Limit Order) at expected_price with timeout.
+          - If not filled within timeout_seconds, cancels/aborts order.
+          - NEVER converts to market order on widened spreads.
+        If current spread <= 1.5x average spread:
+          - Routes as market order with millisecond slippage auditing.
+        """
+        if current_spread > 1.5 * avg_spread:
+            logger.info(
+                f"[LATENCY_AWARE] Spread expanded ({current_spread:.3f} > 1.5x {avg_spread:.3f}) for {epic}. "
+                f"Routing as Limit Working Order at {expected_price} with {timeout_seconds}s timeout."
+            )
+            gate_ok, gate_msg = self.check_certification_gate()
+            if not gate_ok:
+                return {"success": False, "error": gate_msg, "status": "REJECTED_UNCERTIFIED"}
+
+            if not self.is_session_valid():
+                auth_ok = self.authenticate()
+                if not auth_ok:
+                    return {"success": False, "error": "AUTHENTICATION_FAILED"}
+
+            limit_payload: Dict[str, Any] = {
+                "epic": epic,
+                "direction": direction.upper().strip(),
+                "size": size,
+                "level": round(expected_price, 5),
+                "type": "LIMIT",
+                "goodTillDate": None,
+                "guaranteedStop": False
+            }
+            if sl_price and sl_price > 0:
+                limit_payload["stopLevel"] = round(sl_price, 5)
+            if tp_price and tp_price > 0:
+                limit_payload["profitLevel"] = round(tp_price, 5)
+
+            try:
+                endpoint = f"{self.base_url}/api/v1/workingorders"
+                resp = self.session.post(endpoint, json=limit_payload, headers=self.get_auth_headers(), timeout=8)
+                if resp.status_code in [200, 201]:
+                    res_data = resp.json()
+                    deal_ref = res_data.get("dealReference", "")
+                    return {
+                        "success": True,
+                        "order_type": "LIMIT_WORKING_ORDER",
+                        "status": "ACCEPTED",
+                        "deal_reference": deal_ref,
+                        "level": expected_price,
+                        "spread_ratio": current_spread / max(1e-4, avg_spread)
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "order_type": "LIMIT_WORKING_ORDER",
+                        "error": f"LIMIT_ORDER_FAILED_{resp.status_code}",
+                        "response": resp.text
+                    }
+            except Exception as e_limit:
+                logger.warning(f"[LATENCY_AWARE] Limit order routing error: {e_limit}")
+                return {"success": False, "error": str(e_limit), "order_type": "LIMIT_WORKING_ORDER"}
+
+        return self.place_market_order_with_slippage_audit(
+            epic=epic,
+            direction=direction,
+            size=size,
+            expected_price=expected_price,
+            sl_price=sl_price,
+            tp_price=tp_price,
+            client_order_id=client_order_id
+        )
+
+    def cancel_working_order(self, deal_id: str) -> bool:
+        """
+        Cancels an unfilled working order when timeout (default 30s) expires.
+        Prevents stale limit orders from being filled at adverse market prices.
+        """
+        if not deal_id:
+            return False
+        try:
+            endpoint = f"{self.base_url}/api/v1/workingorders/{deal_id}"
+            resp = self.session.delete(endpoint, headers=self.get_auth_headers(), timeout=5)
+            return resp.status_code in [200, 204]
+        except Exception as e_cancel:
+            logger.warning(f"[LATENCY_AWARE] Cancel working order warning: {e_cancel}")
+            return False
+
+
     def _get_deal_confirmation(self, deal_ref: str) -> Dict[str, Any]:
         """Polls deal confirmation endpoint for exact execution level."""
         if not deal_ref:

@@ -146,3 +146,71 @@ class InstitutionalHMMRegimeFilter:
             "sizing_factor": sizing_factor,
             "veto_reason": veto_reason
         }
+
+
+class BayesianWinProbabilityUpdater:
+    """
+    Dynamic Bayesian Win Probability Updating Module (AQ93 Institutional Standard).
+    Equation: P(Win | Recent Data) = P(Recent Data | Win) * P(Win) / P(Recent Data)
+    Under Beta prior Beta(alpha_0, beta_0), updates posterior distribution Beta(alpha, beta)
+    across a rolling window of recent trades (default 20 trades).
+    If posterior win rate drops below 45%, dynamically increases Citadel confluence threshold
+    from 68.0 to 75.0, filtering for only highest-conviction trades and optimizing geometric growth:
+      G = f * E[R] - 0.5 * f^2 * sigma^2
+    """
+
+    def __init__(self, prior_alpha: float = 12.0, prior_beta: float = 8.0, window_size: int = 20):
+        self.prior_alpha = prior_alpha
+        self.prior_beta = prior_beta
+        self.window_size = window_size
+        self.recent_outcomes: List[int] = []
+
+    def record_outcome(self, is_win: bool):
+        """Records the binary outcome of a closed trade (1 for win, 0 for loss)."""
+        self.recent_outcomes.append(1 if is_win else 0)
+        if len(self.recent_outcomes) > self.window_size:
+            self.recent_outcomes.pop(0)
+
+    def get_posterior_win_rate(self) -> float:
+        """Computes posterior expected win probability via Beta distribution mean."""
+        wins = sum(self.recent_outcomes)
+        losses = len(self.recent_outcomes) - wins
+        alpha = self.prior_alpha + wins
+        beta = self.prior_beta + losses
+        return alpha / (alpha + beta)
+
+    def get_dynamic_threshold_and_kelly(self, baseline_threshold: float = 68.0) -> Tuple[float, float]:
+        """
+        Calculates dynamic confluence threshold and Kelly fraction multiplier
+        based on real-time Bayesian posterior win probability.
+        """
+        post_p = self.get_posterior_win_rate()
+        if post_p < 0.45:
+            # Low-edge regime: raise threshold to 75.0, halve position size
+            threshold = 75.0
+            kelly_mult = 0.50
+        elif post_p > 0.65:
+            # High-edge regime: baseline threshold, 1.15x boost
+            threshold = 68.0
+            kelly_mult = 1.15
+        else:
+            threshold = baseline_threshold
+            kelly_mult = 1.0
+        return threshold, kelly_mult
+
+
+_GLOBAL_BAYESIAN_UPDATER = BayesianWinProbabilityUpdater()
+
+def get_bayesian_win_probability_updater() -> BayesianWinProbabilityUpdater:
+    """Returns global singleton BayesianWinProbabilityUpdater."""
+    global _GLOBAL_BAYESIAN_UPDATER
+    return _GLOBAL_BAYESIAN_UPDATER
+
+def get_bayesian_threshold_and_kelly(baseline_threshold: float = 68.0) -> Tuple[float, float]:
+    """Helper to get current dynamic threshold and Kelly fraction multiplier."""
+    return _GLOBAL_BAYESIAN_UPDATER.get_dynamic_threshold_and_kelly(baseline_threshold)
+
+def record_bayesian_trade_outcome(is_win: bool):
+    """Helper to record trade outcome in rolling Bayesian updater."""
+    _GLOBAL_BAYESIAN_UPDATER.record_outcome(is_win)
+

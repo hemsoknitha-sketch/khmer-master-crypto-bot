@@ -526,8 +526,9 @@ def evaluate_bar_signals(
     raw_score = 50.0
 
     if buy_score >= 68.0 and buy_score > sell_score:
-        # VETO 1: H4 Trend Anchor
-        if not ablation_flags.get("drop_h4_anchor", False) and not h4_bullish:
+        # VETO 1: H4 Trend Anchor (Asset-Specific: Strict 1.0 on Equities/Indices, Bypassed on Commodities)
+        is_commodity = (spec.get("type") == "COMMODITY")
+        if not ablation_flags.get("drop_h4_anchor", False) and not is_commodity and not h4_bullish:
             meta["veto_reason"] = "H4_TREND_ANCHOR_VETO (Price below EMA200)"
             return None, 0.0, 0.0, meta
 
@@ -551,8 +552,9 @@ def evaluate_bar_signals(
         raw_score = min(99.5, buy_score)
 
     elif sell_score >= 68.0 and sell_score > buy_score:
-        # VETO 1: H4 Trend Anchor
-        if not ablation_flags.get("drop_h4_anchor", False) and not h4_bearish:
+        # VETO 1: H4 Trend Anchor (Asset-Specific: Strict 1.0 on Equities/Indices, Bypassed on Commodities)
+        is_commodity = (spec.get("type") == "COMMODITY")
+        if not ablation_flags.get("drop_h4_anchor", False) and not is_commodity and not h4_bearish:
             meta["veto_reason"] = "H4_TREND_ANCHOR_VETO (Price above EMA200)"
             return None, 0.0, 0.0, meta
 

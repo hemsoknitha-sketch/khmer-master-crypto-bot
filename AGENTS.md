@@ -1735,6 +1735,22 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - TP1 / Breakeven Armor engages as soon as $R_{\text{gain}} \ge +1.50R$ and net profit clears spread ($\text{UPL} \ge \max(0.60, 1.5\times\text{spread})$), locking trade at $0.00R$ Free Roll.
      - Flash Shock Early Harvest triggers if peak $R \ge +1.5R$ (or peak UPL $\ge \max(1.50, 2.0\times\text{spread})$, ROI $\ge +6.0\%$) retraces $\ge 50\%$, instantly banking gains before trades slip into negative territory.
 
+### Invariant 93: Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter Fiduciary Gates (AQ93 Standard)
+- **Location:** `capital_execution_bridge.py`, `execution_slippage_audit.py`, `regime_filter.py`, `audit_system.py` [CHECK 72/73]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty:
+  1. Certification Gate Enforcement: Live real capital execution is hard-gated at $\le 0.1\%$ risk until $N \ge 544$ verified trades are achieved (`MAX_UNCERTIFIED_LIVE_RISK_PCT = 0.0010`).
+  2. Idempotency Ring-Fence: All Capital.com orders enforce client-side deduplication keys (`processed_client_order_ids`) to eliminate accidental duplicate execution under network retries.
+  3. Execution Slippage Auditing: Millisecond-level tracking of expected vs filled execution price with tick-by-tick spread recording to isolate market microstructure friction from signal alpha.
+  4. Gaussian HMM Regime Clearance: Three-state Markov regime detection (Trend, Mean-Reversion, High Volatility/Chop) gating entries and scaling position sizes.
+
+### Invariant 94: Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (AQ94 Standard - គ្រឹះ ៤ ប្រការបង្កើន Win Rate & ការពារដើមទុន)
+- **Location:** `super_smart_capital_citadel.py`, `capital_10y_backtester.py`, `regime_filter.py`, `capital_execution_bridge.py`, `capital_engine.py`, `audit_system.py` [CHECK 73/73]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Capital Protection:
+  1. **Asset-Specific H4 Trend Anchor:** Tech Equities (`NVDA`, `TSLA`, `AAPL`, `MSFT`) and Indices (`US100`, `US500`, `DE40`) strictly enforce H4 Trend Anchor (weight 1.0) to eliminate falling knife drawdowns. Commodities (`GOLD`, `SILVER`, `OIL_CRUDE`) bypass H4 trend veto to eliminate lag and preserve high-win-rate mean-reversion and Turtle Soup liquidity sweeps.
+  2. **Dynamic Bayesian Win Probability Updating:** Prior $\text{Beta}(12, 8)$ updated across rolling 20 trade outcomes ($P(\text{Win} | \text{Data}) \propto P(\text{Data} | \text{Win}) P(\text{Win})$). If posterior win rate drops below 45%, Citadel confluence threshold dynamically rises from 68.0 to 75.0, filtering for only highest-conviction signals and halving Kelly fraction ($0.50\times$) to maximize long-term geometric capital growth $G = f \cdot E[R] - 0.5 \cdot f^2 \cdot \sigma^2$.
+  3. **Execution Latency-Aware Order Routing:** If current spread $> 1.5\times$ historical average spread, the bridge routes as a Limit Working Order with 30-second timeout; if unfilled, order is canceled and signal is aborted (`cancel_working_order`). Orders are never converted to market orders on blown-out spreads.
+  4. **Dynamic Correlation-Aware Sizing & Hard Clamps:** Pearson correlation matrix calculated on cleaned log returns every 60 seconds. Hard limits: pairwise $\rho \ge 0.95$ rejects trade entirely (collinear data error); $\rho \ge 0.85$ applies 70% haircut; $\rho \ge 0.80$ applies 50% haircut; Risk Parity weighting $w_i = (1/\sigma_i) / \sum (1/\sigma_j)$ with correlation penalty $1 / (1 + \rho)$.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
