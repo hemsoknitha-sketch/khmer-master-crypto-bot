@@ -949,15 +949,44 @@ class TradFiSessionKillZoneRouter:
             )
             return False, reason, session_info
 
-        is_us_stock = any(s == resolved_epic or s in resolved_epic for s in cls.US_EQUITIES)
-        is_us_index = any(idx == resolved_epic or idx in resolved_epic for idx in cls.US_INDICES)
-        is_eu_index = any(de == resolved_epic or de in resolved_epic for de in cls.EUROPEAN_INDICES)
-        is_eu_stock = any(es == resolved_epic or es in resolved_epic for es in getattr(cls, "EUROPEAN_EQUITIES", set()))
-        is_asian_index = any(ai == resolved_epic or ai in resolved_epic for ai in getattr(cls, "ASIAN_INDICES", set()))
-        is_asian_stock = any(as_ == resolved_epic or as_ in resolved_epic for as_ in getattr(cls, "ASIAN_EQUITIES", set()))
+        # Priority 1: Institutional Commodities Clearance (Zero Equities/Index Collision)
+        is_commodity = (
+            resolved_epic in cls.COMMODITIES
+            or any(c == resolved_epic or resolved_epic in (c, f"{c}.USD", f"{c}USD") for c in cls.COMMODITIES)
+            or resolved_epic in {"GOLD", "SILVER", "OIL", "OIL_CRUDE", "OIL_BRENT", "NATURALGAS", "GAS", "XAUUSD", "XAGUSD"}
+        )
+
+        def _matches_ticker(ticker: str, target: str) -> bool:
+            """Exact or dot/slash-delimited ticker match, avoiding single-letter substring collisions."""
+            t_u = str(ticker).strip().upper()
+            tgt_u = str(target).strip().upper()
+            if t_u == tgt_u:
+                return True
+            if tgt_u.startswith(t_u + ".") or tgt_u.endswith("." + t_u):
+                return True
+            if tgt_u.startswith(t_u + "/") or tgt_u.endswith("/" + t_u):
+                return True
+            return False
+
+        if is_commodity:
+            is_us_stock = False
+            is_us_index = False
+            is_eu_index = False
+            is_eu_stock = False
+            is_asian_index = False
+            is_asian_stock = False
+        else:
+            is_us_index = any(_matches_ticker(idx, resolved_epic) for idx in cls.US_INDICES)
+            is_eu_index = any(_matches_ticker(de, resolved_epic) for de in cls.EUROPEAN_INDICES)
+            is_asian_index = any(_matches_ticker(ai, resolved_epic) for ai in getattr(cls, "ASIAN_INDICES", set()))
+            is_us_stock = any(_matches_ticker(s, resolved_epic) for s in cls.US_EQUITIES)
+            is_eu_stock = any(_matches_ticker(es, resolved_epic) for es in getattr(cls, "EUROPEAN_EQUITIES", set()))
+            is_asian_stock = any(_matches_ticker(as_, resolved_epic) for as_ in getattr(cls, "ASIAN_EQUITIES", set()))
 
         # Asian Session (07:00 - 13:30 / 14:00 ICT = 00:00 - 07:00 UTC)
         if sess_code == "ASIAN_SESSION":
+            if is_commodity:
+                return True, "ASIAN_SESSION_COMMODITY_CLEARANCE", session_info
             if is_us_stock or is_us_index:
                 reason = (
                     f"SESSION_KILL_ZONE_ASIAN_US_EQUITIES_CLOSED: US Tech Equities (NVDA, TSLA, META, GOOGL) and "
@@ -978,6 +1007,8 @@ class TradFiSessionKillZoneRouter:
 
         # London Open Kill Zone (14:00 - 18:30 / 20:30 ICT = 07:00 - 13:30 UTC)
         if sess_code == "LONDON_KILL_ZONE":
+            if is_commodity:
+                return True, "LONDON_KILL_ZONE_COMMODITY_CLEARANCE", session_info
             if is_us_stock:
                 reason = (
                     f"SESSION_KILL_ZONE_LONDON_US_EQUITIES_WAITING_OPEN: Wall Street Cash Market opens at 20:30 ICT (13:30 UTC). "
@@ -995,6 +1026,8 @@ class TradFiSessionKillZoneRouter:
 
         # New York Open Kill Zone (20:30 - 01:30 / 03:30 ICT = 13:30 - 20:30 UTC)
         if sess_code == "NEW_YORK_KILL_ZONE":
+            if is_commodity:
+                return True, "NEW_YORK_KILL_ZONE_COMMODITY_CLEARANCE", session_info
             if is_asian_stock:
                 reason = (
                     f"SESSION_KILL_ZONE_ASIAN_MARKETS_CLOSED: Asian cash markets ({resolved_epic}) closed during New York session."
