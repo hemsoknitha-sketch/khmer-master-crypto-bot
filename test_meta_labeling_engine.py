@@ -8,7 +8,11 @@ Author: HEM SINATH | Institutional Quantitative Governance
 import os
 import unittest
 import numpy as np
-from capital_meta_labeling_engine import CapitalMetaLabelingEngine, FEATURE_COLUMNS
+from capital_meta_labeling_engine import (
+    CapitalMetaLabelingEngine,
+    FEATURE_COLUMNS,
+    InstitutionalMultiModelStackingClassifier
+)
 
 
 class TestMetaLabelingEngine(unittest.TestCase):
@@ -95,6 +99,44 @@ class TestMetaLabelingEngine(unittest.TestCase):
         )
         self.assertFalse(res["is_ml_inferred"])
         self.assertTrue(0.0 < res["meta_win_prob"] < 1.0)
+
+    def test_multi_model_stacking_classifier_fit_predict(self):
+        """InstitutionalMultiModelStackingClassifier must fit base models and predict valid probability bounds."""
+        import pandas as pd
+        X_toy = pd.DataFrame(np.random.randn(40, len(FEATURE_COLUMNS)), columns=FEATURE_COLUMNS)
+        y_toy = pd.Series(np.random.randint(0, 2, 40))
+        stack = InstitutionalMultiModelStackingClassifier(weights=(0.40, 0.40, 0.20), random_state=42)
+        stack.fit(X_toy, y_toy)
+
+        probs = stack.predict_proba(X_toy.iloc[:5])
+        self.assertEqual(probs.shape, (5, 2))
+        np.testing.assert_allclose(probs.sum(axis=1), np.ones(5), atol=1e-5)
+        self.assertTrue(hasattr(stack, "models_"))
+        self.assertIn("xgb", stack.models_)
+        self.assertIn("lgb", stack.models_)
+        self.assertIn("cat", stack.models_)
+
+        details = stack.predict_detailed(X_toy.iloc[:1], threshold=0.55)
+        self.assertIn("stacked_prob", details)
+        self.assertIn("prob_xgb", details)
+        self.assertIn("prob_lgb", details)
+        self.assertIn("prob_cat", details)
+        self.assertIn("consensus_ratio", details)
+        self.assertIn("dispersion", details)
+        self.assertTrue(0.0 <= details["consensus_ratio"] <= 1.0)
+
+    def test_multi_model_stacking_loaded_inference(self):
+        """Loaded meta-model must provide multi-model consensus and breakdown."""
+        res = CapitalMetaLabelingEngine.predict_meta_label(self.sample_features, threshold=0.55)
+        self.assertTrue(res["is_ml_inferred"])
+        self.assertTrue(res.get("is_stacked_ensemble", False))
+        self.assertIn("model_breakdown", res)
+        self.assertIn("consensus_ratio", res)
+        self.assertIn("model_dispersion", res)
+        if res["model_breakdown"] is not None:
+            self.assertIn("xgb", res["model_breakdown"])
+            self.assertIn("lgb", res["model_breakdown"])
+            self.assertIn("cat", res["model_breakdown"])
 
 
 if __name__ == "__main__":

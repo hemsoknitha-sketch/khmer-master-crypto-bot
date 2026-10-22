@@ -3902,7 +3902,7 @@ def run_audit():
         log_fail(str(e))
 
     # 71. Invariant 92: The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling
-    print("\n[CHECK 71/74] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
+    print("\n[CHECK 71/75] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
     try:
         has_inv92_agents = "Invariant 92: The Five Pillars of Apex TradFi Capital Profitability" in agents_md
         has_inv92_gemini = "The Five Pillars of Apex TradFi Capital Profitability, Factor Correlation Clamping & Small Capital Compound Scaling (Invariant 92)" in gemini_md
@@ -3938,7 +3938,7 @@ def run_audit():
         log_fail(str(e))
 
     # 72. Invariant 93: Capital.com Execution Bridge, Slippage Auditor, and HMM Regime Filter Fiduciary Gates
-    print("\n[CHECK 72/74] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
+    print("\n[CHECK 72/75] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
     try:
         with open("capital_execution_bridge.py", "r", encoding="utf-8") as f_br:
             bridge_src = f_br.read()
@@ -3967,7 +3967,7 @@ def run_audit():
         log_fail(str(e))
 
     # 73. Invariant 94: Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix
-    print("\n[CHECK 73/74] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
+    print("\n[CHECK 73/75] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
     try:
         with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
             cit_src = f_cit.read()
@@ -4039,7 +4039,7 @@ def run_audit():
         log_fail(str(e))
 
     # 74. Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge
-    print("\n[CHECK 74/74] Verifying Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)...")
+    print("\n[CHECK 74/75] Verifying Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)...")
     try:
         has_inv95_agents = "Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module" in agents_md
         has_inv95_gemini = "Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)" in gemini_md
@@ -4167,6 +4167,106 @@ def run_audit():
             log_fail("Invariant 95 Institutional Turtle Soup Liquidity Sweep Reversal verification failed!")
     except Exception as e:
         failures.append(f"Invariant 95 check failed: {e}")
+        log_fail(str(e))
+
+    # 75. Invariant 96: Institutional Multi-Model Stacking Classifier Meta-Labeling Framework
+    print("\n[CHECK 75/75] Verifying Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)...")
+    try:
+        has_inv96_agents = "Invariant 96: Institutional Multi-Model Stacking Classifier Meta-Labeling Framework" in agents_md
+        has_inv96_gemini = "Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)" in gemini_md
+
+        with open("capital_meta_labeling_engine.py", "r", encoding="utf-8") as f_meta:
+            meta_src = f_meta.read()
+
+        has_stacking_cls = "class InstitutionalMultiModelStackingClassifier:" in meta_src
+        has_get_stacking = "def get_multi_model_stacking_classifier(" in meta_src
+        has_lgbm = "lgb.LGBMClassifier" in meta_src
+        has_catboost = "CatBoostClassifier" in meta_src
+        has_xgb = "xgb.XGBClassifier" in meta_src
+        has_predict_detailed = "def predict_detailed(" in meta_src
+        has_convex_weights = "(0.40, 0.40, 0.20)" in meta_src
+        has_consensus = "consensus_ratio" in meta_src and "model_dispersion" in meta_src
+
+        # Model files check
+        meta_model_path = os.path.join("models", "capital_meta_model.pkl")
+        meta_metrics_path = os.path.join("models", "capital_meta_training_metrics.json")
+        has_model_file = os.path.exists(meta_model_path) and os.path.getsize(meta_model_path) > 10000
+        has_metrics_file = os.path.exists(meta_metrics_path) and os.path.getsize(meta_metrics_path) > 100
+
+        import json
+        with open(meta_metrics_path, "r", encoding="utf-8") as f_met:
+            metrics_data = json.load(f_met)
+        test_brier = metrics_data.get("test_brier_score", 1.0)
+        test_auc = metrics_data.get("test_auc", 0.0)
+        metrics_valid = (test_brier <= 0.22 and test_auc >= 0.60)
+
+        # Dynamic Unit Test for Multi-Model Stacking Classifier & Engine
+        from capital_meta_labeling_engine import (
+            InstitutionalMultiModelStackingClassifier,
+            get_multi_model_stacking_classifier,
+            get_meta_labeling_engine,
+            FEATURE_COLUMNS,
+            FEATURE_DEFAULTS
+        )
+        import pandas as pd
+        import numpy as np
+
+        engine_cls = get_meta_labeling_engine()
+        model = engine_cls.load_model()
+        is_stacked_instance = isinstance(model, InstitutionalMultiModelStackingClassifier)
+
+        # Synthetic feature vector
+        x_dummy = pd.DataFrame([[FEATURE_DEFAULTS.get(col, 0.0) for col in FEATURE_COLUMNS]], columns=FEATURE_COLUMNS)
+        detailed = model.predict_detailed(x_dummy)
+        
+        p_stack = detailed.get("stacked_prob", 0.0)
+        p_xgb = detailed.get("prob_xgb", 0.0)
+        p_lgb = detailed.get("prob_lgb", 0.0)
+        p_cat = detailed.get("prob_cat", 0.0)
+        c_ratio = detailed.get("consensus_ratio", 0.0)
+        
+        expected_convex = 0.40 * p_xgb + 0.40 * p_lgb + 0.20 * p_cat
+        convex_ok = abs(p_stack - expected_convex) < 1e-4
+        probs_valid = all(0.0 <= p <= 1.0 for p in [p_stack, p_xgb, p_lgb, p_cat]) and (0.0 <= c_ratio <= 1.0)
+
+        # Full engine prediction pipeline test
+        test_feat = dict(FEATURE_DEFAULTS)
+        test_feat["raw_score"] = 75.0
+        test_feat["calib_p"] = 0.65
+        pred_res = engine_cls.predict_meta_label(features=test_feat, threshold=0.55)
+        pipeline_valid = (
+            pred_res.get("is_stacked_ensemble") is True and
+            "consensus_ratio" in pred_res and
+            "model_breakdown" in pred_res and
+            isinstance(pred_res.get("meta_win_prob"), float)
+        )
+
+        all_inv96_passed = (
+            has_inv96_agents and has_inv96_gemini and
+            has_stacking_cls and has_get_stacking and
+            has_lgbm and has_catboost and has_xgb and
+            has_predict_detailed and has_convex_weights and has_consensus and
+            has_model_file and has_metrics_file and metrics_valid and
+            is_stacked_instance and convex_ok and probs_valid and pipeline_valid
+        )
+
+        if all_inv96_passed:
+            log_pass(
+                f"Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96) "
+                f"is 100% certified! (XGB 40% + LGBM 40% + CatBoost 20%, Test Brier={test_brier:.4f} <= 0.22, "
+                f"Test AUC={test_auc:.4f} >= 0.60, Consensus Ratio={c_ratio:.2f}, Detailed Telemetry Verified)"
+            )
+        else:
+            failures.append(
+                f"Invariant 96 check failed: agents={has_inv96_agents}, gemini={has_inv96_gemini}, "
+                f"stacking_cls={has_stacking_cls}, lgbm={has_lgbm}, catboost={has_catboost}, "
+                f"weights={has_convex_weights}, model_file={has_model_file}, metrics_valid={metrics_valid}, "
+                f"stacked_instance={is_stacked_instance}, convex_ok={convex_ok}, "
+                f"probs_valid={probs_valid}, pipeline_valid={pipeline_valid}"
+            )
+            log_fail("Invariant 96 Institutional Multi-Model Stacking Classifier verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 96 check failed: {e}")
         log_fail(str(e))
 
 

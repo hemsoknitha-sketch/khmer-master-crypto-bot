@@ -39,3 +39,4 @@ ico_silent_logs.txt
 
 # Scratch scripts & temporary tests
 scratch/
+catboost_info/
