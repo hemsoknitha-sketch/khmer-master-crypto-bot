@@ -987,7 +987,9 @@ def run_backtest_simulation(
     end_date: Optional[str] = None,
     initial_equity: float = 10000.0,
     base_risk_dollars: Optional[float] = None,
-    specs_override: Optional[Dict[str, Dict[str, Any]]] = None
+    specs_override: Optional[Dict[str, Dict[str, Any]]] = None,
+    compounding: bool = False,
+    risk_pct: float = 0.01
 ) -> Tuple[List[Trade], pd.DataFrame, Dict[str, Any]]:
     """
     Simulates the strategy across all instruments chronologically day-by-day.
@@ -1172,7 +1174,7 @@ def run_backtest_simulation(
                     regime=regime,
                     ablation_mode=ablation_mode,
                     sizing_multiplier=sz_mult,
-                    base_risk_dollars=effective_base_risk,
+                    base_risk_dollars=(max(10.0 if initial_equity >= 1000.0 else 2.50, portfolio_equity * risk_pct) if compounding else effective_base_risk),
                     min_deal_size=active_specs[epic].get('min_deal_size')
                 )
                 if new_trade.risk_overrun:
@@ -1597,6 +1599,7 @@ def main():
     parser = argparse.ArgumentParser(description="Angkor Quant 10-Year Institutional Backtester")
     parser.add_argument("--capital", type=float, default=10000.0, help="Initial capital in USD (default: 10000.0)")
     parser.add_argument("--cfd", action="store_true", help="Force Capital.com CFD specifications")
+    parser.add_argument("--compounding", action="store_true", help="Enable dynamic rolling equity compounding")
     args, _ = parser.parse_known_args()
 
     initial_equity = float(args.capital)
@@ -1611,6 +1614,7 @@ def main():
     print("=" * 78)
     print(f"  ANGKOR QUANT — 10-YEAR INSTITUTIONAL TRADFI BACKTESTING & VALIDATION")
     print(f"  Capital: ${initial_equity:,.2f} | Mode: {'Capital.com CFD Specs' if use_cfd else 'Institutional Multi-Asset'}")
+    print(f"  Compounding: {'ENABLED (Dynamic Rolling Equity)' if args.compounding else 'DISABLED (Fixed Base Risk)'}")
     print(f"  Version: 1.0.0 (The 84 Pillars Institutional Audit & Ablation Suite)")
     print("=" * 78)
 
@@ -1621,7 +1625,8 @@ def main():
     logger.info(f">>> STAGE 1: Simulating Full System (2016–2026, Capital: ${initial_equity:,.2f})...")
     trades, df_equity, full_metrics = run_backtest_simulation(
         assets_data, macro_data, initial_equity=initial_equity,
-        base_risk_dollars=effective_base_risk, specs_override=active_specs
+        base_risk_dollars=effective_base_risk, specs_override=active_specs,
+        compounding=args.compounding
     )
 
     print("\n--- BASELINE FULL SYSTEM 10-YEAR AUDIT RESULTS ---")

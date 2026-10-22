@@ -333,7 +333,9 @@ def run_forward_strategy_simulation(
     regimes: np.ndarray,
     initial_equity: float = INITIAL_EQUITY,
     base_risk_dollars: Optional[float] = None,
-    specs_override: Optional[Dict[str, Dict[str, Any]]] = None
+    specs_override: Optional[Dict[str, Dict[str, Any]]] = None,
+    compounding: bool = False,
+    risk_pct: float = 0.01
 ) -> Tuple[List[Any], pd.DataFrame, Dict[str, Any]]:
     """
     Executes the identical institutional /capital strategy across the 2026-2036
@@ -495,7 +497,7 @@ def run_forward_strategy_simulation(
                     regime=regime_label,
                     ablation_mode="BASELINE",
                     sizing_multiplier=sz_mult,
-                    base_risk_dollars=effective_base_risk,
+                    base_risk_dollars=(max(10.0 if initial_equity >= 1000.0 else 2.50, current_equity * risk_pct) if compounding else effective_base_risk),
                     min_deal_size=spec.get("min_deal_size")
                 )
 
@@ -714,6 +716,7 @@ def main():
     parser = argparse.ArgumentParser(description="Angkor Quant 10-Year Institutional Forward-Tester")
     parser.add_argument("--capital", type=float, default=10000.0, help="Initial capital in USD (default: 10000.0)")
     parser.add_argument("--cfd", action="store_true", help="Force Capital.com CFD specifications")
+    parser.add_argument("--compounding", action="store_true", help="Enable dynamic rolling equity compounding")
     args, _ = parser.parse_known_args()
 
     initial_equity = float(args.capital)
@@ -728,6 +731,7 @@ def main():
     print("=" * 78)
     print(f"  ANGKOR QUANT — 10-YEAR INSTITUTIONAL FORWARD-TESTING & RISK VALIDATION")
     print(f"  Capital: ${initial_equity:,.2f} | Mode: {'Capital.com CFD Specs' if use_cfd else 'Institutional Multi-Asset'}")
+    print(f"  Compounding: {'ENABLED (Dynamic Rolling Equity)' if args.compounding else 'DISABLED (Fixed Base Risk)'}")
     print("  Version: 1.0.0 (Decadal Stochastic Monte Carlo Forward Engine 2026-2036)")
     print("=" * 78)
 
@@ -753,7 +757,8 @@ def main():
         assets_data, macro_data, regimes,
         initial_equity=initial_equity,
         base_risk_dollars=effective_base_risk,
-        specs_override=active_specs
+        specs_override=active_specs,
+        compounding=args.compounding
     )
 
     # 5. Run 10,000-Path Monte Carlo Resampling
