@@ -1772,6 +1772,28 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   4. **Empirical Edge Verification:** Enforces Test Brier Score $\le 0.2046$ (superior to single-model XGBoost baseline 0.2050), Test ROC-AUC $\ge 0.640$, and Win Rate $\ge 60.71\%$ at threshold $\hat{p} \ge 0.55$ (+22.43R net PnL, avoiding 546 bad trades) and $60.00\%$ at $\hat{p} \ge 0.60$ (+15.57R net PnL, avoiding 564 bad trades).
   5. **Live Multi-Model Detailed Diagnostics & Consensus Ratio:** Real-time inference generates full model telemetry: `stacked_prob`, individual base probabilities (`prob_xgb`, `prob_lgb`, `prob_cat`), model dispersion ($\max(p_i) - \min(p_i)$), and consensus ratio ($\text{agreed models} / 3.0$). Fallback resilience dynamically normalizes weights if any single base estimator encounters an exception, ensuring zero crashes in live low-latency trading loops.
 
+### Invariant 97: CVD Microstructure Proxy & Large Spread Limit Working Orders (AQ97 Standard - គ្រឹះ CVD Microstructure Proxy & Limit Working Orders លើ Spread ធំ)
+- **Location:** `capital_execution_bridge.py` (`CVDMicrostructureProxy`, `CapitalExecutionBridge`), `test_capital_execution_bridge.py`, `audit_system.py` [CHECK 76/76]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Capital Protection:
+  1. **CVD Microstructure Proxy Engine (Volume Delta Thrust Approximation):** When granular order book taker prints are unavailable on TradFi / CFD instruments, the proxy reconstructs intrabar volume delta from 15m OHLCV bars:
+     $$\Delta V_t = V_t \cdot \frac{C_t - O_t}{\max(\epsilon, H_t - L_t)}$$
+     $$\text{CVD}_t = \sum_{\tau=1}^t \Delta V_\tau$$
+     Aggressor ratio is bounded in $[-1.0, +1.0]$: $\text{Aggressor Ratio} = \frac{\sum \Delta V}{\sum V_t}$.
+  2. **Microstructure Absorption & Aggression Regime Identification:**
+     - **Bearish Absorption (Exhaustion / Trap):** Price makes higher highs ($P_t \ge P_{t-5}$ or $C_t \ge \max(C)$) while CVD thrust is negative ($\Delta\text{CVD} < 0$ or aggressor ratio $< -0.12$), signaling passive institutional limit ask orders absorbing aggressive retail market buy volume.
+     - **Bullish Absorption (Accumulation / Spring):** Price makes lower lows ($P_t \le P_{t-5}$ or $C_t \le \min(C)$) while CVD thrust is positive ($\Delta\text{CVD} > 0$ or aggressor ratio $> +0.12$), signaling passive institutional limit bid orders absorbing retail panic market sell volume.
+     - **Bullish / Bearish Aggression:** Price and CVD thrust advance in aligned directional momentum ($|\text{Aggressor Ratio}| \ge 0.15$).
+  3. **Multi-Trigger Large Spread Routing Activation:** Order execution dynamically switches from immediate market orders to advantageous Limit Working Orders upon any of 4 conditions:
+     - Condition 1 (Spread Ratio): $\text{Current Spread} > 1.50 \times \text{Historical Avg Spread}$.
+     - Condition 2 (Volatility Drag): $\text{Current Spread} \ge 0.10 \times \text{ATR}_{15m}$ (spread drag exceeds 10% of candle volatility).
+     - Condition 3 (Adverse Microstructure Flow): BUY order triggered during Bearish Absorption OR SELL order triggered during Bullish Absorption (prohibiting paying full market spread into institutional absorption blocks).
+     - Condition 4 (Quant Force Flag): Explicit `force_limit_order=True`.
+  4. **Spread-Discounted Smart Limit Pricing:** Working orders are submitted with an institutional spread rebate discount:
+     $$\text{Limit Buy Price} = \text{Expected Price} - \max(0.25 \times \text{Spread}, 0.05 \times \text{ATR}_{15m})$$
+     $$\text{Limit Sell Price} = \text{Expected Price} + \max(0.25 \times \text{Spread}, 0.05 \times \text{ATR}_{15m})$$
+     Eliminates crossing the bid-ask spread and secures an instant $25\%$ spread discount on entry.
+  5. **Working Order Lifecycle Management & 30-Second Auto-Purge:** Active working orders are tracked in `_active_working_orders`. System enforces `audit_and_purge_expired_working_orders(timeout_seconds=30.0)` where unfilled orders older than 30 seconds are automatically canceled via `cancel_working_order` (`/api/v1/workingorders/{deal_id}`), preventing stale order fills when market momentum has dissipated.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

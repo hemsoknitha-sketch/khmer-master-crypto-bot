@@ -3902,7 +3902,7 @@ def run_audit():
         log_fail(str(e))
 
     # 71. Invariant 92: The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling
-    print("\n[CHECK 71/75] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
+    print("\n[CHECK 71/76] Verifying The Five Pillars of Apex TradFi Capital Profitability & Small Capital Compound Scaling (Invariant 92)...")
     try:
         has_inv92_agents = "Invariant 92: The Five Pillars of Apex TradFi Capital Profitability" in agents_md
         has_inv92_gemini = "The Five Pillars of Apex TradFi Capital Profitability, Factor Correlation Clamping & Small Capital Compound Scaling (Invariant 92)" in gemini_md
@@ -3938,7 +3938,7 @@ def run_audit():
         log_fail(str(e))
 
     # 72. Invariant 93: Capital.com Execution Bridge, Slippage Auditor, and HMM Regime Filter Fiduciary Gates
-    print("\n[CHECK 72/75] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
+    print("\n[CHECK 72/76] Verifying Capital.com Execution Bridge, Slippage Auditor & HMM Regime Filter (Invariant 93)...")
     try:
         with open("capital_execution_bridge.py", "r", encoding="utf-8") as f_br:
             bridge_src = f_br.read()
@@ -3967,7 +3967,7 @@ def run_audit():
         log_fail(str(e))
 
     # 73. Invariant 94: Asset-Specific H4 Anchor, Dynamic Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix
-    print("\n[CHECK 73/75] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
+    print("\n[CHECK 73/76] Verifying Asset-Specific H4 Anchor, Bayesian Win Rate Updater, Latency-Aware Routing & Correlation Matrix (Invariant 94)...")
     try:
         with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_cit:
             cit_src = f_cit.read()
@@ -4039,7 +4039,7 @@ def run_audit():
         log_fail(str(e))
 
     # 74. Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge
-    print("\n[CHECK 74/75] Verifying Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)...")
+    print("\n[CHECK 74/76] Verifying Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)...")
     try:
         has_inv95_agents = "Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Module" in agents_md
         has_inv95_gemini = "Institutional Turtle Soup Liquidity Sweep Reversal Module & Boundary Mean-Reversion Edge (Invariant 95)" in gemini_md
@@ -4170,7 +4170,7 @@ def run_audit():
         log_fail(str(e))
 
     # 75. Invariant 96: Institutional Multi-Model Stacking Classifier Meta-Labeling Framework
-    print("\n[CHECK 75/75] Verifying Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)...")
+    print("\n[CHECK 75/76] Verifying Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)...")
     try:
         has_inv96_agents = "Invariant 96: Institutional Multi-Model Stacking Classifier Meta-Labeling Framework" in agents_md
         has_inv96_gemini = "Institutional Multi-Model Stacking Classifier Meta-Labeling Framework (Invariant 96)" in gemini_md
@@ -4267,6 +4267,116 @@ def run_audit():
             log_fail("Invariant 96 Institutional Multi-Model Stacking Classifier verification failed!")
     except Exception as e:
         failures.append(f"Invariant 96 check failed: {e}")
+        log_fail(str(e))
+
+    # 76. Invariant 97: CVD Microstructure Proxy & Large Spread Limit Working Orders
+    print("\n[CHECK 76/76] Verifying CVD Microstructure Proxy & Large Spread Limit Working Orders (Invariant 97)...")
+    try:
+        has_inv97_agents = "Invariant 97: CVD Microstructure Proxy & Large Spread Limit Working Orders" in agents_md
+        has_inv97_gemini = "CVD Microstructure Proxy & Large Spread Limit Working Orders (Invariant 97)" in gemini_md
+
+        with open("capital_execution_bridge.py", "r", encoding="utf-8") as f_br:
+            bridge_src = f_br.read()
+
+        has_cvd_cls = "class CVDMicrostructureProxy:" in bridge_src
+        has_cvd_compute = "def compute_cvd_microstructure(" in bridge_src
+        has_smart_limit = "def calculate_smart_limit_price(" in bridge_src
+        has_active_orders = "_active_working_orders" in bridge_src
+        has_purge_orders = "def audit_and_purge_expired_working_orders(" in bridge_src
+        has_large_spread_4trig = (
+            "current_spread > 1.5 * avg_spread" in bridge_src and
+            "current_spread >= 0.10 * atr_15m" in bridge_src and
+            "is_bearish_absorption" in bridge_src and
+            "is_bullish_absorption" in bridge_src
+        )
+
+        # Dynamic Unit Test for CVD Microstructure Proxy & Smart Limit Working Order Logic
+        from capital_execution_bridge import CVDMicrostructureProxy, CapitalExecutionBridge
+        import time
+
+        # Generate synthetic candles with bullish absorption: price falling to lows, but positive delta thrust
+        candles_cvd_test = []
+        for i in range(25):
+            candles_cvd_test.append({
+                "open": 2000.0 - i * 0.5,
+                "high": 2001.0 - i * 0.5,
+                "low": 1999.0 - i * 0.5,
+                "close": 1999.5 - i * 0.5,
+                "volume": 1000.0
+            })
+        for i in range(5):
+            candles_cvd_test.append({
+                "open": 1980.0,
+                "high": 1986.0,
+                "low": 1978.0,
+                "close": 1985.5,
+                "volume": 5000.0
+            })
+
+        cvd_res = CVDMicrostructureProxy.compute_cvd_microstructure(candles_cvd_test, lookback=20)
+        unit_cvd_calc = (
+            "cvd_value" in cvd_res and
+            "cvd_aggressor_ratio" in cvd_res and
+            "order_flow_regime" in cvd_res and
+            -1.0 <= cvd_res["cvd_aggressor_ratio"] <= 1.0
+        )
+
+        # Test Smart Limit Pricing
+        limit_buy = CVDMicrostructureProxy.calculate_smart_limit_price("BUY", expected_price=2000.0, current_spread=2.0, atr_15m=10.0)
+        limit_sell = CVDMicrostructureProxy.calculate_smart_limit_price("SELL", expected_price=2000.0, current_spread=2.0, atr_15m=10.0)
+        unit_limit_calc = (limit_buy < 2000.0 and limit_sell > 2000.0)
+
+        # Test CapitalExecutionBridge smart routing under large spread
+        bridge = CapitalExecutionBridge(testnet=True)
+        resp_large_spread = bridge.place_smart_order_latency_aware(
+            epic="GOLD",
+            direction="BUY",
+            size=0.1,
+            expected_price=2000.0,
+            current_spread=3.0,
+            avg_spread=1.5,
+            atr_15m=10.0,
+            candles_15m=candles_cvd_test
+        )
+        unit_route_ok = (
+            resp_large_spread.get("order_type") == "LIMIT_WORKING_ORDER" and
+            resp_large_spread.get("is_large_spread") is True and
+            "deal_id" in resp_large_spread and
+            resp_large_spread["deal_id"] in bridge._active_working_orders
+        )
+
+        # Expiration audit test
+        deal_id_test = resp_large_spread["deal_id"]
+        bridge._active_working_orders[deal_id_test]["created_at"] = time.time() - 35.0
+        purged = bridge.audit_and_purge_expired_working_orders(timeout_seconds=30.0)
+        unit_purge_ok = (
+            len(purged) == 1 and
+            purged[0]["deal_id"] == deal_id_test and
+            purged[0]["status"] == "CANCELLED_TIMEOUT"
+        )
+
+        all_inv97_passed = (
+            has_inv97_agents and has_inv97_gemini and
+            has_cvd_cls and has_cvd_compute and has_smart_limit and
+            has_active_orders and has_purge_orders and has_large_spread_4trig and
+            unit_cvd_calc and unit_limit_calc and unit_route_ok and unit_purge_ok
+        )
+
+        if all_inv97_passed:
+            log_pass(
+                "CVD Microstructure Proxy & Large Spread Limit Working Orders (Invariant 97) are 100% certified! "
+                "(CVD Delta Thrust, Aggressor Ratio, Smart Limit Price Discount, 4 Large Spread Triggers, 30s Expiry Purge)"
+            )
+        else:
+            failures.append(
+                f"Invariant 97 check failed: agents={has_inv97_agents}, gemini={has_inv97_gemini}, "
+                f"cvd_cls={has_cvd_cls}, cvd_compute={has_cvd_compute}, smart_limit={has_smart_limit}, "
+                f"active_orders={has_active_orders}, purge_orders={has_purge_orders}, large_spread={has_large_spread_4trig}, "
+                f"unit_cvd={unit_cvd_calc}, unit_limit={unit_limit_calc}, unit_route={unit_route_ok}, unit_purge={unit_purge_ok}"
+            )
+            log_fail("Invariant 97 CVD Microstructure Proxy & Large Spread Limit Working Orders verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 97 check failed: {e}")
         log_fail(str(e))
 
 

@@ -1,0 +1,2 @@
+timestamp,symbol,direction,expected_price,filled_price,slippage_pts,slippage_pct,spread_pts,latency_ms,client_order_id,deal_id,status,environment
+2026-10-22T09:32:13.752Z,GOLD,BUY,2600.00000,2600.00000,+0.00000,+0.0000,0.00000,2632.6,GOLD_BUY_1792661529682_1_8aada8,o_6ebf8f9d-918f-4e56-bc89-a9bd76d35823,FILLED,DEMO
