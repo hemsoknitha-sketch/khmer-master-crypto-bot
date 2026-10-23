@@ -1,6 +1,6 @@
 {
   "project": "ANGKOR QUANT \u2014 1-Month M15 Stochastic Forward-Test ($1,000 Capital)",
-  "generated_at": "2026-10-23T14:16:04.807248",
+  "generated_at": "2026-10-23T15:27:13.694170",
   "timeframe": "M15 (15-Minute Intraday Bars)",
   "period": "2026-10-24 to 2026-11-24 (1 Forward Month)",
   "initial_capital": 1000.0,
@@ -28,17 +28,17 @@
     "final_equity": 768.45
   },
   "monte_carlo_resampling": {
-    "n_paths": 10000,
-    "mean_terminal": 651.09,
-    "median_terminal": 649.21,
-    "std_terminal": 80.74,
-    "p5_terminal": 521.8,
-    "p25_terminal": 595.21,
-    "p75_terminal": 705.16,
-    "p95_terminal": 785.68,
-    "mean_max_dd": 35.79,
-    "p95_max_dd": 48.05,
-    "probability_of_ruin_pct": 2.83
+    "n_paths": 1000,
+    "mean_terminal": 908.64,
+    "median_terminal": 908.17,
+    "std_terminal": 115.4,
+    "p5_terminal": 722.38,
+    "p25_terminal": 825.72,
+    "p75_terminal": 987.96,
+    "p95_terminal": 1105.14,
+    "mean_max_dd": 16.92,
+    "p95_max_dd": 30.31,
+    "probability_of_ruin_pct": 0.0
   },
   "chart_paths": {
     "bt_equity": "data\\capital_m15_1m_backtest_equity.png",

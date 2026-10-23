@@ -94,54 +94,13 @@ CAPITAL_M15_SPECS = {
 
 def compute_m15_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    c = df['close']
-    h = df['high']
-    l = df['low']
-    o = df['open']
-    v = df['volume'] if 'volume' in df.columns else pd.Series(np.ones(len(df)), index=df.index)
-
-    # 1. ATR14
-    prev_c = c.shift(1)
-    tr = pd.concat([h - l, (h - prev_c).abs(), (l - prev_c).abs()], axis=1).max(axis=1)
-    df['atr14'] = tr.ewm(span=14, adjust=False).mean()
-
-    # 2. ADX14
-    up = h - h.shift(1)
-    dn = l.shift(1) - l
-    p_dm = np.where((up > dn) & (up > 0), up, 0.0)
-    m_dm = np.where((dn > up) & (dn > 0), dn, 0.0)
-    p_di = 100 * (pd.Series(p_dm, index=df.index).ewm(span=14, adjust=False).mean() / df['atr14'].replace(0, 1e-5))
-    m_di = 100 * (pd.Series(m_dm, index=df.index).ewm(span=14, adjust=False).mean() / df['atr14'].replace(0, 1e-5))
-    dx = 100 * ((p_di - m_di).abs() / (p_di + m_di).replace(0, 1e-5))
-    df['adx14'] = dx.ewm(span=14, adjust=False).mean().clip(0, 100)
-
-    # 3. RSI14
-    delta = c.diff()
-    gain = delta.clip(lower=0).ewm(span=14, adjust=False).mean()
-    loss = (-delta.clip(upper=0)).ewm(span=14, adjust=False).mean()
-    rs = gain / loss.replace(0, 1e-5)
-    df['rsi14'] = (100 - (100 / (1 + rs))).clip(0, 100)
-
-    # 4. EMAs
-    df['ema20'] = c.ewm(span=20, adjust=False).mean()
-    df['ema50'] = c.ewm(span=50, adjust=False).mean()
-    df['ema200'] = c.ewm(span=200, adjust=False).mean()
-
-    # 5. Dealing Range (96 M15 bars = 24-hour cycle)
-    df['swing_high_96'] = h.shift(1).rolling(96, min_periods=24).max()
-    df['swing_low_96'] = l.shift(1).rolling(96, min_periods=24).min()
-    rng = (df['swing_high_96'] - df['swing_low_96']).replace(0, 1e-5)
-    df['range_pct'] = ((c - df['swing_low_96']) / rng * 100.0).clip(0, 100)
-
-    # 6. Relative Volume (RVOL)
-    df['rvol'] = v / v.rolling(40, min_periods=10).mean().replace(0, 1.0)
-
-    # 7. CVD
-    b_rng = (h - l).replace(0, 1e-5)
-    thrust = (c - o) / b_rng
-    df['cvd'] = (v * thrust).rolling(20, min_periods=5).sum()
-
-    return df.dropna().reset_index(drop=True)
+    if 'Date' not in df.columns and 'datetime' in df.columns:
+        df['Date'] = pd.to_datetime(df['datetime'])
+    from capital_10y_backtester import compute_indicators
+    d = compute_indicators(df)
+    if 'datetime' not in d.columns and 'Date' in d.columns:
+        d['datetime'] = d['Date']
+    return d.dropna().reset_index(drop=True)
 
 
 class M15Trade:
@@ -302,99 +261,17 @@ class M15Trade:
 def evaluate_m15_signal(sym: str, spec: dict, row: pd.Series, prev_rows: pd.DataFrame, ablation_flags: Optional[Dict[str, bool]] = None):
     if ablation_flags is None:
         ablation_flags = {}
-
-    curr_p = float(row['close'])
-    spread = float(spec['spread'])
-    atr = float(row['atr14'])
-    adx = float(row['adx14'])
-    rsi = float(row['rsi14'])
-    range_pct = float(row['range_pct'])
-    ema20 = float(row['ema20'])
-    ema50 = float(row['ema50'])
-    ema200 = float(row['ema200'])
-    cvd = float(row['cvd'])
-    dt = row['datetime']
-    hour_utc = dt.hour if hasattr(dt, 'hour') else 12
-
-    # Invariant 77: London Open (07-11 UTC) or NY Open (13-18 UTC)
-    in_session = (7 <= hour_utc <= 11) or (13 <= hour_utc <= 18)
-    if not in_session and not ablation_flags.get("drop_session_filter", False):
-        return None, 0.0
-
-    # Invariant 76: Chop filter (35-65%)
-    if not ablation_flags.get("drop_chop_filter", False):
-        if 35.0 <= range_pct <= 65.0:
-            return None, 0.0
-
-    # SMC Liquidity Sweeps on 24h range
-    has_ssl_sweep = False
-    has_bsl_sweep = False
-    swing_high = float(row['swing_high_96'])
-    swing_low = float(row['swing_low_96'])
-
-    if len(prev_rows) >= 5 and not ablation_flags.get("drop_smc", False):
-        for idx in range(-4, 0):
-            bh = prev_rows['high'].iloc[idx]
-            bl = prev_rows['low'].iloc[idx]
-            bc = prev_rows['close'].iloc[idx]
-            bo = prev_rows['open'].iloc[idx]
-            if bh > swing_high and bc < swing_high and (bh - max(bo, bc)) >= abs(bc - bo) * 0.40:
-                has_bsl_sweep = True
-            if bl < swing_low and bc > swing_low and (min(bo, bc) - bl) >= abs(bc - bo) * 0.40:
-                has_ssl_sweep = True
-
-    buy_score = 50.0
-    sell_score = 50.0
-
-    # BUY Score
-    if range_pct < 30.0:
-        buy_score += 15.0
-    if has_ssl_sweep:
-        buy_score += 30.0
-    if curr_p > ema20 > ema50:
-        buy_score += 15.0
-    if curr_p > ema200:
-        buy_score += 15.0
-    else:
-        buy_score -= 15.0
-    if cvd > 0:
-        buy_score += 10.0
-
-    # SELL Score
-    if range_pct > 70.0:
-        sell_score += 15.0
-    if has_bsl_sweep:
-        sell_score += 30.0
-    if curr_p < ema20 < ema50:
-        sell_score += 15.0
-    if curr_p < ema200:
-        sell_score += 15.0
-    else:
-        sell_score -= 15.0
-    if cvd < 0:
-        sell_score += 10.0
-
-    # BUY Execution
-    if buy_score >= 75.0 and buy_score > sell_score:
-        if not ablation_flags.get("drop_h4_anchor", False) and curr_p < ema200 and not has_ssl_sweep:
-            return None, 0.0
-        if rsi >= 68.0:
-            return None, 0.0
-        if adx < 22.0:
-            return None, 0.0
-        return "BUY", buy_score
-
-    # SELL Execution (BEAR_ONLY: Requires confirmed downtrend close < ema50 < ema200)
-    elif sell_score >= 75.0 and sell_score > buy_score:
-        if not (curr_p < ema50 < ema200):
-            return None, 0.0
-        if rsi <= 35.0:
-            return None, 0.0
-        if adx < 22.0:
-            return None, 0.0
-        return "SELL", sell_score
-
-    return None, 0.0
+    from capital_10y_backtester import evaluate_bar_signals, ASSET_SPECS
+    asset_spec = ASSET_SPECS.get(sym, spec)
+    sig, raw_score, cal_p, meta = evaluate_bar_signals(
+        row=row,
+        prev_rows=prev_rows,
+        spec=asset_spec,
+        macro_row=None,
+        ablation_flags=ablation_flags,
+        epic=sym
+    )
+    return sig, raw_score
 
 
 def run_m15_simulation(
@@ -450,11 +327,11 @@ def run_m15_simulation(
 
                 df_sym = assets_data[sym]
                 m_idx = df_sym[df_sym['datetime'] == dt].index
-                if m_idx.empty or m_idx[0] < 96:
+                if m_idx.empty or m_idx[0] < 50:
                     continue
                 b_idx = m_idx[0]
                 row = df_sym.iloc[b_idx]
-                prev = df_sym.iloc[max(0, b_idx-96):b_idx]
+                prev = df_sym.iloc[max(0, b_idx-50):b_idx]
 
                 sig, score = evaluate_m15_signal(sym, spec, row, prev, ablation_flags)
                 if sig:
@@ -471,8 +348,8 @@ def run_m15_simulation(
                         entry_time=dt, entry_price=curr_p, sl_price=sl_p,
                         atr_15m=atr, spread=spread, slippage=float(spec['slippage']),
                         base_risk_dollars=base_risk_dollars,
-                        contract_multiplier=float(spec['contract_multiplier']),
-                        min_deal_size=float(spec['min_deal_size']),
+                        contract_multiplier=float(spec.get('contract_multiplier', 1.0)),
+                        min_deal_size=float(spec.get('min_deal_size', 0.01)),
                         compounding_equity=current_equity if compounding else None,
                         risk_pct=risk_pct,
                         drop_scale_out=ablation_flags.get("drop_scale_out", False)
@@ -798,7 +675,7 @@ def run_full_m15_suite():
         {"name": "1. Baseline Institutional M15", "flags": {}},
         {"name": "2. Minus Scale-Out (Fixed 1:1.5)", "flags": {"drop_scale_out": True}},
         {"name": "3. Minus Dealing Range Chop Filter", "flags": {"drop_chop_filter": True}},
-        {"name": "4. Minus Session Kill Zone Filter", "flags": {"drop_session_filter": True}},
+        {"name": "4. Minus SMC Liquidity Sweeps", "flags": {"drop_smc": True}},
         {"name": "5. Minus H4 Trend Anchor", "flags": {"drop_h4_anchor": True}}
     ]
     ablation_matrix = []
