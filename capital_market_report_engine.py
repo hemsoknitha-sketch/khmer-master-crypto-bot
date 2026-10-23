@@ -191,6 +191,368 @@ CAPITAL_DAILY_REPORT_REGISTRY: Dict[str, Dict[str, Any]] = {
     }
 }
 
+# ==============================================================================
+# 1.1 MONTE SAFIEDDINE OFFICIAL DAILY MARKET REPORT (FRIDAY, OCTOBER 23, 2026)
+# ==============================================================================
+# Comprehensive 28-Asset Quantitative Coordinates Transcribed from Capital.com:
+CAPITAL_OCT23_2026_REPORT_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "US500": {
+        "name": "US 500 (S&P 500)", "asset_class": "INDEX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Bull Average",
+        "starting_point": 7667.70, "delta": 46.10,
+        "res1": 7713.80, "sl_res1": 7736.85, "res2": 7759.91, "sl_res2": 7782.96,
+        "sup1": 7621.60, "sl_sup1": 7598.55, "sup2": 7575.49, "sl_sup2": 7552.44,
+        "weekly_starting_point": 7658.00,
+        "weekly_res1": 7775.64, "weekly_sl_res1": 7834.46, "weekly_res2": 7893.28, "weekly_sl_res2": 7952.10,
+        "weekly_sup1": 7540.36, "weekly_sl_sup1": 7481.54, "weekly_sup2": 7422.72, "weekly_sl_sup2": 7363.90,
+        "client_long_pct": 74.0, "client_short_pct": 26.0,
+        "institutional_long_pct": 38.0, "institutional_short_pct": 62.0,
+        "leveraged_funds_long_pct": 19.0, "leveraged_funds_short_pct": 81.0,
+        "asset_managers_long_pct": 85.0, "asset_managers_short_pct": 15.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Neutral", "dmi": "Negative", "adx": "Consolidation", "rsi": "Neutral", "bb": "Lower Extreme"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "US100": {
+        "name": "US Tech 100 (Nasdaq 100)", "asset_class": "INDEX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Consolidation - Volatile",
+        "starting_point": 28916.0, "delta": 303.0,
+        "res1": 29219.0, "sl_res1": 29370.0, "res2": 29521.0, "sl_res2": 29672.0,
+        "sup1": 28614.0, "sl_sup1": 28463.0, "sup2": 28312.0, "sl_sup2": 28160.0,
+        "weekly_starting_point": 29194.0,
+        "weekly_res1": 29947.0, "weekly_sl_res1": 30324.0, "weekly_res2": 30701.0, "weekly_sl_res2": 31077.0,
+        "weekly_sup1": 28440.0, "weekly_sl_sup1": 28064.0, "weekly_sup2": 27687.0, "weekly_sl_sup2": 27310.0,
+        "client_long_pct": 76.0, "client_short_pct": 24.0,
+        "institutional_long_pct": 68.0, "institutional_short_pct": 32.0,
+        "leveraged_funds_long_pct": 40.0, "leveraged_funds_short_pct": 60.0,
+        "asset_managers_long_pct": 75.0, "asset_managers_short_pct": 25.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Neutral", "dmi": "Negative", "adx": "Trending", "rsi": "Neutral", "bb": "Lower Extreme"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "US30": {
+        "name": "Wall Street 30 (Dow Jones)", "asset_class": "INDEX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 52944.0, "delta": 348.0,
+        "res1": 53292.0, "sl_res1": 53466.0, "res2": 53639.0, "sl_res2": 53813.0,
+        "sup1": 52597.0, "sl_sup1": 52423.0, "sup2": 52250.0, "sl_sup2": 52076.0,
+        "weekly_starting_point": 51982.0,
+        "weekly_res1": 52769.0, "weekly_sl_res1": 53163.0, "weekly_res2": 53557.0, "weekly_sl_res2": 53950.0,
+        "weekly_sup1": 51194.0, "weekly_sl_sup1": 50800.0, "weekly_sup2": 50407.0, "weekly_sl_sup2": 50013.0,
+        "client_long_pct": 61.0, "client_short_pct": 39.0,
+        "institutional_long_pct": 66.0, "institutional_short_pct": 34.0,
+        "leveraged_funds_long_pct": 59.0, "leveraged_funds_short_pct": 41.0,
+        "asset_managers_long_pct": 73.0, "asset_managers_short_pct": 27.0,
+        "indicators": {"ma_short": "Bullish", "ma_long": "Bullish", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Upper Extreme"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "US2000": {
+        "name": "Russell 2000", "asset_class": "INDEX",
+        "daily_regime": "Bear Average", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 2786.60, "delta": 20.70,
+        "res1": 2807.30, "sl_res1": 2817.70, "res2": 2828.00, "sl_res2": 2838.40,
+        "sup1": 2765.90, "sl_sup1": 2755.50, "sup2": 2745.20, "sl_sup2": 2734.80,
+        "client_long_pct": 74.0, "client_short_pct": 26.0,
+        "institutional_long_pct": 39.0, "institutional_short_pct": 61.0,
+        "leveraged_funds_long_pct": 34.0, "leveraged_funds_short_pct": 66.0,
+        "asset_managers_long_pct": 56.0, "asset_managers_short_pct": 44.0,
+        "indicators": {"ma_short": "Neutral", "ma_long": "Bearish", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Sell 1st Resistance level only after significant reversal; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Buy 1st Support only after a reversal; Buy 1st Resistance upon breakout from below"
+    },
+    "DE40": {
+        "name": "Germany 40 (DAX)", "asset_class": "INDEX",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 25383.0, "delta": 193.0,
+        "res1": 25576.0, "sl_res1": 25672.0, "res2": 25768.0, "sl_res2": 25865.0,
+        "sup1": 25190.0, "sl_sup1": 25093.0, "sup2": 24997.0, "sl_sup2": 24901.0,
+        "weekly_starting_point": 25470.0,
+        "weekly_res1": 25972.0, "weekly_sl_res1": 26222.0, "weekly_res2": 26473.0, "weekly_sl_res2": 26723.0,
+        "weekly_sup1": 24969.0, "weekly_sl_sup1": 24718.0, "weekly_sup2": 24468.0, "weekly_sl_sup2": 24217.0,
+        "client_long_pct": 66.0, "client_short_pct": 34.0,
+        "indicators": {"ma_short": "Neutral", "ma_long": "Neutral", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Sell 1st Resistance only after significant reversal; Buy 1st Support only after significant reversal",
+        "contrarian_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above"
+    },
+    "UK100": {
+        "name": "UK 100 (FTSE 100)", "asset_class": "INDEX",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Consolidation - Volatile",
+        "starting_point": 10738.10, "delta": 71.70,
+        "res1": 10809.80, "sl_res1": 10845.60, "res2": 10881.40, "sl_res2": 10917.30,
+        "sup1": 10666.40, "sl_sup1": 10630.60, "sup2": 10594.80, "sl_sup2": 10558.90,
+        "client_long_pct": 67.0, "client_short_pct": 33.0,
+        "indicators": {"ma_short": "Neutral", "ma_long": "Bullish", "dmi": "Neutral", "adx": "Consolidation", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Sell 1st Resistance only after significant reversal; Buy 1st Support only after significant reversal",
+        "contrarian_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above"
+    },
+    "ASX200": {
+        "name": "Australia 200 (ASX 200)", "asset_class": "INDEX",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 8770.20, "delta": 58.90,
+        "res1": 8829.10, "sl_res1": 8858.60, "res2": 8888.10, "sl_res2": 8917.60,
+        "sup1": 8711.30, "sl_sup1": 8681.80, "sup2": 8652.30, "sl_sup2": 8622.80,
+        "client_long_pct": 88.0, "client_short_pct": 12.0,
+        "indicators": {"ma_short": "Neutral", "ma_long": "Bearish", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Sell 1st Resistance only after significant reversal; Buy 1st Support only after significant reversal",
+        "contrarian_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above"
+    },
+    "HK50": {
+        "name": "Hong Kong 50 (Hang Seng)", "asset_class": "INDEX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 23115.0, "delta": 241.0,
+        "res1": 23356.0, "sl_res1": 23476.0, "res2": 23597.0, "sl_res2": 23717.0,
+        "sup1": 22875.0, "sl_sup1": 22754.0, "sup2": 22634.0, "sl_sup2": 22513.0,
+        "client_long_pct": 88.0, "client_short_pct": 12.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bearish", "dmi": "Negative", "adx": "Trending", "rsi": "Oversold", "bb": "Lower Extreme"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "JP225": {
+        "name": "Japan 225 (Nikkei 225)", "asset_class": "INDEX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 62112.0, "delta": 977.0,
+        "res1": 63089.0, "sl_res1": 63577.0, "res2": 64065.0, "sl_res2": 64554.0,
+        "sup1": 61135.0, "sl_sup1": 60646.0, "sup2": 60158.0, "sl_sup2": 59669.0,
+        "client_long_pct": 79.0, "client_short_pct": 21.0,
+        "institutional_long_pct": 66.0, "institutional_short_pct": 34.0,
+        "leveraged_funds_long_pct": 46.0, "leveraged_funds_short_pct": 54.0,
+        "asset_managers_long_pct": 95.0, "asset_managers_short_pct": 5.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bearish", "dmi": "Negative", "adx": "Consolidation", "rsi": "Neutral", "bb": "Lower Extreme"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "NVDA": {
+        "name": "NVIDIA Corp", "asset_class": "EQUITY",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Consolidation - Volatile",
+        "starting_point": 212.22, "delta": 3.53,
+        "res1": 215.75, "sl_res1": 217.52, "res2": 219.28, "sl_res2": 221.05,
+        "sup1": 208.69, "sl_sup1": 206.92, "sup2": 205.16, "sl_sup2": 203.39,
+        "client_long_pct": 94.0, "client_short_pct": 6.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Neutral", "dmi": "Negative", "adx": "Consolidation", "rsi": "Neutral", "bb": "Lower Extreme"},
+        "conformist_strategy": "Sell 1st Resistance only after significant reversal; Buy 1st Support only after significant reversal",
+        "contrarian_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above"
+    },
+    "TSLA": {
+        "name": "Tesla Inc", "asset_class": "EQUITY",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Bear Average",
+        "starting_point": 373.20, "delta": 7.56,
+        "res1": 380.76, "sl_res1": 384.54, "res2": 388.32, "sl_res2": 392.10,
+        "sup1": 365.64, "sl_sup1": 361.86, "sup2": 358.08, "sl_sup2": 354.30,
+        "client_long_pct": 85.0, "client_short_pct": 15.0,
+        "indicators": {"ma_short": "Bullish", "ma_long": "Neutral", "dmi": "Positive", "adx": "Consolidation", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Sell 1st Resistance only after significant reversal; Buy 1st Support only after significant reversal",
+        "contrarian_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above"
+    },
+    "AMZN": {
+        "name": "Amazon.com Inc", "asset_class": "EQUITY",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 250.70, "delta": 3.85,
+        "res1": 254.55, "sl_res1": 256.48, "res2": 258.40, "sl_res2": 260.33,
+        "sup1": 246.85, "sl_sup1": 244.92, "sup2": 243.00, "sl_sup2": 241.07,
+        "client_long_pct": 96.0, "client_short_pct": 4.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Neutral", "dmi": "Neutral", "adx": "Consolidation", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "AAPL": {
+        "name": "Apple Inc", "asset_class": "EQUITY",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Bull Average",
+        "starting_point": 348.42, "delta": 4.27,
+        "res1": 352.69, "sl_res1": 354.82, "res2": 356.95, "sl_res2": 359.09,
+        "sup1": 344.15, "sl_sup1": 342.02, "sup2": 339.89, "sl_sup2": 337.75,
+        "client_long_pct": 91.0, "client_short_pct": 9.0,
+        "indicators": {"ma_short": "Bullish", "ma_long": "Bullish", "dmi": "Neutral", "adx": "Consolidation", "rsi": "Neutral", "bb": "Upper Extreme"},
+        "conformist_strategy": "Sell 1st Resistance only after significant reversal; Buy 1st Support only after significant reversal",
+        "contrarian_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above"
+    },
+    "MSFT": {
+        "name": "Microsoft Corp", "asset_class": "EQUITY",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Bull Average",
+        "starting_point": 520.84, "delta": 7.63,
+        "res1": 528.47, "sl_res1": 532.28, "res2": 536.09, "sl_res2": 539.90,
+        "sup1": 513.21, "sl_sup1": 509.40, "sup2": 505.59, "sl_sup2": 501.78,
+        "client_long_pct": 91.0, "client_short_pct": 9.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bullish", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Sell 1st Resistance only after significant reversal; Buy 1st Support only after significant reversal",
+        "contrarian_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above"
+    },
+    "GOLD": {
+        "name": "Gold (Spot / Futures CFD)", "asset_class": "COMMODITY",
+        "daily_regime": "Bear Average", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 4023.61, "delta": 45.41,
+        "res1": 4069.02, "sl_res1": 4091.73, "res2": 4114.43, "sl_res2": 4137.14,
+        "sup1": 3978.20, "sl_sup1": 3955.49, "sup2": 3932.79, "sl_sup2": 3910.08,
+        "weekly_starting_point": 4165.21,
+        "weekly_res1": 4300.15, "weekly_sl_res1": 4367.63, "weekly_res2": 4435.10, "weekly_sl_res2": 4502.57,
+        "weekly_sup1": 4030.27, "weekly_sl_sup1": 3962.79, "weekly_sup2": 3895.32, "weekly_sl_sup2": 3827.85,
+        "client_long_pct": 84.0, "client_short_pct": 16.0,
+        "institutional_long_pct": 87.0, "institutional_short_pct": 13.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bearish", "dmi": "Negative", "adx": "Trending", "rsi": "Neutral", "bb": "Lower Extreme"},
+        "conformist_strategy": "Sell 1st Resistance level only after significant reversal; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Buy 1st Support only after a reversal; Buy 1st Resistance upon breakout from below"
+    },
+    "SILVER": {
+        "name": "Silver (XAGUSD)", "asset_class": "COMMODITY",
+        "daily_regime": "Bear Average", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 54.56, "delta": 1.22,
+        "res1": 55.78, "sl_res1": 56.39, "res2": 57.00, "sl_res2": 57.61,
+        "sup1": 53.33, "sl_sup1": 52.72, "sup2": 52.11, "sl_sup2": 51.50,
+        "weekly_starting_point": 56.94,
+        "weekly_res1": 61.09, "weekly_sl_res1": 63.16, "weekly_res2": 65.23, "weekly_sl_res2": 67.30,
+        "weekly_sup1": 52.80, "weekly_sl_sup1": 50.73, "weekly_sup2": 48.65, "weekly_sl_sup2": 46.58,
+        "client_long_pct": 92.0, "client_short_pct": 8.0,
+        "institutional_long_pct": 75.0, "institutional_short_pct": 25.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bearish", "dmi": "Negative", "adx": "Trending", "rsi": "Neutral", "bb": "Lower Extreme"},
+        "conformist_strategy": "Sell 1st Resistance level only after significant reversal; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Buy 1st Support only after a reversal; Buy 1st Resistance upon breakout from below"
+    },
+    "OIL_CRUDE": {
+        "name": "Crude Oil (WTI)", "asset_class": "COMMODITY",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Consolidation - Volatile",
+        "starting_point": 98.88, "delta": 2.52,
+        "res1": 101.40, "sl_res1": 102.65, "res2": 103.91, "sl_res2": 105.16,
+        "sup1": 96.37, "sl_sup1": 95.11, "sup2": 93.86, "sl_sup2": 92.60,
+        "weekly_starting_point": 98.92,
+        "weekly_res1": 105.19, "weekly_sl_res1": 108.32, "weekly_res2": 111.46, "weekly_sl_res2": 114.59,
+        "weekly_sup1": 92.65, "weekly_sl_sup1": 89.51, "weekly_sup2": 86.38, "weekly_sl_sup2": 83.25,
+        "client_long_pct": 39.0, "client_short_pct": 61.0,
+        "institutional_long_pct": 74.0, "institutional_short_pct": 26.0,
+        "indicators": {"ma_short": "Bullish", "ma_long": "Bullish", "dmi": "Positive", "adx": "Trending", "rsi": "Neutral", "bb": "Upper Extreme"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "NATURAL_GAS": {
+        "name": "Natural Gas", "asset_class": "COMMODITY",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 3.167, "delta": 0.078,
+        "res1": 3.245, "sl_res1": 3.284, "res2": 3.323, "sl_res2": 3.363,
+        "sup1": 3.088, "sl_sup1": 3.049, "sup2": 3.010, "sl_sup2": 2.970,
+        "client_long_pct": 79.0, "client_short_pct": 21.0,
+        "institutional_long_pct": 35.0, "institutional_short_pct": 65.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bullish", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Neutral"},
+        "conformist_strategy": "Buy 1st Resistance upon breakout from below; Sell 1st Support upon breakout from above",
+        "contrarian_strategy": "Sell 1st Resistance only after a reversal; Buy 1st Support only after a reversal"
+    },
+    "EURUSD": {
+        "name": "EUR/USD", "asset_class": "FOREX",
+        "daily_regime": "Bear Average", "weekly_regime": "Consolidation - Negative Bias",
+        "starting_point": 1.1221, "delta": 0.0032,
+        "res1": 1.1253, "sl_res1": 1.1269, "res2": 1.1285, "sl_res2": 1.1301,
+        "sup1": 1.1189, "sl_sup1": 1.1172, "sup2": 1.1156, "sl_sup2": 1.1140,
+        "client_long_pct": 64.0, "client_short_pct": 36.0,
+        "institutional_long_pct": 38.0, "institutional_short_pct": 62.0,
+        "leveraged_funds_long_pct": 39.0, "leveraged_funds_short_pct": 61.0,
+        "asset_managers_long_pct": 62.0, "asset_managers_short_pct": 38.0,
+        "indicators": {"ma_short": "Neutral", "ma_long": "Bearish", "dmi": "Negative", "adx": "Trending", "rsi": "Oversold", "bb": "Neutral"}
+    },
+    "GBPUSD": {
+        "name": "GBP/USD", "asset_class": "FOREX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 1.3403, "delta": 0.0041,
+        "res1": 1.3444, "sl_res1": 1.3465, "res2": 1.3486, "sl_res2": 1.3507,
+        "sup1": 1.3361, "sl_sup1": 1.3340, "sup2": 1.3320, "sl_sup2": 1.3299,
+        "client_long_pct": 63.0, "client_short_pct": 37.0,
+        "institutional_long_pct": 23.0, "institutional_short_pct": 77.0,
+        "leveraged_funds_long_pct": 55.0, "leveraged_funds_short_pct": 45.0,
+        "asset_managers_long_pct": 10.0, "asset_managers_short_pct": 90.0,
+        "indicators": {"ma_short": "Bullish", "ma_long": "Neutral", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Upper Extreme"}
+    },
+    "EURGBP": {
+        "name": "EUR/GBP", "asset_class": "FOREX",
+        "daily_regime": "Bear Average", "weekly_regime": "Consolidation - Volatile",
+        "starting_point": 0.8371, "delta": 0.0013,
+        "res1": 0.8384, "sl_res1": 0.8390, "res2": 0.8397, "sl_res2": 0.8404,
+        "sup1": 0.8358, "sl_sup1": 0.8351, "sup2": 0.8345, "sl_sup2": 0.8338,
+        "client_long_pct": 75.0, "client_short_pct": 25.0,
+        "institutional_long_pct": 47.0, "institutional_short_pct": 53.0,
+        "leveraged_funds_long_pct": 61.0, "leveraged_funds_short_pct": 39.0,
+        "asset_managers_long_pct": 77.0, "asset_managers_short_pct": 23.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bearish", "dmi": "Negative", "adx": "Trending", "rsi": "Oversold", "bb": "Lower Extreme"}
+    },
+    "USDJPY": {
+        "name": "USD/JPY", "asset_class": "FOREX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 156.54, "delta": 0.62,
+        "res1": 157.16, "sl_res1": 157.48, "res2": 157.79, "sl_res2": 158.10,
+        "sup1": 155.91, "sl_sup1": 155.60, "sup2": 155.29, "sl_sup2": 154.97,
+        "client_long_pct": 54.0, "client_short_pct": 46.0,
+        "institutional_long_pct": 42.0, "institutional_short_pct": 58.0,
+        "leveraged_funds_long_pct": 60.0, "leveraged_funds_short_pct": 40.0,
+        "asset_managers_long_pct": 35.0, "asset_managers_short_pct": 65.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bearish", "dmi": "Neutral", "adx": "Consolidation", "rsi": "Neutral", "bb": "Lower Extreme"}
+    },
+    "AUDUSD": {
+        "name": "AUD/USD", "asset_class": "FOREX",
+        "daily_regime": "Bear Average", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 0.7019, "delta": 0.0023,
+        "res1": 0.7042, "sl_res1": 0.7054, "res2": 0.7065, "sl_res2": 0.7077,
+        "sup1": 0.6996, "sl_sup1": 0.6985, "sup2": 0.6973, "sl_sup2": 0.6962,
+        "client_long_pct": 63.0, "client_short_pct": 37.0,
+        "institutional_long_pct": 31.0, "institutional_short_pct": 69.0,
+        "leveraged_funds_long_pct": 70.0, "leveraged_funds_short_pct": 30.0,
+        "asset_managers_long_pct": 30.0, "asset_managers_short_pct": 70.0,
+        "indicators": {"ma_short": "Bullish", "ma_long": "Bearish", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Upper Extreme"}
+    },
+    "USDCAD": {
+        "name": "USD/CAD", "asset_class": "FOREX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Consolidation - Positive Bias",
+        "starting_point": 1.4002, "delta": 0.0035,
+        "res1": 1.4037, "sl_res1": 1.4054, "res2": 1.4072, "sl_res2": 1.4089,
+        "sup1": 1.3967, "sl_sup1": 1.3950, "sup2": 1.3932, "sl_sup2": 1.3915,
+        "client_long_pct": 45.0, "client_short_pct": 55.0,
+        "institutional_long_pct": 67.0, "institutional_short_pct": 33.0,
+        "leveraged_funds_long_pct": 82.0, "leveraged_funds_short_pct": 18.0,
+        "asset_managers_long_pct": 57.0, "asset_managers_short_pct": 43.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Neutral", "dmi": "Negative", "adx": "Trending", "rsi": "Neutral", "bb": "Lower Extreme"}
+    },
+    "USDCHF": {
+        "name": "USD/CHF", "asset_class": "FOREX",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Consolidation - Positive Bias",
+        "starting_point": 0.8199, "delta": 0.0030,
+        "res1": 0.8229, "sl_res1": 0.8244, "res2": 0.8259, "sl_res2": 0.8274,
+        "sup1": 0.8169, "sl_sup1": 0.8154, "sup2": 0.8139, "sl_sup2": 0.8124,
+        "client_long_pct": 72.0, "client_short_pct": 28.0,
+        "institutional_long_pct": 64.0, "institutional_short_pct": 36.0,
+        "leveraged_funds_long_pct": 71.0, "leveraged_funds_short_pct": 29.0,
+        "asset_managers_long_pct": 70.0, "asset_managers_short_pct": 30.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Bullish", "dmi": "Neutral", "adx": "Trending", "rsi": "Neutral", "bb": "Lower Extreme"}
+    },
+    "GBPJPY": {
+        "name": "GBP/JPY", "asset_class": "FOREX",
+        "daily_regime": "Cautious Consolidation", "weekly_regime": "Cautious Consolidation",
+        "starting_point": 209.81, "delta": 0.81,
+        "res1": 210.62, "sl_res1": 211.02, "res2": 211.43, "sl_res2": 211.84,
+        "sup1": 208.99, "sl_sup1": 208.59, "sup2": 208.18, "sl_sup2": 207.77,
+        "client_long_pct": 67.0, "client_short_pct": 33.0,
+        "indicators": {"ma_short": "Neutral", "ma_long": "Bearish", "dmi": "Neutral", "adx": "Consolidation", "rsi": "Neutral", "bb": "Neutral"}
+    },
+    "BTCUSD": {
+        "name": "Bitcoin (BTC/USD)", "asset_class": "CRYPTO",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Consolidation - Volatile",
+        "starting_point": 81287.0, "delta": 1255.0,
+        "res1": 82542.0, "sl_res1": 83170.0, "res2": 83797.0, "sl_res2": 84425.0,
+        "sup1": 80032.0, "sl_sup1": 79404.0, "sup2": 78777.0, "sl_sup2": 78149.0,
+        "client_long_pct": 86.0, "client_short_pct": 14.0,
+        "institutional_long_pct": 54.0, "institutional_short_pct": 46.0,
+        "leveraged_funds_long_pct": 33.0, "leveraged_funds_short_pct": 67.0,
+        "asset_managers_long_pct": 78.0, "asset_managers_short_pct": 22.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Neutral", "dmi": "Neutral", "adx": "Consolidation", "rsi": "Neutral", "bb": "Neutral"}
+    },
+    "ETHUSD": {
+        "name": "Ether (ETH/USD)", "asset_class": "CRYPTO",
+        "daily_regime": "Consolidation - Volatile", "weekly_regime": "Consolidation - Volatile",
+        "starting_point": 2385.30, "delta": 53.0,
+        "res1": 2438.30, "sl_res1": 2464.80, "res2": 2491.20, "sl_res2": 2517.70,
+        "sup1": 2332.30, "sl_sup1": 2305.80, "sup2": 2279.30, "sl_sup2": 2252.80,
+        "client_long_pct": 89.0, "client_short_pct": 11.0,
+        "institutional_long_pct": 53.0, "institutional_short_pct": 47.0,
+        "leveraged_funds_long_pct": 24.0, "leveraged_funds_short_pct": 76.0,
+        "asset_managers_long_pct": 42.0, "asset_managers_short_pct": 58.0,
+        "indicators": {"ma_short": "Bearish", "ma_long": "Neutral", "dmi": "Negative", "adx": "Trending", "rsi": "Neutral", "bb": "Neutral"}
+    }
+}
+
 # In-Memory Cache for live broker sentiments
 _LIVE_SENTIMENT_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _SENTIMENT_CACHE_TTL = 300.0  # 5 minutes
@@ -220,6 +582,18 @@ class CapitalMarketReportEngine:
             return "DE40"
         elif any(o in s for o in ["OIL_CRUDE", "CRUDE", "WTI", "USOIL"]):
             return "OIL_CRUDE"
+        elif any(r in s for r in ["RUSSELL", "US2000"]):
+            return "US2000"
+        elif any(k in s for k in ["UK100", "FTSE"]):
+            return "UK100"
+        elif any(a in s for a in ["ASX", "AU200"]):
+            return "ASX200"
+        elif any(h in s for h in ["HK50", "HSI", "HONGKONG"]):
+            return "HK50"
+        elif any(j in s for j in ["JP225", "NIKKEI", "JAPAN225"]):
+            return "JP225"
+        elif any(ng in s for ng in ["NATGAS", "NATURAL_GAS"]):
+            return "NATURAL_GAS"
         elif "NVDA" in s or "NVIDIA" in s:
             return "NVDA"
         elif "TSLA" in s or "TESLA" in s:
@@ -230,7 +604,38 @@ class CapitalMarketReportEngine:
             return "AAPL"
         elif "MSFT" in s or "MICROSOFT" in s:
             return "MSFT"
+        elif "EURUSD" in s:
+            return "EURUSD"
+        elif "GBPUSD" in s:
+            return "GBPUSD"
+        elif "EURGBP" in s:
+            return "EURGBP"
+        elif "USDJPY" in s:
+            return "USDJPY"
+        elif "AUDUSD" in s:
+            return "AUDUSD"
+        elif "USDCAD" in s:
+            return "USDCAD"
+        elif "USDCHF" in s:
+            return "USDCHF"
+        elif "GBPJPY" in s:
+            return "GBPJPY"
+        elif any(b in s for b in ["BTCUSD", "BITCOIN"]):
+            return "BTCUSD"
+        elif any(e in s for e in ["ETHUSD", "ETHER"]):
+            return "ETHUSD"
         return s
+
+    @classmethod
+    def get_oct23_2026_report_data(cls, epic: str) -> Optional[Dict[str, Any]]:
+        """Retrieves exact transcribed report data from Friday, October 23, 2026."""
+        key = cls.normalize_epic_key(epic)
+        return CAPITAL_OCT23_2026_REPORT_REGISTRY.get(key)
+
+    @classmethod
+    def get_all_oct23_2026_reports(cls) -> Dict[str, Dict[str, Any]]:
+        """Returns the full 28-asset registry from Friday, October 23, 2026."""
+        return dict(CAPITAL_OCT23_2026_REPORT_REGISTRY)
 
     @classmethod
     def get_market_report_data(
