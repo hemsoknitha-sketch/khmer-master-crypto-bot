@@ -3344,6 +3344,48 @@ class SuperSmartCapitalCitadel:
         except Exception as e_meta:
             logger.debug(f"Meta-labeling check note: {e_meta}")
 
+        # Pillar 0.95: Super Smart Apex Quantitative Models (Invariant 100)
+        try:
+            import capital_advanced_quant_models as caqm
+
+            # 1. Intermarket Macro Covariance & Term Structure Evaluation
+            macro_feat_dict = live_macro if 'live_macro' in locals() and isinstance(live_macro, dict) else {}
+            macro_eval = caqm.IntermarketMacroPredictor.evaluate_intermarket_macro_alignment(
+                epic=s_epic, direction=direction, macro_features=macro_feat_dict
+            )
+            diag["macro_alignment"] = macro_eval
+            if macro_eval.get("is_macro_vetoed"):
+                reason = macro_eval.get("macro_veto_reason", "INTERMARKET_MACRO_VETO")
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
+                return False, reason, diag
+
+            # 2. Conformal Prediction Finite-Sample Coverage Set Guarantee (90% Confidence)
+            target_prob = float(diag.get("meta_label", {}).get("meta_win_prob", diag.get("calibrated_win_prob", 0.55)) or 0.55)
+            conformal_eval = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+                predicted_prob_win=target_prob, alpha=0.10
+            )
+            diag["conformal_prediction"] = conformal_eval
+            if not conformal_eval.get("is_conformal_approved") and target_prob < 0.65:
+                reason = (
+                    f"CONFORMAL_PREDICTION_REJECTED: P(Win)={target_prob*100:.1f}% fails 90% finite-sample "
+                    f"statistical guarantee (q_hat={conformal_eval.get('conformal_threshold_qhat')})"
+                )
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
+                return False, reason, diag
+
+            # 3. Multi-Scale Fractal Hurst Surface Alignment
+            hurst_surf = caqm.MultiScaleHurstSurface.evaluate_hurst_surface(candles_15m=diag.get("candles_15m"))
+            diag["hurst_surface"] = hurst_surf
+            if hurst_surf.get("surface_alignment") == "MEAN_REVERTING_CHOP" and not diag.get("is_turtle_soup"):
+                reason = (
+                    f"MULTI_SCALE_HURST_VETO: M15/H1 surface alignment is MEAN_REVERTING_CHOP "
+                    f"(H_15m={hurst_surf.get('m15_hurst')}). Non-sweep trend entry prohibited."
+                )
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
+                return False, reason, diag
+        except Exception as e_apex:
+            logger.debug(f"Apex quant models gatekeeper evaluation note: {e_apex}")
+
         prec = _get_tradfi_precision(epic, diag.get("current_price", 0.0))
         sl_val = diag.get('invalidation_sl', 0.0)
         tp_val = diag.get('target_tp_min', 0.0)

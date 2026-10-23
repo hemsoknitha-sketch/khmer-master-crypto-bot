@@ -708,6 +708,25 @@ class CapitalMetaLabelingEngine:
                     verdict = "META_REJECTED"
                     reason = f"BLOCKED_NLP_NEGATIVE_NEWS_SENTIMENT: Sentiment={nlp_sentiment:.2f} < -0.40 (Bearish Macro Wire Veto)"
 
+        # 4. Conformal Prediction Finite-Sample Coverage Sets (Invariant 100 Pillar 1)
+        conformal_res = {}
+        try:
+            import capital_advanced_quant_models as caqm
+            conformal_res = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+                predicted_prob_win=meta_win_prob, alpha=0.10
+            )
+            if not conformal_res.get("is_conformal_approved", True):
+                if is_approved and meta_win_prob < 0.65:
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = (
+                        f"CONFORMAL_PREDICTION_VETO: P(Win)={meta_win_prob*100:.1f}% fails 90% finite-sample "
+                        f"coverage guarantee (q_hat={conformal_res.get('conformal_threshold_qhat')})"
+                    )
+        except Exception as e_conf:
+            logger.debug(f"Conformal prediction evaluation note: {e_conf}")
+
         return {
             "is_approved": is_approved,
             "meta_win_prob": float(meta_win_prob),
@@ -718,6 +737,7 @@ class CapitalMetaLabelingEngine:
             "is_ml_inferred": is_ml_inferred,
             "regime_beliefs": regime_beliefs,
             "vix_term_structure": vix_term_structure,
+            "conformal_prediction": conformal_res,
             "nlp_sentiment": nlp_sentiment,
             "features": features,
             "model_breakdown": {

@@ -4665,14 +4665,34 @@ class CapitalAutonomousEngine:
                 except Exception as e_rl_exit:
                     logger.debug(f"RL dynamic exit evaluation note: {e_rl_exit}")
 
-            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached or shock_early_harvest or rl_exhaustion_harvest or parabolic_85_harvest) and (upl >= 1.25)
+            # Contextual Multi-Armed Bandit Dynamic Harvest (Invariant 100 Pillar 6)
+            bandit_harvest = False
+            try:
+                import capital_advanced_quant_models as caqm
+                kalman_vel = float(cached_market.get("kalman_velocity", 0.0) or 0.0)
+                bandit_rec = caqm.ContextualBanditExitGovernor.recommend_exit_policy(
+                    current_upl_r=r_gain,
+                    peak_upl_r=peak_upl / max(1e-4, trade_sl_dist * size),
+                    normalized_velocity=kalman_vel,
+                    rsi_15m=rsi_cur,
+                    spread_r=spread / max(1e-4, trade_sl_dist)
+                )
+                if bandit_rec.get("action") == "SHOCK_EARLY_HARVEST" and upl >= max(1.25, spread * 1.5):
+                    bandit_harvest = True
+                    logger.info(f"🎯 [CONTEXTUAL BANDIT HARVEST (AQ100)] {epic}: {bandit_rec.get('reason')}")
+            except Exception as e_bandit:
+                logger.debug(f"Contextual bandit evaluation note: {e_bandit}")
+
+            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached or shock_early_harvest or rl_exhaustion_harvest or parabolic_85_harvest or bandit_harvest) and (upl >= 1.25)
             if harvest_trigger:
                 tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else (
-                    "🧠 [RL DYNAMIC MOMENTUM EXHAUSTION HARVEST]" if rl_exhaustion_harvest else (
-                        "⚡ [PARABOLIC RSI EXHAUSTION 85% HARVEST]" if parabolic_85_harvest else (
-                            "⚡ [SHOCK EARLY HARVEST - 50% RETRACEMENT PROTECTION]" if shock_early_harvest else (
-                                "🎯 [BROKER TP HARVEST]" if tp_target_reached else (
-                                    "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
+                    "🎯 [CONTEXTUAL BANDIT DYNAMIC HARVEST (AQ100)]" if bandit_harvest else (
+                        "🧠 [RL DYNAMIC MOMENTUM EXHAUSTION HARVEST]" if rl_exhaustion_harvest else (
+                            "⚡ [PARABOLIC RSI EXHAUSTION 85% HARVEST]" if parabolic_85_harvest else (
+                                "⚡ [SHOCK EARLY HARVEST - 50% RETRACEMENT PROTECTION]" if shock_early_harvest else (
+                                    "🎯 [BROKER TP HARVEST]" if tp_target_reached else (
+                                        "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
+                                    )
                                 )
                             )
                         )
