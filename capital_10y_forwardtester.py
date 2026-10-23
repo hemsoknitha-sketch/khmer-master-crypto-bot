@@ -457,7 +457,8 @@ def run_forward_strategy_simulation(
                 prev_rows=prev_rows,
                 spec=spec,
                 macro_row=macro_info,
-                ablation_flags={}
+                ablation_flags={},
+                epic=sym
             )
 
             # Invariant 58 & 92: Macro Crisis & High-Beta Equity Shield

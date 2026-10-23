@@ -400,7 +400,8 @@ def evaluate_bar_signals(
     prev_rows: pd.DataFrame,
     spec: Dict[str, Any],
     macro_row: Optional[Dict[str, float]] = None,
-    ablation_flags: Optional[Dict[str, bool]] = None
+    ablation_flags: Optional[Dict[str, bool]] = None,
+    epic: str = "GOLD"
 ) -> Tuple[Optional[str], float, float, Dict[str, Any]]:
     """
     Evaluates trading rules at bar t.
@@ -428,6 +429,40 @@ def evaluate_bar_signals(
         "raw_score": 50.0,
         "calibrated_p": 0.50
     }
+
+    # Invariant 99: Capital.com Daily Market Report S/R & Contrarian Retail Sentiment
+    has_broker_sweep_bull = False
+    has_broker_sweep_bear = False
+    retail_trap_buy = False
+    retail_trap_sell = False
+    try:
+        import capital_market_report_engine
+        cmre = capital_market_report_engine.CapitalMarketReportEngine
+        rep = cmre.get_market_report_data(epic, current_price=curr_p, daily_atr=atr)
+        if len(prev_rows) >= 3:
+            h_wick = float(prev_rows['high'].iloc[-3:].max())
+            l_wick = float(prev_rows['low'].iloc[-3:].min())
+            sweep_chk = cmre.evaluate_broker_stop_cluster_sweep(
+                epic=epic,
+                current_price=curr_p,
+                high_wick=h_wick,
+                low_wick=l_wick,
+                spread=spread
+            )
+            if sweep_chk.get("has_broker_sweep"):
+                if sweep_chk.get("sweep_direction") == "BUY":
+                    has_broker_sweep_bull = True
+                elif sweep_chk.get("sweep_direction") == "SELL":
+                    has_broker_sweep_bear = True
+
+        c_long = float(rep.get("client_long_pct", 50.0))
+        c_short = float(rep.get("client_short_pct", 50.0))
+        if c_long >= 80.0 and curr_p >= rep["res1"] * 0.995:
+            retail_trap_buy = True
+        if c_short >= 70.0 and curr_p <= rep["sup1"] * 1.005:
+            retail_trap_sell = True
+    except Exception:
+        pass
 
     # -------------------------------------------------------------------------
     # 1. HARD VETOES
@@ -539,6 +574,9 @@ def evaluate_bar_signals(
         buy_score += 15.0
     else:
         buy_score -= 15.0
+    if has_broker_sweep_bull:
+        buy_score += 25.0
+        meta["confluence_factors"].append("BROKER_SL_SWEEP_BULL (+25)")
 
     # SELL SIDE SCORING
     if range_pct > 50.0:  # Premium
@@ -557,6 +595,9 @@ def evaluate_bar_signals(
         sell_score += 15.0
     else:
         sell_score -= 15.0
+    if has_broker_sweep_bear:
+        sell_score += 25.0
+        meta["confluence_factors"].append("BROKER_SL_SWEEP_BEAR (+25)")
 
     # Macro Confluence adjustments (DXY & VIX)
     if macro_row is not None:
@@ -605,6 +646,11 @@ def evaluate_bar_signals(
             meta["veto_reason"] = f"LOW_ADX_CHOP ({adx:.1f} < 25.0)"
             return None, 0.0, 0.0, meta
 
+        # VETO 5: Retail Extreme Long Trap (Invariant 99)
+        if retail_trap_buy and not has_broker_sweep_bull:
+            meta["veto_reason"] = "RETAIL_EXTREME_LONG_TRAP_VETO (Retail Herd >= 80% Long at Res1)"
+            return None, 0.0, 0.0, meta
+
         chosen_dir = "BUY"
         raw_score = min(99.5, buy_score)
 
@@ -629,6 +675,11 @@ def evaluate_bar_signals(
         # VETO 4: ADX Trend Momentum
         if not ablation_flags.get("drop_adx_filter", False) and adx < 25.0:
             meta["veto_reason"] = f"LOW_ADX_CHOP ({adx:.1f} < 25.0)"
+            return None, 0.0, 0.0, meta
+
+        # VETO 5: Retail Extreme Short Trap (Invariant 99)
+        if retail_trap_sell and not has_broker_sweep_bear:
+            meta["veto_reason"] = "RETAIL_EXTREME_SHORT_TRAP_VETO (Retail Herd >= 70% Short at Sup1)"
             return None, 0.0, 0.0, meta
 
         chosen_dir = "SELL"
@@ -1116,7 +1167,8 @@ def run_backtest_simulation(
                 prev_rows=prev_rows,
                 spec=active_specs[epic],
                 macro_row=macro_info,
-                ablation_flags=ablation_flags
+                ablation_flags=ablation_flags,
+                epic=epic
             )
 
             if dir_signal is not None and curr_row_idx + 1 < len(df_sym):
