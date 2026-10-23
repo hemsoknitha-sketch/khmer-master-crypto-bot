@@ -4518,7 +4518,7 @@ def run_audit():
         nvda_eval_sell = cmre.evaluate_contrarian_sentiment_edge("NVDA", "SELL", current_price=220.00)
         nvda_boost_ok = float(nvda_eval_sell.get("score_boost", 0.0)) >= 30.0
 
-        # Unit Test 4: Exact Broker Stop Cluster Sweep Reversal (Wick pierced SL_Res1 then rejected)
+        # Unit Test 4: Exact Broker Stop Cluster Sweep Reversal & Breakdown Decoupling
         sweep_test = cmre.evaluate_broker_stop_cluster_sweep(
             epic="GOLD",
             current_price=4165.0,
@@ -4526,11 +4526,26 @@ def run_audit():
             low_wick=4150.0,
             spread=0.50
         )
+        sweep_breakdown_test = cmre.evaluate_broker_stop_cluster_sweep(
+            epic="GOLD",
+            current_price=4030.0,
+            high_wick=4075.0,
+            low_wick=4025.0,
+            close_price=4030.0,
+            spread=0.50,
+            rvol=1.60
+        )
         sweep_ok = (
             sweep_test.get("has_broker_sweep") is True and
             sweep_test.get("sweep_direction") == "SELL" and
             sweep_test.get("swept_level_name") == "BROKER_SL_RESISTANCE_1" and
-            sweep_test.get("structural_sl") is not None
+            sweep_test.get("structural_sl") is not None and
+            sweep_test.get("is_absorption_confirmed") is True and
+            sweep_test.get("sweep_reversal_prob", 0.0) >= 0.65 and
+            sweep_breakdown_test.get("has_broker_sweep") is False and
+            sweep_breakdown_test.get("is_true_breakdown") is True and
+            sweep_breakdown_test.get("true_breakdown_prob", 0.0) >= 0.65 and
+            sweep_breakdown_test.get("sweep_regime") == "TRUE_STRUCTURAL_BREAKDOWN"
         )
 
         # Unit Test 5: Integration in SuperSmartCapitalCitadel

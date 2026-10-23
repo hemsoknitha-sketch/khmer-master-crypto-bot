@@ -690,7 +690,7 @@ class CapitalMarketReportEngine:
         delta = float(report["delta"])
         if current_price > 0 and abs(current_price - bench_p0) / bench_p0 > 0.03:
             p0 = current_price
-            if daily_atr > 0:
+            if daily_atr is not None and daily_atr > 0:
                 delta = daily_atr
             else:
                 pct_delta = delta / bench_p0
@@ -1393,86 +1393,331 @@ class CapitalMarketReportEngine:
         low_wick: float,
         spread: float = 0.50,
         close_price: Optional[float] = None,
-        volume: float = 0.0
+        volume: float = 0.0,
+        candles_15m: Optional[List[Dict[str, Any]]] = None,
+        rvol: Optional[float] = None,
+        daily_atr: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Pillar 4: Exact Broker S/R Stop-Loss Cluster Sweep Reversal & Absorption.
-        Detects when price pierced Monte Safieddine's exact SL for 1st/2nd Resistance or Support
-        and immediately rejected back inside the dealing range, confirming a textbook
-        Turtle Soup Liquidity Hunt at the broker's pre-calculated stop zones.
+        Pillar 4 Formula: Broker Stop-Loss Cluster Sweep Absorption & Reversal vs Breakdown Probability Engine.
+        Mathematical Formulation:
+          1. Broker S/R Stop Clusters:
+             SL_R1 = R1 + 0.5 * Delta, SL_R2 = R2 + 0.5 * Delta
+             SL_S1 = S1 - 0.5 * Delta, SL_S2 = S2 - 0.5 * Delta
+          2. Penetration Depth:
+             Support: D_pen = max(0, S1 - Low_wick), rho_pen = D_pen / Delta
+             Resistance: D_pen = max(0, High_wick - R1), rho_pen = D_pen / Delta
+          3. Microstructure & Absorption Metrics:
+             Wick Rejection Ratio: W_wick = (Close - Low) / Wick_Span (Support)
+             Body Ratio: B_ratio = |Close - Open| / Wick_Span
+             Absorption Liquidity Volume Index (ALVI):
+               ALVI = RVOL * W_wick * max(0.10, 1.0 - |Close - Boundary| / Delta)
+          4. Decoupling Turtle Soup Reversal vs True Structural Breakdown:
+             - If ALVI >= 0.45 and W_wick >= 0.35 and Close snaps back inside Boundary:
+               P(Turtle Soup Reversal) >= 0.65 -> Execute Contrarian FADE (+35 to +40 boost)
+             - If B_ratio >= 0.65 and Close fractures beyond SL cluster with high momentum:
+               P(True Breakdown) >= 0.65 -> STRUCTURAL_BREAKDOWN_VELOCITY_VETO (-35 penalty)
         """
-        rep = cls.get_market_report_data(epic, current_price=current_price)
-        res1 = rep["res1"]
-        sl_res1 = rep["sl_res1"]
-        res2 = rep["res2"]
-        sl_res2 = rep["sl_res2"]
-        sup1 = rep["sup1"]
-        sl_sup1 = rep["sl_sup1"]
-        sup2 = rep["sup2"]
-        sl_sup2 = rep["sl_sup2"]
-        p0 = rep["starting_point"]
+        rep = cls.get_market_report_data(epic, current_price=current_price, daily_atr=daily_atr)
+        res1 = float(rep["res1"])
+        sl_res1 = float(rep["sl_res1"])
+        res2 = float(rep["res2"])
+        sl_res2 = float(rep["sl_res2"])
+        sup1 = float(rep["sup1"])
+        sl_sup1 = float(rep["sl_sup1"])
+        sup2 = float(rep["sup2"])
+        sl_sup2 = float(rep["sl_sup2"])
+        p0 = float(rep["starting_point"])
+        delta = float(rep["delta"]) if float(rep["delta"]) > 0 else 1.0
 
+        c_p = close_price if close_price is not None else current_price
+        c_o = c_p
+        wick_span = max(0.0001, high_wick - low_wick)
+        calc_rvol = 1.0
+        body_ratio = 0.5
+
+        if candles_15m and len(candles_15m) >= 1:
+            try:
+                last_c = candles_15m[-1]
+                c_o = float(last_c.get("open", c_p))
+                vols = [float(c.get("volume", 0.0) or c.get("tick_volume", 0.0) or 1.0) for c in candles_15m]
+                avg_vol = sum(vols[-20:]) / max(1, len(vols[-20:]))
+                curr_vol = volume if volume > 0 else (vols[-1] if vols else avg_vol)
+                calc_rvol = round(curr_vol / max(1.0, avg_vol), 2)
+                body_ratio = round(abs(c_p - c_o) / wick_span, 4)
+            except Exception:
+                pass
+
+        if rvol is not None:
+            calc_rvol = float(rvol)
+
+        swept_level_name = None
+        target_level = None
+        boundary_level = None
+        is_resistance = False
+        is_support = False
+
+        # Identify stop cluster breach
+        if high_wick >= sl_res2:
+            swept_level_name = "BROKER_SL_RESISTANCE_2"
+            target_level = sl_res2
+            boundary_level = res2
+            is_resistance = True
+        elif high_wick >= sl_res1:
+            swept_level_name = "BROKER_SL_RESISTANCE_1"
+            target_level = sl_res1
+            boundary_level = res1
+            is_resistance = True
+        elif high_wick >= res1:
+            swept_level_name = "BROKER_RESISTANCE_1_APPROACH"
+            target_level = sl_res1
+            boundary_level = res1
+            is_resistance = True
+
+        if low_wick <= sl_sup2:
+            swept_level_name = "BROKER_SL_SUPPORT_2"
+            target_level = sl_sup2
+            boundary_level = sup2
+            is_support = True
+        elif low_wick <= sl_sup1:
+            swept_level_name = "BROKER_SL_SUPPORT_1"
+            target_level = sl_sup1
+            boundary_level = sup1
+            is_support = True
+        elif low_wick <= sup1:
+            swept_level_name = "BROKER_SUPPORT_1_APPROACH"
+            target_level = sl_sup1
+            boundary_level = sup1
+            is_support = True
+
+        if not is_resistance and not is_support:
+            return {
+                "has_broker_sweep": False,
+                "sweep_direction": None,
+                "swept_level_name": None,
+                "target_stop_level": None,
+                "boundary_level": None,
+                "penetration_depth": 0.0,
+                "penetration_ratio": 0.0,
+                "penetration_pct": 0.0,
+                "absorption_liquidity_volume_index": 0.0,
+                "rvol": calc_rvol,
+                "rejection_wick_ratio": 0.0,
+                "body_ratio": body_ratio,
+                "sweep_reversal_prob": 0.50,
+                "true_breakdown_prob": 0.50,
+                "sweep_regime": "NEUTRAL_WITHIN_BOUNDARIES",
+                "is_absorption_confirmed": False,
+                "is_true_breakdown": False,
+                "recommended_action": "MONITOR_PRICE_ACTION",
+                "structural_sl": None,
+                "tp1_target": None,
+                "tp2_target": None,
+                "factors": ["PRICE_WITHIN_NOMINAL_RANGE"],
+                "description": "Price remains within normal dealing range boundaries.",
+                "broker_levels": rep,
+            }
+
+        score_reversal = 0.0
+        score_breakdown = 0.0
+        factors = []
         is_bearish_sweep = False
         is_bullish_sweep = False
-        swept_level_name = None
         structural_sl = None
         tp1 = None
         tp2 = None
-        desc = None
 
-        c_p = close_price if close_price is not None else current_price
-        wick_span = max(0.0001, high_wick - low_wick)
-        rejection_wick_ratio = 0.0
-
-        # Check Bearish Stop Run (Wick pierced SL for Resistance, but closed back below Resistance)
-        if high_wick >= sl_res1 and current_price < res1:
-            is_bearish_sweep = True
-            swept_level_name = "BROKER_SL_RESISTANCE_1"
-            structural_sl = round(high_wick + max(2.0 * spread, 0.0010 * current_price), 2)
-            tp1 = round(p0, 2)
-            tp2 = round(sup1, 2)
+        if is_resistance:
+            d_pen = max(0.0, high_wick - boundary_level)
+            rho_pen = round(d_pen / max(0.01, delta), 4)
             rejection_wick_ratio = round((high_wick - c_p) / wick_span, 4)
-            desc = f"Bearish Stop-Run: Pierced Broker SL Res1 (${sl_res1:,.2f}) and rejected below Res1 (${res1:,.2f})"
-        elif high_wick >= sl_res2 and current_price < res2:
-            is_bearish_sweep = True
-            swept_level_name = "BROKER_SL_RESISTANCE_2"
-            structural_sl = round(high_wick + max(2.0 * spread, 0.0010 * current_price), 2)
-            tp1 = round(res1, 2)
-            tp2 = round(p0, 2)
-            rejection_wick_ratio = round((high_wick - c_p) / wick_span, 4)
-            desc = f"Bearish Mega Stop-Run: Pierced Broker SL Res2 (${sl_res2:,.2f}) and rejected below Res2 (${res2:,.2f})"
+            is_re_entered = bool(c_p < boundary_level)
+            is_closed_beyond_sl = bool(c_p >= target_level)
+            alvi = round(calc_rvol * rejection_wick_ratio * max(0.10, 1.0 - (abs(c_p - boundary_level) / max(0.01, delta))), 4)
 
-        # Check Bullish Stop Run (Wick pierced SL for Support, but closed back above Support)
-        elif low_wick <= sl_sup1 and current_price > sup1:
-            is_bullish_sweep = True
-            swept_level_name = "BROKER_SL_SUPPORT_1"
-            structural_sl = round(low_wick - max(2.0 * spread, 0.0010 * current_price), 2)
-            tp1 = round(p0, 2)
-            tp2 = round(res1, 2)
-            rejection_wick_ratio = round((c_p - low_wick) / wick_span, 4)
-            desc = f"Bullish Stop-Run: Pierced Broker SL Sup1 (${sl_sup1:,.2f}) and rejected above Sup1 (${sup1:,.2f})"
-        elif low_wick <= sl_sup2 and current_price > sup2:
-            is_bullish_sweep = True
-            swept_level_name = "BROKER_SL_SUPPORT_2"
-            structural_sl = round(low_wick - max(2.0 * spread, 0.0010 * current_price), 2)
-            tp1 = round(sup1, 2)
-            tp2 = round(p0, 2)
-            rejection_wick_ratio = round((c_p - low_wick) / wick_span, 4)
-            desc = f"Bullish Mega Stop-Run: Pierced Broker SL Sup2 (${sl_sup2:,.2f}) and rejected above Sup2 (${sup2:,.2f})"
+            # Factor 1: Rejection Wick vs Body Thrust
+            if rejection_wick_ratio >= 0.45:
+                score_reversal += 35.0
+                factors.append(f"EXTREME_ABSORPTION_WICK ({rejection_wick_ratio*100:.1f}%)")
+            elif rejection_wick_ratio >= 0.35:
+                score_reversal += 25.0
+                factors.append(f"SOLID_ABSORPTION_WICK ({rejection_wick_ratio*100:.1f}%)")
+            if body_ratio >= 0.70 and (is_closed_beyond_sl or not is_re_entered):
+                score_breakdown += 35.0
+                factors.append(f"MARUBOZU_EXPANSION_BODY ({body_ratio*100:.1f}%)")
+            elif body_ratio >= 0.55:
+                score_breakdown += 15.0
 
-        is_absorption_confirmed = bool(rejection_wick_ratio >= 0.35)
+            # Factor 2: Absorption Liquidity Volume Index (ALVI) & RVOL
+            if alvi >= 0.45:
+                score_reversal += 30.0
+                factors.append(f"INSTITUTIONAL_LIQUIDITY_ABSORPTION (ALVI={alvi:.2f}, RVOL={calc_rvol:.2f}x)")
+            elif calc_rvol >= 1.30 and rejection_wick_ratio >= 0.35:
+                score_reversal += 25.0
+                factors.append(f"HIGH_VOLUME_ABSORPTION_SWEEP (RVOL={calc_rvol:.2f}x)")
+            if calc_rvol >= 1.40 and is_closed_beyond_sl:
+                score_breakdown += 35.0
+                factors.append(f"HIGH_VOLUME_BREAKOUT_MOMENTUM (RVOL={calc_rvol:.2f}x)")
+            elif calc_rvol < 0.85:
+                score_reversal += 15.0
+                factors.append(f"LOW_VOLUME_TRAP_EXHAUSTION (RVOL={calc_rvol:.2f}x)")
+
+            # Factor 3: Close Location relative to Boundary
+            if is_re_entered:
+                score_reversal += 30.0
+                factors.append(f"SNAPBACK_INSIDE_BOUNDARY (Closed ${c_p:,.2f} below Res ${boundary_level:,.2f})")
+            if is_closed_beyond_sl:
+                score_breakdown += 40.0
+                factors.append(f"FRACTURED_STOP_CLUSTER (Decisive close above SL ${target_level:,.2f})")
+            elif not is_re_entered:
+                score_breakdown += 20.0
+                factors.append(f"OUTSIDE_BOUNDARY_TENSION (Closed above Res ${boundary_level:,.2f})")
+
+            # Factor 4: Penetration Depth Ratio
+            if 0.10 <= rho_pen <= 0.75:
+                score_reversal += 15.0
+                factors.append(f"OPTIMAL_SWEEP_PENETRATION (Depth: {rho_pen*100:.1f}% Delta)")
+            elif rho_pen > 1.05:
+                score_breakdown += 25.0
+                factors.append(f"EXCESSIVE_DAMAGE_BLOWOUT (Depth: {rho_pen*100:.1f}% Delta)")
+
+            tot = max(1.0, score_reversal + score_breakdown)
+            p_sweep = round(score_reversal / tot, 4)
+            p_breakdown = round(1.0 - p_sweep, 4)
+
+            if p_sweep >= 0.50 and is_re_entered:
+                is_bearish_sweep = True
+                structural_sl = round(high_wick + max(2.0 * spread, 0.0010 * current_price), 2)
+                tp1 = round(p0, 2) if swept_level_name != "BROKER_SL_RESISTANCE_2" else round(res1, 2)
+                tp2 = round(sup1, 2) if swept_level_name != "BROKER_SL_RESISTANCE_2" else round(p0, 2)
+                sweep_regime = "TURTLE_SOUP_ABSORPTION_REVERSAL"
+                is_absorption_confirmed = bool(rejection_wick_ratio >= 0.35)
+                is_true_breakdown = False
+                recommended_action = "FADE_STOP_RUN_REVERSAL"
+                desc = f"Bearish Stop-Run: Pierced {swept_level_name} (${target_level:,.2f}) with ALVI {alvi:.2f} and rejected below {boundary_level:,.2f}"
+            elif p_breakdown >= 0.55 or is_closed_beyond_sl:
+                sweep_regime = "TRUE_STRUCTURAL_BREAKOUT"
+                is_absorption_confirmed = False
+                is_true_breakdown = True
+                recommended_action = "VETO_COUNTER_TREND_OR_TRAIL_BREAKDOWN"
+                desc = f"True Structural Breakout: Fractured {swept_level_name} (${target_level:,.2f}) with {p_breakdown*100:.1f}% momentum. No absorption."
+            else:
+                sweep_regime = "AMBIGUOUS_STOP_ZONE_TENSION"
+                is_absorption_confirmed = False
+                is_true_breakdown = False
+                recommended_action = "AWAIT_CONFIRMATION_CANDLE"
+                desc = f"Ambiguous Stop-Zone Tension around {swept_level_name} (${target_level:,.2f})."
+
+            sweep_direction = "SELL" if is_bearish_sweep else ("BUY" if is_true_breakdown else None)
+
+        else:  # is_support
+            d_pen = max(0.0, boundary_level - low_wick)
+            rho_pen = round(d_pen / max(0.01, delta), 4)
+            rejection_wick_ratio = round((c_p - low_wick) / wick_span, 4)
+            is_re_entered = bool(c_p > boundary_level)
+            is_closed_beyond_sl = bool(c_p <= target_level)
+            alvi = round(calc_rvol * rejection_wick_ratio * max(0.10, 1.0 - (abs(c_p - boundary_level) / max(0.01, delta))), 4)
+
+            # Factor 1: Rejection Wick vs Body Thrust
+            if rejection_wick_ratio >= 0.45:
+                score_reversal += 35.0
+                factors.append(f"EXTREME_ABSORPTION_WICK ({rejection_wick_ratio*100:.1f}%)")
+            elif rejection_wick_ratio >= 0.35:
+                score_reversal += 25.0
+                factors.append(f"SOLID_ABSORPTION_WICK ({rejection_wick_ratio*100:.1f}%)")
+            if body_ratio >= 0.70 and (is_closed_beyond_sl or not is_re_entered):
+                score_breakdown += 35.0
+                factors.append(f"MARUBOZU_EXPANSION_BODY ({body_ratio*100:.1f}%)")
+            elif body_ratio >= 0.55:
+                score_breakdown += 15.0
+
+            # Factor 2: Absorption Liquidity Volume Index (ALVI) & RVOL
+            if alvi >= 0.45:
+                score_reversal += 30.0
+                factors.append(f"INSTITUTIONAL_LIQUIDITY_ABSORPTION (ALVI={alvi:.2f}, RVOL={calc_rvol:.2f}x)")
+            elif calc_rvol >= 1.30 and rejection_wick_ratio >= 0.35:
+                score_reversal += 25.0
+                factors.append(f"HIGH_VOLUME_ABSORPTION_SWEEP (RVOL={calc_rvol:.2f}x)")
+            if calc_rvol >= 1.40 and is_closed_beyond_sl:
+                score_breakdown += 35.0
+                factors.append(f"HIGH_VOLUME_BREAKDOWN_MOMENTUM (RVOL={calc_rvol:.2f}x)")
+            elif calc_rvol < 0.85:
+                score_reversal += 15.0
+                factors.append(f"LOW_VOLUME_TRAP_EXHAUSTION (RVOL={calc_rvol:.2f}x)")
+
+            # Factor 3: Close Location relative to Boundary
+            if is_re_entered:
+                score_reversal += 30.0
+                factors.append(f"SNAPBACK_INSIDE_BOUNDARY (Closed ${c_p:,.2f} above Sup ${boundary_level:,.2f})")
+            if is_closed_beyond_sl:
+                score_breakdown += 40.0
+                factors.append(f"FRACTURED_STOP_CLUSTER (Decisive close below SL ${target_level:,.2f})")
+            elif not is_re_entered:
+                score_breakdown += 20.0
+                factors.append(f"OUTSIDE_BOUNDARY_TENSION (Closed below Sup ${boundary_level:,.2f})")
+
+            # Factor 4: Penetration Depth Ratio
+            if 0.10 <= rho_pen <= 0.75:
+                score_reversal += 15.0
+                factors.append(f"OPTIMAL_SWEEP_PENETRATION (Depth: {rho_pen*100:.1f}% Delta)")
+            elif rho_pen > 1.05:
+                score_breakdown += 25.0
+                factors.append(f"EXCESSIVE_DAMAGE_BLOWOUT (Depth: {rho_pen*100:.1f}% Delta)")
+
+            tot = max(1.0, score_reversal + score_breakdown)
+            p_sweep = round(score_reversal / tot, 4)
+            p_breakdown = round(1.0 - p_sweep, 4)
+
+            if p_sweep >= 0.50 and is_re_entered:
+                is_bullish_sweep = True
+                structural_sl = round(low_wick - max(2.0 * spread, 0.0010 * current_price), 2)
+                tp1 = round(p0, 2) if swept_level_name != "BROKER_SL_SUPPORT_2" else round(sup1, 2)
+                tp2 = round(res1, 2) if swept_level_name != "BROKER_SL_SUPPORT_2" else round(p0, 2)
+                sweep_regime = "TURTLE_SOUP_ABSORPTION_REVERSAL"
+                is_absorption_confirmed = bool(rejection_wick_ratio >= 0.35)
+                is_true_breakdown = False
+                recommended_action = "FADE_STOP_RUN_REVERSAL"
+                desc = f"Bullish Stop-Run: Pierced {swept_level_name} (${target_level:,.2f}) with ALVI {alvi:.2f} and rejected above {boundary_level:,.2f}"
+            elif p_breakdown >= 0.55 or is_closed_beyond_sl:
+                sweep_regime = "TRUE_STRUCTURAL_BREAKDOWN"
+                is_absorption_confirmed = False
+                is_true_breakdown = True
+                recommended_action = "VETO_COUNTER_TREND_OR_TRAIL_BREAKDOWN"
+                desc = f"True Structural Breakdown: Fractured {swept_level_name} (${target_level:,.2f}) with {p_breakdown*100:.1f}% momentum. No absorption."
+            else:
+                sweep_regime = "AMBIGUOUS_STOP_ZONE_TENSION"
+                is_absorption_confirmed = False
+                is_true_breakdown = False
+                recommended_action = "AWAIT_CONFIRMATION_CANDLE"
+                desc = f"Ambiguous Stop-Zone Tension around {swept_level_name} (${target_level:,.2f})."
+
+            sweep_direction = "BUY" if is_bullish_sweep else ("SELL" if is_true_breakdown else None)
 
         return {
             "has_broker_sweep": (is_bearish_sweep or is_bullish_sweep),
-            "sweep_direction": "SELL" if is_bearish_sweep else ("BUY" if is_bullish_sweep else None),
+            "sweep_direction": sweep_direction,
             "swept_level_name": swept_level_name,
+            "target_stop_level": target_level,
+            "boundary_level": boundary_level,
+            "penetration_depth": round(d_pen, 4),
+            "penetration_ratio": round(rho_pen, 4),
+            "penetration_pct": round(rho_pen * 100.0, 2),
+            "absorption_liquidity_volume_index": alvi,
+            "rvol": calc_rvol,
+            "rejection_wick_ratio": rejection_wick_ratio,
+            "body_ratio": body_ratio,
+            "sweep_reversal_prob": p_sweep,
+            "true_breakdown_prob": p_breakdown,
+            "sweep_regime": sweep_regime,
+            "is_absorption_confirmed": is_absorption_confirmed,
+            "is_true_breakdown": is_true_breakdown,
+            "recommended_action": recommended_action,
             "structural_sl": structural_sl,
             "tp1_target": tp1,
             "tp2_target": tp2,
+            "factors": factors,
             "description": desc,
             "broker_levels": rep,
-            "rejection_wick_ratio": rejection_wick_ratio,
-            "is_absorption_confirmed": is_absorption_confirmed,
         }
 
     @classmethod
@@ -1516,7 +1761,9 @@ class CapitalMarketReportEngine:
             low_wick=l_w,
             spread=spread,
             close_price=close_price,
-            volume=volume
+            volume=volume,
+            candles_15m=candles_15m,
+            rvol=rvol
         )
 
         # 4 Mathematical Formula Calculations
@@ -1545,9 +1792,13 @@ class CapitalMarketReportEngine:
                 sweep_boost = 35.0
                 if sweep_eval.get("is_absorption_confirmed"):
                     sweep_boost += 5.0
-                    factors.append(f"ABSORPTION_WICK_CONFIRMED (+5, Wick: {sweep_eval['rejection_wick_ratio']*100:.1f}%)")
+                    factors.append(
+                        f"ABSORPTION_WICK_CONFIRMED (+5, Wick: {sweep_eval['rejection_wick_ratio']*100:.1f}%, ALVI: {sweep_eval.get('absorption_liquidity_volume_index', 0.0):.2f})"
+                    )
                 total_boost += sweep_boost
-                factors.append(f"BROKER_SL_CLUSTER_SWEEP_CONFIRMED (+{sweep_boost:.0f}, {sweep_eval['swept_level_name']})")
+                factors.append(
+                    f"BROKER_SL_CLUSTER_SWEEP_CONFIRMED (+{sweep_boost:.0f}, {sweep_eval['swept_level_name']}, P(Sweep)={sweep_eval.get('sweep_reversal_prob', 1.0)*100:.1f}%)"
+                )
                 structural_sl = sweep_eval["structural_sl"]
                 tp1 = sweep_eval["tp1_target"]
                 tp2 = sweep_eval["tp2_target"]
@@ -1564,6 +1815,22 @@ class CapitalMarketReportEngine:
             else:
                 total_boost -= 25.0
                 factors.append(f"COUNTER_BROKER_STOP_RUN (-25, {sweep_eval['swept_level_name']})")
+        elif sweep_eval.get("is_true_breakdown"):
+            # Price fractured the broker SL cluster without absorption (True structural breakdown / breakout)
+            if (sweep_eval.get("sweep_direction") == "SELL" and norm_side == "BUY") or \
+               (sweep_eval.get("sweep_direction") == "BUY" and norm_side == "SELL"):
+                is_vetoed = True
+                veto_reason = (
+                    f"STRUCTURAL_BREAKDOWN_VELOCITY_VETO: Price fractured {sweep_eval['swept_level_name']} "
+                    f"with {sweep_eval.get('true_breakdown_prob', 1.0)*100:.1f}% breakdown momentum. "
+                    f"Absorption volume absent (ALVI={sweep_eval.get('absorption_liquidity_volume_index', 0.0):.2f}). Fading is prohibited."
+                )
+                total_boost -= 35.0
+                factors.append(f"TRUE_STRUCTURAL_BREAKDOWN_VETO ({sweep_eval['swept_level_name']}, P={sweep_eval.get('true_breakdown_prob', 1.0)*100:.1f}%)")
+            elif (sweep_eval.get("sweep_direction") == "BUY" and norm_side == "BUY") or \
+                 (sweep_eval.get("sweep_direction") == "SELL" and norm_side == "SELL"):
+                total_boost += 20.0
+                factors.append(f"STRUCTURAL_BREAKTHROUGH_MOMENTUM (+20, {sweep_eval['swept_level_name']}, P={sweep_eval.get('true_breakdown_prob', 1.0)*100:.1f}%)")
 
         # Volatility Delta Expansion Factor
         if vol_exp.get("is_volatility_expanding"):
