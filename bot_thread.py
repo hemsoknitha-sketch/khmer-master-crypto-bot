@@ -27934,14 +27934,14 @@ class TelegramBotThread(BaseThread):
                     f"💡 **របៀបភ្ជាប់គណនី Capital.com ផ្ទាល់ខ្លួន ៖**\n"
                     f"• ចុចប៊ូតុង `🔑 ភ្ជាប់ API ផ្ទាល់ខ្លួន` ខាងក្រោម ឬផ្ញើសារ ៖\n"
                     f"• `/capital API <API_KEY> <EMAIL> <PASSWORD> live`\n"
-                    f"• _(គណនី VIP ដំណើរការផ្តាច់មុខលើ LIVE MAINNET សាច់ប្រាក់ពិតប្រាកដ)_\n"
+                    f"• (គណនី VIP ដំណើរការផ្តាច់មុខលើ LIVE MAINNET សាច់ប្រាក់ពិតប្រាកដ)\n"
                 )
                 guest_guide_en = (
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"💡 **How to Connect Your Personal Account:**\n"
                     f"• Tap `🔑 Personal Vault` below or send command:\n"
                     f"• `/capital API <API_KEY> <EMAIL> <PASSWORD> live`\n"
-                    f"• _(VIP accounts operate exclusively on LIVE MAINNET Real Funds)_\n"
+                    f"• (VIP accounts operate exclusively on LIVE MAINNET Real Funds)\n"
                 )
             else:
                 guest_guide_kh = ""
@@ -27973,7 +27973,7 @@ class TelegramBotThread(BaseThread):
                     f"⏰ **កាលវិភាគវិនិយោគ ៖** `{sched_badge_kh}`\n"
                     f"🎯 **ORB 15m Matrix ៖** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage ៖** `{leadlag_badge}`\n"
-                    f"📐 **Kelly Sizer ($f^*$) ៖** `{kelly_badge}`\n"
+                    f"📐 **Kelly Sizer (Optimal f) ៖** `{kelly_badge}`\n"
                     f"🛡️ **Spread Drag Shield ៖** `{spread_badge}`\n"
                     f"💰 **សមតុល្យលុយពិត (Balance) ៖** `{bal_display}`\n"
                     f"💵 **ទុនទំនេរ (Available) ៖** `{avail_display}`\n"
@@ -27994,8 +27994,8 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **គំរូបញ្ជា Auto ៖** `/capital AUTO ON 50 5` | `/capital SMART_SESSION` | `/capital SCHEDULE` | `/capital RESET`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Angkor Quant_\n"
-                    f"_APEX SUPER BRAIN AI_\n"
+                    f"👑 **Angkor Quant**\n"
+                    f"⚡ **APEX SUPER BRAIN AI**\n"
                     f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
                 )
             else:
@@ -28012,7 +28012,7 @@ class TelegramBotThread(BaseThread):
                     f"⏰ **Trading Schedule:** `{sched_badge_en}`\n"
                     f"🎯 **ORB 15m Matrix:** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage:** `{leadlag_badge}`\n"
-                    f"📐 **Kelly Sizer ($f^*$) :** `{kelly_badge}`\n"
+                    f"📐 **Kelly Sizer (Optimal f):** `{kelly_badge}`\n"
                     f"🛡️ **Spread Drag Shield:** `{spread_badge}`\n"
                     f"💰 **Live Balance:** `{bal_display}`\n"
                     f"💵 **Live Available:** `{avail_display}`\n"
@@ -28033,8 +28033,8 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **Auto Commands:** `/capital AUTO ON 50 5` | `/capital SMART_SESSION` | `/capital SCHEDULE` | `/capital RESET`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Angkor Quant_\n"
-                    f"_APEX SUPER BRAIN AI_\n"
+                    f"👑 **Angkor Quant**\n"
+                    f"⚡ **APEX SUPER BRAIN AI**\n"
                     f"Risk Protection & Wealth Generation 24/7!"
                 )
 
