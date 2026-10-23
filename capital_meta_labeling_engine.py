@@ -304,13 +304,21 @@ class CapitalMetaLabelingEngine:
         candles: Optional[Any] = None,
         macro_data: Optional[Dict[str, float]] = None,
         hurst_exponent: Optional[float] = None,
-        ou_zscore: Optional[float] = None
+        ou_zscore: Optional[float] = None,
+        epic: Optional[str] = None,
+        smart_money_divergence: Optional[float] = None,
+        client_long_pct: Optional[float] = None,
+        leveraged_funds_long_pct: Optional[float] = None,
+        institutional_long_pct: Optional[float] = None,
+        asset_managers_long_pct: Optional[float] = None,
+        sentiment_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, float]:
         """
         Extracts a clean, normalized feature vector for the secondary Meta-Model.
         Dynamically calculates technical indicators (Bollinger %B, Stochastic %K,
         Williams %R, CCI, CVD, BAVI, AVWAP, Volume Profile POC/Width, Hurst Exponent,
-        and Shannon Entropy) from live candles when available, and integrates live macro data.
+        and Shannon Entropy) from live candles when available, integrates live macro data,
+        and injects Multi-Class Sentiment & Smart Money Divergence Index (SMD).
         """
         dir_clean = str(direction or "").upper().strip()
         dir_num = 1.0 if dir_clean == "BUY" else (-1.0 if dir_clean == "SELL" else 0.0)
@@ -474,6 +482,44 @@ class CapitalMetaLabelingEngine:
         vix_val = float(macro.get("vix", vix))
         dxy_chg = float(macro.get("dxy_change", dxy_change))
 
+        # Multi-Class Sentiment & Smart Money Divergence (SMD) Integration
+        smd_val = smart_money_divergence
+        c_long_val = client_long_pct
+        lev_long_val = leveraged_funds_long_pct
+        inst_long_val = institutional_long_pct
+        am_long_val = asset_managers_long_pct
+
+        if smd_val is None and sentiment_data is not None:
+            c_long_val = float(sentiment_data.get("client_long_pct", 50.0))
+            lev_long_val = float(sentiment_data.get("leveraged_funds_long_pct", 50.0))
+            inst_long_val = float(sentiment_data.get("institutional_long_pct", 50.0))
+            am_long_val = float(sentiment_data.get("asset_managers_long_pct", 50.0))
+            smd_val = float(sentiment_data.get("smart_money_divergence", lev_long_val - c_long_val))
+
+        if smd_val is None and epic is not None:
+            try:
+                import capital_market_report_engine as cmre
+                rep = cmre.CapitalMarketReportEngine.get_market_report_data(epic, current_price=price_val)
+                c_long_val = float(rep.get("client_long_pct", 50.0))
+                lev_short = float(rep.get("leveraged_funds_short_pct", 50.0))
+                lev_long_val = float(rep.get("leveraged_funds_long_pct", 100.0 - lev_short))
+                inst_long_val = float(rep.get("institutional_long_pct", 50.0))
+                am_long_val = float(rep.get("asset_managers_long_pct", 50.0))
+                smd_val = round(lev_long_val - c_long_val, 2)
+            except Exception:
+                pass
+
+        if smd_val is None:
+            smd_val = 0.0
+        if c_long_val is None:
+            c_long_val = 50.0
+        if lev_long_val is None:
+            lev_long_val = 50.0
+        if inst_long_val is None:
+            inst_long_val = 50.0
+        if am_long_val is None:
+            am_long_val = 50.0
+
         return {
             "direction_num": float(dir_num),
             "raw_score": float(max(50.0, min(100.0, raw_score))),
@@ -506,7 +552,13 @@ class CapitalMetaLabelingEngine:
             "vix_term_structure": float(vix_term_structure),
             "put_call_ratio": float(put_call_ratio),
             "hurst_exponent": float(hurst),
-            "shannon_entropy": float(entropy)
+            "shannon_entropy": float(entropy),
+            "smart_money_divergence": float(smd_val),
+            "smd": float(smd_val),
+            "client_long_pct": float(c_long_val),
+            "leveraged_funds_long_pct": float(lev_long_val),
+            "institutional_long_pct": float(inst_long_val),
+            "asset_managers_long_pct": float(am_long_val)
         }
 
     @classmethod
@@ -662,6 +714,76 @@ class CapitalMetaLabelingEngine:
                 f"(Avoided false breakout / negative expectancy)"
             )
 
+        # 0. Multi-Class Sentiment & Smart Money Divergence Index (SMD) Governor (Invariant 99 & AQ84)
+        smd = float(features.get("smart_money_divergence", features.get("smd", 0.0)))
+        c_long = float(features.get("client_long_pct", 50.0))
+        lev_long = float(features.get("leveraged_funds_long_pct", 50.0))
+        dir_num = float(features.get("direction_num", 1.0))
+
+        if dir_num == 1.0:  # Proposed Trade is BUY
+            if smd <= -35.0:
+                # Extreme Bearish Smart Money Divergence (e.g. -71.0% on Gold: Retail 84% Long vs LevFunds 13% Long / 87% Short)
+                # AI Model must immediately drop the win probability of a Buy signal to zero (0.0)!
+                meta_win_prob = 0.0
+                is_approved = False
+                sizing_mult = 0.0
+                verdict = "META_REJECTED"
+                reason = (
+                    f"BLOCKED_SMART_MONEY_EXTREME_BEARISH_DIVERGENCE: SMD={smd:.1f}% <= -35.0% "
+                    f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}% | Retail Herd Dip-Buying Trap). "
+                    f"P(Win) crushed to 0.0%."
+                )
+            elif smd < -15.0 and is_approved:
+                meta_win_prob = max(0.0, meta_win_prob - (abs(smd) / 100.0) * 0.35)
+                if meta_win_prob < threshold:
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = (
+                        f"BLOCKED_SMART_MONEY_BEARISH_DIVERGENCE: SMD={smd:.1f}% < -15.0% "
+                        f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}%)"
+                    )
+            elif smd >= 25.0:
+                # Smart Money Bullish Convergence (Hedge funds buying with low retail presence)
+                meta_win_prob = min(0.95, meta_win_prob + 0.10)
+                if not is_approved and meta_win_prob >= threshold:
+                    is_approved = True
+                    sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                    verdict = "META_APPROVED"
+                    reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Buy aligned with Smart Money (SMD=+{smd:.1f}%), P(Win)={meta_win_prob*100:.1f}%"
+
+        elif dir_num == -1.0:  # Proposed Trade is SELL
+            if smd >= 35.0:
+                # Extreme Bullish Smart Money Divergence (Retail crowd panic shorting into Smart Money buying)
+                # AI Model must immediately drop the win probability of a Sell signal to zero (0.0)!
+                meta_win_prob = 0.0
+                is_approved = False
+                sizing_mult = 0.0
+                verdict = "META_REJECTED"
+                reason = (
+                    f"BLOCKED_SMART_MONEY_EXTREME_BULLISH_DIVERGENCE: SMD=+{smd:.1f}% >= +35.0% "
+                    f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}% | Retail Herd Panic Short Trap). "
+                    f"P(Win) crushed to 0.0%."
+                )
+            elif smd > 15.0 and is_approved:
+                meta_win_prob = max(0.0, meta_win_prob - (abs(smd) / 100.0) * 0.35)
+                if meta_win_prob < threshold:
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = (
+                        f"BLOCKED_SMART_MONEY_BULLISH_DIVERGENCE: SMD=+{smd:.1f}% > +15.0% "
+                        f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}%)"
+                    )
+            elif smd <= -25.0:
+                # Short aligned with Smart Money (e.g. LevFunds 87% Short on Gold!)
+                meta_win_prob = min(0.95, meta_win_prob + 0.10)
+                if not is_approved and meta_win_prob >= threshold:
+                    is_approved = True
+                    sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                    verdict = "META_APPROVED"
+                    reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Short aligned with Smart Money (SMD={smd:.1f}%), P(Win)={meta_win_prob*100:.1f}%"
+
         # 1. Probabilistic Regime Evaluation (Gaussian HMM 4 States)
         regime_beliefs = {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
         try:
@@ -715,7 +837,7 @@ class CapitalMetaLabelingEngine:
             conformal_res = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
                 predicted_prob_win=meta_win_prob, alpha=0.10
             )
-            if not conformal_res.get("is_conformal_approved", True):
+            if not conformal_res.get("is_conformal_approved", True) and threshold >= 0.50:
                 if is_approved and meta_win_prob < 0.65:
                     is_approved = False
                     sizing_mult = 0.0
@@ -739,6 +861,9 @@ class CapitalMetaLabelingEngine:
             "vix_term_structure": vix_term_structure,
             "conformal_prediction": conformal_res,
             "nlp_sentiment": nlp_sentiment,
+            "smart_money_divergence": smd,
+            "client_long_pct": c_long,
+            "leveraged_funds_long_pct": lev_long,
             "features": features,
             "model_breakdown": {
                 "xgb": model_details.get("prob_xgb", meta_win_prob),

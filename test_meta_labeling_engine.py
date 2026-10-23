@@ -138,6 +138,31 @@ class TestMetaLabelingEngine(unittest.TestCase):
             self.assertIn("lgb", res["model_breakdown"])
             self.assertIn("cat", res["model_breakdown"])
 
+    def test_smart_money_divergence_governor(self):
+        """Smart Money Divergence <= -35% must unconditionally crush BUY win prob to 0.0."""
+        f_buy_gold = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=85.0, calib_p=0.80, epic="GOLD", price=4023.61,
+            smart_money_divergence=-71.0, client_long_pct=84.0, leveraged_funds_long_pct=13.0
+        )
+        self.assertEqual(f_buy_gold["smart_money_divergence"], -71.0)
+        res_buy = CapitalMetaLabelingEngine.predict_meta_label(f_buy_gold, threshold=0.55)
+        self.assertEqual(res_buy["meta_win_prob"], 0.0)
+        self.assertFalse(res_buy["is_approved"])
+        self.assertEqual(res_buy["sizing_multiplier"], 0.0)
+        self.assertEqual(res_buy["verdict"], "META_REJECTED")
+        self.assertIn("BLOCKED_SMART_MONEY_EXTREME_BEARISH_DIVERGENCE", res_buy["reason"])
+
+        # Bullish SMD >= +35% must crush SELL win prob to 0.0
+        f_sell_trap = CapitalMetaLabelingEngine.extract_features(
+            direction="SELL", raw_score=85.0, calib_p=0.80,
+            smart_money_divergence=45.0, client_long_pct=25.0, leveraged_funds_long_pct=70.0
+        )
+        res_sell = CapitalMetaLabelingEngine.predict_meta_label(f_sell_trap, threshold=0.55)
+        self.assertEqual(res_sell["meta_win_prob"], 0.0)
+        self.assertFalse(res_sell["is_approved"])
+        self.assertEqual(res_sell["verdict"], "META_REJECTED")
+        self.assertIn("BLOCKED_SMART_MONEY_EXTREME_BULLISH_DIVERGENCE", res_sell["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

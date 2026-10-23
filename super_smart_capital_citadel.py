@@ -3366,7 +3366,9 @@ class SuperSmartCapitalCitadel:
                 candles=diag.get("candles_15m"),
                 macro_data=live_macro,
                 hurst_exponent=hurst_val,
-                ou_zscore=ou_val
+                ou_zscore=ou_val,
+                epic=s_epic,
+                sentiment_data=diag.get("market_report")
             )
 
             # Dynamic Regime-Aware Meta-Labeling Cutoff (Invariant 92 Pillar 2)

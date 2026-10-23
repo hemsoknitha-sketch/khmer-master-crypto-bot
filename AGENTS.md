@@ -1542,6 +1542,12 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
       - Zero hardcoded static feature fallbacks permitted during live trading.
       - `CapitalMetaLabelingEngine.extract_features` dynamically computes Bollinger %B, Stochastic %K, Williams %R, CCI, CVD, BAVI, Anchored VWAP distance, Volume Profile POC/width, Hurst Exponent, and Shannon Entropy directly from live 15m candle bars (`candles_15m`).
       - Macro cross ratios (`gold_silver_ratio`, `copper_gold_ratio`, `vix`, etc.) are queried live via `get_live_macro_features(engine)` from real-time quotes.
+   7. **Multi-Class Sentiment & Smart Money Divergence Index (SMD) Governor:**
+      - Model 2 integrates institutional multi-class positioning data (Retail Clients vs Leveraged Funds vs Asset Managers) from Capital.com and CFTC COT reports.
+      - **Smart Money Divergence Index (SMD):**
+        $$\text{SMD} = \text{Leveraged\_Funds\_Long\_\%} - \text{Retail\_Client\_Long\_\%}$$
+      - **Fiduciary Ruin Protection Directive:** If $\text{SMD} \le -35.0\%$ (e.g. $-71.0\%$ on Gold: Leveraged Funds $13\%$ Long / $87\%$ Short vs Retail $84\%$ Long), the AI Meta-Model unconditionally crushes the win probability of a BUY signal to exactly $0.0\%$ (`meta_win_prob = 0.0`), immediately vetoing the trade (`BLOCKED_SMART_MONEY_EXTREME_BEARISH_DIVERGENCE`) and setting sizing to $0.0\times$ to eliminate retail herd dip-buying suicide traps.
+      - Conversely, if $\text{SMD} \ge +35.0\%$, SELL signals are crushed to $0.0\%$ win probability (`BLOCKED_SMART_MONEY_EXTREME_BULLISH_DIVERGENCE`), while SELL signals on negative SMD setups receive conviction alignment boosts.
 - **Enforcement:** Verified by `test_meta_labeling_engine.py` and `audit_system.py` [CHECK 65/66].
 
 ---

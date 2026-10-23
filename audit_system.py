@@ -3416,10 +3416,22 @@ def run_audit():
         edge_eval = meta_engine.predict_meta_edge(test_feat)
         dynamic_meta_eval_ok = isinstance(edge_eval, dict) and "meta_win_prob" in edge_eval and "is_edge_approved" in edge_eval and "sizing_multiplier" in edge_eval
 
-        # Sizing clamp validation
         size_low = meta_engine.calculate_conviction_sizing(0.50)
         size_high = meta_engine.calculate_conviction_sizing(0.85)
         is_sizing_clamped = (size_low == 0.0) and (1.40 <= size_high <= 1.50)
+
+        # Multi-Class Sentiment & Smart Money Divergence Index (SMD) Governor Verification
+        smd_buy_features = meta_engine.extract_features(
+            direction="BUY", raw_score=85.0, calib_p=0.80, epic="GOLD",
+            smart_money_divergence=-71.0, client_long_pct=84.0, leveraged_funds_long_pct=13.0
+        )
+        smd_buy_res = meta_engine.predict_meta_label(smd_buy_features, threshold=0.55)
+        is_smd_crushed_to_zero = (
+            smd_buy_res.get("meta_win_prob") == 0.0 and
+            smd_buy_res.get("is_approved") is False and
+            smd_buy_res.get("verdict") == "META_REJECTED" and
+            "BLOCKED_SMART_MONEY_EXTREME_BEARISH_DIVERGENCE" in smd_buy_res.get("reason", "")
+        )
 
         # 3. Triple-Barrier Engine & 1000+ Real Trades Ledger (Invariant 86)
         import institutional_triple_barrier_engine as itbe
@@ -3555,7 +3567,7 @@ def run_audit():
         all_inv85_86_passed = (
             has_inv85 and has_inv86 and
             has_meta_cls and has_get_meta_engine and meta_model_file and meta_metrics_file and
-            is_meta_quality_valid and has_predict_edge and has_calc_sizing and dynamic_meta_eval_ok and is_sizing_clamped and
+            is_meta_quality_valid and has_predict_edge and has_calc_sizing and dynamic_meta_eval_ok and is_sizing_clamped and is_smd_crushed_to_zero and
             has_triple_barrier_fn and has_ledger_file and is_ledger_1000_plus and has_tb_required_cols and has_institutional_gap_cols and is_tb_label_ok and
             has_purged_kfold and has_cp_cv and has_dsr_fn and has_minbtl_fn and has_mc_bootstrap and is_purged_overlap_ok and is_dsr_eval_ok and
             has_hrp_cls and has_regime_cls and has_vol_target_fn and is_hrp_valid and is_vol_target_ok and is_hmm_prob_valid and
