@@ -1765,6 +1765,8 @@ class SuperSmartCapitalCitadel:
                 spread=spread,
                 high_wick=last_h,
                 low_wick=last_l,
+                close_price=curr_price,
+                candles_15m=candles_15m,
                 engine=engine
             )
             if report_confluence.get("is_vetoed"):

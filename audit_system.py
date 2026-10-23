@@ -4547,7 +4547,7 @@ def run_audit():
             bt_src = f_bt.read()
         cmd_report_ok = 'elif action in ["REPORT", "MARKET_REPORT", "SENTIMENT", "DAILY_REPORT"]:' in bt_src
 
-        # Unit Test 7: Verify 4 Core Mathematical Formulas (Invariant 99 Pillars 1-4)
+        # Unit Test 7: Verify 4 Core Mathematical Formulas & Ornstein-Uhlenbeck Decoupling (Invariant 99 Pillars 1-4)
         v_gold = cmre.calculate_sentiment_velocity_and_acceleration("GOLD", current_price=4023.61)
         velo_ok = (
             v_gold.get("is_retail_trap_accumulation") is True and
@@ -4558,13 +4558,24 @@ def run_audit():
         z_gold = cmre.calculate_normalized_p0_zscore("GOLD", current_price=4125.23)
         z_ok = (z_gold.get("z_score") == 0.0 and z_gold.get("is_in_chop_equilibrium") is True)
 
+        z_ext_snap = cmre.calculate_normalized_p0_zscore("US100", current_price=30050.0, rvol=0.70, adx=20.0)
+        z_ext_run = cmre.calculate_normalized_p0_zscore("US100", current_price=30050.0, rvol=1.65, adx=38.0)
+        ou_decoupling_ok = (
+            z_ext_snap.get("is_overextended_150") is True and
+            z_ext_snap.get("ou_regime") == "MEAN_REVERSION_ELASTIC_SNAPBACK" and
+            z_ext_snap.get("target_reversion_p0") == 29578.0 and
+            z_ext_run.get("is_overextended_150") is True and
+            z_ext_run.get("ou_regime") == "TREND_EXPANSION_SUPER_MOMENTUM" and
+            z_ext_run.get("expansion_target") == 30170.0
+        )
+
         exp_us100 = cmre.calculate_broker_delta_expansion_ratio("US100")
         exp_ok = (exp_us100.get("delta_expansion_ratio", 0.0) > 1.0 and exp_us100.get("is_volatility_expanding") is True)
 
         eval_gold_buy = cmre.evaluate_contrarian_sentiment_edge("GOLD", "BUY", current_price=4023.61)
         trap_veto_ok = bool(eval_gold_buy.get("is_vetoed") and "RETAIL_TRAP_ACCUMULATION_VETO" in str(eval_gold_buy.get("veto_reason")))
 
-        formulas_ok = (velo_ok and z_ok and exp_ok and trap_veto_ok)
+        formulas_ok = (velo_ok and z_ok and ou_decoupling_ok and exp_ok and trap_veto_ok)
 
         all_inv99_passed = (
             has_inv99_agents and has_inv99_gemini and gold_sr_ok and
@@ -4575,7 +4586,7 @@ def run_audit():
             log_pass(
                 "Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment & Exact Broker S/R Stop Engine (Invariant 99) "
                 "are 100% certified! (Monte Safieddine S/R Math, 79.75% Retail Trap Veto, Contrarian +30 Boost, "
-                "Exact Broker SL Cluster Sweep, 4 Core Math Formulas [Velocity, Z-Score, Volatility Expansion, Accumulation Veto], "
+                "Exact Broker SL Cluster Sweep, 4 Core Math Formulas [Velocity, Z-Score O-U Decoupling, Volatility Expansion, Accumulation Veto], "
                 "Citadel Confluence & Telegram /capital report integration)"
             )
         else:

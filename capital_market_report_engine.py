@@ -872,18 +872,45 @@ class CapitalMarketReportEngine:
     def calculate_normalized_p0_zscore(
         cls,
         epic: str,
-        current_price: float
+        current_price: float,
+        candles_15m: Optional[List[Dict[str, Any]]] = None,
+        rvol: Optional[float] = None,
+        adx: Optional[float] = None,
+        rsi: Optional[float] = None,
+        hurst: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Pillar 2 Formula: Normalized Z-Score Distance from Daily Starting Point P0 & Ornstein-Uhlenbeck Drift.
-        Formula:
-          Z = (P_current - P0) / Delta
-          Equilibrium Chop Zone: |Z| < 0.35 (Middle 35% of daily range where price is Brownian motion)
-          Boundary R1: 0.85 <= Z <= 1.15
-          Boundary S1: -1.15 <= Z <= -0.85
-          Overextended R2: Z >= 1.80
-          Overextended S2: Z <= -1.80
-          Ornstein-Uhlenbeck Mean-Reversion Drift: dX = -theta * (P - P0)
+        Pillar 2 Formula: Normalized Z-Score Distance from Daily Starting Point P0 &
+        Ornstein-Uhlenbeck Mean-Reversion Pull vs Trend Expansion Decoupling Engine.
+
+        Mathematical Formulation:
+          1. Normalized Z-Score Distance:
+             Z = (P_current - P0) / Delta
+             abs_Z = |Z|
+          2. Ornstein-Uhlenbeck (O-U) SDE:
+             dP_t = theta * (P0 - P_t) * dt + sigma * dW_t
+             Restoring Drift Pull = -theta * (P_current - P0)
+             Normalized Elastic Tension = abs_Z
+             Half-Life of Reversion t_half = ln(2) / theta (approx 3.15 bars at theta=0.22)
+          3. When abs_Z >= 1.50 (Price is > 1.5x Delta away from P0):
+             Decouple Mean-Reversion Pull from Trend Expansion via 4 micro-signals:
+             a) Relative Volume (RVOL):
+                Declining RVOL (< 0.95) -> Volume Exhaustion -> Mean-Reversion +35
+                Surging RVOL (>= 1.35) -> Breakout Thrust -> Trend Expansion +35
+             b) Candlestick Wick Absorption:
+                Rejection Wick >= 35% -> Institutional Absorption -> Mean-Reversion +30
+                Marubozu Body >= 70% -> Institutional Aggression -> Trend Expansion +30
+             c) Hurst Exponent (H):
+                H < 0.45 (Mean-Reverting) -> Mean-Reversion +25
+                H > 0.55 (Persistent Trend) -> Trend Expansion +25
+             d) ADX Momentum:
+                ADX >= 35.0 -> Trend Expansion +20
+                ADX < 25.0 -> Mean-Reversion +20
+          4. Regimes:
+             - |Z| < 0.35: EQUILIBRIUM_CHOP (Middle 35% random walk dead zone)
+             - |Z| >= 1.50 & P(Revert) >= 0.55: MEAN_REVERSION_ELASTIC_SNAPBACK (Snapback to P0)
+             - |Z| >= 1.50 & P(Expand) > 0.55: TREND_EXPANSION_SUPER_MOMENTUM (Hyper-trend run)
+             - 0.35 <= |Z| < 1.50: STANDARD_BAND (Normal dealing range boundaries)
         """
         rep = cls.get_market_report_data(epic, current_price=current_price)
         p0 = float(rep["starting_point"])
@@ -896,23 +923,131 @@ class CapitalMarketReportEngine:
         is_chop = bool(abs_z < 0.35)
         is_boundary_r1 = bool(0.85 <= z <= 1.15)
         is_boundary_s1 = bool(-1.15 <= z <= -0.85)
+        is_overextended_150 = bool(abs_z >= 1.50)
         is_overextended_r2 = bool(z >= 1.80)
         is_overextended_s2 = bool(z <= -1.80)
 
-        theta = 0.15
+        # Ornstein-Uhlenbeck restoring drift force
+        theta = 0.22  # Mean reversion speed parameter
         ou_drift = round(-theta * (p - p0), 4)
+        half_life_bars = round(math.log(2.0) / theta, 2)  # ~3.15 bars (approx 47 mins on M15)
 
-        regime = "EQUILIBRIUM_CHOP" if is_chop else (
-            "EXTENDED_R1" if is_boundary_r1 else (
-                "EXTENDED_S1" if is_boundary_s1 else (
-                    "OVEREXTENDED_R2" if is_overextended_r2 else (
-                        "OVEREXTENDED_S2" if is_overextended_s2 else (
-                            "BULLISH_EXPANSION" if z > 0 else "BEARISH_CONTRACTION"
-                        )
-                    )
-                )
-            )
-        )
+        # Microstructure feature extraction for decoupling
+        calc_rvol = 1.0
+        wick_ratio = 0.0
+        body_ratio = 0.5
+
+        if candles_15m and len(candles_15m) >= 1:
+            try:
+                vols = [float(c.get("volume", 0.0) or c.get("tick_volume", 0.0) or 1.0) for c in candles_15m]
+                avg_vol = sum(vols[-20:]) / max(1, len(vols[-20:]))
+                curr_vol = vols[-1] if vols else avg_vol
+                calc_rvol = round(curr_vol / max(1.0, avg_vol), 2)
+
+                last_c = candles_15m[-1]
+                c_o = float(last_c.get("open", p))
+                c_h = float(last_c.get("high", p))
+                c_l = float(last_c.get("low", p))
+                c_c = float(last_c.get("close", p))
+                c_span = max(1e-6, c_h - c_l)
+
+                body_ratio = round(abs(c_c - c_o) / c_span, 2)
+                if z > 0:
+                    wick_ratio = round((c_h - max(c_o, c_c)) / c_span, 2)
+                else:
+                    wick_ratio = round((min(c_o, c_c) - c_l) / c_span, 2)
+            except Exception:
+                pass
+
+        if rvol is not None:
+            calc_rvol = float(rvol)
+
+        calc_adx = float(adx) if adx is not None else 25.0
+        calc_hurst = float(hurst) if hurst is not None else 0.50
+
+        # Mean-Reversion Pull vs Trend Expansion Scoring
+        score_revert = 0.0
+        score_expand = 0.0
+        factors = []
+
+        if is_overextended_150:
+            # Factor 1: Volume dynamics
+            if calc_rvol >= 1.35:
+                score_expand += 35.0
+                factors.append(f"RVOL_SURGING ({calc_rvol:.2f}x, Aggressive Breakout Thrust)")
+            elif calc_rvol < 0.95:
+                score_revert += 35.0
+                factors.append(f"RVOL_EXHAUSTION ({calc_rvol:.2f}x, Low-Volume Trap at Boundary)")
+            else:
+                score_expand += 15.0
+                score_revert += 15.0
+
+            # Factor 2: Candlestick Rejection vs Full Body
+            if wick_ratio >= 0.35:
+                score_revert += 30.0
+                factors.append(f"WICK_ABSORPTION ({wick_ratio*100:.1f}% Rejection Wick at Extreme)")
+            elif body_ratio >= 0.70:
+                score_expand += 30.0
+                factors.append(f"EXPANSION_MARUBOZU ({body_ratio*100:.1f}% Strong Directional Body)")
+            else:
+                score_revert += 15.0
+                score_expand += 15.0
+
+            # Factor 3: Hurst Exponent (Memory & Persistence)
+            if calc_hurst < 0.45:
+                score_revert += 25.0
+                factors.append(f"HURST_MEAN_REVERTING (H={calc_hurst:.2f} < 0.45)")
+            elif calc_hurst > 0.55:
+                score_expand += 25.0
+                factors.append(f"HURST_TREND_PERSISTENT (H={calc_hurst:.2f} > 0.55)")
+            else:
+                score_revert += 10.0
+                score_expand += 10.0
+
+            # Factor 4: ADX Trend Strength
+            if calc_adx >= 35.0:
+                score_expand += 20.0
+                factors.append(f"ADX_SUPER_TREND (ADX={calc_adx:.1f} >= 35.0)")
+            elif calc_adx < 25.0:
+                score_revert += 20.0
+                factors.append(f"ADX_MOMENTUM_ABSENCE (ADX={calc_adx:.1f} < 25.0)")
+            else:
+                score_revert += 10.0
+                score_expand += 10.0
+
+            total_s = max(1.0, score_revert + score_expand)
+            p_revert = round(score_revert / total_s, 4)
+            p_expand = round(1.0 - p_revert, 4)
+        else:
+            p_revert = 0.50
+            p_expand = 0.50
+
+        # Regime determination
+        if is_chop:
+            ou_regime = "EQUILIBRIUM_CHOP"
+            recommended_action = "AVOID_MARKET_ENTRY_AWAIT_BOUNDARY"
+        elif is_overextended_150:
+            if p_revert >= 0.55:
+                ou_regime = "MEAN_REVERSION_ELASTIC_SNAPBACK"
+                recommended_action = "FADE_BOUNDARY_TARGET_P0"
+            elif p_expand > 0.55:
+                ou_regime = "TREND_EXPANSION_SUPER_MOMENTUM"
+                recommended_action = "TRAIL_BREAKOUT_EXPANSION"
+            else:
+                ou_regime = "OVEREXTENDED_NEUTRAL_TENSION"
+                recommended_action = "WAIT_FOR_ABSORPTION_OR_THRUST"
+        elif is_boundary_r1:
+            ou_regime = "EXTENDED_R1"
+            recommended_action = "WATCH_RESISTANCE_1_REVERSAL_OR_BREAKOUT"
+        elif is_boundary_s1:
+            ou_regime = "EXTENDED_S1"
+            recommended_action = "WATCH_SUPPORT_1_REVERSAL_OR_BREAKOUT"
+        else:
+            ou_regime = "STANDARD_BAND"
+            recommended_action = "STANDARD_EXECUTION"
+
+        target_p0 = p0
+        expansion_target = round(p0 + (2.0 * delta) if z > 0 else p0 - (2.0 * delta), 2)
 
         return {
             "epic": epic,
@@ -924,10 +1059,22 @@ class CapitalMarketReportEngine:
             "is_in_chop_equilibrium": is_chop,
             "is_boundary_r1": is_boundary_r1,
             "is_boundary_s1": is_boundary_s1,
+            "is_overextended_150": is_overextended_150,
             "is_overextended_r2": is_overextended_r2,
             "is_overextended_s2": is_overextended_s2,
             "ou_drift_force": ou_drift,
-            "zone_regime": regime,
+            "half_life_bars": half_life_bars,
+            "mean_reversion_prob": p_revert,
+            "trend_expansion_prob": p_expand,
+            "ou_regime": ou_regime,
+            "zone_regime": ou_regime,
+            "recommended_action": recommended_action,
+            "target_reversion_p0": target_p0,
+            "expansion_target": expansion_target,
+            "rvol": calc_rvol,
+            "wick_ratio": wick_ratio,
+            "body_ratio": body_ratio,
+            "decoupling_factors": factors,
         }
 
     @classmethod
@@ -1102,6 +1249,49 @@ class CapitalMarketReportEngine:
                 score_boost += 25.0
                 factors.append(f"SMART_MONEY_LONG_DIVERGENCE_EDGE (+25, SMD: {smd:.1f}%)")
 
+        # Case 6: Ornstein-Uhlenbeck Mean-Reversion Snapback vs Trend Expansion Guard (|Z| >= 1.50)
+        z_eval = cls.calculate_normalized_p0_zscore(epic=epic, current_price=current_price)
+        abs_z = z_eval.get("abs_z_score", 0.0)
+        z_val = z_eval.get("z_score", 0.0)
+        ou_reg = z_eval.get("ou_regime")
+
+        if z_eval.get("is_overextended_150"):
+            # Subcase A: Mean-Reversion Snapback (|Z| >= 1.50, volume exhaustion / wick absorption)
+            if ou_reg == "MEAN_REVERSION_ELASTIC_SNAPBACK":
+                # Chasing trend into extreme tension is vetoed
+                if (z_val > 0 and norm_side == "BUY") or (z_val < 0 and norm_side == "SELL"):
+                    if not is_vetoed:
+                        is_vetoed = True
+                        veto_reason = (
+                            f"MEAN_REVERSION_ELASTIC_SNAPBACK_VETO: Price is overextended (|Z| = {abs_z:.2f} >= 1.50) "
+                            f"with Ornstein-Uhlenbeck mean-reversion pull to P0 (${rep['starting_point']:,.2f}, "
+                            f"P(Revert)={z_eval['mean_reversion_prob']*100:.1f}%). Trend chasing is vetoed."
+                        )
+                    score_boost -= 35.0
+                    factors.append(f"MEAN_REVERSION_SNAPBACK_VETO (|Z|={abs_z:.2f}, -35)")
+                # Counter-trend fading gets massive boost
+                elif (z_val > 0 and norm_side == "SELL") or (z_val < 0 and norm_side == "BUY"):
+                    score_boost += 35.0
+                    factors.append(f"ORNSTEIN_UHLENBECK_SNAPBACK_EDGE (+35, Target P0: ${rep['starting_point']:,.2f}, P={z_eval['mean_reversion_prob']*100:.1f}%)")
+
+            # Subcase B: Trend Expansion Super-Momentum (|Z| >= 1.50, volume surging RVOL >= 1.35)
+            elif ou_reg == "TREND_EXPANSION_SUPER_MOMENTUM":
+                # Counter-trend fading is suicidal and vetoed
+                if (z_val > 0 and norm_side == "SELL") or (z_val < 0 and norm_side == "BUY"):
+                    if not is_vetoed:
+                        is_vetoed = True
+                        veto_reason = (
+                            f"TREND_EXPANSION_SUPER_MOMENTUM_VETO: Price is in hyper-expansion (|Z| = {abs_z:.2f} >= 1.50, "
+                            f"P(Expand)={z_eval['trend_expansion_prob']*100:.1f}%, RVOL={z_eval.get('rvol', 1.0):.2f}). "
+                            f"Counter-trend fading is mathematically vetoed."
+                        )
+                    score_boost -= 35.0
+                    factors.append(f"TREND_EXPANSION_MOMENTUM_VETO (|Z|={abs_z:.2f}, -35)")
+                # With-trend momentum gets boost
+                elif (z_val > 0 and norm_side == "BUY") or (z_val < 0 and norm_side == "SELL"):
+                    score_boost += 25.0
+                    factors.append(f"TREND_EXPANSION_RUN_EDGE (+25, Target Expansion: ${z_eval['expansion_target']:,.2f})")
+
         return {
             "epic": epic,
             "proposed_side": norm_side,
@@ -1116,6 +1306,7 @@ class CapitalMarketReportEngine:
             "factors": factors,
             "broker_levels": rep,
             "sentiment_velocity": velo_eval,
+            "z_score_eval": z_eval,
         }
 
     @classmethod
@@ -1221,6 +1412,10 @@ class CapitalMarketReportEngine:
         low_wick: Optional[float] = None,
         close_price: Optional[float] = None,
         volume: float = 0.0,
+        candles_15m: Optional[List[Dict[str, Any]]] = None,
+        rvol: Optional[float] = None,
+        adx: Optional[float] = None,
+        hurst: Optional[float] = None,
         engine: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
@@ -1250,7 +1445,14 @@ class CapitalMarketReportEngine:
         )
 
         # 4 Mathematical Formula Calculations
-        z_eval = cls.calculate_normalized_p0_zscore(epic=epic, current_price=current_price)
+        z_eval = cls.calculate_normalized_p0_zscore(
+            epic=epic,
+            current_price=current_price,
+            candles_15m=candles_15m,
+            rvol=rvol,
+            adx=adx,
+            hurst=hurst
+        )
         vol_exp = cls.calculate_broker_delta_expansion_ratio(epic=epic)
         velo_eval = sent_eval.get("sentiment_velocity", {})
 
@@ -1275,7 +1477,13 @@ class CapitalMarketReportEngine:
                 tp1 = sweep_eval["tp1_target"]
                 tp2 = sweep_eval["tp2_target"]
                 # Override minor veto if confirmed broker stop sweep reversal occurred in same direction
-                if is_vetoed and "RETAIL_TRAP_ACCUMULATION_VETO" not in str(veto_reason) and "SMART_MONEY_BEARISH_DIVERGENCE_VETO" not in str(veto_reason):
+                protected_vetoes = [
+                    "RETAIL_TRAP_ACCUMULATION_VETO",
+                    "SMART_MONEY_BEARISH_DIVERGENCE_VETO",
+                    "MEAN_REVERSION_ELASTIC_SNAPBACK_VETO",
+                    "TREND_EXPANSION_SUPER_MOMENTUM_VETO"
+                ]
+                if is_vetoed and not any(pv in str(veto_reason) for pv in protected_vetoes):
                     is_vetoed = False
                     veto_reason = None
             else:
@@ -1291,6 +1499,22 @@ class CapitalMarketReportEngine:
         # Normalized Z-Score Chop Check
         if z_eval.get("is_in_chop_equilibrium"):
             factors.append(f"EQUILIBRIUM_CHOP_WARNING (|Z|={abs(z_eval['z_score']):.2f} < 0.35, P0={z_eval['p0']:,.2f})")
+
+        # Pillar 2: Overextension Ornstein-Uhlenbeck Mean-Reversion Snapback vs Trend Expansion
+        if z_eval.get("is_overextended_150"):
+            ou_reg = z_eval.get("ou_regime")
+            if ou_reg == "MEAN_REVERSION_ELASTIC_SNAPBACK":
+                factors.append(
+                    f"ORNSTEIN_UHLENBECK_SNAPBACK (|Z|={z_eval['abs_z_score']:.2f} >= 1.5, Target P0: ${z_eval['p0']:,.2f}, P={z_eval['mean_reversion_prob']*100:.1f}%)"
+                )
+                if tp1 is None and ((z_eval["z_score"] > 0 and norm_side == "SELL") or (z_eval["z_score"] < 0 and norm_side == "BUY")):
+                    tp1 = z_eval["target_reversion_p0"]
+            elif ou_reg == "TREND_EXPANSION_SUPER_MOMENTUM":
+                factors.append(
+                    f"TREND_EXPANSION_THRUST (|Z|={z_eval['abs_z_score']:.2f} >= 1.5, Target: ${z_eval['expansion_target']:,.2f}, P={z_eval['trend_expansion_prob']*100:.1f}%)"
+                )
+                if tp1 is None and ((z_eval["z_score"] > 0 and norm_side == "BUY") or (z_eval["z_score"] < 0 and norm_side == "SELL")):
+                    tp1 = z_eval["expansion_target"]
 
         # Multi-timeframe daily regime bonus
         rep = sent_eval["broker_levels"]
