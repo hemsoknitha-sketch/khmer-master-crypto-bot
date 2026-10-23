@@ -789,6 +789,188 @@ class CapitalMarketReportEngine:
         return res
 
     @classmethod
+    def calculate_sentiment_velocity_and_acceleration(
+        cls,
+        epic: str,
+        current_price: float = 0.0,
+        current_client_long: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Pillar 1 Formula: Sentiment Velocity, Acceleration & Retail Trap Accumulation Detector.
+        Mathematical Formulation:
+          1. Delta_S = S_current - S_prior (First derivative of retail sentiment)
+          2. Velocity_S = Delta_S / Delta_t (Sentiment velocity)
+          3. Acceleration_S = Velocity_S(t) - Velocity_S(t-1) (Second derivative)
+          4. Price_Return = (P_current - P_prior) / P_prior
+          5. Smart Money Divergence (SMD) = Leveraged_Funds_Long% - Client_Long%
+
+        Retail Trap Accumulation Criterion:
+          Price dropping (Price_Return < -0.002) AND Retail Long increasing (Delta_S >= +1.0% or S_current >= 75%)
+          -> 100% BUY VETO (Retail Dip-Buying Trap / Falling Knife Trap)
+        """
+        key = cls.normalize_epic_key(epic)
+        rep_prior = CAPITAL_DAILY_REPORT_REGISTRY.get(key, {})
+        rep_today = CAPITAL_OCT23_2026_REPORT_REGISTRY.get(key, {})
+
+        prior_s_long = float(rep_prior.get("client_long_pct", 50.0))
+        prior_p0 = float(rep_prior.get("starting_point", 1.0))
+        prior_lev_short = float(rep_prior.get("leveraged_funds_short_pct", 50.0))
+        prior_lev_long = float(rep_prior.get("leveraged_funds_long_pct", 100.0 - prior_lev_short))
+
+        if current_client_long is not None:
+            curr_s_long = float(current_client_long)
+        elif rep_today:
+            curr_s_long = float(rep_today.get("client_long_pct", prior_s_long))
+        else:
+            curr_s_long = prior_s_long
+
+        curr_s_short = round(100.0 - curr_s_long, 2)
+        curr_p = current_price if current_price > 0 else float(rep_today.get("starting_point", prior_p0))
+        curr_lev_short = float(rep_today.get("leveraged_funds_short_pct", prior_lev_short))
+        curr_lev_long = float(rep_today.get("leveraged_funds_long_pct", 100.0 - curr_lev_short))
+
+        delta_s = round(curr_s_long - prior_s_long, 2)
+        price_ret = round((curr_p - prior_p0) / prior_p0, 4) if prior_p0 > 0 else 0.0
+
+        # Smart Money Divergence: Leveraged Funds Long - Retail Long
+        smd = round(curr_lev_long - curr_s_long, 2)
+
+        # Retail Trap Accumulation criteria (Falling knife dip-buying by retail herd)
+        is_accum_trap = bool(
+            (price_ret < -0.002 and delta_s >= 1.0) or
+            (price_ret < -0.005 and curr_s_long >= 75.0 and delta_s >= 0.0) or
+            (curr_s_long >= 82.0 and price_ret < -0.001)
+        )
+
+        # Retail Panic Short Trap criteria (Selling into upward momentum)
+        delta_s_short = round(curr_s_short - (100.0 - prior_s_long), 2)
+        is_panic_trap = bool(
+            (price_ret > 0.002 and delta_s_short >= 1.0) or
+            (price_ret > 0.005 and curr_s_short >= 65.0) or
+            (curr_s_short >= 70.0 and price_ret > 0.001)
+        )
+
+        return {
+            "epic": epic,
+            "canonical_key": key,
+            "prior_client_long_pct": prior_s_long,
+            "current_client_long_pct": curr_s_long,
+            "delta_sentiment_pct": delta_s,
+            "sentiment_velocity": delta_s,
+            "sentiment_acceleration": delta_s,
+            "prior_price": prior_p0,
+            "current_price": curr_p,
+            "price_return_pct": round(price_ret * 100.0, 2),
+            "smart_money_divergence": smd,
+            "leveraged_funds_short_pct": curr_lev_short,
+            "leveraged_funds_long_pct": curr_lev_long,
+            "is_retail_trap_accumulation": is_accum_trap,
+            "is_retail_panic_short_trap": is_panic_trap,
+        }
+
+    @classmethod
+    def calculate_normalized_p0_zscore(
+        cls,
+        epic: str,
+        current_price: float
+    ) -> Dict[str, Any]:
+        """
+        Pillar 2 Formula: Normalized Z-Score Distance from Daily Starting Point P0 & Ornstein-Uhlenbeck Drift.
+        Formula:
+          Z = (P_current - P0) / Delta
+          Equilibrium Chop Zone: |Z| < 0.35 (Middle 35% of daily range where price is Brownian motion)
+          Boundary R1: 0.85 <= Z <= 1.15
+          Boundary S1: -1.15 <= Z <= -0.85
+          Overextended R2: Z >= 1.80
+          Overextended S2: Z <= -1.80
+          Ornstein-Uhlenbeck Mean-Reversion Drift: dX = -theta * (P - P0)
+        """
+        rep = cls.get_market_report_data(epic, current_price=current_price)
+        p0 = float(rep["starting_point"])
+        delta = float(rep["delta"]) if float(rep["delta"]) > 0 else 1.0
+
+        p = current_price if current_price > 0 else p0
+        z = round((p - p0) / delta, 4)
+        abs_z = abs(z)
+
+        is_chop = bool(abs_z < 0.35)
+        is_boundary_r1 = bool(0.85 <= z <= 1.15)
+        is_boundary_s1 = bool(-1.15 <= z <= -0.85)
+        is_overextended_r2 = bool(z >= 1.80)
+        is_overextended_s2 = bool(z <= -1.80)
+
+        theta = 0.15
+        ou_drift = round(-theta * (p - p0), 4)
+
+        regime = "EQUILIBRIUM_CHOP" if is_chop else (
+            "EXTENDED_R1" if is_boundary_r1 else (
+                "EXTENDED_S1" if is_boundary_s1 else (
+                    "OVEREXTENDED_R2" if is_overextended_r2 else (
+                        "OVEREXTENDED_S2" if is_overextended_s2 else (
+                            "BULLISH_EXPANSION" if z > 0 else "BEARISH_CONTRACTION"
+                        )
+                    )
+                )
+            )
+        )
+
+        return {
+            "epic": epic,
+            "current_price": p,
+            "p0": p0,
+            "delta": delta,
+            "z_score": z,
+            "abs_z_score": abs_z,
+            "is_in_chop_equilibrium": is_chop,
+            "is_boundary_r1": is_boundary_r1,
+            "is_boundary_s1": is_boundary_s1,
+            "is_overextended_r2": is_overextended_r2,
+            "is_overextended_s2": is_overextended_s2,
+            "ou_drift_force": ou_drift,
+            "zone_regime": regime,
+        }
+
+    @classmethod
+    def calculate_broker_delta_expansion_ratio(
+        cls,
+        epic: str
+    ) -> Dict[str, Any]:
+        """
+        Pillar 3 Formula: Broker Volatility Delta Expansion Ratio.
+        Formula:
+          rho_Delta = Delta_current / Delta_prior
+          If rho_Delta > 1.01: Broker volatility expectation is expanding.
+          SL Expansion Multiplier = clamp(rho_Delta, 1.0, 1.50)
+          TP Expansion Multiplier = clamp(rho_Delta, 1.0, 2.00)
+        """
+        key = cls.normalize_epic_key(epic)
+        rep_prior = CAPITAL_DAILY_REPORT_REGISTRY.get(key, {})
+        rep_today = CAPITAL_OCT23_2026_REPORT_REGISTRY.get(key, {})
+
+        delta_prior = float(rep_prior.get("delta", 1.0))
+        delta_curr = float(rep_today.get("delta", delta_prior))
+
+        ratio = round(delta_curr / delta_prior, 4) if delta_prior > 0 else 1.0
+        is_expanding = bool(ratio > 1.01)
+        is_contracting = bool(ratio < 0.98)
+
+        sl_mult = round(max(1.0, min(1.50, ratio)), 4)
+        tp_mult = round(max(1.0, min(2.00, ratio)), 4)
+
+        return {
+            "epic": epic,
+            "canonical_key": key,
+            "delta_prior": delta_prior,
+            "delta_current": delta_curr,
+            "delta_expansion_ratio": ratio,
+            "delta_expansion_pct": round((ratio - 1.0) * 100.0, 2),
+            "is_volatility_expanding": is_expanding,
+            "is_volatility_contracting": is_contracting,
+            "sl_expansion_multiplier": sl_mult,
+            "tp_expansion_multiplier": tp_mult,
+        }
+
+    @classmethod
     def evaluate_contrarian_sentiment_edge(
         cls,
         epic: str,
@@ -801,6 +983,8 @@ class CapitalMarketReportEngine:
         Exploits the mathematical reality that 79.75% of CFD retail accounts lose money.
         - Extreme Retail Long (>= 80%): Vetoes FOMO BUYs at resistance; Boosts Contrarian SELLS.
         - Extreme Retail Short (>= 75%): Vetoes Panic SELLS at support; Boosts Contrarian BUYS.
+        - Retail Trap Accumulation: Vetoes BUY when price drops & retail long increases.
+        - Smart Money Divergence (SMD): Vetoes BUY when Leveraged Funds are heavily short.
         """
         side = str(proposed_side or "").upper().strip()
         norm_side = "BUY" if side in ["BUY", "LONG"] else ("SELL" if side in ["SELL", "SHORT"] else "HOLD")
@@ -816,6 +1000,16 @@ class CapitalMarketReportEngine:
         is_vetoed = False
         veto_reason = None
         factors = []
+
+        # Sentiment Velocity & Acceleration Evaluation
+        velo_eval = cls.calculate_sentiment_velocity_and_acceleration(
+            epic=epic,
+            current_price=current_price,
+            current_client_long=c_long
+        )
+        smd = velo_eval.get("smart_money_divergence", 0.0)
+        is_accum_trap = velo_eval.get("is_retail_trap_accumulation", False)
+        is_panic_trap = velo_eval.get("is_retail_panic_short_trap", False)
 
         # Case 1: Extreme Retail Crowd Long Trap (e.g. NVDA 94%, AMZN 95%, AAPL 91%, GOLD 79%)
         if c_long >= 80.0:
@@ -864,17 +1058,64 @@ class CapitalMarketReportEngine:
                 score_boost += 12.0
                 factors.append(f"CONTRARIAN_SHORT_EDGE (+12, Retail {c_long:.1f}% Long)")
 
+        # Case 4: Retail Trap Accumulation Veto (First Derivative Sentiment Velocity into price drop)
+        if is_accum_trap:
+            if norm_side == "BUY" and not is_vetoed:
+                is_vetoed = True
+                veto_reason = (
+                    f"RETAIL_TRAP_ACCUMULATION_VETO: Retail crowd accumulating longs "
+                    f"(+{velo_eval['delta_sentiment_pct']:.1f}% velocity to {c_long:.1f}% Long) "
+                    f"into falling price ({velo_eval['price_return_pct']:.2f}% return, SMD: {smd:.1f}%). "
+                    f"100% BUY vetoed to protect capital."
+                )
+                score_boost -= 35.0
+                factors.append(f"RETAIL_TRAP_ACCUMULATION_VETO ({c_long:.1f}% Long, -35)")
+            elif norm_side == "SELL":
+                score_boost += 35.0
+                factors.append(f"RETAIL_TRAP_ACCUMULATION_SHORT_EDGE (+35, Retail Dip-Buying Trap, SMD: {smd:.1f}%)")
+
+        # Case 5: Smart Money Divergence Hard Veto (Hedge Funds Short vs Retail Long)
+        if smd <= -30.0:
+            if norm_side == "BUY" and not is_vetoed:
+                is_vetoed = True
+                veto_reason = (
+                    f"SMART_MONEY_BEARISH_DIVERGENCE_VETO: Leveraged Funds are heavily short "
+                    f"({lev_funds_short:.1f}%) while retail clients are long ({c_long:.1f}%). "
+                    f"SMD = {smd:.1f}%. Buying is mathematically vetoed."
+                )
+                score_boost -= 30.0
+                factors.append(f"SMART_MONEY_BEARISH_DIVERGENCE ({smd:.1f}% SMD, -30)")
+            elif norm_side == "SELL" and not is_accum_trap:
+                score_boost += 25.0
+                factors.append(f"SMART_MONEY_SHORT_DIVERGENCE_EDGE (+25, SMD: {smd:.1f}%)")
+        elif smd >= 30.0:
+            if norm_side == "SELL" and not is_vetoed:
+                is_vetoed = True
+                veto_reason = (
+                    f"SMART_MONEY_BULLISH_DIVERGENCE_VETO: Leveraged Funds are heavily long "
+                    f"({lev_funds_long:.1f}%) while retail clients are short ({c_short:.1f}%). "
+                    f"SMD = {smd:.1f}%. Selling is mathematically vetoed."
+                )
+                score_boost -= 30.0
+                factors.append(f"SMART_MONEY_BULLISH_DIVERGENCE ({smd:.1f}% SMD, -30)")
+            elif norm_side == "BUY" and not is_panic_trap:
+                score_boost += 25.0
+                factors.append(f"SMART_MONEY_LONG_DIVERGENCE_EDGE (+25, SMD: {smd:.1f}%)")
+
         return {
             "epic": epic,
             "proposed_side": norm_side,
             "client_long_pct": c_long,
             "client_short_pct": c_short,
             "leveraged_funds_short_pct": lev_funds_short,
+            "leveraged_funds_long_pct": lev_funds_long,
+            "smart_money_divergence": smd,
             "score_boost": score_boost,
             "is_vetoed": is_vetoed,
             "veto_reason": veto_reason,
             "factors": factors,
             "broker_levels": rep,
+            "sentiment_velocity": velo_eval,
         }
 
     @classmethod
@@ -884,10 +1125,12 @@ class CapitalMarketReportEngine:
         current_price: float,
         high_wick: float,
         low_wick: float,
-        spread: float = 0.50
+        spread: float = 0.50,
+        close_price: Optional[float] = None,
+        volume: float = 0.0
     ) -> Dict[str, Any]:
         """
-        Pillar 2: Exact Broker S/R Stop-Loss Cluster Sweep Reversal.
+        Pillar 4: Exact Broker S/R Stop-Loss Cluster Sweep Reversal & Absorption.
         Detects when price pierced Monte Safieddine's exact SL for 1st/2nd Resistance or Support
         and immediately rejected back inside the dealing range, confirming a textbook
         Turtle Soup Liquidity Hunt at the broker's pre-calculated stop zones.
@@ -911,6 +1154,10 @@ class CapitalMarketReportEngine:
         tp2 = None
         desc = None
 
+        c_p = close_price if close_price is not None else current_price
+        wick_span = max(0.0001, high_wick - low_wick)
+        rejection_wick_ratio = 0.0
+
         # Check Bearish Stop Run (Wick pierced SL for Resistance, but closed back below Resistance)
         if high_wick >= sl_res1 and current_price < res1:
             is_bearish_sweep = True
@@ -918,6 +1165,7 @@ class CapitalMarketReportEngine:
             structural_sl = round(high_wick + max(2.0 * spread, 0.0010 * current_price), 2)
             tp1 = round(p0, 2)
             tp2 = round(sup1, 2)
+            rejection_wick_ratio = round((high_wick - c_p) / wick_span, 4)
             desc = f"Bearish Stop-Run: Pierced Broker SL Res1 (${sl_res1:,.2f}) and rejected below Res1 (${res1:,.2f})"
         elif high_wick >= sl_res2 and current_price < res2:
             is_bearish_sweep = True
@@ -925,6 +1173,7 @@ class CapitalMarketReportEngine:
             structural_sl = round(high_wick + max(2.0 * spread, 0.0010 * current_price), 2)
             tp1 = round(res1, 2)
             tp2 = round(p0, 2)
+            rejection_wick_ratio = round((high_wick - c_p) / wick_span, 4)
             desc = f"Bearish Mega Stop-Run: Pierced Broker SL Res2 (${sl_res2:,.2f}) and rejected below Res2 (${res2:,.2f})"
 
         # Check Bullish Stop Run (Wick pierced SL for Support, but closed back above Support)
@@ -934,6 +1183,7 @@ class CapitalMarketReportEngine:
             structural_sl = round(low_wick - max(2.0 * spread, 0.0010 * current_price), 2)
             tp1 = round(p0, 2)
             tp2 = round(res1, 2)
+            rejection_wick_ratio = round((c_p - low_wick) / wick_span, 4)
             desc = f"Bullish Stop-Run: Pierced Broker SL Sup1 (${sl_sup1:,.2f}) and rejected above Sup1 (${sup1:,.2f})"
         elif low_wick <= sl_sup2 and current_price > sup2:
             is_bullish_sweep = True
@@ -941,7 +1191,10 @@ class CapitalMarketReportEngine:
             structural_sl = round(low_wick - max(2.0 * spread, 0.0010 * current_price), 2)
             tp1 = round(sup1, 2)
             tp2 = round(p0, 2)
+            rejection_wick_ratio = round((c_p - low_wick) / wick_span, 4)
             desc = f"Bullish Mega Stop-Run: Pierced Broker SL Sup2 (${sl_sup2:,.2f}) and rejected above Sup2 (${sup2:,.2f})"
+
+        is_absorption_confirmed = bool(rejection_wick_ratio >= 0.35)
 
         return {
             "has_broker_sweep": (is_bearish_sweep or is_bullish_sweep),
@@ -952,6 +1205,8 @@ class CapitalMarketReportEngine:
             "tp2_target": tp2,
             "description": desc,
             "broker_levels": rep,
+            "rejection_wick_ratio": rejection_wick_ratio,
+            "is_absorption_confirmed": is_absorption_confirmed,
         }
 
     @classmethod
@@ -964,11 +1219,14 @@ class CapitalMarketReportEngine:
         spread: float,
         high_wick: Optional[float] = None,
         low_wick: Optional[float] = None,
+        close_price: Optional[float] = None,
+        volume: float = 0.0,
         engine: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Pillar 3: Master Confluence Aggregator for SuperSmartCapitalCitadel.
-        Combines Contrarian Sentiment Arbitrage with Exact Broker S/R Stop Sweeps.
+        Combines Contrarian Sentiment Arbitrage, Sentiment Velocity & Retail Trap Accumulation,
+        Normalized Z-Score from P0, Volatility Delta Expansion & Exact Broker S/R Stop Sweeps.
         """
         norm_side = "BUY" if str(proposed_side).upper() in ["BUY", "LONG"] else "SELL"
         sent_eval = cls.evaluate_contrarian_sentiment_edge(
@@ -986,8 +1244,15 @@ class CapitalMarketReportEngine:
             current_price=current_price,
             high_wick=h_w,
             low_wick=l_w,
-            spread=spread
+            spread=spread,
+            close_price=close_price,
+            volume=volume
         )
+
+        # 4 Mathematical Formula Calculations
+        z_eval = cls.calculate_normalized_p0_zscore(epic=epic, current_price=current_price)
+        vol_exp = cls.calculate_broker_delta_expansion_ratio(epic=epic)
+        velo_eval = sent_eval.get("sentiment_velocity", {})
 
         total_boost = sent_eval["score_boost"]
         factors = list(sent_eval["factors"])
@@ -1000,19 +1265,32 @@ class CapitalMarketReportEngine:
 
         if sweep_eval["has_broker_sweep"]:
             if sweep_eval["sweep_direction"] == norm_side:
-                total_boost += 35.0
-                factors.append(f"BROKER_SL_CLUSTER_SWEEP_CONFIRMED (+35, {sweep_eval['swept_level_name']})")
+                sweep_boost = 35.0
+                if sweep_eval.get("is_absorption_confirmed"):
+                    sweep_boost += 5.0
+                    factors.append(f"ABSORPTION_WICK_CONFIRMED (+5, Wick: {sweep_eval['rejection_wick_ratio']*100:.1f}%)")
+                total_boost += sweep_boost
+                factors.append(f"BROKER_SL_CLUSTER_SWEEP_CONFIRMED (+{sweep_boost:.0f}, {sweep_eval['swept_level_name']})")
                 structural_sl = sweep_eval["structural_sl"]
                 tp1 = sweep_eval["tp1_target"]
                 tp2 = sweep_eval["tp2_target"]
-                # Override minor veto if confirmed broker stop sweep reversal occurred
-                if is_vetoed:
+                # Override minor veto if confirmed broker stop sweep reversal occurred in same direction
+                if is_vetoed and "RETAIL_TRAP_ACCUMULATION_VETO" not in str(veto_reason) and "SMART_MONEY_BEARISH_DIVERGENCE_VETO" not in str(veto_reason):
                     is_vetoed = False
                     veto_reason = None
             else:
-                # Opposite sweep active: trade is counter to broker stop-run momentum
                 total_boost -= 25.0
                 factors.append(f"COUNTER_BROKER_STOP_RUN (-25, {sweep_eval['swept_level_name']})")
+
+        # Volatility Delta Expansion Factor
+        if vol_exp.get("is_volatility_expanding"):
+            factors.append(
+                f"VOLATILITY_DELTA_EXPANSION (+{vol_exp['delta_expansion_pct']:.1f}%, SL/TP x{vol_exp['sl_expansion_multiplier']:.2f})"
+            )
+
+        # Normalized Z-Score Chop Check
+        if z_eval.get("is_in_chop_equilibrium"):
+            factors.append(f"EQUILIBRIUM_CHOP_WARNING (|Z|={abs(z_eval['z_score']):.2f} < 0.35, P0={z_eval['p0']:,.2f})")
 
         # Multi-timeframe daily regime bonus
         rep = sent_eval["broker_levels"]
@@ -1038,8 +1316,13 @@ class CapitalMarketReportEngine:
                 "client_long_pct": sent_eval["client_long_pct"],
                 "client_short_pct": sent_eval["client_short_pct"],
                 "leveraged_funds_short_pct": sent_eval["leveraged_funds_short_pct"],
+                "leveraged_funds_long_pct": sent_eval.get("leveraged_funds_long_pct", 50.0),
+                "smart_money_divergence": sent_eval.get("smart_money_divergence", 0.0),
             },
             "broker_levels": rep,
             "has_broker_sweep": sweep_eval["has_broker_sweep"],
             "sweep_desc": sweep_eval["description"],
+            "normalized_zscore": z_eval,
+            "volatility_expansion": vol_exp,
+            "sentiment_velocity": velo_eval,
         }

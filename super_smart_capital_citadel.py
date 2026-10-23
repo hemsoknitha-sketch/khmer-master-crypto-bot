@@ -2575,6 +2575,13 @@ class SuperSmartCapitalCitadel:
             breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
             tp_spread_mult = 10.0
 
+        # Volatility Delta Expansion breathing stop scaling (Invariant 99 / 4 Core Formulas):
+        if report_confluence:
+            vol_exp = report_confluence.get("volatility_expansion", {})
+            sl_scale = float(vol_exp.get("sl_expansion_multiplier", 1.0))
+            if sl_scale > 1.0:
+                breathing_sl_dist = round(breathing_sl_dist * sl_scale, 4)
+
         # Gap 6 (ចន្លោះទី 6): DYNAMIC STRUCTURAL STOPS & MFE/MAE CALIBRATION
         # Replaces single static formula with Structural Invalidation + Volatility Buffer
         # and Market Structure / MFE-calibrated Take-Profit Targets.
