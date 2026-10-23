@@ -1419,6 +1419,38 @@ class SuperSmartCapitalCitadel:
     ) -> Dict[str, Any]:
         """
         Comprehensive Institutional Trap & Confluence Evaluation for a Capital.com TradFi Asset.
+        Guarantees presence of market_report (Invariant 99) across all execution regimes.
+        """
+        res = cls._evaluate_institutional_tradfi_trap_inner(
+            epic=epic,
+            proposed_side=proposed_side,
+            engine=engine,
+            strategy_regime=strategy_regime
+        )
+        if isinstance(res, dict) and "market_report" not in res:
+            try:
+                import capital_market_report_engine
+                res["market_report"] = capital_market_report_engine.CapitalMarketReportEngine.evaluate_market_report_confluence(
+                    epic=res.get("epic", epic),
+                    proposed_side=res.get("proposed_side", proposed_side),
+                    current_price=res.get("current_price", 0.0),
+                    atr_15m=res.get("atr_15m", 0.0),
+                    spread=res.get("spread", 0.0)
+                )
+            except Exception:
+                res["market_report"] = {}
+        return res
+
+    @classmethod
+    def _evaluate_institutional_tradfi_trap_inner(
+        cls,
+        epic: str,
+        proposed_side: str,
+        engine: Optional[Any] = None,
+        strategy_regime: str = "AUTO"
+    ) -> Dict[str, Any]:
+        """
+        Comprehensive Institutional Trap & Confluence Evaluation for a Capital.com TradFi Asset.
         Returns full diagnostics, approval status, conviction score, and invalidation levels.
         """
         import capital_engine
