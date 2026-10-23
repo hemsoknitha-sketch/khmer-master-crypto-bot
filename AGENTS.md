@@ -1812,6 +1812,26 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - **Phase 3 (+3.50R TP2 Hit):** Upon hitting $+3.50R$, banks 30% lot cash profit and ratchets Stop Loss to $+2.00R$ Guaranteed Cash Profit Floor, locking solid net gains in pocket.
      - **Phase 4 (Parabolic & RSI Extreme Exhaustion Harvest):** If 15m RSI $\ge 80.0$ (for BUY) or $\le 20.0$ (for SELL) indicating extreme parabolic exhaustion and price retraces $\ge 15\%$ from peak (`upl <= peak_upl * 0.85` with `peak_upl >= max(2.50, spread * 2.5)`), the engine executes an immediate market harvest (`PARABOLIC_85_HARVEST`), banking 85% of peak cash profit before violent reversals occur.
 
+### Invariant 99: Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment Arbitrage & Exact Broker S/R Stop-Loss Cluster Engine (AQ99 Standard - គ្រឹះកេងចំណេញចិត្តសាស្ត្រ Retail Herd ៧៩.៧៥% & ស្ទាក់ចាប់ Stop Loss Clusters របស់ Broker)
+- **Location:** `capital_market_report_engine.py`, `super_smart_capital_citadel.py` (`evaluate_institutional_tradfi_trap`, `CapitalMarketReportEngine`), `capital_engine.py`, `bot_thread.py` (`/capital report`), `audit_system.py` [CHECK 78/78]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Mathematical Capital Protection:
+  1. **Deterministic Broker Volatility S/R & Stop-Loss Calculation:** Ingests Monte Safieddine's Daily Market Report and dynamically synthesizes exact broker support, resistance, and stop-loss coordinates across 12 prime TradFi assets (US500, US100, US30, DE40, GOLD, SILVER, OIL, NVDA, TSLA, AMZN, AAPL, MSFT):
+     $$\text{Res}_1 = P_0 + \Delta, \quad \text{SL}_{\text{Res1}} = \text{Res}_1 + 0.5\Delta$$
+     $$\text{Res}_2 = \text{Res}_1 + \Delta, \quad \text{SL}_{\text{Res2}} = \text{Res}_2 + 0.5\Delta$$
+     $$\text{Sup}_1 = P_0 - \Delta, \quad \text{SL}_{\text{Sup1}} = \text{Sup}_1 - 0.5\Delta$$
+     $$\text{Sup}_2 = \text{Sup}_1 - \Delta, \quad \text{SL}_{\text{Sup2}} = \text{Sup}_2 - 0.5\Delta$$
+     Where $P_0$ is the Relative Starting Point and $\Delta$ is the Daily Average Range / ATR volatility increment.
+  2. **Contrarian Retail Sentiment Arbitrage (79.75% Retail Loss Exploitation):**
+     - Exploits broker-certified empirical proof that 79.75% of retail accounts lose money on CFD leverage.
+     - When Client Sentiment $\ge 80.0\%$ Long (e.g. NVDA 94%, AMZN 95%, AAPL 91%, GOLD 79%), Long entries at or near Resistance 1 are strictly VETOED (`RETAIL_EXTREME_LONG_TRAP_VETO`), permanently eliminating buying the top.
+     - When Client Sentiment $\ge 70.0\%$ Short, Short entries at or near Support 1 are strictly VETOED (`RETAIL_EXTREME_SHORT_TRAP_VETO`), permanently eliminating selling panic bottoms.
+     - Contrarian reversals (Shorting into trapped Longs or Buying into trapped Shorts) receive $+30.0$ to $+35.0$ Institutional Confluence Score boosts.
+  3. **Exact Broker Stop-Loss Cluster Sweep Detection (Turtle Soup at Broker SL):**
+     - Detects when price pierces $\text{SL}_{\text{Res1}}$ or $\text{SL}_{\text{Res2}}$ (broker stop-loss zone for short sellers) and then rejects back below Resistance $\rightarrow$ Confirmed Bearish Liquidity Hunt. Enforces structural stop loss at $\text{High Wick} + 2\times\text{Spread}$ and targets equilibrium $P_0$ and $\text{Sup}_1$ ($R:R \ge 1:3.5$).
+     - Detects when price pierces $\text{SL}_{\text{Sup1}}$ or $\text{SL}_{\text{Sup2}}$ (broker stop-loss zone for buyers) and then rejects back above Support $\rightarrow$ Confirmed Bullish Liquidity Hunt. Enforces structural stop loss at $\text{Low Wick} - 2\times\text{Spread}$ and targets equilibrium $P_0$ and $\text{Res}_1$ ($R:R \ge 1:3.5$).
+  4. **Multi-Timeframe Regime & Institutional CoT Synchronization:** Synchronizes Daily and Weekly Regimes with CFTC Commitments of Traders (CoT) Leveraged Funds and Asset Managers data, feeding dynamic orthogonal features into the Marcos López de Prado Model 2 Meta-Labeling Classifier to maximize compound geometric growth.
+  5. **Telegram Command Integration:** Accessible via `/capital report [EPIC]` and `/capital sentiment` for real-time institutional transparency.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

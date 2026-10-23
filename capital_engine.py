@@ -4121,6 +4121,9 @@ class CapitalAutonomousEngine:
                 base_quant["citadel_approved"] = citadel_approved
                 base_quant["calibrated_win_prob"] = cit_diag.get("calibrated_win_prob", 0.50)
                 base_quant["calibrated_win_prob_pct"] = cit_diag.get("calibrated_win_prob_pct", 50.0)
+                if cit_diag.get("market_report"):
+                    base_quant["market_report"] = cit_diag["market_report"]
+                    base_quant["sentiment_data"] = cit_diag["market_report"].get("sentiment_data", {})
 
                 # Extract and merge Smart Money Concepts & ICT confluence
                 if cit_diag.get("smc_ict_setup"):

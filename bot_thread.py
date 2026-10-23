@@ -26660,6 +26660,39 @@ class TelegramBotThread(BaseThread):
                         )
                         await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
                         return
+                elif action in ["REPORT", "MARKET_REPORT", "SENTIMENT", "DAILY_REPORT"]:
+                    import capital_market_report_engine
+                    target_epic = str(args[1]).upper().strip() if len(args) > 1 else "GOLD"
+                    norm_key = capital_market_report_engine.CapitalMarketReportEngine.normalize_epic_key(target_epic)
+                    rep_data = capital_market_report_engine.CapitalMarketReportEngine.get_market_report_data(norm_key)
+                    sent_data = capital_market_report_engine.CapitalMarketReportEngine.fetch_live_client_sentiment(norm_key)
+                    c_long = sent_data.get("client_long_pct", 50.0)
+                    c_short = sent_data.get("client_short_pct", 50.0)
+                    lev_short = rep_data.get("leveraged_funds_short_pct", 50.0)
+                    lev_long = rep_data.get("leveraged_funds_long_pct", 50.0)
+                    inst_long = rep_data.get("institutional_long_pct", 50.0)
+                    
+                    rep_msg = (
+                        f"📊 **[CAPITAL.COM INSTITUTIONAL DAILY MARKET REPORT]** 🏛️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🎯 **ទ្រព្យសម្បត្តិ ៖** `{norm_key}` | **របបទីផ្សារ ៖** `{rep_data.get('daily_regime')}`\n"
+                        f"📈 **Weekly Macro ៖** `{rep_data.get('weekly_regime')}`\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"📍 **Relative Starting Point ៖** `${rep_data.get('starting_point'):,.2f}`\n"
+                        f"🔴 **Resistance 1 ៖** `${rep_data.get('res1'):,.2f}` (SL: `${rep_data.get('sl_res1'):,.2f}`)\n"
+                        f"🔴 **Resistance 2 ៖** `${rep_data.get('res2'):,.2f}` (SL: `${rep_data.get('sl_res2'):,.2f}`)\n"
+                        f"🟢 **Support 1 ៖** `${rep_data.get('sup1'):,.2f}` (SL: `${rep_data.get('sl_sup1'):,.2f}`)\n"
+                        f"🟢 **Support 2 ៖** `${rep_data.get('sup2'):,.2f}` (SL: `${rep_data.get('sl_sup2'):,.2f}`)\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"👥 **Client Herd (Retail 79.75% Loss) ៖** `Long {c_long:.1f}%` | `Short {c_short:.1f}%`\n"
+                        f"💼 **Leveraged Funds (Hedge Funds) ៖** `Long {lev_long:.1f}%` | `Short {lev_short:.1f}%`\n"
+                        f"🏦 **Asset Managers (Institutions) ៖** `Long {rep_data.get('asset_managers_long_pct', 50):.1f}%` | `Short {rep_data.get('asset_managers_short_pct', 50):.1f}%`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚡ **Contrarian Edge ៖** `{'⚠️ Extreme Retail Herd Trap (Avoid Buying Top)' if c_long >= 80 else ('⚠️ Extreme Retail Panic Trap (Avoid Selling Bottom)' if c_short >= 70 else '✅ Balanced Order Flow')}`\n"
+                        f"🛡️ _Invariant 99 Certified: Stop Clusters & Retail Liquidity Hunter Active!_"
+                    )
+                    await update.effective_message.reply_text(rep_msg, parse_mode="Markdown")
+                    return
                 elif action in ["RESET_DAILY", "RESETDAILY", "GOVERNOR_RESET", "RESET_GOVERNOR"]:
                     import portfolio_circuit_breaker
                     c_eng = capital_engine.get_user_capital_engine(chat_id)

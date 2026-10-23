@@ -4380,7 +4380,7 @@ def run_audit():
         log_fail(str(e))
 
     # 77. Invariant 98: Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor
-    print("\n[CHECK 77/77] Verifying Institutional Structural SL Anchor, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor (Invariant 98)...")
+    print("\n[CHECK 77/78] Verifying Institutional Structural SL Anchor, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor (Invariant 98)...")
     try:
         has_inv98_agents = "Invariant 98: Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor" in agents_md
         has_inv98_gemini = "Institutional Structural Invalidation Anchor SL, Liquidity Pool TP1/TP2/Runner & 4-Phase Breakeven Armor (Invariant 98)" in gemini_md
@@ -4488,6 +4488,85 @@ def run_audit():
             log_fail("Invariant 98 Structural SL Anchor & 4-Phase Breakeven Armor verification failed!")
     except Exception as e:
         failures.append(f"Invariant 98 check failed: {e}")
+        log_fail(str(e))
+
+    # 78. Invariant 99: Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment Arbitrage & Exact Broker S/R Stop-Loss Cluster Engine
+    print("\n[CHECK 78/78] Verifying Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment & Exact Broker S/R Stop Engine (Invariant 99)...")
+    try:
+        has_inv99_agents = "Invariant 99: Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment Arbitrage & Exact Broker S/R Stop-Loss Cluster Engine" in agents_md
+        has_inv99_gemini = "Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment Arbitrage & Exact Broker S/R Stop-Loss Cluster Engine (Invariant 99)" in gemini_md
+
+        import capital_market_report_engine
+        cmre = capital_market_report_engine.CapitalMarketReportEngine
+
+        # Unit Test 1: Benchmark report retrieval & S/R math
+        gold_rep = cmre.get_market_report_data("GOLD")
+        gold_sr_ok = (
+            gold_rep.get("starting_point") == 4125.23 and
+            gold_rep.get("res1") == 4171.00 and
+            gold_rep.get("sl_res1") == 4193.88 and
+            gold_rep.get("sup1") == 4079.46 and
+            gold_rep.get("sl_sup1") == 4056.58 and
+            gold_rep.get("client_long_pct") == 79.0
+        )
+
+        # Unit Test 2: Contrarian Retail Trap Veto on Overcrowded Longs (NVDA 94% Long)
+        nvda_eval_buy = cmre.evaluate_contrarian_sentiment_edge("NVDA", "BUY", current_price=223.00)
+        nvda_veto_ok = bool(nvda_eval_buy.get("is_vetoed") and "RETAIL_EXTREME_LONG_TRAP_VETO" in str(nvda_eval_buy.get("veto_reason")))
+
+        # Unit Test 3: Contrarian Smart Money Short Boost on Overcrowded Longs
+        nvda_eval_sell = cmre.evaluate_contrarian_sentiment_edge("NVDA", "SELL", current_price=220.00)
+        nvda_boost_ok = float(nvda_eval_sell.get("score_boost", 0.0)) >= 30.0
+
+        # Unit Test 4: Exact Broker Stop Cluster Sweep Reversal (Wick pierced SL_Res1 then rejected)
+        sweep_test = cmre.evaluate_broker_stop_cluster_sweep(
+            epic="GOLD",
+            current_price=4165.0,
+            high_wick=4196.0,
+            low_wick=4150.0,
+            spread=0.50
+        )
+        sweep_ok = (
+            sweep_test.get("has_broker_sweep") is True and
+            sweep_test.get("sweep_direction") == "SELL" and
+            sweep_test.get("swept_level_name") == "BROKER_SL_RESISTANCE_1" and
+            sweep_test.get("structural_sl") is not None
+        )
+
+        # Unit Test 5: Integration in SuperSmartCapitalCitadel
+        import super_smart_capital_citadel
+        cit_eval = super_smart_capital_citadel.SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap(
+            epic="GOLD",
+            proposed_side="SELL",
+            engine=None
+        )
+        cit_rep_ok = "market_report" in cit_eval
+
+        # Unit Test 6: Verify Telegram bot command handler integration
+        with open("bot_thread.py", "r", encoding="utf-8") as f_bt:
+            bt_src = f_bt.read()
+        cmd_report_ok = 'elif action in ["REPORT", "MARKET_REPORT", "SENTIMENT", "DAILY_REPORT"]:' in bt_src
+
+        all_inv99_passed = (
+            has_inv99_agents and has_inv99_gemini and gold_sr_ok and
+            nvda_veto_ok and nvda_boost_ok and sweep_ok and cit_rep_ok and cmd_report_ok
+        )
+
+        if all_inv99_passed:
+            log_pass(
+                "Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment & Exact Broker S/R Stop Engine (Invariant 99) "
+                "are 100% certified! (Monte Safieddine S/R Math, 79.75% Retail Trap Veto, Contrarian +30 Boost, "
+                "Exact Broker SL Cluster Sweep, Citadel Confluence & Telegram /capital report integration)"
+            )
+        else:
+            failures.append(
+                f"Invariant 99 check failed: agents={has_inv99_agents}, gemini={has_inv99_gemini}, "
+                f"sr={gold_sr_ok}, veto={nvda_veto_ok}, boost={nvda_boost_ok}, sweep={sweep_ok}, "
+                f"cit={cit_rep_ok}, cmd={cmd_report_ok}"
+            )
+            log_fail("Invariant 99 Market Report & Contrarian Sentiment Engine verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 99 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

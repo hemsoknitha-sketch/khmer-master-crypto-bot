@@ -1719,6 +1719,39 @@ class SuperSmartCapitalCitadel:
 
         preliminary_sl = round(curr_price - breathing_sl_dist if norm_side == "BUY" else curr_price + breathing_sl_dist, prec)
 
+        # Invariant 99: Capital.com Daily Market Report & Contrarian Sentiment Arbitrage
+        report_confluence = {}
+        try:
+            import capital_market_report_engine
+            last_h = highs[-1] if highs else curr_price
+            last_l = lows[-1] if lows else curr_price
+            report_confluence = capital_market_report_engine.CapitalMarketReportEngine.evaluate_market_report_confluence(
+                epic=resolved_epic,
+                proposed_side=norm_side,
+                current_price=curr_price,
+                atr_15m=atr_15m,
+                spread=spread,
+                high_wick=last_h,
+                low_wick=last_l,
+                engine=engine
+            )
+            if report_confluence.get("is_vetoed"):
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": report_confluence.get("veto_reason"),
+                    "confluence_score": 15.0,
+                    "spread": spread,
+                    "invalidation_sl": preliminary_sl,
+                    "breathing_sl_dist": breathing_sl_dist,
+                    "market_report": report_confluence
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
+        except Exception as e_rep:
+            logger.debug(f"Capital Market Report confluence evaluation note: {e_rep}")
+
         # --------------------------------------------------------------------
         # 1. PILLAR 6: NON-NEGOTIABLE SAFETY HARD GUARDS (RSI ARMOR & ADX MOMENTUM)
         # --------------------------------------------------------------------
@@ -1866,7 +1899,8 @@ class SuperSmartCapitalCitadel:
                 "swing_low": swing_low,
                 "spread": spread,
                 "invalidation_sl": preliminary_sl,
-                "breathing_sl_dist": breathing_sl_dist
+                "breathing_sl_dist": breathing_sl_dist,
+                "market_report": report_confluence
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -2468,6 +2502,14 @@ class SuperSmartCapitalCitadel:
             if pat_h4.get("bullish") or pat_d1.get("bullish"):
                 score -= 15.0
 
+        # Capital Market Report Score Boost & Structural Stop Alignment (Invariant 99)
+        if report_confluence and report_confluence.get("score_boost"):
+            score += float(report_confluence.get("score_boost", 0.0))
+            for f in report_confluence.get("factors", []):
+                factors.append(f)
+            if report_confluence.get("structural_sl"):
+                preliminary_sl = report_confluence["structural_sl"]
+
         confluence_score = round(max(0.0, min(99.5, score)), 1)
 
         # --------------------------------------------------------------------
@@ -2734,6 +2776,7 @@ class SuperSmartCapitalCitadel:
             "candlestick_patterns": htf_patterns_eval,
             "fibonacci": fib_analysis,
             "h4_trend_anchor": h4_anchor,
+            "market_report": report_confluence,
             "candles_15m": candles_15m
         }
 
