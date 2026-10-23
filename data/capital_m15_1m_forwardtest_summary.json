@@ -1,0 +1,47 @@
+{
+  "project": "ANGKOR QUANT \u2014 1-Month M15 Stochastic Forward-Test ($1,000 Capital)",
+  "generated_at": "2026-10-23T14:16:04.807248",
+  "timeframe": "M15 (15-Minute Intraday Bars)",
+  "period": "2026-10-24 to 2026-11-24 (1 Forward Month)",
+  "initial_capital": 1000.0,
+  "base_risk_dollars": 10.0,
+  "forward_metrics": {
+    "total_trades": 105,
+    "n_wins": 31,
+    "n_losses": 74,
+    "win_rate": 29.52,
+    "ci_lower": 21.65,
+    "ci_upper": 38.85,
+    "avg_win_r": 1.36,
+    "avg_loss_r": 0.84,
+    "realized_rr": 1.62,
+    "expectancy_r": -0.189,
+    "gross_profit": 411.6,
+    "gross_loss": 643.15,
+    "net_profit": -231.55,
+    "roi_pct": -23.15,
+    "profit_factor": 0.64,
+    "total_costs": 32.8,
+    "max_drawdown_pct": 25.95,
+    "max_drawdown_dollars": 269.35,
+    "sharpe_ratio": -3.76,
+    "final_equity": 768.45
+  },
+  "monte_carlo_resampling": {
+    "n_paths": 10000,
+    "mean_terminal": 651.09,
+    "median_terminal": 649.21,
+    "std_terminal": 80.74,
+    "p5_terminal": 521.8,
+    "p25_terminal": 595.21,
+    "p75_terminal": 705.16,
+    "p95_terminal": 785.68,
+    "mean_max_dd": 35.79,
+    "p95_max_dd": 48.05,
+    "probability_of_ruin_pct": 2.83
+  },
+  "chart_paths": {
+    "bt_equity": "data\\capital_m15_1m_backtest_equity.png",
+    "fwd_fan": "data\\capital_m15_1m_forwardtest_fan.png"
+  }
+}
