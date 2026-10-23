@@ -1080,41 +1080,116 @@ class CapitalMarketReportEngine:
     @classmethod
     def calculate_broker_delta_expansion_ratio(
         cls,
-        epic: str
+        epic: str,
+        delta_current: Optional[float] = None,
+        delta_prior: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Pillar 3 Formula: Broker Volatility Delta Expansion Ratio.
         Formula:
           rho_Delta = Delta_current / Delta_prior
-          If rho_Delta > 1.01: Broker volatility expectation is expanding.
+          If rho_Delta > 1.00: Broker volatility expectation is expanding.
           SL Expansion Multiplier = clamp(rho_Delta, 1.0, 1.50)
-          TP Expansion Multiplier = clamp(rho_Delta, 1.0, 2.00)
+          TP Expansion Multiplier = clamp(rho_Delta ** 1.5, 1.0, 2.00)
         """
         key = cls.normalize_epic_key(epic)
         rep_prior = CAPITAL_DAILY_REPORT_REGISTRY.get(key, {})
         rep_today = CAPITAL_OCT23_2026_REPORT_REGISTRY.get(key, {})
 
-        delta_prior = float(rep_prior.get("delta", 1.0))
-        delta_curr = float(rep_today.get("delta", delta_prior))
+        d_prior = float(delta_prior) if delta_prior is not None else float(rep_prior.get("delta", 1.0))
+        d_curr = float(delta_current) if delta_current is not None else float(rep_today.get("delta", d_prior))
 
-        ratio = round(delta_curr / delta_prior, 4) if delta_prior > 0 else 1.0
-        is_expanding = bool(ratio > 1.01)
-        is_contracting = bool(ratio < 0.98)
+        ratio = round(d_curr / d_prior, 4) if d_prior > 0 else 1.0
+        is_expanding = bool(ratio > 1.00)
+        is_contracting = bool(ratio < 0.99)
 
-        sl_mult = round(max(1.0, min(1.50, ratio)), 4)
-        tp_mult = round(max(1.0, min(2.00, ratio)), 4)
+        sl_mult = round(max(1.0, min(1.50, ratio)), 4) if ratio >= 1.0 else round(max(0.85, ratio), 4)
+        tp_mult = round(max(1.0, min(2.00, ratio ** 1.5)), 4) if ratio >= 1.0 else round(max(0.80, ratio), 4)
 
         return {
             "epic": epic,
             "canonical_key": key,
-            "delta_prior": delta_prior,
-            "delta_current": delta_curr,
+            "delta_prior": d_prior,
+            "delta_current": d_curr,
             "delta_expansion_ratio": ratio,
             "delta_expansion_pct": round((ratio - 1.0) * 100.0, 2),
             "is_volatility_expanding": is_expanding,
             "is_volatility_contracting": is_contracting,
             "sl_expansion_multiplier": sl_mult,
             "tp_expansion_multiplier": tp_mult,
+        }
+
+    @classmethod
+    def apply_broker_delta_expansion_to_stops(
+        cls,
+        epic: str,
+        proposed_side: str,
+        entry_price: float,
+        base_sl: float,
+        base_tp1: float,
+        base_tp2: Optional[float] = None,
+        base_tp3: Optional[float] = None,
+        precision: int = 2,
+        delta_current: Optional[float] = None,
+        delta_prior: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Pillar 3 Formula: Apply Broker Volatility Delta Expansion Ratio directly to SL & TP.
+        Formula:
+          rho_Delta = Delta_current / Delta_prior
+          SL Multiplier = clamp(rho_Delta, 1.00, 1.50)
+          TP Multiplier = clamp(rho_Delta ** 1.5, 1.00, 2.00)
+          Adjusted SL Distance = Base SL Distance * SL Multiplier
+          Adjusted TP Distance = Base TP Distance * TP Multiplier
+        """
+        norm_side = "BUY" if str(proposed_side).upper() in ["BUY", "LONG"] else "SELL"
+        vol_exp = cls.calculate_broker_delta_expansion_ratio(
+            epic=epic,
+            delta_current=delta_current,
+            delta_prior=delta_prior
+        )
+        sl_mult = vol_exp.get("sl_expansion_multiplier", 1.0)
+        tp_mult = vol_exp.get("tp_expansion_multiplier", 1.0)
+
+        base_sl_dist = abs(entry_price - base_sl)
+        base_tp1_dist = abs(base_tp1 - entry_price)
+
+        adj_sl_dist = round(base_sl_dist * sl_mult, 4)
+        adj_tp1_dist = round(base_tp1_dist * tp_mult, 4)
+
+        if norm_side == "BUY":
+            adj_sl = round(entry_price - adj_sl_dist, precision)
+            adj_tp1 = round(entry_price + adj_tp1_dist, precision)
+            adj_tp2 = round(entry_price + (abs(base_tp2 - entry_price) * tp_mult), precision) if base_tp2 is not None else None
+            adj_tp3 = round(entry_price + (abs(base_tp3 - entry_price) * tp_mult), precision) if base_tp3 is not None else None
+        else:
+            adj_sl = round(entry_price + adj_sl_dist, precision)
+            adj_tp1 = round(entry_price - adj_tp1_dist, precision)
+            adj_tp2 = round(entry_price - (abs(entry_price - base_tp2) * tp_mult), precision) if base_tp2 is not None else None
+            adj_tp3 = round(entry_price - (abs(entry_price - base_tp3) * tp_mult), precision) if base_tp3 is not None else None
+
+        adj_rr = round(adj_tp1_dist / max(1e-6, adj_sl_dist), 2)
+
+        return {
+            "epic": epic,
+            "side": norm_side,
+            "entry_price": entry_price,
+            "original_sl": base_sl,
+            "adjusted_sl": adj_sl,
+            "sl_expansion_multiplier": sl_mult,
+            "sl_distance_delta": round(adj_sl_dist - base_sl_dist, 4),
+            "original_tp1": base_tp1,
+            "adjusted_tp1": adj_tp1,
+            "tp_expansion_multiplier": tp_mult,
+            "tp1_distance_delta": round(adj_tp1_dist - base_tp1_dist, 4),
+            "original_tp2": base_tp2,
+            "adjusted_tp2": adj_tp2,
+            "original_tp3": base_tp3,
+            "adjusted_tp3": adj_tp3,
+            "adjusted_rr": adj_rr,
+            "is_expanded": bool(sl_mult > 1.0001 or tp_mult > 1.0001),
+            "delta_expansion_ratio": vol_exp.get("delta_expansion_ratio", 1.0),
+            "delta_expansion_pct": vol_exp.get("delta_expansion_pct", 0.0),
         }
 
     @classmethod
@@ -1522,9 +1597,25 @@ class CapitalMarketReportEngine:
         if "Bull" in d_regime and norm_side == "BUY":
             total_boost += 8.0
             factors.append("DAILY_REGIME_BULL_ALIGNMENT (+8)")
-        elif "Bear" in d_regime and norm_side == "SELL":
-            total_boost += 8.0
-            factors.append("DAILY_REGIME_BEAR_ALIGNMENT (+8)")
+        # Pillar 3: Dynamically apply Broker Volatility Delta Expansion directly to SL & TP targets
+        stops_adj = {}
+        if structural_sl is not None and tp1 is not None and vol_exp.get("is_volatility_expanding"):
+            stops_adj = cls.apply_broker_delta_expansion_to_stops(
+                epic=epic,
+                proposed_side=norm_side,
+                entry_price=current_price,
+                base_sl=structural_sl,
+                base_tp1=tp1,
+                base_tp2=tp2,
+                precision=2
+            )
+            structural_sl = stops_adj["adjusted_sl"]
+            tp1 = stops_adj["adjusted_tp1"]
+            if tp2 is not None and stops_adj.get("adjusted_tp2") is not None:
+                tp2 = stops_adj["adjusted_tp2"]
+            factors.append(
+                f"VOLATILITY_EXPANSION_STOPS_APPLIED (SL x{stops_adj['sl_expansion_multiplier']:.2f}, TP x{stops_adj['tp_expansion_multiplier']:.2f})"
+            )
 
         return {
             "epic": epic,
@@ -1536,6 +1627,7 @@ class CapitalMarketReportEngine:
             "structural_sl": structural_sl,
             "tp1": tp1,
             "tp2": tp2,
+            "volatility_stops_adjustment": stops_adj,
             "sentiment_data": {
                 "client_long_pct": sent_eval["client_long_pct"],
                 "client_short_pct": sent_eval["client_short_pct"],

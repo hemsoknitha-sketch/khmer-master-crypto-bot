@@ -4570,7 +4570,16 @@ def run_audit():
         )
 
         exp_us100 = cmre.calculate_broker_delta_expansion_ratio("US100")
-        exp_ok = (exp_us100.get("delta_expansion_ratio", 0.0) > 1.0 and exp_us100.get("is_volatility_expanding") is True)
+        exp_stops_test = cmre.apply_broker_delta_expansion_to_stops(
+            "US100", "BUY", entry_price=30000.0, base_sl=29900.0, base_tp1=30250.0
+        )
+        exp_ok = (
+            exp_us100.get("delta_expansion_ratio", 0.0) > 1.0 and
+            exp_us100.get("is_volatility_expanding") is True and
+            exp_stops_test.get("is_expanded") is True and
+            exp_stops_test.get("adjusted_sl") == 29897.64 and
+            exp_stops_test.get("adjusted_tp1") == 30258.9
+        )
 
         eval_gold_buy = cmre.evaluate_contrarian_sentiment_edge("GOLD", "BUY", current_price=4023.61)
         trap_veto_ok = bool(eval_gold_buy.get("is_vetoed") and "RETAIL_TRAP_ACCUMULATION_VETO" in str(eval_gold_buy.get("veto_reason")))

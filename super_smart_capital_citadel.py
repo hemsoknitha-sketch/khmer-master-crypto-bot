@@ -2644,6 +2644,35 @@ class SuperSmartCapitalCitadel:
             rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
             structural_stops_meta = {"method": "TURTLE_SOUP_STRUCTURAL" if (is_turtle_soup and turtle_soup_res.get("direction") == norm_side) else "LEGACY_FALLBACK"}
 
+        # Volatility Delta Expansion dynamic stop & target scaling (Invariant 99 Pillar 3):
+        if report_confluence:
+            vol_exp = report_confluence.get("volatility_expansion", {})
+            sl_scale = float(vol_exp.get("sl_expansion_multiplier", 1.0))
+            tp_scale = float(vol_exp.get("tp_expansion_multiplier", 1.0))
+            if sl_scale > 1.0001 or tp_scale > 1.0001:
+                cur_sl_dist = abs(curr_price - invalidation_sl)
+                expanded_sl_dist = max(cur_sl_dist * sl_scale, breathing_sl_dist)
+                if norm_side == "BUY":
+                    invalidation_sl = round(curr_price - expanded_sl_dist, prec)
+                    tp_1 = round(curr_price + (abs(tp_1 - curr_price) * tp_scale), prec)
+                    tp_2 = round(curr_price + (abs(tp_2 - curr_price) * tp_scale), prec)
+                    tp_3 = round(curr_price + (abs(tp_3 - curr_price) * tp_scale), prec)
+                else:
+                    invalidation_sl = round(curr_price + expanded_sl_dist, prec)
+                    tp_1 = round(curr_price - (abs(curr_price - tp_1) * tp_scale), prec)
+                    tp_2 = round(curr_price - (abs(curr_price - tp_2) * tp_scale), prec)
+                    tp_3 = round(curr_price - (abs(curr_price - tp_3) * tp_scale), prec)
+                rr_ratio = round(abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl)), 2)
+                structural_stops_meta["volatility_delta_expansion"] = {
+                    "sl_expansion_multiplier": sl_scale,
+                    "tp_expansion_multiplier": tp_scale,
+                    "delta_expansion_ratio": vol_exp.get("delta_expansion_ratio", 1.0),
+                    "is_volatility_expanding": vol_exp.get("is_volatility_expanding", False),
+                }
+                factors.append(
+                    f"VOLATILITY_EXPANSION_STOPS_APPLIED (SL x{sl_scale:.2f}, TP x{tp_scale:.2f})"
+                )
+
         # Gap 2 (ចន្លោះទី 2): 5 Mutually Orthogonal Factor Groups Analysis
         # Decomposes setup into 5 de-collinearized groups with intra-group diminishing returns
         # 1. Trend & Regime | 2. Liquidity & Structure | 3. Momentum & Volatility | 4. Macro & Event Risk | 5. Execution Cost
