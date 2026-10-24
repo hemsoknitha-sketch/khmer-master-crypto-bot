@@ -3732,17 +3732,34 @@ def run_audit():
         has_100_us = len(ctru.TOP_100_US_DATA) == 100
         has_100_eu = len(ctru.TOP_100_EU_DATA) == 100
         has_100_asia = len(ctru.TOP_100_ASIA_DATA) == 100
-        has_tri_summary = ctru.get_tri_regional_summary().get("total_universe_assets", 0) >= 290
+
+        has_300_us = len(ctru.TOP_300_US_DATA) == 300
+        has_300_eu = len(ctru.TOP_300_EU_DATA) == 300
+        has_300_asia = len(ctru.TOP_300_ASIA_DATA) == 300
+
+        summary = ctru.get_tri_regional_summary()
+        has_tri_summary = summary.get("total_universe_assets", 0) >= 890
+        has_ram_trained = summary.get("is_ram_trained") is True
+        has_trained_assets = summary.get("total_assets_trained_in_ram", 0) >= 890
+
         has_fast_ram_sets = (
             len(ctru.TOP_100_US_SET) == 100 and
             len(ctru.TOP_100_EU_SET) == 100 and
             len(ctru.TOP_100_ASIA_SET) == 100 and
-            len(ctru.ALL_TRI_REGIONAL_EPICS_SET) >= 290
+            len(ctru.TOP_300_US_SET) == 300 and
+            len(ctru.TOP_300_EU_SET) == 300 and
+            len(ctru.TOP_300_ASIA_SET) == 300 and
+            len(ctru.ALL_TRI_REGIONAL_EPICS_SET) >= 890
         )
         has_asset_types = (
             len(ctru.INDEX_EPICS_SET) >= 15 and
             len(ctru.COMMODITY_EPICS_SET) >= 5 and
-            len(ctru.EQUITY_EPICS_SET) >= 270
+            len(ctru.EQUITY_EPICS_SET) >= 800
+        )
+        has_ram_dna = (
+            ctru.get_asset_ram_dna("NVDA") is not None and
+            ctru.get_asset_ram_dna("GOLD") is not None and
+            ctru.get_asset_ram_dna("7203") is not None
         )
 
         # 3. Session Timing & Dynamic Asset Routing Verification
@@ -3773,14 +3790,16 @@ def run_audit():
 
         all_inv89_passed = (
             has_inv89_agents and has_inv89_gemini and
-            has_100_us and has_100_eu and has_100_asia and has_tri_summary and
+            has_100_us and has_100_eu and has_100_asia and
+            has_300_us and has_300_eu and has_300_asia and
+            has_tri_summary and has_ram_trained and has_trained_assets and has_ram_dna and
             has_fast_ram_sets and has_asset_types and is_sess_valid and
             has_tri_reg_import and has_priority_tri_reg and has_max_30_slots and
             slots_ok and has_citadel_tri_reg
         )
 
         if all_inv89_passed:
-            log_pass(f"Tri-Regional Universe (Top 100 US, Top 100 EU, Top 100 ASIA) in RAM & Session Routing (Invariant 89) are 100% locked & certified! (300 assets, Active Session: {sess_code}, Max Slots: 30)")
+            log_pass(f"Tri-Regional Universe (Top 300 US, Top 300 EU, Top 300 ASIA - 900 Assets) in RAM, Asset DNA Training & Session Routing (Invariant 89) are 100% locked & certified! (897 unique assets, Active Session: {sess_code}, Max Slots: 30)")
         else:
             failures.append(
                 f"Invariant 89 check failed: inv89_agents={has_inv89_agents}, inv89_gemini={has_inv89_gemini}, "

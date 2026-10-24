@@ -809,9 +809,9 @@ class TradFiSessionKillZoneRouter:
 
     try:
         import capital_tri_regional_universe as ctru
-        _EXTRA_US = ctru.TOP_100_US_SET - {"US100", "US500", "US30", "US2000", "GOLD", "SILVER", "OIL_CRUDE"}
-        _EXTRA_EU = ctru.TOP_100_EU_SET - {"DE40", "GERMANY40", "UK100", "FR40", "EU50", "SWI20", "IT40", "ES35", "NL25", "GOLD", "SILVER", "OIL_CRUDE", "OIL_BRENT"}
-        _EXTRA_ASIA = ctru.TOP_100_ASIA_SET - {"JP225", "HK50", "CN50", "AUS200", "SG30", "TW30", "GOLD", "SILVER", "OIL_CRUDE"}
+        _EXTRA_US = getattr(ctru, "TOP_300_US_SET", ctru.TOP_100_US_SET) - {"US100", "US500", "US30", "US2000", "GOLD", "SILVER", "OIL_CRUDE"}
+        _EXTRA_EU = getattr(ctru, "TOP_300_EU_SET", ctru.TOP_100_EU_SET) - {"DE40", "GERMANY40", "UK100", "FR40", "EU50", "SWI20", "IT40", "ES35", "NL25", "GOLD", "SILVER", "OIL_CRUDE", "OIL_BRENT"}
+        _EXTRA_ASIA = getattr(ctru, "TOP_300_ASIA_SET", ctru.TOP_100_ASIA_SET) - {"JP225", "HK50", "CN50", "AUS200", "SG30", "TW30", "GOLD", "SILVER", "OIL_CRUDE"}
         _EXTRA_EU_INDICES = {"UK100", "FR40", "EU50", "SWI20", "IT40", "ES35", "NL25"}
         _EXTRA_ASIA_INDICES = {"JP225", "J225", "HK50", "CN50", "AUS200", "AU200", "SG30", "SG25", "TW30"}
     except Exception:

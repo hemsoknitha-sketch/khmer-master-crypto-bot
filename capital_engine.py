@@ -3878,7 +3878,8 @@ class CapitalAutonomousEngine:
             raw_assets = ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "GERMANY40"]
             try:
                 import capital_tri_regional_universe as ctru
-                raw_assets.extend([a for a in ctru.TOP_100_US_EPICS if a not in raw_assets])
+                us_epics = getattr(ctru, "TOP_300_US_EPICS", ctru.TOP_100_US_EPICS)
+                raw_assets.extend([a for a in us_epics if a not in raw_assets])
             except Exception:
                 pass
             if crypto_allowed:
@@ -3888,7 +3889,8 @@ class CapitalAutonomousEngine:
             raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER"]
             try:
                 import capital_tri_regional_universe as ctru
-                raw_assets.extend([a for a in ctru.TOP_100_EU_EPICS if a not in raw_assets])
+                eu_epics = getattr(ctru, "TOP_300_EU_EPICS", ctru.TOP_100_EU_EPICS)
+                raw_assets.extend([a for a in eu_epics if a not in raw_assets])
             except Exception:
                 pass
             if forex_allowed:
@@ -3900,7 +3902,8 @@ class CapitalAutonomousEngine:
             raw_assets = ["GOLD", "SILVER", "OIL_CRUDE"]
             try:
                 import capital_tri_regional_universe as ctru
-                raw_assets.extend([a for a in ctru.TOP_100_ASIA_EPICS if a not in raw_assets])
+                asia_epics = getattr(ctru, "TOP_300_ASIA_EPICS", ctru.TOP_100_ASIA_EPICS)
+                raw_assets.extend([a for a in asia_epics if a not in raw_assets])
             except Exception:
                 pass
             if forex_allowed:
