@@ -8389,4 +8389,24 @@ async def tradfi_100_daily_training_job(app: Application):
         logger.error(f"❌ [TRADFI DAILY TRAINING JOB ERROR]: {e}")
 
 
-
+async def tri_regional_900_daily_training_job(app: Application):
+    """
+    🏛️ Invariant 89: Tri-Regional Top 900 TradFi In-Memory RAM Universe Daily Self-Training Job (03:30 AM ICT).
+    Executes in the Overnight Rollover Swap Shield & Flat Cash window (03:30 - 07:00 ICT / 20:30 - 23:59 UTC):
+    1. Re-trains all 900 TradFi assets (Top 300 US, Top 300 EU, Top 300 ASIA) in RAM (< 0.0001ms latency).
+    2. Deeply characterizes and records the true institutional DNA of each asset:
+       - Volatility Regime (Expansive High-Beta vs Defensive Low-Beta vs Macro Index vs Cyclical Commodity)
+       - Fractal Hurst Exponent (H > 0.55 Trend Persistence vs H < 0.48 Mean Reversion)
+       - Bayesian Win Prior (60% - 64% Baseline)
+       - HRP Sector Covariance Clusters (Heat Contagion Immunity)
+       - Regulatory Leverage (5:1 Equities, 20:1 Indices/Commodities)
+    3. Archives the daily training run to data/tri_regional_daily_training_ledger.json.
+    4. Dispatches the comprehensive executive intelligence alert directly to BOT SUPER ADMIN (859271875).
+    """
+    try:
+        import capital_tri_regional_universe as ctru
+        logger.info("🧠 [SCHEDULER] Triggering Tri-Regional 900 TradFi Daily Self-Training & Audit (03:30 AM ICT)...")
+        res = await ctru.execute_daily_330am_ram_training_and_audit(app=app, force_telegram=True)
+        logger.info(f"✅ [SCHEDULER] Tri-Regional 900 TradFi Daily Training complete: {res.get('total_trained')} assets trained in {res.get('elapsed_ms', 0):.1f}ms.")
+    except Exception as e:
+        logger.error(f"❌ [SCHEDULER ERROR] Tri-Regional 900 Daily Training failed: {e}")

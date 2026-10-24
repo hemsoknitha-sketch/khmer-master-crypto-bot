@@ -1,0 +1,30 @@
+[
+  {
+    "date": "2026-10-24",
+    "timestamp_ict": "23:57:21 ICT",
+    "timestamp_utc": "2026-10-24 16:57:21 UTC",
+    "total_assets_trained": 896,
+    "total_us_assets": 300,
+    "total_eu_assets": 300,
+    "total_asia_assets": 300,
+    "unique_epics": 896,
+    "training_latency_ms": 21.69,
+    "high_beta_count": 124,
+    "low_beta_count": 36,
+    "high_hurst_count": 123,
+    "mean_reverting_count": 29,
+    "hrp_clusters_count": 32,
+    "asian_session_priority_sample": [
+      "GOLD",
+      "SILVER",
+      "OIL_CRUDE",
+      "J225",
+      "HK50",
+      "CN50",
+      "AU200",
+      "SG25",
+      "JP225",
+      "AUS200"
+    ]
+  }
+]

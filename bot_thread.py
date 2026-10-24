@@ -29297,6 +29297,19 @@ class TelegramBotThread(BaseThread):
         )
         self.log_signal.emit("🏛️ CSX AI Daily Closing EOD Report job scheduled at 15:05 PM (Mon-Fri ICT).")
 
+        # 🧠 Invariant 89: TRI-REGIONAL TOP 900 TRADFI IN-MEMORY RAM UNIVERSE (300 US, 300 EU, 300 ASIA)
+        # Daily Self-Training, Asset DNA Characterization & Super Admin Intelligence Alert Job (03:30 AM ICT)
+        self.scheduler.add_job(
+            scheduler_tasks.tri_regional_900_daily_training_job,
+            'cron',
+            hour=3,
+            minute=30,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id='tri_regional_900_daily_training_job'
+        )
+        self.log_signal.emit("🏛️ Tri-Regional 900 TradFi Daily Self-Training & Super Admin Alert scheduled at 03:30 AM (ICT).")
+
         # 🧠 TOP 100+ TradFi Geospatial Sessions & 10-Year Trend/MA Daily Training Job (03:45 AM Phnom Penh ICT)
         self.scheduler.add_job(
             scheduler_tasks.tradfi_100_daily_training_job,
