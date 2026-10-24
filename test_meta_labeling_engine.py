@@ -163,6 +163,39 @@ class TestMetaLabelingEngine(unittest.TestCase):
         self.assertEqual(res_sell["verdict"], "META_REJECTED")
         self.assertIn("BLOCKED_SMART_MONEY_EXTREME_BULLISH_DIVERGENCE", res_sell["reason"])
 
+    def test_conformal_prediction_regime_coupling(self):
+        """Conformal Prediction must reject BUY trades in Bear Average and require strict singleton in Volatile Consolidation."""
+        import capital_advanced_quant_models as caqm
+
+        # 1. Bear Average must veto BUY trades
+        eval_bear_buy = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+            predicted_prob_win=0.72, alpha=0.10, direction="BUY", daily_regime="Bear Average"
+        )
+        self.assertFalse(eval_bear_buy["is_conformal_approved"])
+        self.assertIn("CONFORMAL_INSTITUTIONAL_REGIME_VETO", eval_bear_buy.get("rejection_reason", ""))
+        self.assertIn("BUY trade strictly rejected in 'Bear Average'", eval_bear_buy.get("rejection_reason", ""))
+
+        # 2. Bull Average must veto SELL trades
+        eval_bull_sell = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+            predicted_prob_win=0.72, alpha=0.10, direction="SELL", daily_regime="Bull Average"
+        )
+        self.assertFalse(eval_bull_sell["is_conformal_approved"])
+        self.assertIn("CONFORMAL_INSTITUTIONAL_REGIME_VETO", eval_bull_sell.get("rejection_reason", ""))
+        self.assertIn("SELL trade strictly rejected in 'Bull Average'", eval_bull_sell.get("rejection_reason", ""))
+
+        # 3. Consolidation Volatile requires P(Win) >= 70% and 95% coverage
+        eval_whipsaw = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+            predicted_prob_win=0.62, alpha=0.10, direction="BUY", daily_regime="Consolidation - Volatile"
+        )
+        self.assertFalse(eval_whipsaw["is_conformal_approved"])
+        self.assertEqual(eval_whipsaw["coverage_guarantee_pct"], 95.0)
+
+        # 4. Bear Average with SELL (aligned trend) approves high-conviction short
+        eval_bear_sell = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+            predicted_prob_win=0.75, alpha=0.10, direction="SELL", daily_regime="Bear Average"
+        )
+        self.assertTrue(eval_bear_sell["is_conformal_approved"])
+
 
 if __name__ == "__main__":
     unittest.main()

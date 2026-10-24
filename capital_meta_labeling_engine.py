@@ -311,8 +311,10 @@ class CapitalMetaLabelingEngine:
         leveraged_funds_long_pct: Optional[float] = None,
         institutional_long_pct: Optional[float] = None,
         asset_managers_long_pct: Optional[float] = None,
-        sentiment_data: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, float]:
+        sentiment_data: Optional[Dict[str, Any]] = None,
+        daily_regime: Optional[str] = None,
+        weekly_regime: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Extracts a clean, normalized feature vector for the secondary Meta-Model.
         Dynamically calculates technical indicators (Bollinger %B, Stochastic %K,
@@ -488,24 +490,36 @@ class CapitalMetaLabelingEngine:
         lev_long_val = leveraged_funds_long_pct
         inst_long_val = institutional_long_pct
         am_long_val = asset_managers_long_pct
+        daily_reg_val = daily_regime
+        weekly_reg_val = weekly_regime
 
-        if smd_val is None and sentiment_data is not None:
-            c_long_val = float(sentiment_data.get("client_long_pct", 50.0))
-            lev_long_val = float(sentiment_data.get("leveraged_funds_long_pct", 50.0))
-            inst_long_val = float(sentiment_data.get("institutional_long_pct", 50.0))
-            am_long_val = float(sentiment_data.get("asset_managers_long_pct", 50.0))
-            smd_val = float(sentiment_data.get("smart_money_divergence", lev_long_val - c_long_val))
+        if sentiment_data is not None:
+            if smd_val is None:
+                c_long_val = float(sentiment_data.get("client_long_pct", 50.0))
+                lev_long_val = float(sentiment_data.get("leveraged_funds_long_pct", 50.0))
+                inst_long_val = float(sentiment_data.get("institutional_long_pct", 50.0))
+                am_long_val = float(sentiment_data.get("asset_managers_long_pct", 50.0))
+                smd_val = float(sentiment_data.get("smart_money_divergence", lev_long_val - c_long_val))
+            if daily_reg_val is None:
+                daily_reg_val = sentiment_data.get("daily_regime")
+            if weekly_reg_val is None:
+                weekly_reg_val = sentiment_data.get("weekly_regime")
 
-        if smd_val is None and epic is not None:
+        if (smd_val is None or daily_reg_val is None) and epic is not None:
             try:
                 import capital_market_report_engine as cmre
                 rep = cmre.CapitalMarketReportEngine.get_market_report_data(epic, current_price=price_val)
-                c_long_val = float(rep.get("client_long_pct", 50.0))
-                lev_short = float(rep.get("leveraged_funds_short_pct", 50.0))
-                lev_long_val = float(rep.get("leveraged_funds_long_pct", 100.0 - lev_short))
-                inst_long_val = float(rep.get("institutional_long_pct", 50.0))
-                am_long_val = float(rep.get("asset_managers_long_pct", 50.0))
-                smd_val = round(lev_long_val - c_long_val, 2)
+                if smd_val is None:
+                    c_long_val = float(rep.get("client_long_pct", 50.0))
+                    lev_short = float(rep.get("leveraged_funds_short_pct", 50.0))
+                    lev_long_val = float(rep.get("leveraged_funds_long_pct", 100.0 - lev_short))
+                    inst_long_val = float(rep.get("institutional_long_pct", 50.0))
+                    am_long_val = float(rep.get("asset_managers_long_pct", 50.0))
+                    smd_val = round(lev_long_val - c_long_val, 2)
+                if daily_reg_val is None:
+                    daily_reg_val = rep.get("daily_regime")
+                if weekly_reg_val is None:
+                    weekly_reg_val = rep.get("weekly_regime")
             except Exception:
                 pass
 
@@ -558,7 +572,11 @@ class CapitalMetaLabelingEngine:
             "client_long_pct": float(c_long_val),
             "leveraged_funds_long_pct": float(lev_long_val),
             "institutional_long_pct": float(inst_long_val),
-            "asset_managers_long_pct": float(am_long_val)
+            "asset_managers_long_pct": float(am_long_val),
+            "daily_regime": str(daily_reg_val or ""),
+            "weekly_regime": str(weekly_reg_val or ""),
+            "direction": dir_clean,
+            "epic": str(epic or "")
         }
 
     @classmethod
@@ -830,22 +848,31 @@ class CapitalMetaLabelingEngine:
                     verdict = "META_REJECTED"
                     reason = f"BLOCKED_NLP_NEGATIVE_NEWS_SENTIMENT: Sentiment={nlp_sentiment:.2f} < -0.40 (Bearish Macro Wire Veto)"
 
-        # 4. Conformal Prediction Finite-Sample Coverage Sets (Invariant 100 Pillar 1)
+        # 4. Conformal Prediction Finite-Sample Coverage Sets Coupled with Institutional Market Regimes (Invariant 100 Pillar 1 & AQ84)
         conformal_res = {}
         try:
             import capital_advanced_quant_models as caqm
             conformal_res = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
-                predicted_prob_win=meta_win_prob, alpha=0.10
+                predicted_prob_win=meta_win_prob,
+                alpha=0.10,
+                direction=features.get("direction", "BUY" if dir_num == 1.0 else "SELL"),
+                daily_regime=features.get("daily_regime"),
+                weekly_regime=features.get("weekly_regime"),
+                epic=features.get("epic")
             )
             if not conformal_res.get("is_conformal_approved", True) and threshold >= 0.50:
-                if is_approved and meta_win_prob < 0.65:
-                    is_approved = False
-                    sizing_mult = 0.0
-                    verdict = "META_REJECTED"
-                    reason = (
-                        f"CONFORMAL_PREDICTION_VETO: P(Win)={meta_win_prob*100:.1f}% fails 90% finite-sample "
-                        f"coverage guarantee (q_hat={conformal_res.get('conformal_threshold_qhat')})"
-                    )
+                is_approved = False
+                sizing_mult = 0.0
+                verdict = "META_REJECTED"
+                conf_reason = conformal_res.get(
+                    "rejection_reason",
+                    f"CONFORMAL_PREDICTION_VETO: P(Win)={meta_win_prob*100:.1f}% fails 90% finite-sample "
+                    f"coverage guarantee (q_hat={conformal_res.get('conformal_threshold_qhat')})"
+                )
+                if not reason:
+                    reason = conf_reason
+                else:
+                    reason = f"{reason} | {conf_reason}"
         except Exception as e_conf:
             logger.debug(f"Conformal prediction evaluation note: {e_conf}")
 

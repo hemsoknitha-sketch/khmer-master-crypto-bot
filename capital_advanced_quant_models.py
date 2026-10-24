@@ -32,6 +32,7 @@ class ConformalPredictionGovernor:
     Finite-sample distribution-free Conformal Prediction (Vovk et al.).
     Guarantees that the probability of the true label Y falling into C(X) is >= 1 - alpha.
     Eliminates calibration bias and prevents taking trades in ambiguous regime transitions.
+    Coupled with Institutional Market Regimes from Capital.com Daily Market Reports (AQ84 Invariant 100).
     """
     DEFAULT_CALIBRATION_SCORES = [
         0.12, 0.15, 0.18, 0.22, 0.25, 0.28, 0.31, 0.34, 0.36, 0.39,
@@ -39,27 +40,112 @@ class ConformalPredictionGovernor:
         0.72, 0.77, 0.81, 0.85, 0.89
     ]
 
+    # Stricter calibration nonconformity scores for volatile consolidation regimes
+    VOLATILE_CALIBRATION_SCORES = [
+        0.20, 0.24, 0.28, 0.32, 0.36, 0.40, 0.44, 0.48, 0.52, 0.56,
+        0.60, 0.64, 0.68, 0.72, 0.76, 0.80, 0.84, 0.88, 0.91, 0.94,
+        0.96, 0.97, 0.98, 0.99, 0.995
+    ]
+
     @classmethod
     def evaluate_conformal_approval(
         cls,
         predicted_prob_win: float,
         alpha: float = 0.10,
-        calibration_nonconformity: Optional[List[float]] = None
+        calibration_nonconformity: Optional[List[float]] = None,
+        direction: Optional[str] = None,
+        daily_regime: Optional[str] = None,
+        weekly_regime: Optional[str] = None,
+        epic: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Computes nonconformity score and finite-sample prediction set C(x).
-        alpha = 0.10 corresponds to 90% coverage guarantee.
+        Coupled with Institutional Market Regimes from Capital.com Daily Market Reports:
+        1. Counter-Trend Macro Veto: Rejects BUYs in Bear Average/Trend regimes and SELLs in Bull Average/Trend regimes.
+        2. Volatile Consolidation Armor: In Consolidation - Volatile, tightens alpha to 0.05 (95% coverage)
+           and requires P(Win) >= 70.0% with strict singleton C(x) == [1] to eliminate whipsaw chop.
+        3. Biased Consolidation Guard: Vetoes adverse drift entries without extreme statistical edge.
         """
-        scores = sorted(calibration_nonconformity or cls.DEFAULT_CALIBRATION_SCORES)
-        n = len(scores)
-        
-        # Nonconformity score for candidate label y=1 (profitable trade)
-        # alpha_1 = 1 - P(Y=1 | X=x)
+        dir_clean = str(direction or "").upper().strip()
+        d_reg = str(daily_regime or "").strip()
+        w_reg = str(weekly_regime or "").strip()
+
+        # Dynamic fallback lookup from Market Report Engine if epic is provided
+        if not d_reg and epic:
+            try:
+                import capital_market_report_engine as cmre
+                rep = cmre.CapitalMarketReportEngine.get_market_report_data(epic)
+                d_reg = str(rep.get("daily_regime", "")).strip()
+                if not w_reg:
+                    w_reg = str(rep.get("weekly_regime", "")).strip()
+            except Exception:
+                pass
+
         p_win = max(0.001, min(0.999, float(predicted_prob_win)))
+        rejection_reason = None
+        regime_veto = False
+        effective_alpha = float(alpha)
+        active_scores = cls.DEFAULT_CALIBRATION_SCORES
+
+        d_reg_upper = d_reg.upper()
+
+        # Institutional Regime Coupling Vetoes & Alpha Modulation:
+        # Rule 1: Bearish Macro Regimes vs Long/BUY Trades
+        is_bear_regime = any(b in d_reg_upper for b in ["BEAR AVERAGE", "BEARISH TREND", "BEARISH VOLATILE", "BEAR VOLATILE", "BEAR STRONG"])
+        if is_bear_regime and dir_clean == "BUY":
+            regime_veto = True
+            rejection_reason = (
+                f"CONFORMAL_INSTITUTIONAL_REGIME_VETO: BUY trade strictly rejected in '{d_reg}' daily regime "
+                f"(Counter-Institutional Macro Direction Trap). Zero tolerance for fighting institutional downtrend."
+            )
+
+        # Rule 2: Bullish Macro Regimes vs Short/SELL Trades
+        is_bull_regime = any(b in d_reg_upper for b in ["BULL AVERAGE", "BULLISH TREND", "BULLISH VOLATILE", "BULL VOLATILE", "BULL STRONG"])
+        if is_bull_regime and dir_clean == "SELL":
+            regime_veto = True
+            rejection_reason = (
+                f"CONFORMAL_INSTITUTIONAL_REGIME_VETO: SELL trade strictly rejected in '{d_reg}' daily regime "
+                f"(Counter-Institutional Macro Direction Trap). Zero tolerance for shorting into institutional rally."
+            )
+
+        # Rule 3: Consolidation - Volatile (High Whipsaw / False Breakout Trap)
+        is_volatile_consol = any(v in d_reg_upper for v in ["CONSOLIDATION - VOLATILE", "CONSOLIDATION VOLATILE", "VOLATILE CONSOLIDATION"])
+        if is_volatile_consol:
+            effective_alpha = 0.05  # Enforce 95% statistical coverage guarantee
+            active_scores = cls.VOLATILE_CALIBRATION_SCORES
+            if p_win < 0.70:
+                regime_veto = True
+                rejection_reason = (
+                    f"CONFORMAL_INSTITUTIONAL_REGIME_VETO: High whipsaw risk in '{d_reg}' regime. "
+                    f"Requires P(Win) >= 70.0% and 95% finite-sample coverage (current P(Win)={p_win*100:.1f}%)."
+                )
+
+        # Rule 4: Consolidation with Adverse Drift Bias
+        if "NEGATIVE BIAS" in d_reg_upper and dir_clean == "BUY":
+            effective_alpha = 0.05
+            if p_win < 0.65:
+                regime_veto = True
+                rejection_reason = (
+                    f"CONFORMAL_INSTITUTIONAL_REGIME_VETO: BUY trade in '{d_reg}' regime requires P(Win) >= 65.0% "
+                    f"due to adverse negative drift (current P(Win)={p_win*100:.1f}%)."
+                )
+        elif "POSITIVE BIAS" in d_reg_upper and dir_clean == "SELL":
+            effective_alpha = 0.05
+            if p_win < 0.65:
+                regime_veto = True
+                rejection_reason = (
+                    f"CONFORMAL_INSTITUTIONAL_REGIME_VETO: SELL trade in '{d_reg}' regime requires P(Win) >= 65.0% "
+                    f"due to adverse positive drift (current P(Win)={p_win*100:.1f}%)."
+                )
+
+        scores = sorted(calibration_nonconformity or active_scores)
+        n = len(scores)
+
+        # Nonconformity score for candidate label y=1 (profitable trade)
         nonconformity_candidate_1 = 1.0 - p_win
 
-        # Quantile threshold at level ceil((n + 1) * (1 - alpha)) / n
-        q_idx = int(math.ceil((n + 1) * (1.0 - alpha))) - 1
+        # Quantile threshold at level ceil((n + 1) * (1 - effective_alpha)) / n
+        q_idx = int(math.ceil((n + 1) * (1.0 - effective_alpha))) - 1
         q_idx = max(0, min(n - 1, q_idx))
         q_hat = float(scores[q_idx])
 
@@ -74,14 +160,30 @@ class ConformalPredictionGovernor:
 
         # Construct prediction set C(x)
         prediction_set = []
-        if p_val_1 > alpha:
+        if p_val_1 > effective_alpha:
             prediction_set.append(1)
-        if p_val_0 > alpha:
+        if p_val_0 > effective_alpha:
             prediction_set.append(0)
 
-        # An entry is statistically approved if and only if C(x) == {1}
-        # (Meaning label 0 is strictly rejected at the 90% confidence level)
-        is_approved = (prediction_set == [1]) or (p_val_1 > alpha and p_win >= 0.55 and nonconformity_candidate_1 <= q_hat)
+        # Base mathematical conformal approval
+        math_approved = (prediction_set == [1]) or (p_val_1 > effective_alpha and p_win >= 0.55 and nonconformity_candidate_1 <= q_hat)
+
+        # In volatile consolidation, require strict singleton [1]
+        if is_volatile_consol and prediction_set != [1]:
+            math_approved = False
+            if not rejection_reason:
+                rejection_reason = (
+                    f"CONFORMAL_INSTITUTIONAL_REGIME_VETO: Prediction set C(x)={prediction_set} is not singleton [1] "
+                    f"in '{d_reg}' (Ambiguous finite-sample coverage)."
+                )
+
+        is_approved = math_approved and not regime_veto
+
+        if not is_approved and not rejection_reason:
+            rejection_reason = (
+                f"CONFORMAL_PREDICTION_VETO: P(Win)={p_win*100:.1f}% fails {round((1.0 - effective_alpha) * 100.0, 1)}% "
+                f"finite-sample coverage guarantee (q_hat={round(q_hat, 4)})"
+            )
 
         return {
             "is_conformal_approved": bool(is_approved),
@@ -90,8 +192,12 @@ class ConformalPredictionGovernor:
             "conformal_p_value_loss": round(p_val_0, 4),
             "nonconformity_score": round(nonconformity_candidate_1, 4),
             "conformal_threshold_qhat": round(q_hat, 4),
-            "coverage_guarantee_pct": round((1.0 - alpha) * 100.0, 1),
-            "uncertainty_flag": (len(prediction_set) > 1 or len(prediction_set) == 0)
+            "coverage_guarantee_pct": round((1.0 - effective_alpha) * 100.0, 1),
+            "uncertainty_flag": (len(prediction_set) > 1 or len(prediction_set) == 0),
+            "daily_regime": d_reg or "Neutral",
+            "weekly_regime": w_reg or "Neutral",
+            "regime_coupled": bool(d_reg),
+            "rejection_reason": rejection_reason
         }
 
 

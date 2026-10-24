@@ -3431,14 +3431,22 @@ class SuperSmartCapitalCitadel:
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
                 return False, reason, diag
 
-            # 2. Conformal Prediction Finite-Sample Coverage Set Guarantee (90% Confidence)
+            # 2. Conformal Prediction Finite-Sample Coverage Set Guarantee Coupled with Institutional Daily Regime
             target_prob = float(diag.get("meta_label", {}).get("meta_win_prob", diag.get("calibrated_win_prob", 0.55)) or 0.55)
+            d_reg = diag.get("market_report", {}).get("daily_regime")
+            w_reg = diag.get("market_report", {}).get("weekly_regime")
             conformal_eval = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
-                predicted_prob_win=target_prob, alpha=0.10
+                predicted_prob_win=target_prob,
+                alpha=0.10,
+                direction=direction,
+                daily_regime=d_reg,
+                weekly_regime=w_reg,
+                epic=s_epic
             )
             diag["conformal_prediction"] = conformal_eval
-            if not conformal_eval.get("is_conformal_approved") and target_prob < 0.65:
-                reason = (
+            if not conformal_eval.get("is_conformal_approved") and (target_prob < 0.65 or conformal_eval.get("rejection_reason")):
+                reason = conformal_eval.get(
+                    "rejection_reason",
                     f"CONFORMAL_PREDICTION_REJECTED: P(Win)={target_prob*100:.1f}% fails 90% finite-sample "
                     f"statistical guarantee (q_hat={conformal_eval.get('conformal_threshold_qhat')})"
                 )

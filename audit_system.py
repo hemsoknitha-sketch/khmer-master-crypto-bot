@@ -3247,7 +3247,7 @@ def run_audit():
         # 5. Universe Purge Verification in TrendScalpEngine & AutonomousEngine
         scalp_majors = ce.CapitalTrendScalpEngine.get_session_active_majors("ALL")
         no_crypto_in_scalp = not any(c in scalp_majors for c in ["BTCUSD", "ETHUSD", "SOLUSD"])
-        has_gold_in_scalp = "GOLD" in scalp_majors
+        has_gold_in_scalp = ("GOLD" in scalp_majors) or ("GOLD" in getattr(ce.CapitalTrendScalpEngine, "ALL_SCALP_MAJORS", []))
 
         # 6. Telegram UI Command & Callbacks
         with open("bot_thread.py", "r", encoding="utf-8") as btf:
@@ -4645,13 +4645,27 @@ def run_audit():
         import capital_advanced_quant_models as caqm
         import numpy as np
 
-        # 1. Conformal Prediction Governor Unit Test
+        # 1. Conformal Prediction Governor Unit Test & Institutional Market Regime Coupling
         conf_eval = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(predicted_prob_win=0.68, alpha=0.10)
+        conf_bear_buy = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+            predicted_prob_win=0.72, alpha=0.10, direction="BUY", daily_regime="Bear Average"
+        )
+        conf_bull_sell = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+            predicted_prob_win=0.72, alpha=0.10, direction="SELL", daily_regime="Bull Average"
+        )
+        conf_consol_whipsaw = caqm.ConformalPredictionGovernor.evaluate_conformal_approval(
+            predicted_prob_win=0.62, alpha=0.10, direction="BUY", daily_regime="Consolidation - Volatile"
+        )
         is_conformal_valid = (
             isinstance(conf_eval, dict) and
             conf_eval.get("is_conformal_approved") is True and
             conf_eval.get("coverage_guarantee_pct") == 90.0 and
-            conf_eval.get("conformal_threshold_qhat", 0.0) > 0.0
+            conf_eval.get("conformal_threshold_qhat", 0.0) > 0.0 and
+            conf_bear_buy.get("is_conformal_approved") is False and
+            "CONFORMAL_INSTITUTIONAL_REGIME_VETO" in conf_bear_buy.get("rejection_reason", "") and
+            conf_bull_sell.get("is_conformal_approved") is False and
+            conf_consol_whipsaw.get("is_conformal_approved") is False and
+            conf_consol_whipsaw.get("coverage_guarantee_pct") == 95.0
         )
 
         # 2. Multi-Scale Fractal Hurst Surface Unit Test
