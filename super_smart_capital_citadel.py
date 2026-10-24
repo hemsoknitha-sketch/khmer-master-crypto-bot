@@ -1786,6 +1786,33 @@ class SuperSmartCapitalCitadel:
         except Exception as e_rep:
             logger.debug(f"Capital Market Report confluence evaluation note: {e_rep}")
 
+        # Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Governor
+        vpin_confluence = {}
+        try:
+            import vpin_order_flow_engine as vpin_eng
+            vpin_confluence = vpin_eng.VPINOrderFlowEngine.evaluate_vpin_toxicity_gatekeeper(
+                candles_15m=candles_15m,
+                proposed_side=norm_side,
+                threshold=0.65
+            )
+            if vpin_confluence.get("is_vetoed"):
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": vpin_confluence.get("veto_reason"),
+                    "confluence_score": 10.0,
+                    "spread": spread,
+                    "invalidation_sl": preliminary_sl,
+                    "breathing_sl_dist": breathing_sl_dist,
+                    "vpin_confluence": vpin_confluence,
+                    "market_report": report_confluence
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
+        except Exception as e_vpin:
+            logger.debug(f"Citadel VPIN evaluation note: {e_vpin}")
+
         # --------------------------------------------------------------------
         # 1. PILLAR 6: NON-NEGOTIABLE SAFETY HARD GUARDS (RSI ARMOR & ADX MOMENTUM)
         # --------------------------------------------------------------------
@@ -2544,6 +2571,14 @@ class SuperSmartCapitalCitadel:
             if report_confluence.get("structural_sl"):
                 preliminary_sl = report_confluence["structural_sl"]
 
+        # VPIN Toxic Order Flow Score Boost (Invariant 101 & AQ84 Pillar 2)
+        if vpin_confluence and vpin_confluence.get("is_toxic") and vpin_confluence.get("is_aligned"):
+            score += float(vpin_confluence.get("score_boost", 30.0))
+            factors.append(
+                f"VPIN_TOXIC_WAVE_RIDE (+30, VPIN: {vpin_confluence.get('vpin'):.2f}, "
+                f"{vpin_confluence.get('dominant_toxic_flow')} Wave, Net Tox: {vpin_confluence.get('net_toxicity_ratio'):+.2f})"
+            )
+
         confluence_score = round(max(0.0, min(99.5, score)), 1)
 
         # --------------------------------------------------------------------
@@ -2847,6 +2882,7 @@ class SuperSmartCapitalCitadel:
             "fibonacci": fib_analysis,
             "h4_trend_anchor": h4_anchor,
             "market_report": report_confluence,
+            "vpin_confluence": vpin_confluence,
             "candles_15m": candles_15m
         }
 
@@ -3309,6 +3345,26 @@ class SuperSmartCapitalCitadel:
                 return False, reason, {"is_approved": False, "rejection_reason": reason, "smd_eval": smd_eval}
         except Exception as e_smd_gate:
             logger.debug(f"SMD gatekeeper evaluation note: {e_smd_gate}")
+
+        # Pillar 0.89: Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Governor (Invariant 101 & AQ84 Pillar 2)
+        try:
+            import vpin_order_flow_engine as vpin_eng
+            candles = []
+            if engine and hasattr(engine, "get_historical_prices"):
+                try:
+                    candles = engine.get_historical_prices(s_epic, resolution="MINUTE_15", max_bars=40)
+                except Exception:
+                    pass
+            if candles and len(candles) >= 5:
+                vpin_gate_eval = vpin_eng.VPINOrderFlowEngine.evaluate_vpin_toxicity_gatekeeper(
+                    candles_15m=candles, proposed_side=direction, threshold=0.65
+                )
+                if vpin_gate_eval.get("is_vetoed"):
+                    reason = vpin_gate_eval.get("veto_reason", "VPIN_INSTITUTIONAL_TOXICITY_VETO")
+                    print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                    return False, reason, {"is_approved": False, "rejection_reason": reason, "vpin_eval": vpin_gate_eval}
+        except Exception as e_vpin_gate:
+            logger.debug(f"VPIN gatekeeper evaluation note: {e_vpin_gate}")
 
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):

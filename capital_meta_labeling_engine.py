@@ -313,7 +313,10 @@ class CapitalMetaLabelingEngine:
         asset_managers_long_pct: Optional[float] = None,
         sentiment_data: Optional[Dict[str, Any]] = None,
         daily_regime: Optional[str] = None,
-        weekly_regime: Optional[str] = None
+        weekly_regime: Optional[str] = None,
+        vpin: Optional[float] = None,
+        vpin_toxicity_direction: Optional[str] = None,
+        vpin_is_toxic: Optional[bool] = None
     ) -> Dict[str, Any]:
         """
         Extracts a clean, normalized feature vector for the secondary Meta-Model.
@@ -533,6 +536,28 @@ class CapitalMetaLabelingEngine:
             inst_long_val = 50.0
         if am_long_val is None:
             am_long_val = 50.0
+        # VPIN Order Flow Toxicity (Invariant 101 & AQ84 Pillar 2)
+        vpin_val = vpin
+        vpin_dir_val = vpin_toxicity_direction
+        vpin_toxic_val = vpin_is_toxic
+        if vpin_val is None and candles and len(candles) >= 5:
+            try:
+                import vpin_order_flow_engine as vpin_eng
+                vpin_eval = vpin_eng.VPINOrderFlowEngine.compute_vpin(candles)
+                vpin_val = float(vpin_eval.get("vpin", 0.50))
+                if vpin_dir_val is None:
+                    vpin_dir_val = str(vpin_eval.get("dominant_toxic_flow", "NONE"))
+                if vpin_toxic_val is None:
+                    vpin_toxic_val = bool(vpin_eval.get("is_toxic", False))
+            except Exception:
+                pass
+
+        if vpin_val is None:
+            vpin_val = 0.50
+        if vpin_dir_val is None:
+            vpin_dir_val = "NONE"
+        if vpin_toxic_val is None:
+            vpin_toxic_val = bool(vpin_val >= 0.65)
 
         return {
             "direction_num": float(dir_num),
@@ -573,6 +598,9 @@ class CapitalMetaLabelingEngine:
             "leveraged_funds_long_pct": float(lev_long_val),
             "institutional_long_pct": float(inst_long_val),
             "asset_managers_long_pct": float(am_long_val),
+            "vpin": float(vpin_val),
+            "vpin_is_toxic": bool(vpin_toxic_val),
+            "vpin_toxicity_direction": str(vpin_dir_val).upper(),
             "daily_regime": str(daily_reg_val or ""),
             "weekly_regime": str(weekly_reg_val or ""),
             "direction": dir_clean,
@@ -802,6 +830,49 @@ class CapitalMetaLabelingEngine:
                     verdict = "META_APPROVED"
                     reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Short aligned with Smart Money institutional winners (SMD={smd:.1f}% <= -25.0%), P(Win)={meta_win_prob*100:.1f}%"
 
+        # 0.5. VPIN Toxic Order Flow Governor (Invariant 101 & AQ84 Pillar 2)
+        vpin = float(features.get("vpin", 0.0) or 0.0)
+        vpin_dir = str(features.get("vpin_toxicity_direction", features.get("vpin_dominant_flow", "NONE")) or "NONE").upper()
+        if vpin >= 0.65:
+            if dir_num == 1.0:  # Proposed Trade is BUY
+                if vpin_dir in ["BEARISH", "SELL"]:
+                    # VETO BUY into toxic selling wave
+                    meta_win_prob = 0.0
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = (
+                        f"BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO: VPIN={vpin:.3f} >= 0.65 with BEARISH toxic flow. "
+                        f"Longing into aggressive institutional liquidation attack is strictly prohibited. P(Win) crushed to 0.0%."
+                    )
+                elif vpin_dir in ["BULLISH", "BUY"]:
+                    # Ride the wave
+                    meta_win_prob = min(0.95, meta_win_prob + 0.15)
+                    if not is_approved and meta_win_prob >= threshold:
+                        is_approved = True
+                        sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                        verdict = "META_APPROVED"
+                        reason = f"META_APPROVED_VPIN_WAVE_ALIGNED: Buy aligned with toxic institutional wave (VPIN={vpin:.3f} >= 0.65), P(Win)={meta_win_prob*100:.1f}%"
+            elif dir_num == -1.0:  # Proposed Trade is SELL
+                if vpin_dir in ["BULLISH", "BUY"]:
+                    # VETO SELL into toxic buying wave
+                    meta_win_prob = 0.0
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = (
+                        f"BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO: VPIN={vpin:.3f} >= 0.65 with BULLISH toxic flow. "
+                        f"Shorting into aggressive institutional buying attack is strictly prohibited. P(Win) crushed to 0.0%."
+                    )
+                elif vpin_dir in ["BEARISH", "SELL"]:
+                    # Ride the wave
+                    meta_win_prob = min(0.95, meta_win_prob + 0.15)
+                    if not is_approved and meta_win_prob >= threshold:
+                        is_approved = True
+                        sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                        verdict = "META_APPROVED"
+                        reason = f"META_APPROVED_VPIN_WAVE_ALIGNED: Short aligned with toxic institutional wave (VPIN={vpin:.3f} >= 0.65), P(Win)={meta_win_prob*100:.1f}%"
+
         # 1. Probabilistic Regime Evaluation (Gaussian HMM 4 States)
         regime_beliefs = {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
         try:
@@ -918,6 +989,9 @@ class CapitalMetaLabelingEngine:
             "smart_money_divergence": smd,
             "true_institutional_winner": "BUY" if smd > 25.0 else ("SELL" if smd < -25.0 else "NEUTRAL"),
             "is_smd_aligned": (dir_num == 1.0 and smd > 25.0) or (dir_num == -1.0 and smd < -25.0) or (-25.0 <= smd <= 25.0),
+            "vpin": vpin,
+            "vpin_is_toxic": bool(vpin >= 0.65),
+            "vpin_toxicity_direction": vpin_dir,
             "client_long_pct": c_long,
             "leveraged_funds_long_pct": lev_long,
             "features": features,

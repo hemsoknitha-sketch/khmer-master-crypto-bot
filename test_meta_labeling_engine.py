@@ -247,6 +247,77 @@ class TestMetaLabelingEngine(unittest.TestCase):
         self.assertGreater(shock_eval["autoencoder_recon_error"], 1.50)
         self.assertLess(shock_eval["execution_latency_ms"], 5.0)
 
+    def test_vpin_toxic_order_flow_governor(self):
+        """VPIN >= 0.65 must veto opposing trades and approve/boost aligned trades (Invariant 101)."""
+        import vpin_order_flow_engine as vpin_eng
+
+        # 1. Bearish toxic flow (VPIN >= 0.65 with BEARISH dominant flow) must veto BUY trades
+        f_buy_into_dump = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=85.0, calib_p=0.80,
+            vpin=0.72, vpin_toxicity_direction="BEARISH", vpin_is_toxic=True
+        )
+        self.assertEqual(f_buy_into_dump["vpin"], 0.72)
+        self.assertTrue(f_buy_into_dump["vpin_is_toxic"])
+        self.assertEqual(f_buy_into_dump["vpin_toxicity_direction"], "BEARISH")
+
+        res_buy_dump = CapitalMetaLabelingEngine.predict_meta_label(f_buy_into_dump, threshold=0.55)
+        self.assertEqual(res_buy_dump["meta_win_prob"], 0.0)
+        self.assertFalse(res_buy_dump["is_approved"])
+        self.assertEqual(res_buy_dump["sizing_multiplier"], 0.0)
+        self.assertEqual(res_buy_dump["verdict"], "META_REJECTED")
+        self.assertIn("BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO", res_buy_dump["reason"])
+        self.assertTrue(res_buy_dump["vpin_is_toxic"])
+
+        # 2. Bullish toxic flow (VPIN >= 0.65 with BULLISH dominant flow) must veto SELL trades
+        f_sell_into_pump = CapitalMetaLabelingEngine.extract_features(
+            direction="SELL", raw_score=85.0, calib_p=0.80,
+            vpin=0.68, vpin_toxicity_direction="BULLISH", vpin_is_toxic=True
+        )
+        res_sell_pump = CapitalMetaLabelingEngine.predict_meta_label(f_sell_into_pump, threshold=0.55)
+        self.assertEqual(res_sell_pump["meta_win_prob"], 0.0)
+        self.assertFalse(res_sell_pump["is_approved"])
+        self.assertEqual(res_sell_pump["verdict"], "META_REJECTED")
+        self.assertIn("BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO", res_sell_pump["reason"])
+
+        # 3. Aligned trades receive boost
+        f_buy_aligned = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=80.0, calib_p=0.75,
+            vpin=0.70, vpin_toxicity_direction="BULLISH", vpin_is_toxic=True
+        )
+        f_buy_baseline = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=80.0, calib_p=0.75,
+            vpin=0.50, vpin_toxicity_direction="BALANCED", vpin_is_toxic=False
+        )
+        res_buy_aligned = CapitalMetaLabelingEngine.predict_meta_label(f_buy_aligned, threshold=0.55)
+        res_buy_baseline = CapitalMetaLabelingEngine.predict_meta_label(f_buy_baseline, threshold=0.55)
+        self.assertGreater(res_buy_aligned["meta_win_prob"], res_buy_baseline["meta_win_prob"])
+        self.assertTrue(res_buy_aligned["vpin_is_toxic"])
+        self.assertEqual(res_buy_aligned["vpin_toxicity_direction"], "BULLISH")
+
+        # 4. Normal flow (< 0.65) must not veto
+        f_normal = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=80.0, calib_p=0.75,
+            vpin=0.45, vpin_toxicity_direction="BALANCED", vpin_is_toxic=False
+        )
+        res_normal = CapitalMetaLabelingEngine.predict_meta_label(f_normal, threshold=0.55)
+        self.assertFalse(res_normal["vpin_is_toxic"])
+
+        # 5. Direct gatekeeper evaluation
+        from test_vpin_order_flow_engine import _generate_synthetic_vpin_candles
+        bull_candles = _generate_synthetic_vpin_candles(n=30, flow_type="BULLISH_TOXIC")
+        gate_buy = vpin_eng.evaluate_vpin_toxicity(bull_candles, "BUY")
+        self.assertFalse(gate_buy["is_vetoed"])
+        self.assertTrue(gate_buy["is_aligned"])
+        self.assertEqual(gate_buy["score_boost"], 30.0)
+        self.assertEqual(gate_buy["action"], "RIDE_TOXIC_BULLISH_WAVE")
+
+        gate_sell = vpin_eng.evaluate_vpin_toxicity(bull_candles, "SELL")
+        self.assertTrue(gate_sell["is_vetoed"])
+        self.assertFalse(gate_sell["is_aligned"])
+        self.assertEqual(gate_sell["score_boost"], -35.0)
+        self.assertIn("VPIN_INSTITUTIONAL_TOXICITY_VETO", gate_sell["veto_reason"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -4503,7 +4503,7 @@ def run_audit():
         log_fail(str(e))
 
     # 78. Invariant 99: Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment Arbitrage & Exact Broker S/R Stop-Loss Cluster Engine
-    print("\n[CHECK 78/78] Verifying Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment & Exact Broker S/R Stop Engine (Invariant 99)...")
+    print("\n[CHECK 78/80] Verifying Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment & Exact Broker S/R Stop Engine (Invariant 99)...")
     try:
         has_inv99_agents = "Invariant 99: Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment Arbitrage & Exact Broker S/R Stop-Loss Cluster Engine" in agents_md
         has_inv99_gemini = "Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment Arbitrage & Exact Broker S/R Stop-Loss Cluster Engine (Invariant 99)" in gemini_md
@@ -4650,7 +4650,7 @@ def run_audit():
         log_fail(str(e))
 
     # 79. Invariant 100: Super Smart Apex Quantitative Models: Conformal Prediction, Multi-Scale Hurst Surface, Hawkes Point Process, Kalman State Tracker, Intermarket Macro Covariance & Contextual Multi-Armed Bandit Governor
-    print("\n[CHECK 79/79] Verifying Super Smart Apex Quantitative Models (Invariant 100)...")
+    print("\n[CHECK 79/80] Verifying Super Smart Apex Quantitative Models (Invariant 100)...")
     try:
         has_inv100_agents = "Invariant 100: Super Smart Apex Quantitative Models: Conformal Prediction, Multi-Scale Hurst Surface" in agents_md
         has_inv100_gemini = "Super Smart Apex Quantitative Models: Conformal Prediction, Multi-Scale Hurst Surface, Hawkes Point Process, Kalman State Tracker, Intermarket Macro Covariance & Contextual Multi-Armed Bandit Governor (Invariant 100)" in gemini_md
@@ -4808,6 +4808,102 @@ def run_audit():
             log_fail("Invariant 100 Super Smart Apex Quantitative Models verification failed!")
     except Exception as e:
         failures.append(f"Invariant 100 check failed: {e}")
+        log_fail(str(e))
+
+    # 80. Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard
+    print("\n[CHECK 80/80] Verifying Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)...")
+    try:
+        has_inv101_agents = "Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity)" in agents_md
+        has_inv101_gemini = "Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)" in gemini_md
+
+        import vpin_order_flow_engine as vpin_eng
+        from test_vpin_order_flow_engine import _generate_synthetic_vpin_candles
+
+        # Unit Test 1: Equal Volume Buckets & Balanced Flow
+        candles_bal = _generate_synthetic_vpin_candles(n=30, flow_type="BALANCED")
+        bal_res = vpin_eng.compute_vpin(candles_bal, num_buckets=10)
+        bal_ok = (
+            isinstance(bal_res, dict) and
+            bal_res.get("is_toxic") is False and
+            bal_res.get("vpin", 1.0) < 0.65 and
+            bal_res.get("dominant_toxic_flow") == "BALANCED" and
+            bal_res.get("bucket_volume", 0.0) > 0.0 and
+            bal_res.get("completed_buckets", 0) > 0
+        )
+
+        # Unit Test 2: Aggressive Bullish Toxicity (VPIN >= 0.65)
+        candles_bull = _generate_synthetic_vpin_candles(n=35, flow_type="BULLISH_TOXIC")
+        bull_res = vpin_eng.compute_vpin(candles_bull)
+        gate_bull_buy = vpin_eng.evaluate_vpin_toxicity(candles_bull, "BUY")
+        gate_bull_sell = vpin_eng.evaluate_vpin_toxicity(candles_bull, "SELL")
+        bull_ok = (
+            bull_res.get("is_toxic") is True and
+            bull_res.get("vpin", 0.0) >= 0.65 and
+            bull_res.get("dominant_toxic_flow") == "BULLISH" and
+            gate_bull_buy.get("is_vetoed") is False and
+            gate_bull_buy.get("score_boost") == 30.0 and
+            gate_bull_buy.get("action") == "RIDE_TOXIC_BULLISH_WAVE" and
+            gate_bull_sell.get("is_vetoed") is True and
+            gate_bull_sell.get("score_boost") == -35.0 and
+            "VPIN_INSTITUTIONAL_TOXICITY_VETO" in gate_bull_sell.get("veto_reason", "")
+        )
+
+        # Unit Test 3: Aggressive Bearish Toxicity (VPIN >= 0.65)
+        candles_bear = _generate_synthetic_vpin_candles(n=35, flow_type="BEARISH_TOXIC")
+        bear_res = vpin_eng.compute_vpin(candles_bear)
+        gate_bear_sell = vpin_eng.evaluate_vpin_toxicity(candles_bear, "SELL")
+        gate_bear_buy = vpin_eng.evaluate_vpin_toxicity(candles_bear, "BUY")
+        bear_ok = (
+            bear_res.get("is_toxic") is True and
+            bear_res.get("vpin", 0.0) >= 0.65 and
+            bear_res.get("dominant_toxic_flow") == "BEARISH" and
+            gate_bear_sell.get("is_vetoed") is False and
+            gate_bear_sell.get("score_boost") == 30.0 and
+            gate_bear_sell.get("action") == "RIDE_TOXIC_BEARISH_WAVE" and
+            gate_bear_buy.get("is_vetoed") is True and
+            gate_bear_buy.get("score_boost") == -35.0 and
+            "VPIN_INSTITUTIONAL_TOXICITY_VETO" in gate_bear_buy.get("veto_reason", "")
+        )
+
+        # Unit Test 4: Integration in SuperSmartCapitalCitadel
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_sscc:
+            sscc_src = f_sscc.read()
+        has_citadel_vpin_int = (
+            "vpin_order_flow_engine" in sscc_src and
+            "VPIN_TOXIC_WAVE_RIDE" in sscc_src and
+            "vpin_confluence" in sscc_src
+        )
+
+        # Unit Test 5: Integration in CapitalMetaLabelingEngine
+        with open("capital_meta_labeling_engine.py", "r", encoding="utf-8") as f_meta:
+            meta_src = f_meta.read()
+        has_meta_vpin_int = (
+            "BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO" in meta_src and
+            "vpin_toxicity_direction" in meta_src and
+            "vpin_is_toxic" in meta_src
+        )
+
+        all_inv101_passed = (
+            has_inv101_agents and has_inv101_gemini and
+            bal_ok and bull_ok and bear_ok and
+            has_citadel_vpin_int and has_meta_vpin_int
+        )
+
+        if all_inv101_passed:
+            log_pass(
+                "Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101) are 100% certified! "
+                "(Equal Volume Bucketing, VPIN >= 0.65 Unilateral Attack Detection, Bullish/Bearish Wave Ride +30 Boost, "
+                "Anti-Counter-Trade Strict Veto, Citadel Gatekeeper & Meta-Labeling Governor Integration)"
+            )
+        else:
+            failures.append(
+                f"Invariant 101 check failed: agents={has_inv101_agents}, gemini={has_inv101_gemini}, "
+                f"bal={bal_ok}, bull={bull_ok}, bear={bear_ok}, "
+                f"cit_vpin={has_citadel_vpin_int}, meta_vpin={has_meta_vpin_int}"
+            )
+            log_fail("Invariant 101 VPIN Order Flow Engine verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 101 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

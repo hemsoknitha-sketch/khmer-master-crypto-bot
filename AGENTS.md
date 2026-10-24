@@ -1850,6 +1850,19 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   7. **Predatory Liquidity Vacuum Hunter:** Quantifies Kyle's Lambda and Amihud illiquidity to capture high-volume absorption sweep wicks at session open boundaries with asymmetric $R:R \ge 1:3.5$.
   8. **Real-Time Deep Regime Transition Detector (LSTM Autoencoder & Markov Switching in RAM):** Sub-0.005ms in-memory deep learning transition detector combining an orthogonal LSTM Autoencoder anomaly tracker ($MSE \ge 1.50$) with a 4-state Hamilton Markov Switching recursive filter. Detects violent Panic Liquidation shocks within 5 seconds of Wall Street Cash Open (20:30 ICT / 13:30 UTC), immediately executing `REALTIME_SHOCK_REGIME_VETO` on Long entries ($P(\text{PANIC\_LIQUIDATION}) \ge 0.50$), locking profits on open positions, and preventing capital wipeout in cascading crashes.
 
+### Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard (AQ84 Pillar 2 - គ្រឹះវាស់ស្ទង់កម្លាំងពុលនៃលំហូរបញ្ជាទិញ VPIN ស្ទាក់ចាប់ស្ថាប័នធំ និងហាមបើកបញ្ជាប្រឆាំងដាច់ខាត)
+- **Location:** `vpin_order_flow_engine.py`, `super_smart_capital_citadel.py` (Pillar 0.89), `capital_meta_labeling_engine.py` (Section 0.5), `test_vpin_order_flow_engine.py`, `audit_system.py` [CHECK 80/80]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Mathematical Capital Protection:
+  1. **Volume-Synchronized Equal Bucketing:** Eliminates clock-time bar distortion by dividing trading volume into equal-sized volume buckets $V_{\text{bucket}} = V_{\text{total}} / N$. Each bar's volume is decomposed via Bulk Volume Classification (BVC) into Buy Volume $V_\tau^B$ and Sell Volume $V_\tau^S$.
+  2. **VPIN Formulation:** Order flow toxicity is measured across $N$ rolling completed buckets:
+     $$\text{VPIN} = \frac{\sum_{\tau=1}^N |V_\tau^B - V_\tau^S|}{N \cdot V_{\text{bucket}}}$$
+     and Net Toxicity Direction:
+     $$\text{Net Toxicity Ratio} = \frac{\sum_{\tau=1}^N (V_\tau^B - V_\tau^S)}{N \cdot V_{\text{bucket}}} \in [-1.0, +1.0]$$
+  3. **Institutional Unilateral Attack Wave & Anti-Counter-Trade Guard ($\text{VPIN} \ge 0.65$):** When VPIN exceeds 0.65, informed institutions are executing an aggressive unilateral order flow attack.
+     - **Bullish Toxicity ($\text{Net Toxicity} > 0$):** Dominant institutional buying wave. BUY trades are aligned and rewarded with a $+30.0$ Citadel score boost and $+0.15$ meta win probability expansion. Opposing SELL/Short trades are strictly VETOED (`BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO: VPIN >= 0.65 with Bullish toxic flow. Shorting into aggressive institutional buying wave is strictly prohibited.`).
+     - **Bearish Toxicity ($\text{Net Toxicity} < 0$):** Dominant institutional liquidation dump. SELL trades are aligned and rewarded with a $+30.0$ Citadel score boost and $+0.15$ meta win probability expansion. Opposing BUY/Long trades are strictly VETOED (`BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO: VPIN >= 0.65 with Bearish toxic flow. Longing into aggressive institutional liquidation attack is strictly prohibited [Falling knife guard].`).
+     - **Normal Flow ($\text{VPIN} < 0.65$):** Order flow is two-sided and healthy (`NORMAL_BALANCED_FLOW`), granting standard execution clearance without toxicity veto.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
