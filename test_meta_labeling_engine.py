@@ -196,6 +196,32 @@ class TestMetaLabelingEngine(unittest.TestCase):
         )
         self.assertTrue(eval_bear_sell["is_conformal_approved"])
 
+    def test_realtime_deep_regime_transition_detector(self):
+        """Deep Learning Real-Time Regime Transition Detector must detect shock dump in <5ms and veto Longs."""
+        import capital_advanced_quant_models as caqm
+
+        # 1. Normal sequence
+        normal_rets = [0.0001, -0.0002, 0.0003, 0.0001, -0.0001, 0.0002, 0.0000, 0.0001]
+        norm_eval = caqm.RealTimeDeepRegimeDetector.evaluate_realtime_regime(
+            returns=normal_rets, volume_ratios=[1.0]*8, direction="BUY"
+        )
+        self.assertFalse(norm_eval["is_shock_regime"])
+        self.assertFalse(norm_eval["veto_longs"])
+        self.assertLess(norm_eval["panic_liquidation_prob"], 0.20)
+        self.assertLess(norm_eval["execution_latency_ms"], 5.0)
+
+        # 2. Panic Liquidation Shock sequence (Wall Street Cash Open shock dump)
+        shock_rets = [-0.015, -0.022, -0.018, -0.025, -0.030, -0.028, -0.032, -0.029]
+        shock_eval = caqm.RealTimeDeepRegimeDetector.evaluate_realtime_regime(
+            returns=shock_rets, volume_ratios=[3.0]*8, direction="BUY"
+        )
+        self.assertTrue(shock_eval["is_shock_regime"])
+        self.assertTrue(shock_eval["veto_longs"])
+        self.assertGreaterEqual(shock_eval["panic_liquidation_prob"], 0.50)
+        self.assertEqual(shock_eval["dominant_regime"], "PANIC_LIQUIDATION")
+        self.assertGreater(shock_eval["autoencoder_recon_error"], 1.50)
+        self.assertLess(shock_eval["execution_latency_ms"], 5.0)
+
 
 if __name__ == "__main__":
     unittest.main()

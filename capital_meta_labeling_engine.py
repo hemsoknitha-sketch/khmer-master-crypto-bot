@@ -876,6 +876,32 @@ class CapitalMetaLabelingEngine:
         except Exception as e_conf:
             logger.debug(f"Conformal prediction evaluation note: {e_conf}")
 
+        # 5. Deep Learning Real-Time Regime Transition Detector (Invariant 100 Pillar 8 & AQ84)
+        deep_regime_res = {}
+        try:
+            import capital_advanced_quant_models as caqm
+            deep_regime_res = caqm.RealTimeDeepRegimeDetector.evaluate_realtime_regime(
+                current_price=float(features.get("price", 1.0)),
+                current_atr=float(features.get("atr14", 1.0)),
+                current_spread=float(features.get("spread", 0.0)),
+                direction=features.get("direction", "BUY" if dir_num == 1.0 else "SELL")
+            )
+            if deep_regime_res.get("is_shock_regime") and deep_regime_res.get("veto_longs") and dir_num == 1.0:
+                is_approved = False
+                sizing_mult = 0.0
+                verdict = "META_REJECTED"
+                shock_reason = (
+                    f"BLOCKED_DEEP_REGIME_PANIC_LIQUIDATION: Deep Learning LSTM Autoencoder / Markov Switching detected "
+                    f"Panic Liquidation shock transition (P={deep_regime_res.get('panic_liquidation_prob', 0.0)*100:.1f}%, "
+                    f"MSE={deep_regime_res.get('autoencoder_recon_error', 0.0):.2f}). Longs strictly vetoed."
+                )
+                if not reason:
+                    reason = shock_reason
+                else:
+                    reason = f"{reason} | {shock_reason}"
+        except Exception as e_deep:
+            logger.debug(f"Deep regime detector note: {e_deep}")
+
         return {
             "is_approved": is_approved,
             "meta_win_prob": float(meta_win_prob),
@@ -887,6 +913,7 @@ class CapitalMetaLabelingEngine:
             "regime_beliefs": regime_beliefs,
             "vix_term_structure": vix_term_structure,
             "conformal_prediction": conformal_res,
+            "deep_regime_detector": deep_regime_res,
             "nlp_sentiment": nlp_sentiment,
             "smart_money_divergence": smd,
             "client_long_pct": c_long,

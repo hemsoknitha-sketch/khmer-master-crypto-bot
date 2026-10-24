@@ -3463,6 +3463,31 @@ class SuperSmartCapitalCitadel:
                 )
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
                 return False, reason, diag
+
+            # 4. Real-Time Deep Regime Transition Detector (Invariant 100 Pillar 8)
+            deep_regime = caqm.RealTimeDeepRegimeDetector.evaluate_realtime_regime(
+                current_price=current_price,
+                current_atr=atr_15m,
+                current_spread=spread,
+                candles_1m_or_5m=diag.get("candles_15m"),
+                direction=direction
+            )
+            diag["deep_regime_detector"] = deep_regime
+            if deep_regime.get("is_shock_regime") and deep_regime.get("veto_longs") and direction == "BUY":
+                reason = (
+                    f"REALTIME_SHOCK_REGIME_VETO: Real-time LSTM Autoencoder / Markov Switching detected "
+                    f"Panic Liquidation shock transition (P={deep_regime.get('panic_liquidation_prob', 0.0)*100:.1f}%, "
+                    f"MSE={deep_regime.get('autoencoder_recon_error', 0.0):.2f}). Buying panic collapse is prohibited."
+                )
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
+                return False, reason, diag
+            if deep_regime.get("freeze_all_entries"):
+                reason = (
+                    f"REALTIME_LIQUIDITY_CRUNCH_VETO: Real-time Liquidity Crunch shock transition detected "
+                    f"(P={deep_regime.get('liquidity_crunch_prob', 0.0)*100:.1f}%). New orders frozen."
+                )
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
+                return False, reason, diag
         except Exception as e_apex:
             logger.debug(f"Apex quant models gatekeeper evaluation note: {e_apex}")
 

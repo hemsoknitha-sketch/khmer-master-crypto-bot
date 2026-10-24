@@ -4724,19 +4724,46 @@ def run_audit():
             vacuum_eval.get("is_bull_vacuum_sweep") is True
         )
 
-        # 8. Integration Verification
+        # 8. Real-Time Deep Regime Transition Detector Unit Test (Invariant 100 Pillar 8)
+        norm_rets = [0.0001, -0.0002, 0.0003, 0.0001, -0.0001, 0.0002, 0.0000, 0.0001]
+        norm_regime = caqm.RealTimeDeepRegimeDetector.evaluate_realtime_regime(
+            returns=norm_rets, volume_ratios=[1.0]*8, direction="BUY"
+        )
+        shock_rets = [-0.015, -0.022, -0.018, -0.025, -0.030, -0.028, -0.032, -0.029]
+        shock_regime = caqm.RealTimeDeepRegimeDetector.evaluate_realtime_regime(
+            returns=shock_rets, volume_ratios=[3.0]*8, direction="BUY"
+        )
+        is_deep_regime_valid = (
+            isinstance(norm_regime, dict) and
+            norm_regime.get("is_shock_regime") is False and
+            norm_regime.get("veto_longs") is False and
+            norm_regime.get("execution_latency_ms", 99.0) < 5.0 and
+            isinstance(shock_regime, dict) and
+            shock_regime.get("is_shock_regime") is True and
+            shock_regime.get("veto_longs") is True and
+            shock_regime.get("dominant_regime") == "PANIC_LIQUIDATION" and
+            shock_regime.get("panic_liquidation_prob", 0.0) >= 0.50 and
+            shock_regime.get("autoencoder_recon_error", 0.0) >= 1.50
+        )
+
+        # 9. Integration Verification
         with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_sscc:
             sscc_src = f_sscc.read()
         has_citadel_apex_int = (
             "capital_advanced_quant_models" in sscc_src and
             "ConformalPredictionGovernor" in sscc_src and
             "IntermarketMacroPredictor" in sscc_src and
-            "MultiScaleHurstSurface" in sscc_src
+            "MultiScaleHurstSurface" in sscc_src and
+            "RealTimeDeepRegimeDetector" in sscc_src
         )
 
         with open("capital_meta_labeling_engine.py", "r", encoding="utf-8") as f_meta:
             meta_src = f_meta.read()
-        has_meta_conformal_int = "ConformalPredictionGovernor" in meta_src and "conformal_prediction" in meta_src
+        has_meta_conformal_int = (
+            "ConformalPredictionGovernor" in meta_src and
+            "conformal_prediction" in meta_src and
+            "RealTimeDeepRegimeDetector" in meta_src
+        )
 
         with open("capital_engine.py", "r", encoding="utf-8") as f_cap:
             cap_src = f_cap.read()
@@ -4746,7 +4773,7 @@ def run_audit():
             has_inv100_agents and has_inv100_gemini and
             is_conformal_valid and is_hurst_surface_valid and
             is_hawkes_valid and is_kalman_valid and is_macro_valid and
-            is_bandit_valid and is_vacuum_valid and
+            is_bandit_valid and is_vacuum_valid and is_deep_regime_valid and
             has_citadel_apex_int and has_meta_conformal_int and has_cap_bandit_int
         )
 
@@ -4754,14 +4781,16 @@ def run_audit():
             log_pass(
                 "Super Smart Apex Quantitative Models (Invariant 100) are 100% certified! "
                 "(Conformal 90% Coverage Guarantee, Multi-Scale Hurst Surface, Hawkes Cluster Jump, "
-                "Kalman Zero-Lag Drift, Macro Term Structure Backwardation Guard, Contextual Bandit Early Harvest & Liquidity Vacuum Hunter)"
+                "Kalman Zero-Lag Drift, Macro Term Structure Backwardation Guard, Contextual Bandit Early Harvest, "
+                "Liquidity Vacuum Hunter & Real-Time Deep Regime Transition Detector)"
             )
         else:
             failures.append(
                 f"Invariant 100 check failed: agents={has_inv100_agents}, gemini={has_inv100_gemini}, "
                 f"conformal={is_conformal_valid}, hurst={is_hurst_surface_valid}, hawkes={is_hawkes_valid}, "
                 f"kalman={is_kalman_valid}, macro={is_macro_valid}, bandit={is_bandit_valid}, vacuum={is_vacuum_valid}, "
-                f"cit_apex={has_citadel_apex_int}, meta_conf={has_meta_conformal_int}, cap_bandit={has_cap_bandit_int}"
+                f"deep_regime={is_deep_regime_valid}, cit_apex={has_citadel_apex_int}, meta_conf={has_meta_conformal_int}, "
+                f"cap_bandit={has_cap_bandit_int}"
             )
             log_fail("Invariant 100 Super Smart Apex Quantitative Models verification failed!")
     except Exception as e:
