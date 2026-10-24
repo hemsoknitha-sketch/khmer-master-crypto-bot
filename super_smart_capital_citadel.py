@@ -1963,11 +1963,28 @@ class SuperSmartCapitalCitadel:
         is_discount = curr_price < equilibrium
         is_premium = curr_price > equilibrium
 
-        # Equilibrium Chop Zone Injunction (Pillar 1 & Invariant 76):
+        # Equilibrium Chop Zone Injunction (Pillar 1, Invariant 76 & Invariant 103):
         # Strictly block market order guessing in the middle 30% of the dealing range (35.0% - 65.0%)
         # 90% of whipsaw losses occur from taking directional market orders in the middle of chop!
         # Automatically arm the in-memory dual-directional stealth breakout radar in RAM to await boundary reaction instead.
-        if 35.0 <= price_range_pct <= 65.0:
+        import dealing_range_equilibrium_chop_engine as eq_chop_eng
+        p0_c = report_confluence.get("p0") or report_confluence.get("starting_point") if report_confluence else None
+        r1_c = report_confluence.get("r1") or report_confluence.get("res1") if report_confluence else None
+        s1_c = report_confluence.get("s1") or report_confluence.get("sup1") if report_confluence else None
+
+        chop_eval = eq_chop_eng.DealingRangeEquilibriumChopEngine.evaluate_dealing_range_equilibrium_gatekeeper(
+            epic=resolved_epic,
+            direction=norm_side,
+            current_price=curr_price,
+            p0=p0_c,
+            r1=r1_c,
+            s1=s1_c,
+            candles_15m=candles_15m,
+            atr_15m=atr_15m,
+            spread=spread
+        )
+
+        if chop_eval.get("is_vetoed") or (35.0 <= price_range_pct <= 65.0):
             CapitalInMemoryVirtualRadar.arm_radar_trap(
                 epic=resolved_epic,
                 engine_source="CITADEL_RADAR",
@@ -1999,7 +2016,8 @@ class SuperSmartCapitalCitadel:
                 "spread": spread,
                 "invalidation_sl": preliminary_sl,
                 "breathing_sl_dist": breathing_sl_dist,
-                "market_report": report_confluence
+                "market_report": report_confluence,
+                "dealing_range_chop": chop_eval
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -2627,6 +2645,14 @@ class SuperSmartCapitalCitadel:
             if delta_absorption.get("structural_sl"):
                 preliminary_sl = delta_absorption["structural_sl"]
 
+        # Dealing Range Equilibrium Boundary Acceleration Boost (Invariant 103 & AQ84 Pillar 4)
+        if chop_eval and not chop_eval.get("is_vetoed") and chop_eval.get("is_aligned"):
+            score += float(chop_eval.get("score_boost", 25.0))
+            factors.append(
+                f"DEALING_RANGE_BOUNDARY_ACCELERATION (+25, {chop_eval.get('zone_name')}, "
+                f"Range: {chop_eval.get('range_pct'):.1f}%)"
+            )
+
         confluence_score = round(max(0.0, min(99.5, score)), 1)
 
         # --------------------------------------------------------------------
@@ -2932,6 +2958,7 @@ class SuperSmartCapitalCitadel:
             "market_report": report_confluence,
             "vpin_confluence": vpin_confluence,
             "delta_absorption": delta_absorption,
+            "dealing_range_chop": chop_eval,
             "candles_15m": candles_15m
         }
 
@@ -3447,6 +3474,39 @@ class SuperSmartCapitalCitadel:
                     return False, reason, {"is_approved": False, "rejection_reason": reason, "delta_absorption_eval": abs_gate_eval}
         except Exception as e_abs_gate:
             logger.debug(f"Delta absorption gatekeeper evaluation note: {e_abs_gate}")
+
+        # Pillar 0.91: Institutional Dealing Range Equilibrium Chop Gatekeeper (Invariant 103 & AQ84 Pillar 4)
+        try:
+            import dealing_range_equilibrium_chop_engine as eq_chop_eng
+            candles_chop = []
+            if engine and hasattr(engine, "get_historical_prices"):
+                try:
+                    candles_chop = engine.get_historical_prices(s_epic, resolution="MINUTE_15", max_bars=35)
+                except Exception:
+                    pass
+            cp_chop = 0.0
+            if engine and hasattr(engine, "get_market_details"):
+                try:
+                    md_chop = engine.get_market_details(s_epic)
+                    cp_chop = float(md_chop.get("mid", 0.0) or md_chop.get("ask", 0.0) or 0.0)
+                except Exception:
+                    pass
+            if cp_chop <= 0.0 and candles_chop:
+                cp_chop = float(candles_chop[-1].get("close", 0.0))
+
+            if cp_chop > 0.0:
+                chop_gate_eval = eq_chop_eng.DealingRangeEquilibriumChopEngine.evaluate_dealing_range_equilibrium_gatekeeper(
+                    epic=s_epic,
+                    direction=direction,
+                    current_price=cp_chop,
+                    candles_15m=candles_chop
+                )
+                if chop_gate_eval.get("is_vetoed"):
+                    reason = chop_gate_eval.get("veto_reason", "BLOCKED_DEALING_RANGE_EQUILIBRIUM_CHOP_VETO")
+                    print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                    return False, reason, {"is_approved": False, "rejection_reason": reason, "equilibrium_chop_eval": chop_gate_eval}
+        except Exception as e_chop_gate:
+            logger.debug(f"Dealing range chop gatekeeper evaluation note: {e_chop_gate}")
 
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):

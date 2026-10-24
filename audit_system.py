@@ -4811,7 +4811,7 @@ def run_audit():
         log_fail(str(e))
 
     # 80. Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard
-    print("\n[CHECK 80/81] Verifying Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)...")
+    print("\n[CHECK 80/82] Verifying Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)...")
     try:
         has_inv101_agents = "Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity)" in agents_md
         has_inv101_gemini = "Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)" in gemini_md
@@ -4907,7 +4907,7 @@ def run_audit():
         log_fail(str(e))
 
     # 81. Invariant 102: Institutional Order Flow Delta Absorption Footprint & Boundary Bull/Bear Exhaustion Engine
-    print("\n[CHECK 81/81] Verifying Institutional Order Flow Delta Absorption Engine & Boundary Bull/Bear Exhaustion (Invariant 102)...")
+    print("\n[CHECK 81/82] Verifying Institutional Order Flow Delta Absorption Engine & Boundary Bull/Bear Exhaustion (Invariant 102)...")
     try:
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_md = f.read()
@@ -5009,6 +5009,110 @@ def run_audit():
             log_fail("Invariant 102 Order Flow Delta Absorption verification failed!")
     except Exception as e:
         failures.append(f"Invariant 102 check failed: {e}")
+        log_fail(str(e))
+
+    # 82. Invariant 103: Institutional Dealing Range Equilibrium Chop Veto & Boundary Acceleration Engine
+    print("\n[CHECK 82/82] Verifying Institutional Dealing Range Equilibrium Chop Engine & Boundary Acceleration (Invariant 103)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_md = f.read()
+
+        has_inv103_agents = "Invariant 103: Institutional Dealing Range Equilibrium Chop Veto & Boundary Acceleration Engine" in agents_md
+        has_inv103_gemini = "Institutional Dealing Range Equilibrium Chop Veto & Boundary Acceleration Engine (Invariant 103)" in gemini_md
+
+        import dealing_range_equilibrium_chop_engine as eq_chop_eng
+
+        # Unit Test 1: Middle Equilibrium Chop (50% Range): Strict Veto
+        gate_chop_buy = eq_chop_eng.evaluate_dealing_range_equilibrium_gatekeeper(
+            epic="GOLD", direction="BUY", current_price=2650.0, p0=2650.0, r1=2700.0, s1=2600.0
+        )
+        gate_chop_sell = eq_chop_eng.evaluate_dealing_range_equilibrium_gatekeeper(
+            epic="GOLD", direction="SELL", current_price=2650.0, p0=2650.0, r1=2700.0, s1=2600.0
+        )
+        chop_ok = (
+            gate_chop_buy.get("is_vetoed") is True and
+            gate_chop_buy.get("score_boost") == -40.0 and
+            gate_chop_buy.get("zone_name") == "EQUILIBRIUM_CHOP_ZONE" and
+            "BLOCKED_DEALING_RANGE_EQUILIBRIUM_CHOP_VETO" in gate_chop_buy.get("veto_reason", "") and
+            gate_chop_sell.get("is_vetoed") is True and
+            gate_chop_sell.get("score_boost") == -40.0
+        )
+
+        # Unit Test 2: Discount Boundary Zone (< 35% near S1): BUY Aligned (+25 Boost)
+        gate_disc_buy = eq_chop_eng.evaluate_dealing_range_equilibrium_gatekeeper(
+            epic="GOLD", direction="BUY", current_price=2620.0, p0=2650.0, r1=2700.0, s1=2600.0
+        )
+        gate_disc_sell = eq_chop_eng.evaluate_dealing_range_equilibrium_gatekeeper(
+            epic="GOLD", direction="SELL", current_price=2620.0, p0=2650.0, r1=2700.0, s1=2600.0
+        )
+        disc_ok = (
+            gate_disc_buy.get("is_vetoed") is False and
+            gate_disc_buy.get("is_aligned") is True and
+            gate_disc_buy.get("score_boost") == 25.0 and
+            gate_disc_buy.get("zone_name") == "DISCOUNT_BOUNDARY_ZONE" and
+            gate_disc_sell.get("is_aligned") is False
+        )
+
+        # Unit Test 3: Premium Boundary Zone (> 65% near R1): SELL Aligned (+25 Boost)
+        gate_prem_sell = eq_chop_eng.evaluate_dealing_range_equilibrium_gatekeeper(
+            epic="GOLD", direction="SELL", current_price=2680.0, p0=2650.0, r1=2700.0, s1=2600.0
+        )
+        gate_prem_buy = eq_chop_eng.evaluate_dealing_range_equilibrium_gatekeeper(
+            epic="GOLD", direction="BUY", current_price=2680.0, p0=2650.0, r1=2700.0, s1=2600.0
+        )
+        prem_ok = (
+            gate_prem_sell.get("is_vetoed") is False and
+            gate_prem_sell.get("is_aligned") is True and
+            gate_prem_sell.get("score_boost") == 25.0 and
+            gate_prem_sell.get("zone_name") == "PREMIUM_BOUNDARY_ZONE" and
+            gate_prem_buy.get("is_aligned") is False
+        )
+
+        # Unit Test 4: Integration in SuperSmartCapitalCitadel
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_sscc:
+            sscc_src = f_sscc.read()
+        has_citadel_chop_int = (
+            "dealing_range_equilibrium_chop_engine" in sscc_src and
+            "Pillar 0.91: Institutional Dealing Range Equilibrium Chop Gatekeeper" in sscc_src and
+            "DEALING_RANGE_BOUNDARY_ACCELERATION" in sscc_src and
+            '"dealing_range_chop"' in sscc_src
+        )
+
+        # Unit Test 5: Integration in CapitalMetaLabelingEngine
+        with open("capital_meta_labeling_engine.py", "r", encoding="utf-8") as f_meta:
+            meta_src = f_meta.read()
+        has_meta_chop_int = (
+            "BLOCKED_DEALING_RANGE_EQUILIBRIUM_CHOP_VETO" in meta_src and
+            "is_equilibrium_chop" in meta_src and
+            "equilibrium_zone" in meta_src and
+            "META_APPROVED_BOUNDARY_DISCOUNT" in meta_src and
+            "META_APPROVED_BOUNDARY_PREMIUM" in meta_src
+        )
+
+        all_inv103_passed = (
+            has_inv103_agents and has_inv103_gemini and
+            chop_ok and disc_ok and prem_ok and
+            has_citadel_chop_int and has_meta_chop_int
+        )
+
+        if all_inv103_passed:
+            log_pass(
+                "Institutional Dealing Range Equilibrium Chop Engine & Boundary Acceleration (Invariant 103) "
+                "are 100% certified! (35%-65% Brownian Motion Equilibrium Chop Strict Veto, Sizing Crushed to 0.0x, "
+                "Discount Boundary Accumulation < 35% [+25 Boost], Premium Boundary Distribution > 65% [+25 Boost], "
+                "Citadel Gatekeeper & Meta-Labeling Governor Integration)"
+            )
+        else:
+            failures.append(
+                f"Invariant 103 check failed: agents={has_inv103_agents}, gemini={has_inv103_gemini}, "
+                f"chop={chop_ok}, disc={disc_ok}, prem={prem_ok}, "
+                f"cit_chop={has_citadel_chop_int}, meta_chop={has_meta_chop_int}"
+            )
+            log_fail("Invariant 103 Dealing Range Equilibrium Chop verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 103 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

@@ -381,6 +381,55 @@ class TestMetaLabelingEngine(unittest.TestCase):
         self.assertFalse(gate_buy["is_aligned"])
         self.assertIn("BLOCKED_ORDER_FLOW_BULL_EXHAUSTION_VETO", gate_buy["veto_reason"])
 
+    def test_dealing_range_equilibrium_chop_governor(self):
+        """Dealing range equilibrium chop (35%-65%) must strictly veto directional market orders (Invariant 103)."""
+        import dealing_range_equilibrium_chop_engine as drec
+
+        # 1. Equilibrium Chop (50% Range): Must be strictly vetoed
+        f_chop = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=85.0, calib_p=0.80,
+            range_pct=50.0, is_equilibrium_chop=True, equilibrium_zone="EQUILIBRIUM_CHOP_ZONE"
+        )
+        self.assertTrue(f_chop["is_equilibrium_chop"])
+        self.assertEqual(f_chop["equilibrium_zone"], "EQUILIBRIUM_CHOP_ZONE")
+
+        res_chop = CapitalMetaLabelingEngine.predict_meta_label(f_chop, threshold=0.55)
+        self.assertEqual(res_chop["meta_win_prob"], 0.0)
+        self.assertFalse(res_chop["is_approved"])
+        self.assertEqual(res_chop["sizing_multiplier"], 0.0)
+        self.assertEqual(res_chop["verdict"], "META_REJECTED")
+        self.assertIn("BLOCKED_DEALING_RANGE_EQUILIBRIUM_CHOP_VETO", res_chop["reason"])
+
+        # 2. Discount Boundary (< 35% Range near S1): BUY is awarded boundary edge (+0.10 expansion)
+        f_discount_base = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=75.0, calib_p=0.70,
+            range_pct=50.0, is_equilibrium_chop=False
+        )
+        res_discount_base = CapitalMetaLabelingEngine.predict_meta_label(f_discount_base, threshold=0.55)
+
+        f_discount_buy = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=75.0, calib_p=0.70,
+            range_pct=20.0, is_equilibrium_chop=False, equilibrium_zone="DISCOUNT_BOUNDARY_ZONE"
+        )
+        res_discount_buy = CapitalMetaLabelingEngine.predict_meta_label(f_discount_buy, threshold=0.55)
+        self.assertGreater(res_discount_buy["meta_win_prob"], res_discount_base["meta_win_prob"])
+        self.assertEqual(res_discount_buy["equilibrium_zone"], "DISCOUNT_BOUNDARY_ZONE")
+
+        # 3. Premium Boundary (> 65% Range near R1): SELL is awarded boundary edge (+0.10 expansion)
+        f_premium_base = CapitalMetaLabelingEngine.extract_features(
+            direction="SELL", raw_score=75.0, calib_p=0.70,
+            range_pct=50.0, is_equilibrium_chop=False
+        )
+        res_premium_base = CapitalMetaLabelingEngine.predict_meta_label(f_premium_base, threshold=0.55)
+
+        f_premium_sell = CapitalMetaLabelingEngine.extract_features(
+            direction="SELL", raw_score=75.0, calib_p=0.70,
+            range_pct=80.0, is_equilibrium_chop=False, equilibrium_zone="PREMIUM_BOUNDARY_ZONE"
+        )
+        res_premium_sell = CapitalMetaLabelingEngine.predict_meta_label(f_premium_sell, threshold=0.55)
+        self.assertGreater(res_premium_sell["meta_win_prob"], res_premium_base["meta_win_prob"])
+        self.assertEqual(res_premium_sell["equilibrium_zone"], "PREMIUM_BOUNDARY_ZONE")
+
 
 if __name__ == "__main__":
     unittest.main()

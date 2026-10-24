@@ -319,7 +319,9 @@ class CapitalMetaLabelingEngine:
         vpin_is_toxic: Optional[bool] = None,
         delta_absorption_regime: Optional[str] = None,
         is_delta_absorption_active: Optional[bool] = None,
-        delta_absorption_winner: Optional[str] = None
+        delta_absorption_winner: Optional[str] = None,
+        is_equilibrium_chop: Optional[bool] = None,
+        equilibrium_zone: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Extracts a clean, normalized feature vector for the secondary Meta-Model.
@@ -591,6 +593,18 @@ class CapitalMetaLabelingEngine:
         if abs_win is None:
             abs_win = "NEUTRAL"
 
+        if is_equilibrium_chop is None:
+            is_equilibrium_chop = False
+        if equilibrium_zone is None:
+            if is_equilibrium_chop:
+                equilibrium_zone = "EQUILIBRIUM_CHOP_ZONE"
+            elif float(range_pct) < 35.0:
+                equilibrium_zone = "DISCOUNT_BOUNDARY_ZONE"
+            elif float(range_pct) > 65.0:
+                equilibrium_zone = "PREMIUM_BOUNDARY_ZONE"
+            else:
+                equilibrium_zone = "EQUILIBRIUM_ZONE"
+
         return {
             "direction_num": float(dir_num),
             "raw_score": float(max(50.0, min(100.0, raw_score))),
@@ -636,6 +650,8 @@ class CapitalMetaLabelingEngine:
             "delta_absorption_regime": str(abs_reg),
             "is_delta_absorption_active": bool(abs_active),
             "delta_absorption_winner": str(abs_win).upper(),
+            "is_equilibrium_chop": bool(is_equilibrium_chop),
+            "equilibrium_zone": str(equilibrium_zone),
             "daily_regime": str(daily_reg_val or ""),
             "weekly_regime": str(weekly_reg_val or ""),
             "direction": dir_clean,
@@ -952,6 +968,38 @@ class CapitalMetaLabelingEngine:
                         verdict = "META_APPROVED"
                         reason = f"META_APPROVED_DELTA_ABSORPTION_ALIGNED: Short aligned with Bull Exhaustion institutional ceiling ({abs_regime}), P(Win)={meta_win_prob*100:.1f}%"
 
+        # 0.7. Institutional Dealing Range Equilibrium Chop Governor (Invariant 103 & AQ84 Pillar 4)
+        is_eq_chop = bool(features.get("is_equilibrium_chop", False))
+        range_pct_val = float(features.get("range_pct", 50.0))
+        if is_eq_chop:
+            meta_win_prob = 0.0
+            is_approved = False
+            sizing_mult = 0.0
+            verdict = "META_REJECTED"
+            reason = (
+                f"BLOCKED_DEALING_RANGE_EQUILIBRIUM_CHOP_VETO: Price is at {range_pct_val:.1f}% of Dealing Range "
+                f"[35.0% - 65.0%]. Middle equilibrium is Brownian motion retail chop without institutional edge. "
+                f"P(Win) crushed to 0.0%, Sizing crushed to 0.0x."
+            )
+        elif range_pct_val < 35.0:
+            # Discount Boundary Zone near S1: If BUY, award boundary edge
+            if dir_num == 1.0:
+                meta_win_prob = min(0.95, meta_win_prob + 0.10)
+                if not is_approved and meta_win_prob >= threshold:
+                    is_approved = True
+                    sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                    verdict = "META_APPROVED"
+                    reason = f"META_APPROVED_BOUNDARY_DISCOUNT: Buy aligned with discount accumulation boundary (Range={range_pct_val:.1f}% < 35%), P(Win)={meta_win_prob*100:.1f}%"
+        elif range_pct_val > 65.0:
+            # Premium Boundary Zone near R1: If SELL, award boundary edge
+            if dir_num == -1.0:
+                meta_win_prob = min(0.95, meta_win_prob + 0.10)
+                if not is_approved and meta_win_prob >= threshold:
+                    is_approved = True
+                    sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                    verdict = "META_APPROVED"
+                    reason = f"META_APPROVED_BOUNDARY_PREMIUM: Short aligned with premium distribution boundary (Range={range_pct_val:.1f}% > 65%), P(Win)={meta_win_prob*100:.1f}%"
+
         # 1. Probabilistic Regime Evaluation (Gaussian HMM 4 States)
         regime_beliefs = {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
         try:
@@ -1074,6 +1122,9 @@ class CapitalMetaLabelingEngine:
             "is_delta_absorption_active": abs_active,
             "delta_absorption_winner": abs_winner,
             "delta_absorption_regime": abs_regime,
+            "is_equilibrium_chop": bool(is_eq_chop),
+            "equilibrium_zone": "EQUILIBRIUM_CHOP_ZONE" if is_eq_chop else ("DISCOUNT_BOUNDARY_ZONE" if range_pct_val < 35.0 else ("PREMIUM_BOUNDARY_ZONE" if range_pct_val > 65.0 else "EQUILIBRIUM_ZONE")),
+            "range_pct": range_pct_val,
             "client_long_pct": c_long,
             "leveraged_funds_long_pct": lev_long,
             "features": features,

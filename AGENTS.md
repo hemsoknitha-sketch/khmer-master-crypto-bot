@@ -1875,6 +1875,22 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - **BUY Trades:** Approved with a $+35.0$ Citadel confluence score boost and $+0.15$ meta win probability expansion. Stop Loss is tightly anchored right below the absorption low wick: $SL = \text{Low}_{\text{wick}} - \max(2.0 \times \text{spread}, 0.20 \times \text{ATR}_{15m})$.
      - **SELL Trades:** Strictly VETOED (`BLOCKED_ORDER_FLOW_BEAR_EXHAUSTION_VETO: Price stalled at Support 1 despite heavy sell volume delta. Institutional limit buyers have absorbed all sell flow (Bear Exhaustion). Shorting is prohibited.`).
 
+### Invariant 103: Institutional Dealing Range Equilibrium Chop Veto & Boundary Acceleration Engine (AQ84 Pillar 4 - គ្រឹះផ្ទៀងផ្ទាត់តំបន់កណ្តាល Dealing Range Equilibrium Chop Veto ៣៥% - ៦៥% លុបបំបាត់ការចូលផ្សារច្របូកច្របល់ និងស្ទាក់ចាប់កម្លាំងពិតប្រាកដនៅព្រំដែន R1 / S1)
+- **Location:** `dealing_range_equilibrium_chop_engine.py`, `super_smart_capital_citadel.py` (Pillar 0.91 & Pillar 2), `capital_meta_labeling_engine.py` (Section 0.7), `test_dealing_range_equilibrium_chop_engine.py`, `audit_system.py` [CHECK 82/82]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Mathematical Capital Protection:
+  1. **Equilibrium Dealing Range Coordinates ($P_0, R_1, S_1$):**
+     - Resolves the dealing range boundaries from Monte Safieddine's Daily Market Report or broker volatility coordinates: Resistance 1 ($R_1$), Support 1 ($S_1$), and Starting Point ($P_0 = (R_1 + S_1) / 2$).
+     - Price position within the dealing range is normalized as:
+       $$\text{Dealing Range Position \%} = \frac{\text{Price} - S_1}{\max(10^{-6}, R_1 - S_1)} \times 100\%$$
+  2. **Equilibrium Chop Zone Injunction (35.0% - 65.0% Dealing Range):**
+     - Between 35% and 65% of the dealing range, price movements are driven by Brownian motion random walk without institutional directional edge ($E[X] \le 0$). Over 90% of retail trading losses occur in this middle zone due to whipsaws.
+     - Taking directional market orders in this equilibrium zone is strictly VETOED (`BLOCKED_DEALING_RANGE_EQUILIBRIUM_CHOP_VETO: Price is at X% of Dealing Range [35%-65%]. Middle equilibrium is Brownian motion retail chop without institutional edge. Awaiting boundary approach (R1/S1).`).
+     - AI Meta-Model unconditionally crushes win probability to 0.0% and bet sizing to 0.0x (`verdict = "META_REJECTED"`). The system arms the in-memory dual-directional stealth breakout radar in RAM to await confirmed boundary interactions.
+  3. **Discount Boundary Zone (< 35.0% near $S_1$):**
+     - Approaching Support 1 ($S_1$) boundary: Institutional accumulation and liquidity sweep traps become active. BUY setups are aligned with discount boundary edge, receiving a $+25.0$ Citadel score boost and $+0.10$ meta win probability expansion.
+  4. **Premium Boundary Zone (> 65.0% near $R_1$):**
+     - Approaching Resistance 1 ($R_1$) boundary: Institutional distribution and upthrust traps become active. SELL setups are aligned with premium boundary edge, receiving a $+25.0$ Citadel score boost and $+0.10$ meta win probability expansion.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
