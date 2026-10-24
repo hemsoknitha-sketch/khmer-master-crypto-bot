@@ -317,7 +317,72 @@ class TestMetaLabelingEngine(unittest.TestCase):
         self.assertEqual(gate_sell["score_boost"], -35.0)
         self.assertIn("VPIN_INSTITUTIONAL_TOXICITY_VETO", gate_sell["veto_reason"])
 
+    def test_order_flow_delta_absorption_governor(self):
+        """Order Flow Delta Absorption at R1/S1 must veto opposing trades and boost aligned trades (Invariant 102)."""
+        import order_flow_delta_absorption_engine as ofda
+
+        # 1. Bull Exhaustion at R1 (Institutional Limit Sellers absorb Buy Flow):
+        # Proposed BUY must be strictly VETOED with 0.0% P(Win)
+        f_buy_r1 = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=85.0, calib_p=0.80,
+            is_delta_absorption_active=True, delta_absorption_winner="SELL",
+            delta_absorption_regime="BEARISH_ABSORPTION_AT_R1"
+        )
+        self.assertTrue(f_buy_r1["is_delta_absorption_active"])
+        self.assertEqual(f_buy_r1["delta_absorption_winner"], "SELL")
+
+        res_buy_r1 = CapitalMetaLabelingEngine.predict_meta_label(f_buy_r1, threshold=0.55)
+        self.assertEqual(res_buy_r1["meta_win_prob"], 0.0)
+        self.assertFalse(res_buy_r1["is_approved"])
+        self.assertEqual(res_buy_r1["sizing_multiplier"], 0.0)
+        self.assertEqual(res_buy_r1["verdict"], "META_REJECTED")
+        self.assertIn("BLOCKED_ORDER_FLOW_BULL_EXHAUSTION_VETO", res_buy_r1["reason"])
+
+        # 2. Bull Exhaustion at R1:
+        # Proposed SELL is aligned with institutional ceiling (boosted)
+        f_sell_r1 = CapitalMetaLabelingEngine.extract_features(
+            direction="SELL", raw_score=80.0, calib_p=0.75,
+            is_delta_absorption_active=True, delta_absorption_winner="SELL",
+            delta_absorption_regime="BEARISH_ABSORPTION_AT_R1"
+        )
+        f_sell_base = CapitalMetaLabelingEngine.extract_features(
+            direction="SELL", raw_score=80.0, calib_p=0.75,
+            is_delta_absorption_active=False, delta_absorption_winner="NEUTRAL"
+        )
+        res_sell_r1 = CapitalMetaLabelingEngine.predict_meta_label(f_sell_r1, threshold=0.55)
+        res_sell_base = CapitalMetaLabelingEngine.predict_meta_label(f_sell_base, threshold=0.55)
+        self.assertGreater(res_sell_r1["meta_win_prob"], res_sell_base["meta_win_prob"])
+        self.assertTrue(res_sell_r1["is_delta_absorption_active"])
+        self.assertEqual(res_sell_r1["delta_absorption_winner"], "SELL")
+
+        # 3. Bear Exhaustion at S1 (Institutional Limit Buyers absorb Sell Flow):
+        # Proposed SELL must be strictly VETOED with 0.0% P(Win)
+        f_sell_s1 = CapitalMetaLabelingEngine.extract_features(
+            direction="SELL", raw_score=85.0, calib_p=0.80,
+            is_delta_absorption_active=True, delta_absorption_winner="BUY",
+            delta_absorption_regime="BULLISH_ABSORPTION_AT_S1"
+        )
+        res_sell_s1 = CapitalMetaLabelingEngine.predict_meta_label(f_sell_s1, threshold=0.55)
+        self.assertEqual(res_sell_s1["meta_win_prob"], 0.0)
+        self.assertFalse(res_sell_s1["is_approved"])
+        self.assertEqual(res_sell_s1["verdict"], "META_REJECTED")
+        self.assertIn("BLOCKED_ORDER_FLOW_BEAR_EXHAUSTION_VETO", res_sell_s1["reason"])
+
+        # 4. Direct Gatekeeper Evaluation
+        from test_order_flow_delta_absorption_engine import _generate_synthetic_boundary_candles
+        r1_candles = _generate_synthetic_boundary_candles(setup_type="BULL_EXHAUSTION_R1")
+        gate_sell = ofda.evaluate_boundary_absorption_gatekeeper("GOLD", "SELL", 4046.0, r1_candles, r1=4050.0, s1=3950.0)
+        self.assertFalse(gate_sell["is_vetoed"])
+        self.assertTrue(gate_sell["is_aligned"])
+        self.assertEqual(gate_sell["score_boost"], 35.0)
+
+        gate_buy = ofda.evaluate_boundary_absorption_gatekeeper("GOLD", "BUY", 4046.0, r1_candles, r1=4050.0, s1=3950.0)
+        self.assertTrue(gate_buy["is_vetoed"])
+        self.assertFalse(gate_buy["is_aligned"])
+        self.assertIn("BLOCKED_ORDER_FLOW_BULL_EXHAUSTION_VETO", gate_buy["veto_reason"])
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

@@ -4811,7 +4811,7 @@ def run_audit():
         log_fail(str(e))
 
     # 80. Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard
-    print("\n[CHECK 80/80] Verifying Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)...")
+    print("\n[CHECK 80/81] Verifying Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)...")
     try:
         has_inv101_agents = "Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity)" in agents_md
         has_inv101_gemini = "Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)" in gemini_md
@@ -4904,6 +4904,111 @@ def run_audit():
             log_fail("Invariant 101 VPIN Order Flow Engine verification failed!")
     except Exception as e:
         failures.append(f"Invariant 101 check failed: {e}")
+        log_fail(str(e))
+
+    # 81. Invariant 102: Institutional Order Flow Delta Absorption Footprint & Boundary Bull/Bear Exhaustion Engine
+    print("\n[CHECK 81/81] Verifying Institutional Order Flow Delta Absorption Engine & Boundary Bull/Bear Exhaustion (Invariant 102)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_md = f.read()
+
+        has_inv102_agents = "Invariant 102: Institutional Order Flow Delta Absorption Footprint & Boundary Bull/Bear Exhaustion Engine" in agents_md
+        has_inv102_gemini = "Institutional Order Flow Delta Absorption Footprint & Boundary Bull/Bear Exhaustion Engine (Invariant 102)" in gemini_md
+
+        import order_flow_delta_absorption_engine as abs_eng
+        from test_order_flow_delta_absorption_engine import _generate_synthetic_boundary_candles
+
+        # Unit Test 1: Balanced Normal Flow (No boundary exhaustion)
+        candles_norm = _generate_synthetic_boundary_candles(setup_type="BALANCED")
+        norm_res = abs_eng.evaluate_delta_absorption("GOLD", 4012.5, candles_norm, r1=4100.0, s1=3900.0, atr_15m=10.0)
+        norm_ok = (
+            isinstance(norm_res, dict) and
+            norm_res.get("is_absorption_active") is False and
+            norm_res.get("true_institutional_winner") == "NEUTRAL"
+        )
+
+        # Unit Test 2: Bull Exhaustion at Resistance 1 (R1) - Heavy Buy Volume Absorbed by Institutional Limit Sells
+        candles_bull_ex = _generate_synthetic_boundary_candles(setup_type="BULL_EXHAUSTION_R1")
+        bull_ex_res = abs_eng.evaluate_delta_absorption("GOLD", 4046.0, candles_bull_ex, r1=4050.0, s1=3950.0, atr_15m=8.0, spread=0.50)
+        gate_bull_sell = abs_eng.evaluate_boundary_absorption_gatekeeper("GOLD", "SELL", 4046.0, candles_bull_ex, r1=4050.0, s1=3950.0, atr_15m=8.0, spread=0.50)
+        gate_bull_buy = abs_eng.evaluate_boundary_absorption_gatekeeper("GOLD", "BUY", 4046.0, candles_bull_ex, r1=4050.0, s1=3950.0, atr_15m=8.0, spread=0.50)
+        bull_ex_ok = (
+            bull_ex_res.get("is_absorption_active") is True and
+            bull_ex_res.get("true_institutional_winner") == "SELL" and
+            bull_ex_res.get("is_bull_exhaustion") is True and
+            bull_ex_res.get("structural_sl") is not None and
+            bull_ex_res["structural_sl"] > 4050.0 and
+            gate_bull_sell.get("is_vetoed") is False and
+            gate_bull_sell.get("score_boost") == 35.0 and
+            gate_bull_sell.get("is_aligned") is True and
+            gate_bull_buy.get("is_vetoed") is True and
+            gate_bull_buy.get("score_boost") == -35.0 and
+            "BLOCKED_ORDER_FLOW_BULL_EXHAUSTION_VETO" in gate_bull_buy.get("veto_reason", "")
+        )
+
+        # Unit Test 3: Bear Exhaustion at Support 1 (S1) - Heavy Sell Volume Absorbed by Institutional Limit Buys
+        candles_bear_ex = _generate_synthetic_boundary_candles(setup_type="BEAR_EXHAUSTION_S1")
+        bear_ex_res = abs_eng.evaluate_delta_absorption("GOLD", 3954.0, candles_bear_ex, r1=4050.0, s1=3950.0, atr_15m=8.0, spread=0.50)
+        gate_bear_buy = abs_eng.evaluate_boundary_absorption_gatekeeper("GOLD", "BUY", 3954.0, candles_bear_ex, r1=4050.0, s1=3950.0, atr_15m=8.0, spread=0.50)
+        gate_bear_sell = abs_eng.evaluate_boundary_absorption_gatekeeper("GOLD", "SELL", 3954.0, candles_bear_ex, r1=4050.0, s1=3950.0, atr_15m=8.0, spread=0.50)
+        bear_ex_ok = (
+            bear_ex_res.get("is_absorption_active") is True and
+            bear_ex_res.get("true_institutional_winner") == "BUY" and
+            bear_ex_res.get("is_bear_exhaustion") is True and
+            bear_ex_res.get("structural_sl") is not None and
+            bear_ex_res["structural_sl"] < 3950.0 and
+            gate_bear_buy.get("is_vetoed") is False and
+            gate_bear_buy.get("score_boost") == 35.0 and
+            gate_bear_buy.get("is_aligned") is True and
+            gate_bear_sell.get("is_vetoed") is True and
+            gate_bear_sell.get("score_boost") == -35.0 and
+            "BLOCKED_ORDER_FLOW_BEAR_EXHAUSTION_VETO" in gate_bear_sell.get("veto_reason", "")
+        )
+
+        # Unit Test 4: Integration in SuperSmartCapitalCitadel
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as f_sscc:
+            sscc_src = f_sscc.read()
+        has_citadel_abs_int = (
+            "order_flow_delta_absorption_engine" in sscc_src and
+            "Pillar 0.90: Institutional Order Flow Delta Absorption Gatekeeper" in sscc_src and
+            "ORDER_FLOW_DELTA_ABSORPTION_RIDE" in sscc_src and
+            '"delta_absorption"' in sscc_src
+        )
+
+        # Unit Test 5: Integration in CapitalMetaLabelingEngine
+        with open("capital_meta_labeling_engine.py", "r", encoding="utf-8") as f_meta:
+            meta_src = f_meta.read()
+        has_meta_abs_int = (
+            "BLOCKED_ORDER_FLOW_BULL_EXHAUSTION_VETO" in meta_src and
+            "BLOCKED_ORDER_FLOW_BEAR_EXHAUSTION_VETO" in meta_src and
+            "delta_absorption_regime" in meta_src and
+            "delta_absorption_winner" in meta_src
+        )
+
+        all_inv102_passed = (
+            has_inv102_agents and has_inv102_gemini and
+            norm_ok and bull_ex_ok and bear_ex_ok and
+            has_citadel_abs_int and has_meta_abs_int
+        )
+
+        if all_inv102_passed:
+            log_pass(
+                "Institutional Order Flow Delta Absorption Footprint & Boundary Bull/Bear Exhaustion Engine (Invariant 102) "
+                "are 100% certified! (R1/S1 Boundary Absorption Footprint, Effort vs. Result Ratio >= 2.0, "
+                "Bull Exhaustion Limit Sell Iceberg Detection, Bear Exhaustion Limit Buy Iceberg Detection, "
+                "Structural SL Behind Wick Extreme, +35 Score Boost, Strict Counter-Trade Veto, Citadel & Meta-Labeling Integration)"
+            )
+        else:
+            failures.append(
+                f"Invariant 102 check failed: agents={has_inv102_agents}, gemini={has_inv102_gemini}, "
+                f"norm={norm_ok}, bull_ex={bull_ex_ok}, bear_ex={bear_ex_ok}, "
+                f"cit_abs={has_citadel_abs_int}, meta_abs={has_meta_abs_int}"
+            )
+            log_fail("Invariant 102 Order Flow Delta Absorption verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 102 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

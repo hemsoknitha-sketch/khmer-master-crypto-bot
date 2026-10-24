@@ -1863,6 +1863,18 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - **Bearish Toxicity ($\text{Net Toxicity} < 0$):** Dominant institutional liquidation dump. SELL trades are aligned and rewarded with a $+30.0$ Citadel score boost and $+0.15$ meta win probability expansion. Opposing BUY/Long trades are strictly VETOED (`BLOCKED_TOXIC_ORDER_FLOW_VPIN_VETO: VPIN >= 0.65 with Bearish toxic flow. Longing into aggressive institutional liquidation attack is strictly prohibited [Falling knife guard].`).
      - **Normal Flow ($\text{VPIN} < 0.65$):** Order flow is two-sided and healthy (`NORMAL_BALANCED_FLOW`), granting standard execution clearance without toxicity veto.
 
+### Invariant 102: Institutional Order Flow Delta Absorption Footprint & Boundary Bull/Bear Exhaustion Engine (AQ84 Pillar 3 - គ្រឹះវាស់ស្ទង់ជើងព្រីនស្រូបយកសាច់ប្រាក់ Order Flow Delta Absorption នៅ Resistance 1 / Support 1 ស្ទាក់ចាប់ស្ថាប័នកើបចំណេញ)
+- **Location:** `order_flow_delta_absorption_engine.py`, `super_smart_capital_citadel.py` (Pillar 0.90), `capital_meta_labeling_engine.py` (Section 0.6), `test_order_flow_delta_absorption_engine.py`, `audit_system.py` [CHECK 81/81]
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Mathematical Capital Protection:
+  1. **Boundary Interaction & Delta Efficiency:** When price pushes into Resistance 1 ($R_1$) or Support 1 ($S_1$) (from Monte Safieddine's Daily Market Report or broker volatility coordinates), the system calculates the Effort vs. Result ratio:
+     $$\text{Effort vs Result} = \frac{RVOL}{\max(0.02, |\Delta P| / \text{ATR}_{15m})}$$
+  2. **Bull Exhaustion & Bearish Delta Absorption at Resistance 1 ($R_1$):** When price reaches $R_1$ with heavy aggressive buy volume ($RVOL \ge 1.15\times$, positive delta), but price progress stalls ($\text{Effort vs Result} \ge 2.0$, or upper rejection wick $\ge 35\%$ of candle range), Passive Institutional Limit Sell Orders (iceberg sell walls) have absorbed all retail/breakout buy orders. Buyers are exhausted; Sellers are the true institutional winners.
+     - **SELL Trades:** Approved with a $+35.0$ Citadel confluence score boost and $+0.15$ meta win probability expansion. Stop Loss is tightly anchored right above the absorption high wick: $SL = \text{High}_{\text{wick}} + \max(2.0 \times \text{spread}, 0.20 \times \text{ATR}_{15m})$.
+     - **BUY Trades:** Strictly VETOED (`BLOCKED_ORDER_FLOW_BULL_EXHAUSTION_VETO: Price stalled at Resistance 1 despite heavy buy volume delta. Institutional limit sellers have absorbed all buy flow (Bull Exhaustion). Longing is prohibited.`).
+  3. **Bear Exhaustion & Bullish Delta Absorption at Support 1 ($S_1$):** When price reaches $S_1$ with heavy aggressive sell volume ($RVOL \ge 1.15\times$, negative delta), but price progress stalls ($\text{Effort vs Result} \ge 2.0$, or lower rejection wick $\ge 35\%$ of candle range), Passive Institutional Limit Buy Orders (iceberg buy walls) have absorbed all panic sell orders. Sellers are exhausted; Buyers are the true institutional winners.
+     - **BUY Trades:** Approved with a $+35.0$ Citadel confluence score boost and $+0.15$ meta win probability expansion. Stop Loss is tightly anchored right below the absorption low wick: $SL = \text{Low}_{\text{wick}} - \max(2.0 \times \text{spread}, 0.20 \times \text{ATR}_{15m})$.
+     - **SELL Trades:** Strictly VETOED (`BLOCKED_ORDER_FLOW_BEAR_EXHAUSTION_VETO: Price stalled at Support 1 despite heavy sell volume delta. Institutional limit buyers have absorbed all sell flow (Bear Exhaustion). Shorting is prohibited.`).
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

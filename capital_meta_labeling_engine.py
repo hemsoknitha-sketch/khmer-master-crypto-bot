@@ -316,7 +316,10 @@ class CapitalMetaLabelingEngine:
         weekly_regime: Optional[str] = None,
         vpin: Optional[float] = None,
         vpin_toxicity_direction: Optional[str] = None,
-        vpin_is_toxic: Optional[bool] = None
+        vpin_is_toxic: Optional[bool] = None,
+        delta_absorption_regime: Optional[str] = None,
+        is_delta_absorption_active: Optional[bool] = None,
+        delta_absorption_winner: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Extracts a clean, normalized feature vector for the secondary Meta-Model.
@@ -559,6 +562,35 @@ class CapitalMetaLabelingEngine:
         if vpin_toxic_val is None:
             vpin_toxic_val = bool(vpin_val >= 0.65)
 
+        # Order Flow Delta Absorption (Invariant 102 & AQ84 Pillar 3)
+        abs_active = is_delta_absorption_active
+        abs_reg = delta_absorption_regime
+        abs_win = delta_absorption_winner
+        if abs_active is None and candles and len(candles) >= 5:
+            try:
+                import order_flow_delta_absorption_engine as ofda
+                abs_eval = ofda.OrderFlowDeltaAbsorptionEngine.evaluate_delta_absorption(
+                    epic=epic or "",
+                    current_price=price_val,
+                    candles_15m=candles,
+                    atr_15m=atr_val,
+                    spread=spread_val
+                )
+                abs_active = bool(abs_eval.get("is_absorption_active", False))
+                if abs_reg is None:
+                    abs_reg = str(abs_eval.get("regime", "NONE"))
+                if abs_win is None:
+                    abs_win = str(abs_eval.get("true_institutional_winner", "NEUTRAL"))
+            except Exception:
+                pass
+
+        if abs_active is None:
+            abs_active = False
+        if abs_reg is None:
+            abs_reg = "NONE"
+        if abs_win is None:
+            abs_win = "NEUTRAL"
+
         return {
             "direction_num": float(dir_num),
             "raw_score": float(max(50.0, min(100.0, raw_score))),
@@ -601,6 +633,9 @@ class CapitalMetaLabelingEngine:
             "vpin": float(vpin_val),
             "vpin_is_toxic": bool(vpin_toxic_val),
             "vpin_toxicity_direction": str(vpin_dir_val).upper(),
+            "delta_absorption_regime": str(abs_reg),
+            "is_delta_absorption_active": bool(abs_active),
+            "delta_absorption_winner": str(abs_win).upper(),
             "daily_regime": str(daily_reg_val or ""),
             "weekly_regime": str(weekly_reg_val or ""),
             "direction": dir_clean,
@@ -873,6 +908,50 @@ class CapitalMetaLabelingEngine:
                         verdict = "META_APPROVED"
                         reason = f"META_APPROVED_VPIN_WAVE_ALIGNED: Short aligned with toxic institutional wave (VPIN={vpin:.3f} >= 0.65), P(Win)={meta_win_prob*100:.1f}%"
 
+        # 0.6. Institutional Order Flow Delta Absorption Governor (Invariant 102 & AQ84 Pillar 3)
+        abs_active = bool(features.get("is_delta_absorption_active", False))
+        abs_winner = str(features.get("delta_absorption_winner", "NEUTRAL")).upper()
+        abs_regime = str(features.get("delta_absorption_regime", "NONE"))
+        if abs_active:
+            if dir_num == 1.0:  # Proposed Trade is BUY
+                if abs_winner in ["SELL", "BEARISH"]:
+                    # VETO BUY into Bull Exhaustion at R1
+                    meta_win_prob = 0.0
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = (
+                        f"BLOCKED_ORDER_FLOW_BULL_EXHAUSTION_VETO: Price stalled at Resistance 1 despite buy volume delta. "
+                        f"Institutional limit sellers have absorbed all buy flow ({abs_regime}). P(Win) crushed to 0.0%."
+                    )
+                elif abs_winner in ["BUY", "BULLISH"]:
+                    # BUY aligned with Bear Exhaustion at S1 (Smart Money Accumulation)
+                    meta_win_prob = min(0.95, meta_win_prob + 0.15)
+                    if not is_approved and meta_win_prob >= threshold:
+                        is_approved = True
+                        sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                        verdict = "META_APPROVED"
+                        reason = f"META_APPROVED_DELTA_ABSORPTION_ALIGNED: Buy aligned with Bear Exhaustion institutional floor ({abs_regime}), P(Win)={meta_win_prob*100:.1f}%"
+            elif dir_num == -1.0:  # Proposed Trade is SELL
+                if abs_winner in ["BUY", "BULLISH"]:
+                    # VETO SELL into Bear Exhaustion at S1
+                    meta_win_prob = 0.0
+                    is_approved = False
+                    sizing_mult = 0.0
+                    verdict = "META_REJECTED"
+                    reason = (
+                        f"BLOCKED_ORDER_FLOW_BEAR_EXHAUSTION_VETO: Price stalled at Support 1 despite sell volume delta. "
+                        f"Institutional limit buyers have absorbed all sell flow ({abs_regime}). P(Win) crushed to 0.0%."
+                    )
+                elif abs_winner in ["SELL", "BEARISH"]:
+                    # SELL aligned with Bull Exhaustion at R1 (Smart Money Distribution)
+                    meta_win_prob = min(0.95, meta_win_prob + 0.15)
+                    if not is_approved and meta_win_prob >= threshold:
+                        is_approved = True
+                        sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
+                        verdict = "META_APPROVED"
+                        reason = f"META_APPROVED_DELTA_ABSORPTION_ALIGNED: Short aligned with Bull Exhaustion institutional ceiling ({abs_regime}), P(Win)={meta_win_prob*100:.1f}%"
+
         # 1. Probabilistic Regime Evaluation (Gaussian HMM 4 States)
         regime_beliefs = {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
         try:
@@ -992,6 +1071,9 @@ class CapitalMetaLabelingEngine:
             "vpin": vpin,
             "vpin_is_toxic": bool(vpin >= 0.65),
             "vpin_toxicity_direction": vpin_dir,
+            "is_delta_absorption_active": abs_active,
+            "delta_absorption_winner": abs_winner,
+            "delta_absorption_regime": abs_regime,
             "client_long_pct": c_long,
             "leveraged_funds_long_pct": lev_long,
             "features": features,

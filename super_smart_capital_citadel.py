@@ -1813,6 +1813,44 @@ class SuperSmartCapitalCitadel:
         except Exception as e_vpin:
             logger.debug(f"Citadel VPIN evaluation note: {e_vpin}")
 
+        # Pillar 0.90: Institutional Order Flow Delta Absorption Gatekeeper (Invariant 102 & AQ84 Pillar 3)
+        delta_absorption = {}
+        try:
+            import order_flow_delta_absorption_engine as ofda
+            r1_rep = report_confluence.get("r1") or report_confluence.get("res1") if report_confluence else None
+            s1_rep = report_confluence.get("s1") or report_confluence.get("sup1") if report_confluence else None
+            delta_absorption = ofda.OrderFlowDeltaAbsorptionEngine.evaluate_boundary_absorption_gatekeeper(
+                epic=resolved_epic,
+                direction=norm_side,
+                current_price=curr_price,
+                candles_15m=candles_15m,
+                r1=r1_rep,
+                s1=s1_rep,
+                atr_15m=atr_15m,
+                spread=spread
+            )
+            if delta_absorption.get("is_vetoed"):
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": delta_absorption.get("veto_reason"),
+                    "confluence_score": 10.0,
+                    "spread": spread,
+                    "invalidation_sl": preliminary_sl,
+                    "breathing_sl_dist": breathing_sl_dist,
+                    "delta_absorption": delta_absorption,
+                    "vpin_confluence": vpin_confluence,
+                    "market_report": report_confluence
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
+            elif delta_absorption.get("is_absorption_active") and delta_absorption.get("is_aligned"):
+                if delta_absorption.get("structural_sl"):
+                    preliminary_sl = delta_absorption["structural_sl"]
+        except Exception as e_delta_abs:
+            logger.debug(f"Citadel delta absorption evaluation note: {e_delta_abs}")
+
         # --------------------------------------------------------------------
         # 1. PILLAR 6: NON-NEGOTIABLE SAFETY HARD GUARDS (RSI ARMOR & ADX MOMENTUM)
         # --------------------------------------------------------------------
@@ -2579,6 +2617,16 @@ class SuperSmartCapitalCitadel:
                 f"{vpin_confluence.get('dominant_toxic_flow')} Wave, Net Tox: {vpin_confluence.get('net_toxicity_ratio'):+.2f})"
             )
 
+        # Order Flow Delta Absorption Score Boost (Invariant 102 & AQ84 Pillar 3)
+        if delta_absorption and delta_absorption.get("is_absorption_active") and delta_absorption.get("is_aligned"):
+            score += float(delta_absorption.get("score_boost", 35.0))
+            factors.append(
+                f"ORDER_FLOW_DELTA_ABSORPTION_RIDE (+35, {delta_absorption.get('regime')}, "
+                f"Winner: {delta_absorption.get('true_institutional_winner')})"
+            )
+            if delta_absorption.get("structural_sl"):
+                preliminary_sl = delta_absorption["structural_sl"]
+
         confluence_score = round(max(0.0, min(99.5, score)), 1)
 
         # --------------------------------------------------------------------
@@ -2883,6 +2931,7 @@ class SuperSmartCapitalCitadel:
             "h4_trend_anchor": h4_anchor,
             "market_report": report_confluence,
             "vpin_confluence": vpin_confluence,
+            "delta_absorption": delta_absorption,
             "candles_15m": candles_15m
         }
 
@@ -3365,6 +3414,39 @@ class SuperSmartCapitalCitadel:
                     return False, reason, {"is_approved": False, "rejection_reason": reason, "vpin_eval": vpin_gate_eval}
         except Exception as e_vpin_gate:
             logger.debug(f"VPIN gatekeeper evaluation note: {e_vpin_gate}")
+
+        # Pillar 0.90: Institutional Order Flow Delta Absorption & Bull/Bear Exhaustion Gatekeeper (Invariant 102 & AQ84 Pillar 3)
+        try:
+            import order_flow_delta_absorption_engine as ofda
+            candles_abs = []
+            if engine and hasattr(engine, "get_historical_prices"):
+                try:
+                    candles_abs = engine.get_historical_prices(s_epic, resolution="MINUTE_15", max_bars=35)
+                except Exception:
+                    pass
+            if candles_abs and len(candles_abs) >= 5:
+                cp_gate = 0.0
+                if engine and hasattr(engine, "get_market_details"):
+                    try:
+                        md = engine.get_market_details(s_epic)
+                        cp_gate = float(md.get("mid", 0.0) or md.get("ask", 0.0) or 0.0)
+                    except Exception:
+                        pass
+                if cp_gate <= 0.0 and candles_abs:
+                    cp_gate = float(candles_abs[-1].get("close", 0.0))
+
+                abs_gate_eval = ofda.OrderFlowDeltaAbsorptionEngine.evaluate_boundary_absorption_gatekeeper(
+                    epic=s_epic,
+                    direction=direction,
+                    current_price=cp_gate,
+                    candles_15m=candles_abs
+                )
+                if abs_gate_eval.get("is_vetoed"):
+                    reason = abs_gate_eval.get("veto_reason", "BLOCKED_ORDER_FLOW_EXHAUSTION_VETO")
+                    print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                    return False, reason, {"is_approved": False, "rejection_reason": reason, "delta_absorption_eval": abs_gate_eval}
+        except Exception as e_abs_gate:
+            logger.debug(f"Delta absorption gatekeeper evaluation note: {e_abs_gate}")
 
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):
