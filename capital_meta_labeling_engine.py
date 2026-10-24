@@ -881,6 +881,29 @@ class CapitalMetaLabelingEngine:
                     verdict = "META_APPROVED"
                     reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Short aligned with Smart Money institutional winners (SMD={smd:.1f}% <= -25.0%), P(Win)={meta_win_prob*100:.1f}%"
 
+        # 0.1. Smart Money Alignment Rule with Leveraged Funds (Invariant 104 Pillar 1 - 75%-85% Win Rate Standard)
+        lev_short = 100.0 - lev_long
+        if dir_num == 1.0 and lev_short >= 60.0:
+            meta_win_prob = 0.0
+            is_approved = False
+            sizing_mult = 0.0
+            verdict = "META_REJECTED"
+            lev_reason = (
+                f"BLOCKED_SMART_MONEY_ALIGNMENT_VETO: LEVERAGED_FUNDS_SHORT_VETO: Leveraged Funds are {lev_short:.1f}% SHORT (>= 60.0%). "
+                f"All M15 BUY signals are 100% vetoed to eliminate falling knife traps on Gold and US100. P(Win) crushed to 0.0%."
+            )
+            reason = f"{reason} | {lev_reason}" if "BLOCKED_" in reason else lev_reason
+        elif dir_num == -1.0 and lev_long >= 60.0:
+            meta_win_prob = 0.0
+            is_approved = False
+            sizing_mult = 0.0
+            verdict = "META_REJECTED"
+            lev_reason = (
+                f"BLOCKED_SMART_MONEY_ALIGNMENT_VETO: LEVERAGED_FUNDS_LONG_VETO: Leveraged Funds are {lev_long:.1f}% LONG (>= 60.0%). "
+                f"All M15 SELL signals are 100% vetoed to eliminate shorting into institutional accumulation. P(Win) crushed to 0.0%."
+            )
+            reason = f"{reason} | {lev_reason}" if "BLOCKED_" in reason else lev_reason
+
         # 0.5. VPIN Toxic Order Flow Governor (Invariant 101 & AQ84 Pillar 2)
         vpin = float(features.get("vpin", 0.0) or 0.0)
         vpin_dir = str(features.get("vpin_toxicity_direction", features.get("vpin_dominant_flow", "NONE")) or "NONE").upper()

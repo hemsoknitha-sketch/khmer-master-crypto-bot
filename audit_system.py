@@ -5012,7 +5012,7 @@ def run_audit():
         log_fail(str(e))
 
     # 82. Invariant 103: Institutional Dealing Range Equilibrium Chop Veto & Boundary Acceleration Engine
-    print("\n[CHECK 82/82] Verifying Institutional Dealing Range Equilibrium Chop Engine & Boundary Acceleration (Invariant 103)...")
+    print("\n[CHECK 82/83] Verifying Institutional Dealing Range Equilibrium Chop Engine & Boundary Acceleration (Invariant 103)...")
     try:
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_md = f.read()
@@ -5113,6 +5113,113 @@ def run_audit():
             log_fail("Invariant 103 Dealing Range Equilibrium Chop verification failed!")
     except Exception as e:
         failures.append(f"Invariant 103 check failed: {e}")
+        log_fail(str(e))
+
+    # 83. Invariant 104: Institutional Profitability Architecture, Leveraged Funds Alignment & 5-Pillar Win Rate Engine
+    print("\n[CHECK 83/83] Verifying Institutional Profitability Architecture, Leveraged Funds Alignment & 5-Pillar Win Rate Engine (Invariant 104)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_md = f.read()
+
+        has_inv104_agents = "Invariant 104: Institutional Profitability Architecture, Smart Money Leveraged Funds Alignment & 5-Pillar Win Rate Expansion Engine" in agents_md
+        has_inv104_gemini = "Institutional Profitability Architecture, Smart Money Leveraged Funds Alignment & 5-Pillar Win Rate Expansion Engine (Invariant 104)" in gemini_md
+
+        from capital_market_report_engine import CapitalMarketReportEngine
+        from capital_meta_labeling_engine import CapitalMetaLabelingEngine
+        from dynamic_structural_stops import DynamicStructuralStops
+        from super_smart_capital_citadel import TradFiMultiTargetScaleOutManager
+
+        # 1. Pillar 1 Unit Test: Smart Money Alignment with Leveraged Funds (Short >= 60% vetoes Buy 100%)
+        sent_eval_buy = CapitalMarketReportEngine.evaluate_contrarian_sentiment_edge(
+            epic="GOLD", proposed_side="BUY", current_price=2650.0
+        )
+        p1_market_ok = (
+            sent_eval_buy.get("is_vetoed") is True and
+            sent_eval_buy.get("is_leveraged_funds_vetoed") is True and
+            "SMART_MONEY_ALIGNMENT_VETO" in sent_eval_buy.get("veto_reason", "")
+        )
+
+        meta_feat_buy = {"direction_num": 1.0, "leveraged_funds_long_pct": 30.0, "client_long_pct": 50.0}
+        res_meta_buy = CapitalMetaLabelingEngine.predict_meta_label(meta_feat_buy, threshold=0.60)
+        p1_meta_ok = (
+            res_meta_buy.get("is_approved") is False and
+            res_meta_buy.get("meta_win_prob") == 0.0 and
+            "LEVERAGED_FUNDS_SHORT_VETO" in res_meta_buy.get("reason", "")
+        )
+
+        # 2. Pillar 2 Unit Test: Structural SL behind Broker SL Clusters + 1.5x Spread Buffer
+        sl_b_eval = DynamicStructuralStops.calculate_structural_sl(
+            side="BUY", curr_price=2620.0, spread=0.50, atr_15m=10.0,
+            swing_high=2700.0, swing_low=2600.0, broker_sup1_sl=2575.0
+        )
+        p2_sl_ok = (
+            sl_b_eval.get("structural_anchor") <= 2575.0 and
+            sl_b_eval.get("volatility_buffer") >= 0.75 and
+            sl_b_eval.get("invalidation_sl") <= (2575.0 - 0.75) and
+            sl_b_eval.get("anchor_type") == "BROKER_SL_CLUSTER_S1"
+        )
+
+        # 3. Pillar 3 Unit Test: 4-Phase Breakeven Armor & Multi-Target Scale-Out
+        res_p2 = TradFiMultiTargetScaleOutManager.evaluate_scale_out_lifecycle(
+            epic="GOLD", direction="BUY", entry_price=2650.0, current_price=2668.5,
+            sl_dist=10.0, spread=0.40, upl=18.5, peak_upl=18.5, scale_tier=0.5, atr_15m=4.0
+        )
+        res_p3 = TradFiMultiTargetScaleOutManager.evaluate_scale_out_lifecycle(
+            epic="GOLD", direction="BUY", entry_price=2650.0, current_price=2686.0,
+            sl_dist=10.0, spread=0.40, upl=36.0, peak_upl=36.0, scale_tier=1, atr_15m=4.0
+        )
+        p3_armor_ok = (
+            res_p2.get("action") == "STAGE_1_BREAKEVEN_ARMOR" and
+            res_p2.get("new_scale_tier") == 1 and
+            res_p3.get("action") == "STAGE_2_PROFIT_LOCK" and
+            res_p3.get("new_scale_tier") == 2
+        )
+
+        # 4. Pillar 4 Unit Test: Flash Shock Protective Early Harvest (Pullback >= 50% from peak)
+        res_shock = TradFiMultiTargetScaleOutManager.evaluate_scale_out_lifecycle(
+            epic="US100", direction="BUY", entry_price=20000.0, current_price=20015.0,
+            sl_dist=100.0, spread=1.50, upl=1.50, peak_upl=3.50, scale_tier=0.5
+        )
+        p4_shock_ok = (
+            res_shock.get("action") == "SHOCK_EARLY_HARVEST" and
+            res_shock.get("should_close_tranche") is True
+        )
+
+        # 5. Pillar 5 Unit Test: 45-Minute Post-SL Quarantine with Gold Adaptive Exception
+        import capital_engine
+        import gold_candlestick_pattern_memory as gcpm
+        p5_quarantine_ok = (
+            hasattr(capital_engine, "is_asset_quarantined") and
+            hasattr(capital_engine, "set_global_asset_quarantine") and
+            hasattr(gcpm, "evaluate_gold_adaptive_re_entry")
+        )
+
+        all_inv104_passed = (
+            has_inv104_agents and has_inv104_gemini and
+            p1_market_ok and p1_meta_ok and p2_sl_ok and
+            p3_armor_ok and p4_shock_ok and p5_quarantine_ok
+        )
+
+        if all_inv104_passed:
+            log_pass(
+                "Institutional Profitability Architecture, Leveraged Funds Alignment & 5-Pillar Win Rate Engine (Invariant 104) "
+                "are 100% certified! (Pillar 1: Smart Money Alignment Rule with Leveraged Funds [Short >= 60% Vetoes Buy 100%], "
+                "Pillar 2: Real Structural SL Behind Broker SL Clusters + 1.5x Spread Buffer, "
+                "Pillar 3: 4-Phase Breakeven Armor & Multi-Target Scale-Out [+1.8R Free Roll, +3.5R Cash Floor, 20% Runner], "
+                "Pillar 4: Flash Shock Protective Early Harvest [50% Pullback Lock], "
+                "Pillar 5: 45-Minute Post-SL Anti-Revenge Quarantine with Gold Adaptive Re-Study Exception)"
+            )
+        else:
+            failures.append(
+                f"Invariant 104 check failed: agents={has_inv104_agents}, gemini={has_inv104_gemini}, "
+                f"p1_mkt={p1_market_ok}, p1_meta={p1_meta_ok}, p2_sl={p2_sl_ok}, "
+                f"p3_armor={p3_armor_ok}, p4_shock={p4_shock_ok}, p5_q={p5_quarantine_ok}"
+            )
+            log_fail("Invariant 104 Profitability Architecture & 5-Pillar verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 104 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

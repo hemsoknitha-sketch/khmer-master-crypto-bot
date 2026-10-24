@@ -64,7 +64,10 @@ class DynamicStructuralStops:
         has_liquidity_sweep: bool = False,
         sweep_wick_extreme: Optional[float] = None,
         fvg_gp_setup: Optional[Dict[str, Any]] = None,
-        volatility_regime: str = "NORMAL"
+        volatility_regime: str = "NORMAL",
+        broker_sl_cluster: Optional[float] = None,
+        broker_sup1_sl: Optional[float] = None,
+        broker_res1_sl: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Calculates Stop Loss anchored strictly to Structural Invalidation + Dynamic Volatility Buffer.
@@ -119,6 +122,14 @@ class DynamicStructuralStops:
                 raw_anchor = curr_p - (2.2 * atr)
                 anchor_type = "FALLBACK_ATR"
 
+            # Invariant 104 Pillar 2: Anchor behind Broker SL S1 Cluster + 1.5x Spread Buffer
+            b_s1 = float(broker_sup1_sl or broker_sl_cluster or 0.0)
+            if b_s1 > 0:
+                raw_anchor = min(raw_anchor, b_s1)
+                vol_buffer = max(vol_buffer, 1.5 * sp)
+                if raw_anchor == b_s1:
+                    anchor_type = "BROKER_SL_CLUSTER_S1"
+
             raw_sl = raw_anchor - vol_buffer
             raw_dist = max(1e-4, curr_p - raw_sl)
 
@@ -145,6 +156,14 @@ class DynamicStructuralStops:
                 raw_anchor = curr_p + (2.2 * atr)
                 anchor_type = "FALLBACK_ATR"
 
+            # Invariant 104 Pillar 2: Anchor behind Broker SL R1 Cluster + 1.5x Spread Buffer
+            b_r1 = float(broker_res1_sl or broker_sl_cluster or 0.0)
+            if b_r1 > 0:
+                raw_anchor = max(raw_anchor, b_r1)
+                vol_buffer = max(vol_buffer, 1.5 * sp)
+                if raw_anchor == b_r1:
+                    anchor_type = "BROKER_SL_CLUSTER_R1"
+
             raw_sl = raw_anchor + vol_buffer
             raw_dist = max(1e-4, raw_sl - curr_p)
 
@@ -153,6 +172,8 @@ class DynamicStructuralStops:
         min_noise_dist = max(1.80 * atr, 3.0 * sp)
         # Extension Ceiling: Prevents absurdly wide stops (> 3.8 ATR or > 2.5% of price)
         max_ceil_dist = min(3.80 * atr, 0.025 * curr_p)
+        if anchor_type.startswith("BROKER_SL_CLUSTER"):
+            max_ceil_dist = max(max_ceil_dist, min(raw_dist, max(5.0 * atr, 0.035 * curr_p)))
 
         is_clamped_noise_floor = False
         is_clamped_extension_ceiling = False
@@ -306,7 +327,10 @@ class DynamicStructuralStops:
         has_liquidity_sweep: bool = False,
         sweep_wick_extreme: Optional[float] = None,
         fvg_gp_setup: Optional[Dict[str, Any]] = None,
-        volatility_regime: str = "NORMAL"
+        volatility_regime: str = "NORMAL",
+        broker_sl_cluster: Optional[float] = None,
+        broker_sup1_sl: Optional[float] = None,
+        broker_res1_sl: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Unified Institutional Structural Stops Evaluator:
@@ -325,7 +349,10 @@ class DynamicStructuralStops:
             has_liquidity_sweep=has_liquidity_sweep,
             sweep_wick_extreme=sweep_wick_extreme,
             fvg_gp_setup=fvg_gp_setup,
-            volatility_regime=volatility_regime
+            volatility_regime=volatility_regime,
+            broker_sl_cluster=broker_sl_cluster,
+            broker_sup1_sl=broker_sup1_sl,
+            broker_res1_sl=broker_res1_sl
         )
 
         tp_res = cls.calculate_calibrated_tp(

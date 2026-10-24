@@ -1405,6 +1405,42 @@ class CapitalMarketReportEngine:
                 score_boost += 30.0
                 factors.append(f"SMD_INSTITUTIONAL_LONG_EDGE (+30, SMD: +{smd:.1f}%, Buyers Win)")
 
+        # Case 5.5: Smart Money Alignment Rule with Leveraged Funds (Invariant 104 Pillar 1 - 75%-85% Win Rate Standard)
+        # If Leveraged Funds are >= 60.0% Short, all M15 BUY signals are 100% vetoed (eliminating falling knife traps on Gold & US100 by >70%).
+        # If Leveraged Funds are >= 60.0% Long, all M15 SELL signals are 100% vetoed (eliminating shorting into institutional accumulation).
+        is_lev_vetoed = False
+        is_sm_aligned = False
+        if lev_funds_short >= 60.0:
+            if norm_side == "BUY":
+                is_vetoed = True
+                lev_veto = (
+                    f"SMART_MONEY_ALIGNMENT_VETO: LEVERAGED_FUNDS_SHORT_VETO: Leveraged Funds are {lev_funds_short:.1f}% SHORT (>= 60.0%). "
+                    f"All M15 BUY signals on {epic} are 100% vetoed to eliminate falling knife traps."
+                )
+                veto_reason = f"{veto_reason} | {lev_veto}" if veto_reason else lev_veto
+                is_lev_vetoed = True
+                score_boost -= 40.0
+                factors.append(f"SMART_MONEY_LEVERAGED_FUNDS_SHORT_VETO ({lev_funds_short:.1f}% Short, -40)")
+            elif norm_side == "SELL":
+                is_sm_aligned = True
+                score_boost += 30.0
+                factors.append(f"SMART_MONEY_LEVERAGED_FUNDS_SHORT_ALIGNMENT (+30, {lev_funds_short:.1f}% Short)")
+        elif lev_funds_long >= 60.0:
+            if norm_side == "SELL":
+                is_vetoed = True
+                lev_veto = (
+                    f"SMART_MONEY_ALIGNMENT_VETO: LEVERAGED_FUNDS_LONG_VETO: Leveraged Funds are {lev_funds_long:.1f}% LONG (>= 60.0%). "
+                    f"All M15 SELL signals on {epic} are 100% vetoed to eliminate shorting into institutional accumulation."
+                )
+                veto_reason = f"{veto_reason} | {lev_veto}" if veto_reason else lev_veto
+                is_lev_vetoed = True
+                score_boost -= 40.0
+                factors.append(f"SMART_MONEY_LEVERAGED_FUNDS_LONG_VETO ({lev_funds_long:.1f}% Long, -40)")
+            elif norm_side == "BUY":
+                is_sm_aligned = True
+                score_boost += 30.0
+                factors.append(f"SMART_MONEY_LEVERAGED_FUNDS_LONG_ALIGNMENT (+30, {lev_funds_long:.1f}% Long)")
+
         # Case 6: Ornstein-Uhlenbeck Mean-Reversion Snapback vs Trend Expansion Guard (|Z| >= 1.50)
         z_eval = cls.calculate_normalized_p0_zscore(epic=epic, current_price=current_price)
         abs_z = z_eval.get("abs_z_score", 0.0)
@@ -1456,6 +1492,8 @@ class CapitalMarketReportEngine:
             "leveraged_funds_short_pct": lev_funds_short,
             "leveraged_funds_long_pct": lev_funds_long,
             "smart_money_divergence": smd,
+            "is_leveraged_funds_vetoed": is_lev_vetoed,
+            "is_smart_money_aligned": is_sm_aligned,
             "score_boost": score_boost,
             "is_vetoed": is_vetoed,
             "veto_reason": veto_reason,

@@ -2700,6 +2700,9 @@ class SuperSmartCapitalCitadel:
         try:
             import dynamic_structural_stops as dss
             vol_regime = "HIGH_VOLATILITY" if adx_15m >= 35.0 else ("LOW_VOLATILITY" if adx_15m < 20.0 else "NORMAL")
+            rep_levels = report_confluence.get("broker_levels", {}) if isinstance(report_confluence, dict) else {}
+            b_sl_sup1 = report_confluence.get("sl_sup1") or rep_levels.get("sl_sup1")
+            b_sl_res1 = report_confluence.get("sl_res1") or rep_levels.get("sl_res1")
             struct_stops = dss.DynamicStructuralStops.evaluate_structural_stops(
                 side=norm_side,
                 curr_price=curr_price,
@@ -2711,7 +2714,9 @@ class SuperSmartCapitalCitadel:
                 has_liquidity_sweep=(has_ssl_sweep if norm_side == "BUY" else has_bsl_sweep),
                 sweep_wick_extreme=(float(turtle_soup_res["extreme_wick_price"]) if (is_turtle_soup and turtle_soup_res.get("extreme_wick_price")) else (float(candles_15m[-1]["low"]) if (norm_side == "BUY" and candles_15m) else (float(candles_15m[-1]["high"]) if candles_15m else None))),
                 fvg_gp_setup=fvg_gp_setup if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == norm_side) else None,
-                volatility_regime=vol_regime
+                volatility_regime=vol_regime,
+                broker_sup1_sl=b_sl_sup1,
+                broker_res1_sl=b_sl_res1
             )
             invalidation_sl = round(struct_stops["invalidation_sl"], prec)
             risk_dist = struct_stops["sl_dist"]
@@ -4415,6 +4420,19 @@ class TradFiMultiTargetScaleOutManager:
         dir_u = direction.upper()
         r_gain = cls.calculate_r_multiple(entry_price, current_price, dir_u, sl_dist)
         eff_atr = float(atr_15m) if (atr_15m is not None and atr_15m > 0) else (sl_dist / 2.2)
+
+        # Flash Shock Protective Early Harvest (Invariant 104 Pillar 4 - 75%-85% Win Rate Standard)
+        # If Peak UPL >= $2.50 (or Peak R >= +1.5R) and price retraces >= 50% from peak, execute instant market harvest!
+        if (peak_upl >= 2.50 or r_gain >= 1.5) and peak_upl > 0 and (upl <= peak_upl * 0.50) and upl >= max(0.25, spread * 0.5):
+            return {
+                "action": "SHOCK_EARLY_HARVEST",
+                "stage": 4.5,
+                "r_gain": r_gain,
+                "new_sl": None,
+                "new_scale_tier": 4.5,
+                "should_close_tranche": True,
+                "reason": f"Flash shock protective harvest: Pullback >= 50% from Peak UPL ${peak_upl:.2f} (Current: ${upl:.2f}). Market exit to prevent profit evaporation."
+            }
 
         # Phase 4: Parabolic Acceleration & RSI > 80.0 Exhaustion Ratchet
         is_parabolic = (
