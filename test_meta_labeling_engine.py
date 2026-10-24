@@ -139,7 +139,10 @@ class TestMetaLabelingEngine(unittest.TestCase):
             self.assertIn("cat", res["model_breakdown"])
 
     def test_smart_money_divergence_governor(self):
-        """Smart Money Divergence <= -35% must unconditionally crush BUY win prob to 0.0."""
+        """Smart Money Divergence <= -25% must unconditionally crush BUY win prob to 0.0, and >= +25% must crush SELL."""
+        import capital_market_report_engine as cmre
+
+        # Extreme Bearish SMD: Gold -71.0% (Retail 84% Long vs LevFunds 13% Long / 87% Short)
         f_buy_gold = CapitalMetaLabelingEngine.extract_features(
             direction="BUY", raw_score=85.0, calib_p=0.80, epic="GOLD", price=4023.61,
             smart_money_divergence=-71.0, client_long_pct=84.0, leveraged_funds_long_pct=13.0
@@ -151,8 +154,9 @@ class TestMetaLabelingEngine(unittest.TestCase):
         self.assertEqual(res_buy["sizing_multiplier"], 0.0)
         self.assertEqual(res_buy["verdict"], "META_REJECTED")
         self.assertIn("BLOCKED_SMART_MONEY_EXTREME_BEARISH_DIVERGENCE", res_buy["reason"])
+        self.assertEqual(res_buy["true_institutional_winner"], "SELL")
 
-        # Bullish SMD >= +35% must crush SELL win prob to 0.0
+        # Bullish SMD >= +25% must crush SELL win prob to 0.0
         f_sell_trap = CapitalMetaLabelingEngine.extract_features(
             direction="SELL", raw_score=85.0, calib_p=0.80,
             smart_money_divergence=45.0, client_long_pct=25.0, leveraged_funds_long_pct=70.0
@@ -162,6 +166,27 @@ class TestMetaLabelingEngine(unittest.TestCase):
         self.assertFalse(res_sell["is_approved"])
         self.assertEqual(res_sell["verdict"], "META_REJECTED")
         self.assertIn("BLOCKED_SMART_MONEY_EXTREME_BULLISH_DIVERGENCE", res_sell["reason"])
+        self.assertEqual(res_sell["true_institutional_winner"], "BUY")
+
+        # Strict 25% boundary test: SMD = -26.0% must veto BUY
+        f_boundary_buy = CapitalMetaLabelingEngine.extract_features(
+            direction="BUY", raw_score=80.0, calib_p=0.75,
+            smart_money_divergence=-26.0, client_long_pct=60.0, leveraged_funds_long_pct=34.0
+        )
+        res_boundary_buy = CapitalMetaLabelingEngine.predict_meta_label(f_boundary_buy, threshold=0.55)
+        self.assertEqual(res_boundary_buy["meta_win_prob"], 0.0)
+        self.assertFalse(res_boundary_buy["is_approved"])
+
+        # SmartMoneyDivergenceGovernor direct evaluation on Gold and US500
+        smd_gold_buy = cmre.SmartMoneyDivergenceGovernor.evaluate_smd("GOLD", direction="BUY", custom_client_long=84.0, custom_lev_funds_long=13.0)
+        self.assertTrue(smd_gold_buy["is_vetoed"])
+        self.assertEqual(smd_gold_buy["true_institutional_winner"], "SELL")
+        self.assertIn("SMD_INSTITUTIONAL_DIRECTION_VETO", smd_gold_buy["veto_reason"])
+
+        smd_gold_sell = cmre.SmartMoneyDivergenceGovernor.evaluate_smd("GOLD", direction="SELL", custom_client_long=84.0, custom_lev_funds_long=13.0)
+        self.assertFalse(smd_gold_sell["is_vetoed"])
+        self.assertTrue(smd_gold_sell["is_aligned"])
+        self.assertEqual(smd_gold_sell["score_boost"], 30.0)
 
     def test_conformal_prediction_regime_coupling(self):
         """Conformal Prediction must reject BUY trades in Bear Average and require strict singleton in Volatile Consolidation."""

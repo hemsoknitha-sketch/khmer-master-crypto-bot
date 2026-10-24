@@ -4613,23 +4613,36 @@ def run_audit():
 
         formulas_ok = (velo_ok and z_ok and ou_decoupling_ok and exp_ok and trap_veto_ok)
 
+        # Unit Test 8: Institutional Smart Money Divergence (SMD) Governor (|SMD| >= 25.0%)
+        smd_gold_eval = cmre.calculate_smart_money_divergence("GOLD", direction="BUY", custom_client_long=84.0, custom_lev_funds_long=13.0)
+        smd_gold_sell_eval = cmre.calculate_smart_money_divergence("GOLD", direction="SELL", custom_client_long=84.0, custom_lev_funds_long=13.0)
+        smd_ok = (
+            smd_gold_eval.get("is_vetoed") is True and
+            smd_gold_eval.get("smart_money_divergence") == -71.0 and
+            smd_gold_eval.get("true_institutional_winner") == "SELL" and
+            "SMD_INSTITUTIONAL_DIRECTION_VETO" in smd_gold_eval.get("veto_reason", "") and
+            smd_gold_sell_eval.get("is_vetoed") is False and
+            smd_gold_sell_eval.get("is_aligned") is True and
+            smd_gold_sell_eval.get("score_boost") == 30.0
+        )
+
         all_inv99_passed = (
             has_inv99_agents and has_inv99_gemini and gold_sr_ok and
-            nvda_veto_ok and nvda_boost_ok and sweep_ok and cit_rep_ok and cmd_report_ok and formulas_ok
+            nvda_veto_ok and nvda_boost_ok and sweep_ok and cit_rep_ok and cmd_report_ok and formulas_ok and smd_ok
         )
 
         if all_inv99_passed:
             log_pass(
-                "Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment & Exact Broker S/R Stop Engine (Invariant 99) "
+                "Institutional Capital.com Daily Market Report, Contrarian Retail Sentiment, Exact Broker S/R Stop Engine & SMD Governor (Invariant 99) "
                 "are 100% certified! (Monte Safieddine S/R Math, 79.75% Retail Trap Veto, Contrarian +30 Boost, "
                 "Exact Broker SL Cluster Sweep, 4 Core Math Formulas [Velocity, Z-Score O-U Decoupling, Volatility Expansion, Accumulation Veto], "
-                "Citadel Confluence & Telegram /capital report integration)"
+                "Smart Money Divergence [|SMD| >= 25% Winner Alignment], Citadel Confluence & Telegram /capital report integration)"
             )
         else:
             failures.append(
                 f"Invariant 99 check failed: agents={has_inv99_agents}, gemini={has_inv99_gemini}, "
                 f"sr={gold_sr_ok}, veto={nvda_veto_ok}, boost={nvda_boost_ok}, sweep={sweep_ok}, "
-                f"cit={cit_rep_ok}, cmd={cmd_report_ok}, formulas={formulas_ok}"
+                f"cit={cit_rep_ok}, cmd={cmd_report_ok}, formulas={formulas_ok}, smd={smd_ok}"
             )
             log_fail("Invariant 99 Market Report & Contrarian Sentiment Engine verification failed!")
     except Exception as e:

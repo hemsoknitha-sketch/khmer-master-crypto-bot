@@ -3299,6 +3299,17 @@ class SuperSmartCapitalCitadel:
             except Exception as e_corr:
                 logger.debug(f"Factor correlation guard note: {e_corr}")
 
+        # Pillar 0.88: Institutional Smart Money Divergence (SMD) Directional Governor (Invariant 99 & AQ84)
+        try:
+            import capital_market_report_engine as cmre
+            smd_eval = cmre.CapitalMarketReportEngine.calculate_smart_money_divergence(s_epic, direction=direction)
+            if smd_eval.get("is_vetoed"):
+                reason = smd_eval.get("veto_reason", "SMD_INSTITUTIONAL_DIRECTION_VETO")
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                return False, reason, {"is_approved": False, "rejection_reason": reason, "smd_eval": smd_eval}
+        except Exception as e_smd_gate:
+            logger.debug(f"SMD gatekeeper evaluation note: {e_smd_gate}")
+
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):
             reason = diag.get("rejection_reason", "SUPER_SMART_CAPITAL_CITADEL_REJECTED")

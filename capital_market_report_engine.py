@@ -862,10 +862,91 @@ class CapitalMarketReportEngine:
             "current_price": curr_p,
             "price_return_pct": round(price_ret * 100.0, 2),
             "smart_money_divergence": smd,
+            "true_institutional_winner": "BUY" if smd > 25.0 else ("SELL" if smd < -25.0 else "NEUTRAL"),
             "leveraged_funds_short_pct": curr_lev_short,
             "leveraged_funds_long_pct": curr_lev_long,
             "is_retail_trap_accumulation": is_accum_trap,
             "is_retail_panic_short_trap": is_panic_trap,
+        }
+
+    @classmethod
+    def calculate_smart_money_divergence(
+        cls,
+        epic: str,
+        direction: Optional[str] = None,
+        custom_client_long: Optional[float] = None,
+        custom_lev_funds_long: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Institutional Smart Money Divergence (SMD) Formula (Invariant 99 & AQ84):
+        SMD = Leveraged_Funds_Long_Pct - Retail_Clients_Long_Pct
+        - When SMD > +25.0%: BUY is the true institutional winner (Smart Money accumulation).
+          Only BUY is permitted; SELL is strictly vetoed.
+        - When SMD < -25.0%: SELL is the true institutional winner (Smart Money distribution/liquidation).
+          Only SELL is permitted; BUY is strictly vetoed.
+        - When -25.0% <= SMD <= +25.0%: Neutral equilibrium (Standard quantitative confluence).
+        """
+        rep = cls.get_market_report_data(epic) or {}
+        c_long = float(custom_client_long if custom_client_long is not None else rep.get("client_long_pct", 50.0))
+        lev_long = float(custom_lev_funds_long if custom_lev_funds_long is not None else rep.get("leveraged_funds_long_pct", 50.0))
+        lev_short = 100.0 - lev_long
+        c_short = 100.0 - c_long
+
+        smd = round(lev_long - c_long, 2)
+
+        true_winner = "NEUTRAL"
+        is_aligned = True
+        is_vetoed = False
+        veto_reason = ""
+        score_boost = 0.0
+
+        if smd > 25.0:
+            true_winner = "BUY"
+            if direction:
+                dir_upper = str(direction).upper().strip()
+                if dir_upper in ["BUY", "LONG"]:
+                    is_aligned = True
+                    score_boost = 30.0
+                elif dir_upper in ["SELL", "SHORT"]:
+                    is_aligned = False
+                    is_vetoed = True
+                    veto_reason = (
+                        f"SMD_INSTITUTIONAL_DIRECTION_VETO: SMD=+{smd:.1f}% > +25.0% proves Buyers are "
+                        f"true institutional winners (LevFunds Long {lev_long:.1f}% vs Retail {c_long:.1f}%). "
+                        f"Selling against smart money accumulation is prohibited."
+                    )
+                    score_boost = -35.0
+        elif smd < -25.0:
+            true_winner = "SELL"
+            if direction:
+                dir_upper = str(direction).upper().strip()
+                if dir_upper in ["SELL", "SHORT"]:
+                    is_aligned = True
+                    score_boost = 30.0
+                elif dir_upper in ["BUY", "LONG"]:
+                    is_aligned = False
+                    is_vetoed = True
+                    veto_reason = (
+                        f"SMD_INSTITUTIONAL_DIRECTION_VETO: SMD={smd:.1f}% < -25.0% proves Sellers are "
+                        f"true institutional winners (LevFunds Long {lev_long:.1f}% vs Retail {c_long:.1f}%). "
+                        f"Buying against smart money liquidation is prohibited."
+                    )
+                    score_boost = -35.0
+
+        return {
+            "epic": epic,
+            "smart_money_divergence": smd,
+            "smd": smd,
+            "client_long_pct": c_long,
+            "client_short_pct": c_short,
+            "leveraged_funds_long_pct": lev_long,
+            "leveraged_funds_short_pct": lev_short,
+            "true_institutional_winner": true_winner,
+            "direction": direction,
+            "is_aligned": is_aligned,
+            "is_vetoed": is_vetoed,
+            "veto_reason": veto_reason,
+            "score_boost": score_boost
         }
 
     @classmethod
@@ -1296,33 +1377,33 @@ class CapitalMarketReportEngine:
                 score_boost += 35.0
                 factors.append(f"RETAIL_TRAP_ACCUMULATION_SHORT_EDGE (+35, Retail Dip-Buying Trap, SMD: {smd:.1f}%)")
 
-        # Case 5: Smart Money Divergence Hard Veto (Hedge Funds Short vs Retail Long)
-        if smd <= -30.0:
+        # Case 5: Institutional Smart Money Divergence (SMD) Directional Governor (|SMD| >= 25.0%)
+        if smd <= -25.0:
             if norm_side == "BUY" and not is_vetoed:
                 is_vetoed = True
                 veto_reason = (
-                    f"SMART_MONEY_BEARISH_DIVERGENCE_VETO: Leveraged Funds are heavily short "
+                    f"SMD_INSTITUTIONAL_DIRECTION_VETO: SMART_MONEY_BEARISH_DIVERGENCE_VETO: Leveraged Funds are heavily short "
                     f"({lev_funds_short:.1f}%) while retail clients are long ({c_long:.1f}%). "
-                    f"SMD = {smd:.1f}%. Buying is mathematically vetoed."
+                    f"SMD = {smd:.1f}% <= -25.0% proves Sellers are true institutional winners. Buying is mathematically vetoed."
                 )
-                score_boost -= 30.0
-                factors.append(f"SMART_MONEY_BEARISH_DIVERGENCE ({smd:.1f}% SMD, -30)")
+                score_boost -= 35.0
+                factors.append(f"SMD_INSTITUTIONAL_BEARISH_VETO ({smd:.1f}% SMD, -35)")
             elif norm_side == "SELL" and not is_accum_trap:
-                score_boost += 25.0
-                factors.append(f"SMART_MONEY_SHORT_DIVERGENCE_EDGE (+25, SMD: {smd:.1f}%)")
-        elif smd >= 30.0:
+                score_boost += 30.0
+                factors.append(f"SMD_INSTITUTIONAL_SHORT_EDGE (+30, SMD: {smd:.1f}%, Sellers Win)")
+        elif smd >= 25.0:
             if norm_side == "SELL" and not is_vetoed:
                 is_vetoed = True
                 veto_reason = (
-                    f"SMART_MONEY_BULLISH_DIVERGENCE_VETO: Leveraged Funds are heavily long "
+                    f"SMD_INSTITUTIONAL_DIRECTION_VETO: SMART_MONEY_BULLISH_DIVERGENCE_VETO: Leveraged Funds are heavily long "
                     f"({lev_funds_long:.1f}%) while retail clients are short ({c_short:.1f}%). "
-                    f"SMD = {smd:.1f}%. Selling is mathematically vetoed."
+                    f"SMD = +{smd:.1f}% >= +25.0% proves Buyers are true institutional winners. Selling is mathematically vetoed."
                 )
-                score_boost -= 30.0
-                factors.append(f"SMART_MONEY_BULLISH_DIVERGENCE ({smd:.1f}% SMD, -30)")
+                score_boost -= 35.0
+                factors.append(f"SMD_INSTITUTIONAL_BULLISH_VETO (+{smd:.1f}% SMD, -35)")
             elif norm_side == "BUY" and not is_panic_trap:
-                score_boost += 25.0
-                factors.append(f"SMART_MONEY_LONG_DIVERGENCE_EDGE (+25, SMD: {smd:.1f}%)")
+                score_boost += 30.0
+                factors.append(f"SMD_INSTITUTIONAL_LONG_EDGE (+30, SMD: +{smd:.1f}%, Buyers Win)")
 
         # Case 6: Ornstein-Uhlenbeck Mean-Reversion Snapback vs Trend Expansion Guard (|Z| >= 1.50)
         z_eval = cls.calculate_normalized_p0_zscore(epic=epic, current_price=current_price)
@@ -1909,3 +1990,39 @@ class CapitalMarketReportEngine:
             "volatility_expansion": vol_exp,
             "sentiment_velocity": velo_eval,
         }
+
+
+class SmartMoneyDivergenceGovernor:
+    """
+    Institutional Smart Money Divergence (SMD) Governor (Invariant 99 & AQ84):
+    Formula:
+        SMD = Leveraged_Funds_Long_Pct - Retail_Clients_Long_Pct
+
+    Institutional Directional Rules:
+    1. When SMD > +25.0%:
+       - Buyers are the true institutional winners (Smart Money Accumulation).
+       - Long (BUY) entries are confirmed with confidence boost (+30.0) and meta-prob expansion.
+       - Short (SELL) entries are strictly VETOED (SMD_INSTITUTIONAL_DIRECTION_VETO).
+    2. When SMD < -25.0%:
+       - Sellers are the true institutional winners (Smart Money Distribution / Liquidation).
+         (e.g., Gold SMD = -71.0%, US500 SMD = -55.0% on Oct 22-23).
+       - Short (SELL) entries are confirmed with confidence boost (+30.0) and meta-prob expansion.
+       - Long (BUY) entries are strictly VETOED (SMD_INSTITUTIONAL_DIRECTION_VETO).
+    3. When -25.0% <= SMD <= +25.0%:
+       - Neutral equilibrium regime. Standard quantitative confluence applies.
+    """
+
+    @classmethod
+    def evaluate_smd(
+        cls,
+        epic: str,
+        direction: Optional[str] = None,
+        custom_client_long: Optional[float] = None,
+        custom_lev_funds_long: Optional[float] = None
+    ) -> Dict[str, Any]:
+        return CapitalMarketReportEngine.calculate_smart_money_divergence(
+            epic=epic,
+            direction=direction,
+            custom_client_long=custom_client_long,
+            custom_lev_funds_long=custom_lev_funds_long
+        )

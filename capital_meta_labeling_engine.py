@@ -739,17 +739,17 @@ class CapitalMetaLabelingEngine:
         dir_num = float(features.get("direction_num", 1.0))
 
         if dir_num == 1.0:  # Proposed Trade is BUY
-            if smd <= -35.0:
-                # Extreme Bearish Smart Money Divergence (e.g. -71.0% on Gold: Retail 84% Long vs LevFunds 13% Long / 87% Short)
+            if smd <= -25.0:
+                # Extreme Bearish Smart Money Divergence (Sellers are true winners, e.g. -71% on Gold, -55% on US500)
                 # AI Model must immediately drop the win probability of a Buy signal to zero (0.0)!
                 meta_win_prob = 0.0
                 is_approved = False
                 sizing_mult = 0.0
                 verdict = "META_REJECTED"
                 reason = (
-                    f"BLOCKED_SMART_MONEY_EXTREME_BEARISH_DIVERGENCE: SMD={smd:.1f}% <= -35.0% "
-                    f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}% | Retail Herd Dip-Buying Trap). "
-                    f"P(Win) crushed to 0.0%."
+                    f"BLOCKED_SMART_MONEY_EXTREME_BEARISH_DIVERGENCE: BLOCKED_SMD_DIRECTION_MISMATCH: SMD={smd:.1f}% <= -25.0% "
+                    f"proves Sellers are true institutional winners (LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}% | Retail Herd Dip-Buying Trap). "
+                    f"Buying against smart money liquidation is prohibited. P(Win) crushed to 0.0%."
                 )
             elif smd < -15.0 and is_approved:
                 meta_win_prob = max(0.0, meta_win_prob - (abs(smd) / 100.0) * 0.35)
@@ -762,26 +762,26 @@ class CapitalMetaLabelingEngine:
                         f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}%)"
                     )
             elif smd >= 25.0:
-                # Smart Money Bullish Convergence (Hedge funds buying with low retail presence)
-                meta_win_prob = min(0.95, meta_win_prob + 0.10)
+                # Smart Money Bullish Convergence (Hedge funds buying with low retail presence - Buyers Win)
+                meta_win_prob = min(0.95, meta_win_prob + 0.15)
                 if not is_approved and meta_win_prob >= threshold:
                     is_approved = True
                     sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
                     verdict = "META_APPROVED"
-                    reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Buy aligned with Smart Money (SMD=+{smd:.1f}%), P(Win)={meta_win_prob*100:.1f}%"
+                    reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Buy aligned with Smart Money institutional winners (SMD=+{smd:.1f}% >= +25.0%), P(Win)={meta_win_prob*100:.1f}%"
 
         elif dir_num == -1.0:  # Proposed Trade is SELL
-            if smd >= 35.0:
-                # Extreme Bullish Smart Money Divergence (Retail crowd panic shorting into Smart Money buying)
+            if smd >= 25.0:
+                # Extreme Bullish Smart Money Divergence (Buyers are true winners)
                 # AI Model must immediately drop the win probability of a Sell signal to zero (0.0)!
                 meta_win_prob = 0.0
                 is_approved = False
                 sizing_mult = 0.0
                 verdict = "META_REJECTED"
                 reason = (
-                    f"BLOCKED_SMART_MONEY_EXTREME_BULLISH_DIVERGENCE: SMD=+{smd:.1f}% >= +35.0% "
+                    f"BLOCKED_SMART_MONEY_EXTREME_BULLISH_DIVERGENCE: BLOCKED_SMD_DIRECTION_MISMATCH: SMD=+{smd:.1f}% >= +25.0% "
                     f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}% | Retail Herd Panic Short Trap). "
-                    f"P(Win) crushed to 0.0%."
+                    f"Selling against smart money accumulation is prohibited. P(Win) crushed to 0.0%."
                 )
             elif smd > 15.0 and is_approved:
                 meta_win_prob = max(0.0, meta_win_prob - (abs(smd) / 100.0) * 0.35)
@@ -794,13 +794,13 @@ class CapitalMetaLabelingEngine:
                         f"(LevFunds Long {lev_long:.1f}% vs Retail Long {c_long:.1f}%)"
                     )
             elif smd <= -25.0:
-                # Short aligned with Smart Money (e.g. LevFunds 87% Short on Gold!)
-                meta_win_prob = min(0.95, meta_win_prob + 0.10)
+                # Short aligned with Smart Money (e.g. LevFunds 87% Short on Gold, 81% Short on US500 - Sellers Win)
+                meta_win_prob = min(0.95, meta_win_prob + 0.15)
                 if not is_approved and meta_win_prob >= threshold:
                     is_approved = True
                     sizing_mult = float(np.clip(1.0 + ((meta_win_prob - threshold) * 2.0), 0.75, 1.50))
                     verdict = "META_APPROVED"
-                    reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Short aligned with Smart Money (SMD={smd:.1f}%), P(Win)={meta_win_prob*100:.1f}%"
+                    reason = f"META_APPROVED_SMART_MONEY_CONVERGENCE: Short aligned with Smart Money institutional winners (SMD={smd:.1f}% <= -25.0%), P(Win)={meta_win_prob*100:.1f}%"
 
         # 1. Probabilistic Regime Evaluation (Gaussian HMM 4 States)
         regime_beliefs = {"BULL": 0.40, "CHOP": 0.35, "BEAR": 0.20, "CRASH": 0.05}
@@ -916,6 +916,8 @@ class CapitalMetaLabelingEngine:
             "deep_regime_detector": deep_regime_res,
             "nlp_sentiment": nlp_sentiment,
             "smart_money_divergence": smd,
+            "true_institutional_winner": "BUY" if smd > 25.0 else ("SELL" if smd < -25.0 else "NEUTRAL"),
+            "is_smd_aligned": (dir_num == 1.0 and smd > 25.0) or (dir_num == -1.0 and smd < -25.0) or (-25.0 <= smd <= 25.0),
             "client_long_pct": c_long,
             "leveraged_funds_long_pct": lev_long,
             "features": features,
