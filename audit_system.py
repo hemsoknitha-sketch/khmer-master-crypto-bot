@@ -4811,7 +4811,7 @@ def run_audit():
         log_fail(str(e))
 
     # 80. Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard
-    print("\n[CHECK 80/82] Verifying Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)...")
+    print("\n[CHECK 80/83] Verifying Institutional VPIN Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)...")
     try:
         has_inv101_agents = "Invariant 101: Institutional VPIN (Volume-Synchronized Probability of Toxicity)" in agents_md
         has_inv101_gemini = "Institutional VPIN (Volume-Synchronized Probability of Toxicity) Order Flow Engine & Unilateral Attack Wave Guard (Invariant 101)" in gemini_md
@@ -4907,7 +4907,7 @@ def run_audit():
         log_fail(str(e))
 
     # 81. Invariant 102: Institutional Order Flow Delta Absorption Footprint & Boundary Bull/Bear Exhaustion Engine
-    print("\n[CHECK 81/82] Verifying Institutional Order Flow Delta Absorption Engine & Boundary Bull/Bear Exhaustion (Invariant 102)...")
+    print("\n[CHECK 81/83] Verifying Institutional Order Flow Delta Absorption Engine & Boundary Bull/Bear Exhaustion (Invariant 102)...")
     try:
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_md = f.read()
