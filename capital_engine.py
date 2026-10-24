@@ -181,9 +181,10 @@ EPIC_MAP = {
     "US30": "US30",             # Dow Jones Industrial Average
     "DJ30": "US30",             # Dow Jones Industrial Average
     "WALLSTREET": "US30",       # Dow Jones Industrial Average
-    "US2000": "US2000",         # Russell 2000 Small-Cap
-    "RUT": "US2000",            # Russell 2000 Small-Cap
-    "DAX": "DE40",              # German DAX 40 (Capital.com canonical epic)
+    "US2000": "RTY",            # Russell 2000 Small-Cap (Capital.com canonical epic RTY)
+    "RUT": "RTY",               # Russell 2000 Small-Cap
+    "RTY": "RTY",               # US Russell 2000
+    "DAX": "DE40",              # German DAX 40 (Capital.com canonical epic DE40)
     "GERMANY40": "DE40",        # German DAX 40
     "DE40": "DE40",             # German DAX 40
     "UK100": "UK100",           # UK FTSE 100
@@ -192,23 +193,86 @@ EPIC_MAP = {
     "CAC40": "FR40",            # France CAC 40
     "EU50": "EU50",             # Euro Stoxx 50
     "STOXX50": "EU50",          # Euro Stoxx 50
-    "SWI20": "SWI20",           # Swiss SMI 20
+    "SWI20": "SW20",            # Swiss SMI 20 (Capital.com canonical epic SW20)
+    "SW20": "SW20",             # Swiss SMI 20
+    "SMI": "SW20",              # Swiss SMI 20
     "IT40": "IT40",             # Italy FTSE MIB
-    "ES35": "ES35",             # Spain IBEX 35
+    "ES35": "SP35",             # Spain IBEX 35 (Capital.com canonical epic SP35)
+    "SP35": "SP35",             # Spain IBEX 35
+    "IBEX35": "SP35",           # Spain IBEX 35
     "NL25": "NL25",             # Netherlands AEX
-    "JP225": "J225",            # Japan Nikkei 225 (Capital.com canonical epic)
+    "JP225": "J225",            # Japan Nikkei 225 (Capital.com canonical epic J225)
     "J225": "J225",             # Japan Nikkei 225
     "NIKKEI": "J225",           # Japan Nikkei 225
     "HK50": "HK50",             # Hong Kong Hang Seng Index
     "HSI": "HK50",              # Hong Kong Hang Seng Index
     "CN50": "CN50",             # China A50 Index
     "CHINA50": "CN50",          # China A50 Index
-    "AUS200": "AU200",          # Australia ASX 200 (Capital.com canonical epic)
+    "AUS200": "AU200",          # Australia ASX 200 (Capital.com canonical epic AU200)
     "AU200": "AU200",           # Australia ASX 200
     "ASX200": "AU200",          # Australia ASX 200
-    "SG30": "SG25",             # Singapore Straits Times / SG25 (Capital.com canonical epic)
+    "SG30": "SG25",             # Singapore Straits Times / SG25 (Capital.com canonical epic SG25)
     "SG25": "SG25",             # Singapore Straits Times / SG25
     "TW30": "TW30",             # Taiwan Index
+    # European Equities Canonical Epics (Germany, France, UK, Spain, Italy, Netherlands)
+    "SAP": "SAPD",              # SAP SE (Germany)
+    "BAS": "BASD",              # BASF SE (Germany)
+    "ALV": "ALVD",              # Allianz SE (Germany)
+    "MBG": "MBGN",              # Mercedes-Benz Group (Germany)
+    "ADS": "ADSGN",             # Adidas AG (Germany)
+    "CON": "COND",              # Continental AG (Germany)
+    "MRK_DE": "MRKD",           # Merck KGaA (Germany)
+    "HEI": "HEID",              # Heidelberg Materials (Germany)
+    "AIR": "AIRFR",             # Airbus SE (France)
+    "MC": "MCFR",               # LVMH Moet Hennessy (France)
+    "LVMH": "MCFR",             # LVMH Moet Hennessy
+    "CAP": "CAPFR",             # Capgemini SE (France)
+    "TTE": "TTEF",              # TotalEnergies SE (France)
+    "STM": "STMPA",             # STMicroelectronics (France)
+    "STMPA": "STMPA",           # STMicroelectronics (France)
+    "SAN": "SANE",              # Banco Santander (Spain)
+    "SAN_MC": "SANE",           # Banco Santander (Spain)
+    "BBVA": "BBVAES",           # BBVA (Spain)
+    "IBE": "IBEES",             # Iberdrola (Spain)
+    "SHEL": "SHELGB",           # Shell plc (UK)
+    "RIO": "RIOGB",             # Rio Tinto plc (UK)
+    "NG": "NG.",                # National Grid plc (UK)
+    "BP": "BP.",                # BP plc (UK)
+    "ADYEN": "ADYENA",          # Adyen NV (Netherlands)
+    "HEIA": "HEIN",             # Heineken NV (Netherlands)
+    "NOVO_B": "NVO",            # Novo Nordisk AS ADR
+    "NVO": "NVO",               # Novo Nordisk AS ADR
+    "ISP_MI": "ISP",            # Intesa Sanpaolo (Italy)
+    # Asian Equities, Singapore, Australian & Global Asian Mega-Cap ADRs
+    "CBA": "CBAAU",             # Commonwealth Bank of Australia
+    "CBAAU": "CBAAU",           # Commonwealth Bank of Australia
+    "BHP": "BHPGB",             # BHP Group (Capital.com canonical epic BHPGB)
+    "BHPGB": "BHPGB",           # BHP Group
+    "DBS": "D05SG",             # DBS Group (Singapore)
+    "WILMAR": "F34SG",          # Wilmar International (Singapore)
+    "SIA": "C6LSG",             # Singapore Airlines (Singapore)
+    "KEPPEL": "BN4SG",          # Keppel Corporation (Singapore)
+    "CAPLAND": "A17USG",        # CapitaLand Ascendas REIT (Singapore)
+    "2330": "TSM",              # Taiwan Semiconductor (TSMC ADR)
+    "005930": "SMSN",           # Samsung Electronics (GDR)
+    "601318": "2318",           # Ping An Insurance (HK Listing)
+    "601857": "0857",           # PetroChina (HK Listing)
+    "002594": "1211",           # BYD Company (HK Listing)
+    "601899": "2899",           # Zijin Mining (HK Listing)
+    "600585": "0914",           # Anhui Conch Cement (HK Listing)
+    "9618": "JD",               # JD.com Inc - ADR
+    "9999": "NTES",             # NetEase Inc - ADR
+    "9888": "BIDU",             # Baidu Inc - ADR
+    "2015": "LI",               # Li Auto Inc - ADR
+    "9866": "NIO",              # NIO Inc - ADR
+    "9868": "XPEV",             # XPeng Inc - ADR
+    "0981": "SMI",              # Semiconductor Manufacturing Intl (SMIC ADR)
+    "0883": "CEO",              # CNOOC Ltd ADR
+    "0941": "CHL",              # China Mobile ADR
+    # US Canonical Ticker Aliases
+    "PRU_US": "PRU",            # Prudential Financial Inc (US)
+    "EL_US": "EL",              # Estee Lauder Companies Inc (US)
+    "BF_B": "BFB",              # Brown-Forman Corp Class B (US)
     # US Mega-Cap Stocks
     "META": "META",             # Meta Platforms Inc
     "GOOGL": "GOOGL",           # Alphabet Inc (Google) Class A
@@ -219,6 +283,15 @@ EPIC_MAP = {
     "AAPL": "AAPL",             # Apple Inc
     "MSFT": "MSFT",             # Microsoft Corporation
     "AMZN": "AMZN",             # Amazon.com Inc
+    "UBER": "UBER",             # Uber Technologies Inc
+    "ABNB": "ABNB",             # Airbnb Inc
+    "COIN": "COIN",             # Coinbase Global Inc
+    "ARM": "ARM",               # ARM Holdings PLC
+    "SMCI": "SMCI",             # Super Micro Computer Inc
+    "DELL": "DELL",             # Dell Technologies Inc
+    "PANW": "PANW",             # Palo Alto Networks
+    "NET": "NET",               # Cloudflare Inc
+    "DDOG": "DDOG",             # Datadog Inc
     # Forex Majors & Crosses
     "EURUSD": "EURUSD",         # Euro / US Dollar
     "GBPUSD": "GBPUSD",         # British Pound / US Dollar
