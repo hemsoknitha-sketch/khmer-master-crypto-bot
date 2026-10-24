@@ -232,6 +232,7 @@ class M15Trade:
         raw_size = self.target_risk / max(1e-4, self.sl_dist * contract_multiplier)
         self.position_size = max(min_deal_size, round(raw_size, 2 if min_deal_size >= 0.1 else 3))
         self.initial_risk_dollars = self.position_size * self.sl_dist * contract_multiplier
+        self.risk_overrun = self.initial_risk_dollars > (self.target_risk * 1.25)
 
         # Multi-Stage Targets (Invariant 98)
         if self.drop_scale_out:
@@ -655,8 +656,11 @@ def run_m15_backtest_simulation(
                         risk_pct=risk_pct,
                         drop_scale_out=ablation_flags.get("drop_scale_out", False)
                     )
+                    if new_trade.risk_overrun:
+                        continue
                     trade_id_counter += 1
                     open_trades[sym] = new_trade
+
 
                     if len(open_trades) >= 3:
                         break

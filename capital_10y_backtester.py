@@ -46,6 +46,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 # Import institutional probability calibrator for exact live/backtest parity (Priority 4)
 from capital_probability_calibrator import CapitalProbabilityCalibrator
+from purged_cv_deflated_sharpe import PurgedKFold, compute_deflated_sharpe_ratio
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("Capital10YBacktester")
@@ -1785,6 +1786,32 @@ def main():
     df_ledger.to_csv(ledger_path, index=False)
     logger.info(f"Saved Trade Ledger ({len(df_ledger)} trades) to {ledger_path}")
 
+    # 8.5 Marcos López de Prado Purged & Embargoed Cross-Validation (AFML Standard)
+    purged_cv_results = []
+    dsr_result = {}
+    if len(df_ledger) >= 10:
+        try:
+            pkf = PurgedKFold(n_splits=5, pct_embargo=0.01)
+            for fold_idx, (train_idx, test_idx) in enumerate(pkf.split(df_ledger, entry_col="entry_date", exit_col="exit_date")):
+                test_subset = df_ledger.iloc[test_idx]
+                test_wins = test_subset[test_subset["pnl_r"] > 0]
+                test_wr = round((len(test_wins) / max(1, len(test_subset))) * 100.0, 1)
+                test_net = round(float(test_subset["pnl_dollars"].sum()), 2)
+                test_exp = round(float(test_subset["pnl_r"].mean()), 3) if len(test_subset) > 0 else 0.0
+                purged_cv_results.append({
+                    "fold": fold_idx + 1,
+                    "train_trades": len(train_idx),
+                    "test_trades": len(test_idx),
+                    "test_win_rate": test_wr,
+                    "test_expectancy_r": test_exp,
+                    "test_net_profit": test_net
+                })
+            trade_returns = df_ledger["pnl_dollars"].values
+            dsr_result = compute_deflated_sharpe_ratio(returns=trade_returns, n_trials=350)
+            logger.info(f"Purged K-Fold Cross-Validation completed ({len(purged_cv_results)} folds). DSR: {dsr_result.get('deflated_sharpe_ratio', 0.0)}")
+        except Exception as e:
+            logger.warning(f"Purged CV computation note: {e}")
+
     # 9. Export Summary JSON
     summary_data = {
         "project": "ANGKOR QUANT — Institutional TradFi 10-Year Backtesting & Validation Project",
@@ -1800,6 +1827,8 @@ def main():
             "out_of_sample_20": oos_metrics
         },
         "walk_forward_stability": wf_results,
+        "purged_cross_validation": purged_cv_results,
+        "deflated_sharpe_ratio": dsr_result,
         "ablation_matrix": ablation_matrix,
         "asset_breakdown": asset_breakdown,
         "regime_breakdown": regime_breakdown,
@@ -1821,6 +1850,8 @@ def main():
     print(f"  Final Equity     : ${initial_equity + full_metrics['net_profit']:,.2f} (+{((full_metrics['net_profit'])/initial_equity)*100:.2f}%)")
     print(f"  Max Drawdown     : {full_metrics['max_drawdown_pct']}% (${full_metrics['max_drawdown_dollars']:,.2f})")
     print(f"  Sharpe Ratio     : {full_metrics['sharpe_ratio']}")
+    print(f"  Deflated Sharpe  : {dsr_result.get('deflated_sharpe_ratio', 'N/A')} (Significant: {dsr_result.get('is_statistically_significant', False)})")
+    print(f"  Purged CV Folds  : {len(purged_cv_results)} Folds Evaluated")
     print(f"  Brier Score      : {full_metrics['brier_score']}")
     print("=" * 78)
 

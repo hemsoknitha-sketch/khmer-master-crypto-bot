@@ -211,6 +211,11 @@ class TelegramBotThread(BaseThread):
         global MAIN_BOT_LOOP
         self.loop = asyncio.new_event_loop()
         MAIN_BOT_LOOP = self.loop
+        try:
+            import system_state
+            system_state.set_main_loop(self.loop)
+        except Exception:
+            pass
         asyncio.set_event_loop(self.loop)
         
         # 🚀 Institutional High-Concurrency ThreadPool (64 Dedicated Workers)

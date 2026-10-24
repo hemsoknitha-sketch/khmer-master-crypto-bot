@@ -6859,8 +6859,8 @@ def record_virtual_trade_pnl(ticket: int, symbol: str, total_pnl: float, close_p
                     f"<i>✨ ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វ័យប្រវត្តិកម្រិត Cloud 24/7!</i>"
                 )
                 import notification_manager
-                import bot_thread
-                loop = getattr(bot_thread, "MAIN_BOT_LOOP", None)
+                import system_state
+                loop = system_state.get_main_loop()
                 if loop and loop.is_running():
                     import asyncio
                     asyncio.run_coroutine_threadsafe(
@@ -6918,8 +6918,8 @@ def record_virtual_trade_pnl(ticket: int, symbol: str, total_pnl: float, close_p
             )
             admin_cid = 859271875
             import notification_manager
-            import bot_thread
-            loop = getattr(bot_thread, "MAIN_BOT_LOOP", None)
+            import system_state
+            loop = system_state.get_main_loop()
             if loop and loop.is_running():
                 import asyncio
                 asyncio.run_coroutine_threadsafe(

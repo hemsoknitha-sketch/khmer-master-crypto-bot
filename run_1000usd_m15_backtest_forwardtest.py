@@ -147,6 +147,8 @@ class M15Trade:
         raw_size = self.target_risk / max(1e-4, self.sl_dist * contract_multiplier)
         self.position_size = max(min_deal_size, round(raw_size, 2 if min_deal_size >= 0.1 else 3))
         self.initial_risk_dollars = self.position_size * self.sl_dist * contract_multiplier
+        self.risk_overrun = self.initial_risk_dollars > (self.target_risk * 1.25)
+
 
         if self.drop_scale_out:
             self.tp1_price = entry_price + (1.5 * self.sl_dist) if direction == "BUY" else entry_price - (1.5 * self.sl_dist)
@@ -354,8 +356,11 @@ def run_m15_simulation(
                         risk_pct=risk_pct,
                         drop_scale_out=ablation_flags.get("drop_scale_out", False)
                     )
+                    if nt.risk_overrun:
+                        continue
                     trade_id += 1
                     open_trades[sym] = nt
+
                     if is_comm:
                         has_comm = True
                     else:

@@ -7272,8 +7272,18 @@ class CapitalOpeningRangeBreakoutEngine:
                     continue
 
                 size_prec = 2 if min_deal >= 0.01 else 4
-                buy_size = round(max(min_deal, min(float(buy_size or min_deal), max_affordable_buy)), size_prec)
-                sell_size = round(max(min_deal, min(float(sell_size or min_deal), max_affordable_sell)), size_prec)
+                if user_allow_buy and float(buy_size or 0.0) >= min_deal:
+                    buy_size = round(max(min_deal, min(float(buy_size), max_affordable_buy)), size_prec)
+                else:
+                    buy_size = 0.0
+                    user_allow_buy = False
+
+                if user_allow_sell and float(sell_size or 0.0) >= min_deal:
+                    sell_size = round(max(min_deal, min(float(sell_size), max_affordable_sell)), size_prec)
+                else:
+                    sell_size = 0.0
+                    user_allow_sell = False
+
 
                 # In-Memory Virtual Breakout Radar: Zero broker pending exposure during wait!
                 u_trap = {
