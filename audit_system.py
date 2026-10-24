@@ -3830,6 +3830,7 @@ def run_audit():
         with open("models/apex_live_trade_engines.py", "r", encoding="utf-8") as f:
             models_apex_code = f.read()
 
+        has_byte_parity = (apex_code == models_apex_code)
         has_no_skeleton = "pass # (កូដដំណើរការនៅទីនេះ)" not in apex_code and "pass # (កូដដំណើរការនៅទីនេះ)" not in models_apex_code
         has_mev_engine = "class MEVFlashLoanEngine:" in apex_code and "def build_liquidity_graph" in apex_code and "def execute_if_profitable" in apex_code
         has_canonical_rotation = "cycle[idx:] + cycle[:idx]" in apex_code and "cycle[idx:] + cycle[:idx]" in models_apex_code
@@ -3875,7 +3876,7 @@ def run_audit():
 
         all_inv90_passed = (
             has_inv90_agents and has_inv90_gemini and
-            has_no_skeleton and has_mev_engine and has_canonical_rotation and
+            has_byte_parity and has_no_skeleton and has_mev_engine and has_canonical_rotation and
             has_whale_tracker and has_execution_engine and has_drawdown_guard and
             mev_unit_ok and mev_exec_ok and whale_unit_ok and fusion_unit_ok and
             kelly_unit_ok and dd_kill_ok
@@ -3886,7 +3887,7 @@ def run_audit():
         else:
             failures.append(
                 f"Invariant 90 check failed: inv90_agents={has_inv90_agents}, inv90_gemini={has_inv90_gemini}, "
-                f"no_skeleton={has_no_skeleton}, mev_eng={has_mev_engine}, rotation={has_canonical_rotation}, "
+                f"byte_parity={has_byte_parity}, no_skeleton={has_no_skeleton}, mev_eng={has_mev_engine}, rotation={has_canonical_rotation}, "
                 f"whale_tracker={has_whale_tracker}, exec_eng={has_execution_engine}, dd_guard={has_drawdown_guard}, "
                 f"mev_unit={mev_unit_ok}, mev_exec={mev_exec_ok}, whale_unit={whale_unit_ok}, "
                 f"fusion_unit={fusion_unit_ok}, kelly_unit={kelly_unit_ok}, dd_kill={dd_kill_ok}"

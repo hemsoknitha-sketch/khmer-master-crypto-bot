@@ -138,7 +138,7 @@ def safe_float(val, default: float = 0.0) -> float:
 
 def init_db():
     """Initializes the database and creates necessary tables/migrations automatically if they don't exist."""
-    conn = sqlite3.connect(DB_FILE, timeout=30.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Users table
@@ -1269,7 +1269,7 @@ def init_db():
         pass
 
 def register_user(chat_id: int, username: str) -> bool:
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute("SELECT chat_id FROM users WHERE chat_id = ?", (chat_id,))
