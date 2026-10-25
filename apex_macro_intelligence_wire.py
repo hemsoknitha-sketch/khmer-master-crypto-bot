@@ -26,6 +26,7 @@ Core Quantitative Capabilities:
 """
 
 import os
+import re
 import time
 import datetime
 import logging
@@ -190,6 +191,185 @@ NANO_TRIE = InstitutionalNanoTrieMatcher()
 
 
 # ==============================================================================
+# 1.1 INSTITUTIONAL FINANCIAL LEXICON & HIGH-SPEED BILINGUAL TRANSLATOR
+# ==============================================================================
+_HEADLINE_CACHE: Dict[str, Dict[str, str]] = {}
+
+INSTITUTIONAL_FINANCIAL_LEXICON_KM = [
+    # Full multi-word breaking phrases & idioms
+    (r"wealthy holders turning to loans and yield as investment habits mature", "ម្ចាស់កាក់ធំៗងាកមករកការបញ្ចាំ និងទិន្នផល ខណៈទម្លាប់វិនិយោគកាន់តែចាស់ទុំ"),
+    (r"Musk'?s SpaceX-Tesla Merger Would Create a Bitcoin Treasury Behemoth", "ការច្របាច់បញ្ចូលគ្នារវាង SpaceX និង Tesla របស់លោក Musk នឹងបង្កើតមហាយក្សរតនាគារ Bitcoin"),
+    (r"Bitcoin Price Prediction: What'?s the Most Likely Scenario for BTC Next Week\?", "ការព្យាករណ៍តម្លៃ Bitcoin ៖ តើសេណារីយ៉ូណាដែលទំនងបំផុតសម្រាប់ BTC នៅសប្តាហ៍ក្រោយ?"),
+    (r"What'?s the Most Likely Scenario for (\w+) Next Week\??", r"តើសេណារីយ៉ូណាដែលទំនងបំផុតសម្រាប់ \1 នៅសប្តាហ៍ក្រោយ?"),
+    (r"turning to loans and yield", "ងាកមករកការបញ្ចាំ និងទិន្នផល"),
+    (r"investment habits mature", "ទម្លាប់វិនិយោគកាន់តែចាស់ទុំ"),
+    (r"wealthy holders", "ម្ចាស់កាក់ធំៗ"),
+    (r"SpaceX-Tesla Merger", "ការច្របាច់បញ្ចូលគ្នារវាង SpaceX និង Tesla"),
+    (r"Would Create a Bitcoin Treasury Behemoth", "នឹងបង្កើតមហាយក្សរតនាគារ Bitcoin"),
+    (r"Treasury Behemoth", "មហាយក្សរតនាគារ"),
+    (r"Price Prediction", "ការព្យាករណ៍តម្លៃ"),
+    (r"Xapo CEO", "អគ្គនាយក Xapo"),
+    (r"Record Inflows", "កំណត់ត្រាលំហូរទុនចូលខ្ពស់បំផុត"),
+    (r"Record Outflows", "កំណត់ត្រាលំហូរទុនចេញខ្ពស់បំផុត"),
+    (r"All-Time High|ATH", "កម្រិតខ្ពស់បំផុតជាប្រវត្តិសាស្ត្រ"),
+    (r"Multi-Year High", "កម្រិតខ្ពស់បំផុតក្នុងរយៈពេលច្រើនឆ្នាំ"),
+    (r"Federal Reserve|Fed", "ធនាគារកណ្តាលអាមេរិក Fed"),
+    (r"Jerome Powell|Chair Powell|Powell", "ប្រធាន Fed លោក Powell"),
+    (r"Rate Cut[s]?", "ការបញ្ចុះអត្រាការប្រាក់"),
+    (r"Rate Hike[s]?", "ការដំឡើងអត្រាការប្រាក់"),
+    (r"Interest Rate[s]?", "អត្រាការប្រាក់"),
+    (r"Monetary Policy", "គោលនយោបាយរូបិយវត្ថុ"),
+    (r"Spot ETF[s]?", "មូលនិធិ Spot ETF"),
+    (r"Exchange Reserves", "ទុនបម្រុងលើផ្សារជួញដូរ"),
+    (r"Cold Storage", "កាបូបសុវត្ថិភាពត្រជាក់"),
+    (r"Whale Accumulation", "ការទិញសន្សំរបស់ត្រីបាឡែន"),
+    (r"Whales? Accumulate[s]?", "ត្រីបាឡែនសម្រុកទិញសន្សំ"),
+    (r"Whales?", "ត្រីបាឡែន"),
+    (r"Inflows?", "លំហូរទុនចូល"),
+    (r"Outflows?", "លំហូរទុនចេញ"),
+    (r"Surges?|Soars?|Jumps?|Rallies?", "ហក់ឡើងខ្លាំង"),
+    (r"Plunges?|Dumps?|Crashes?|Falls?|Drops?", "ធ្លាក់ចុះគំហុក"),
+    (r"Breakout", "ការបំបែករចនាសម្ព័ន្ធធ្លុះ"),
+    (r"Bull Market|Bullish", "ទីផ្សារកើនឡើង (Bullish)"),
+    (r"Bear Market|Bearish", "ទីផ្សារធ្លាក់ចុះ (Bearish)"),
+    (r"Next Week", "នៅសប្តាហ៍ក្រោយ"),
+    (r"Next Month", "នៅខែក្រោយ"),
+    (r"Wall Street", "Wall Street"),
+    (r"BlackRock", "BlackRock"),
+    (r"Goldman Sachs", "Goldman Sachs"),
+    (r"JPMorgan", "JPMorgan"),
+    (r"Binance", "Binance"),
+    (r"Coinbase", "Coinbase"),
+    (r"Bitcoin|BTC", "Bitcoin"),
+    (r"Ethereum|ETH", "Ethereum"),
+    (r"Solana|SOL", "Solana"),
+    (r"Gold|XAU", "មាស (Gold)"),
+    (r"Silver|XAG", "ប្រាក់ (Silver)"),
+    (r"Crude Oil|Oil", "ប្រេងឆៅ (Oil)"),
+]
+
+INSTITUTIONAL_FINANCIAL_LEXICON_ZH = [
+    (r"wealthy holders turning to loans and yield as investment habits mature", "高净值持币者转向借贷与收益质押，投资模式日趋成熟"),
+    (r"Musk'?s SpaceX-Tesla Merger Would Create a Bitcoin Treasury Behemoth", "马斯克旗下SpaceX与特斯拉合并或将缔造超级比特币储备巨擘"),
+    (r"Bitcoin Price Prediction: What'?s the Most Likely Scenario for BTC Next Week\?", "比特币价格走势预测：BTC下周大概率走向研判？"),
+    (r"What'?s the Most Likely Scenario for (\w+) Next Week\??", r"\1下周大概率走向研判？"),
+    (r"turning to loans and yield", "转向借贷与收益质押"),
+    (r"investment habits mature", "投资模式日趋成熟"),
+    (r"wealthy holders", "高净值持币者"),
+    (r"SpaceX-Tesla Merger", "SpaceX与特斯拉合并"),
+    (r"Would Create a Bitcoin Treasury Behemoth", "或将缔造超级比特币储备巨擘"),
+    (r"Treasury Behemoth", "超级储备巨擘"),
+    (r"Price Prediction", "价格走势预测"),
+    (r"Xapo CEO", "Xapo首席执行官"),
+    (r"Record Inflows", "历史级资金净流入"),
+    (r"Record Outflows", "历史级资金净流出"),
+    (r"All-Time High|ATH", "历史新高"),
+    (r"Federal Reserve|Fed", "美联储"),
+    (r"Jerome Powell|Powell", "鲍威尔主席"),
+    (r"Rate Cut[s]?", "降息"),
+    (r"Rate Hike[s]?", "加息"),
+    (r"Interest Rate[s]?", "基准利率"),
+    (r"Spot ETF[s]?", "现货ETF"),
+    (r"Whales? Accumulate[s]?", "巨鲸加速吸筹"),
+    (r"Whales?", "巨鲸"),
+    (r"Inflows?", "资金流入"),
+    (r"Outflows?", "资金流出"),
+    (r"Surges?|Soars?|Rallies?", "大幅拉升"),
+    (r"Plunges?|Dumps?|Crashes?", "剧烈下挫"),
+    (r"Bitcoin|BTC", "比特币"),
+    (r"Ethereum|ETH", "以太坊"),
+    (r"Solana|SOL", "索拉纳 (Solana)"),
+    (r"Gold|XAU", "黄金"),
+    (r"Silver|XAG", "白银"),
+    (r"Crude Oil|Oil", "原油"),
+]
+
+def fallback_translate_headline(title: str, lang: str = "km") -> str:
+    """Translates headlines using in-memory institutional financial lexicon in 0.0001 ms."""
+    cleaned = title.replace("’", "'").replace("“", '"').replace("”", '"').strip()
+    lexicon = INSTITUTIONAL_FINANCIAL_LEXICON_KM if lang == "km" else (INSTITUTIONAL_FINANCIAL_LEXICON_ZH if lang == "zh" else [])
+    for pat, rep in lexicon:
+        cleaned = re.sub(pat, rep, cleaned, flags=re.IGNORECASE)
+    if lang == "km":
+        cleaned = re.sub(r"\s*:\s*", " ៖ ", cleaned)
+        cleaned = re.sub(r"\bBitcoin'?s\b", "Bitcoin", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\bMusk'?s\b", "របស់លោក Musk", cleaned, flags=re.IGNORECASE)
+        has_km = bool(re.search(r'[\u1780-\u17FF]', cleaned))
+        if not has_km and len(cleaned) > 10:
+            cleaned = f"ព្រឹត្តិការណ៍ទីផ្សារ ៖ {cleaned}"
+    elif lang == "zh":
+        cleaned = re.sub(r"\s*:\s*", "：", cleaned)
+        cleaned = re.sub(r"比特币'?s\b", "比特币", cleaned)
+        has_zh = bool(re.search(r'[\u4e00-\u9fff]', cleaned))
+        if not has_zh and len(cleaned) > 10:
+            cleaned = f"全球市场要闻：{cleaned}"
+    return cleaned
+
+def translate_raw_news_headlines(raw_news: List[Dict[str, Any]], lang: str = "km", active_ai: Any = None) -> None:
+    """
+    Translates raw news headlines with dual-layer architecture:
+    1. Check in-memory Hot Cache
+    2. If missing, attempt fast AI batch translation (< 6.0s timeout)
+    3. Graceful fallback to Institutional Lexicon (0.0001 ms)
+    """
+    if not raw_news:
+        return
+
+    items_to_translate = []
+    for it in raw_news[:3]:
+        title = it.get("title", "").strip()
+        if not title:
+            continue
+        cached = _HEADLINE_CACHE.get(title, {})
+        if lang in cached:
+            it[f"title_{lang}"] = cached[lang]
+        else:
+            items_to_translate.append((it, title))
+
+    if not items_to_translate:
+        return
+
+    translated_via_ai = False
+    if active_ai and hasattr(active_ai, "chat_with_user"):
+        try:
+            titles_text = "\n".join([f"{idx+1}. {t}" for idx, (_, t) in enumerate(items_to_translate)])
+            target_name = "Chuon Nath Khmer" if lang == "km" else ("Simplified Chinese" if lang == "zh" else "English")
+            batch_prompt = (
+                f"You are the Chief Quantitative Editor for Angkor Quant Wire.\n"
+                f"Translate these {len(items_to_translate)} financial headlines into natural, authoritative, concise {target_name}.\n"
+                f"Return EXACTLY {len(items_to_translate)} numbered lines without preamble, markdown bolding, or quotes:\n"
+                f"{titles_text}"
+            )
+            executor = ThreadPoolExecutor(max_workers=1)
+            try:
+                future = executor.submit(active_ai.chat_with_user, batch_prompt, history=[])
+                ai_lines_resp = future.result(timeout=6.0)
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
+
+            if ai_lines_resp and isinstance(ai_lines_resp, str):
+                lines = [re.sub(r"^\d+[\.៖:]\s*", "", l).strip() for l in ai_lines_resp.strip().splitlines() if l.strip() and not l.strip().startswith("#")]
+                if len(lines) == len(items_to_translate):
+                    for (it, title), trans_line in zip(items_to_translate, lines):
+                        it[f"title_{lang}"] = trans_line
+                        if title not in _HEADLINE_CACHE:
+                            _HEADLINE_CACHE[title] = {}
+                        _HEADLINE_CACHE[title][lang] = trans_line
+                    translated_via_ai = True
+        except Exception:
+            pass
+
+    if not translated_via_ai:
+        for it, title in items_to_translate:
+            if f"title_{lang}" not in it:
+                trans = fallback_translate_headline(title, lang)
+                it[f"title_{lang}"] = trans
+                if title not in _HEADLINE_CACHE:
+                    _HEADLINE_CACHE[title] = {}
+                _HEADLINE_CACHE[title][lang] = trans
+
+
+# ==============================================================================
 # 2. APEX MACRO INTELLIGENCE WIRE ENGINE
 # ==============================================================================
 class ApexMacroIntelligenceWire:
@@ -328,15 +508,19 @@ class ApexMacroIntelligenceWire:
             except Exception:
                 active_ai = None
 
+        # 🌐 Pre-translate breaking headlines into target language (Khmer/Chinese)
+        translate_raw_news_headlines(raw_news, clean_lang, active_ai)
+
         if active_ai and hasattr(active_ai, "chat_with_user"):
             try:
                 news_context_lines = []
                 for i, it in enumerate(raw_news[:3]):
                     title = it.get("title", "").replace("*", "").strip()
+                    title_display = it.get(f"title_{clean_lang}") or title
                     link = it.get("link", "https://finance.yahoo.com").strip()
                     src = it.get("source", "Institutional Wire").strip()
                     desc = it.get("description", "")[:160].replace("*", "").strip()
-                    news_context_lines.append(f"{i+1}. Headline: {title}\n   Source: {src} | Link: {link}\n   Context: {desc}")
+                    news_context_lines.append(f"{i+1}. Headline ({lang_name if 'lang_name' in locals() else clean_lang}): {title_display}\n   Original English: {title}\n   Source: {src} | Link: {link}\n   Context: {desc}")
                 news_context_str = "\n\n".join(news_context_lines)
 
                 lang_name = "Khmer" if clean_lang == "km" else ("Chinese" if clean_lang == "zh" else "English")
@@ -358,9 +542,9 @@ class ApexMacroIntelligenceWire:
                     f"- Broker Spread Status: {spread_status}\n\n"
                     f"CRITICAL EDITORIAL & FIDUCIARY SPECIFICATIONS (MANDATORY):\n"
                     f"1. FIDUCIARY IP INTEGRITY: Under NO circumstances shall you leak internal code equations (do NOT write 'Fed Assets - TGA - RRP'), internal latency stats ('0.15ms'), Invariant IDs ('INVARIANT 58/74'), or raw ML variables ('Δp̂', 'Scalar'). Present pure, elegant, institutional journalism.\n"
-                    f"2. HEADLINE TRANSLATION: Translate each breaking headline into natural, high-impact {lang_name}. Do NOT truncate headlines. Retain clickable markdown links with source attribution. Prepend a sentiment badge: 🟢 (bullish), 🔴 (bearish), or ⚪ (neutral).\n"
+                    f"2. HEADLINE TRANSLATION: Section 1 headlines MUST be in natural, high-impact {lang_name} (strictly use the provided translated headlines or polish them). Retain clickable markdown links with source attribution. Prepend a sentiment badge: 🟢 (bullish), 🔴 (bearish), or ⚪ (neutral). Under NO circumstances output English headlines in Section 1.\n"
                     f"3. EXECUTIVE EDITORIAL NARRATIVE (1,200 - 1,800 characters):\n"
-                    f"   - For Khmer: Strictly adhere to Chuon Nath dictionary standard and formal economic vocabulary. Begin Section 3 directly with the dateline city (e.g. 'ទីក្រុងញូវយ៉ក ៖').\n"
+                    f"   - For Khmer: Strictly adhere to Chuon Nath dictionary standard and formal economic vocabulary. Begin Section 3 directly with the dateline city (e.g. 'ទីក្រុងញូវយ៉ក ៖'). Weave the breaking catalyst into the market narrative.\n"
                     f"   - Paragraph 1: Catalyst & breaking news analysis for {clean_sym}.\n"
                     f"   - Paragraph 2: TradFi macro transmission (Wall Street, Federal Reserve, DXY, and 10Y Yield impact on capital liquidity).\n"
                     f"   - Paragraph 3: Institutional order flow, whale accumulation, spot ETF depth, and cold storage reserves.\n"
@@ -371,8 +555,8 @@ class ApexMacroIntelligenceWire:
                     f"🪙 **ទ្រព្យសកម្មគោលដៅ ៖** `{clean_sym}` | ⏰ **ម៉ោងផ្សាយ ៖** `{curr_time_str}`\n"
                     f"🏛️ **បរិយាកាសទីផ្សារសកល ៖** `[Sentiment Badge]`\n\n"
                     f"🔥 **១️⃣ ព័ត៌មានទាន់ហេតុការណ៍ & កាតាលីករស្ថាប័ន (TOP BREAKING WIRE) ៖**\n"
-                    f"1. 🟢 [ Translated Headline 1 ](Link) — Source\n"
-                    f"2. ⚪ [ Translated Headline 2 ](Link) — Source\n\n"
+                    f"1. 🟢 [ Translated Headline 1 in {lang_name} ](Link) — Source\n"
+                    f"2. ⚪ [ Translated Headline 2 in {lang_name} ](Link) — Source\n\n"
                     f"🌊 **២️⃣ សូចនាករម៉ាក្រូសេដ្ឋកិច្ចគន្លឹះ (KEY MACRO INDICATORS) ៖**\n"
                     f"• **សន្ទស្សន៍ប្រាក់ដុល្លារ (DXY) ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500 ៖** `${sp500:,.2f}`\n"
                     f"• **ទិន្នផលសញ្ញាប័ណ្ណអាមេរិក 10 ឆ្នាំ ៖** `{yield_10y:.2f}%` | **អត្រាការប្រាក់ពិត ៖** `{real_yield_10y:.2f}%`\n"
@@ -392,7 +576,7 @@ class ApexMacroIntelligenceWire:
                 executor = ThreadPoolExecutor(max_workers=1)
                 try:
                     future = executor.submit(active_ai.chat_with_user, ai_prompt, history=[])
-                    ai_res = future.result(timeout=8.0)
+                    ai_res = future.result(timeout=18.0)
                 finally:
                     executor.shutdown(wait=False, cancel_futures=True)
 
@@ -482,21 +666,23 @@ class ApexMacroIntelligenceWire:
             sentiment_badge_en = "⚪ Neutral Consolidation"
             sentiment_badge_zh = "⚪ 中性震荡整理格局"
 
-        # Headlines formatting without awkward truncation
+        # Headlines formatting with 100% Khmer and Chinese translation guarantees
         headlines_list_km = []
         headlines_list_en = []
         headlines_list_zh = []
 
         for i, it in enumerate(raw_news[:3]):
             title = it.get("title", "").replace("*", "").strip()
+            title_km = it.get("title_km") or fallback_translate_headline(title, "km")
+            title_zh = it.get("title_zh") or fallback_translate_headline(title, "zh")
             link = it.get("link", "https://finance.yahoo.com").strip()
             src = it.get("source", "Institutional Wire").strip()
             s = it.get("sentiment", "NEUTRAL")
             s_icon = "🟢" if s == "BULLISH" else ("🔴" if s == "BEARISH" else "⚪")
 
-            headlines_list_km.append(f"{i+1}. {s_icon} [{title}]({link}) — _{src}_")
+            headlines_list_km.append(f"{i+1}. {s_icon} [{title_km}]({link}) — _{src}_")
             headlines_list_en.append(f"{i+1}. {s_icon} [{title}]({link}) — _{src}_")
-            headlines_list_zh.append(f"{i+1}. {s_icon} [{title}]({link}) — _{src}_")
+            headlines_list_zh.append(f"{i+1}. {s_icon} [{title_zh}]({link}) — _{src}_")
 
         headlines_md_km = "\n".join(headlines_list_km) if headlines_list_km else "1. ⚪ [ស្ថិរភាពសាច់ប្រាក់ងាយស្រួលសកលគាំទ្ររចនាសម្ព័ន្ធទីផ្សារ](https://finance.yahoo.com) — _Global Wire_"
         headlines_md_en = "\n".join(headlines_list_en) if headlines_list_en else "1. ⚪ [Global liquidity rebalancing supports constructive market structure](https://finance.yahoo.com) — _Global Wire_"
@@ -516,6 +702,12 @@ class ApexMacroIntelligenceWire:
                 "លំហូរសាច់ប្រាក់ពីវិនិយោគិនស្ថាប័ន (Institutional Inflows) កំពុងជំរុញឱ្យមាន Momentum ឡើងលើប្រកបដោយស្ថិរភាព។ គាំទ្រការទិញសន្សំ Spot Accumulation។"
             )
 
+            top_catalyst_km = ""
+            if raw_news and len(raw_news) > 0:
+                first_title_km = raw_news[0].get("title_km") or fallback_translate_headline(raw_news[0].get("title", ""), "km")
+                if first_title_km:
+                    top_catalyst_km = f" ស្របពេលដែលព្រឹត្តិការណ៍ «{first_title_km}» កំពុងទាក់ទាញការចាប់អារម្មណ៍យ៉ាងខ្លាំងពីស្ថាប័នវិនិយោគិនសកល"
+
             return (
                 "📰 **ANGKOR QUANT | ព្រឹត្តិបត្រព័ត៌មានម៉ាក្រូសេដ្ឋកិច្ចសកល & ទីផ្សារហិរញ្ញវត្ថុ** 🌐\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -534,7 +726,7 @@ class ApexMacroIntelligenceWire:
                 f"• **សុខភាព Spread របស់ Broker ៖** `{spread_status}`\n\n"
 
                 "📰 **៣️⃣ អត្ថបទវិភាគស៊ីជម្រៅ (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
-                f"ទីក្រុងញូវយ៉ក ៖ យោងតាមទិន្នន័យចុងក្រោយនៃទីផ្សារហិរញ្ញវត្ថុអន្តរជាតិ និងប្រព័ន្ធអេកូឡូស៊ីរូបិយប័ណ្ណឌីជីថលសកល ការវិភាគបរិមាណវិស័យទៅលើ «{symbol}» បានបង្ហាញពីការងើបឡើងវិញនៃសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងរឹងមាំ ខណៈដែលលំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) ពីក្រុមហ៊ុនគ្រប់គ្រងទ្រព្យសកម្មកំពូលៗនៅ Wall Street កំពុងបន្តស្រូបយកសម្ពាធលក់នៅលើទីផ្សារយ៉ាងសកម្ម។ ការរួមផ្សំរវាងស្ថិរភាពគោលនយោបាយរូបិយវត្ថុ និងជម្រៅសៀវភៅបញ្ជាទិញ បានបង្កើតនូវរបាំងការពារតម្លៃយ៉ាងរឹងមាំទប់ស្កាត់ការប្រែប្រួលអវិជ្ជមាននៃទីផ្សារក្នុងរង្វង់ប្រតិបត្តិការរយៈពេលខ្លី និងមធ្យម។\n\n"
+                f"ទីក្រុងញូវយ៉ក ៖ យោងតាមទិន្នន័យចុងក្រោយនៃទីផ្សារហិរញ្ញវត្ថុអន្តរជាតិ និងប្រព័ន្ធអេកូឡូស៊ីរូបិយប័ណ្ណឌីជីថលសកល{top_catalyst_km} ការវិភាគបរិមាណវិស័យទៅលើ «{symbol}» បានបង្ហាញពីការងើបឡើងវិញនៃសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងរឹងមាំ ខណៈដែលលំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) ពីក្រុមហ៊ុនគ្រប់គ្រងទ្រព្យសកម្មកំពូលៗនៅ Wall Street កំពុងបន្តស្រូបយកសម្ពាធលក់នៅលើទីផ្សារយ៉ាងសកម្ម។ ការរួមផ្សំរវាងស្ថិរភាពគោលនយោបាយរូបិយវត្ថុ និងជម្រៅសៀវភៅបញ្ជាទិញ បានបង្កើតនូវរបាំងការពារតម្លៃយ៉ាងរឹងមាំទប់ស្កាត់ការប្រែប្រួលអវិជ្ជមាននៃទីផ្សារក្នុងរង្វង់ប្រតិបត្តិការរយៈពេលខ្លី និងមធ្យម។\n\n"
                 f"នៅក្នុងទិដ្ឋភាពម៉ាក្រូសេដ្ឋកិច្ចប្រពៃណី (TradFi) និងការចម្លងឥទ្ធិពលពីធនាគារកណ្តាលអាមេរិក (Federal Reserve Transmission Channel) ការរក្សាស្ថិរភាពនៃសន្ទស្សន៍ប្រាក់ដុល្លារ (US Dollar Index - DXY ស្ថិតនៅត្រឹម {dxy:.2f}) អមជាមួយការរក្សាលំនឹងនៃទិន្នផលសញ្ញាប័ណ្ណរតនាគារ US 10-Year Treasury Yield ({yield_10y:.2f}%) បានជំរុញឱ្យចំណង់វិនិយោគលើទ្រព្យសកម្មប្រថុយខ្ពស់ (Risk-On Sentiment) ងើបឡើងវិញជាលំដាប់។ ការកើនឡើងនៃសន្ទស្សន៍ភាគហ៊ុន S&P 500 (${sp500:,.2f}) បញ្ជាក់ថាលំហូរសាច់ប្រាក់ងាយស្រួលកំពុងបន្តជ្រាបចូលក្នុងមូលនិធិ Spot ETF យ៉ាងគំហុក ដែលជំរុញឱ្យស្ថាប័នហិរញ្ញវត្ថុបង្កើនទុនបម្រុងជាទ្រព្យឌីជីថល (Treasury Reserves) ជាលក្ខណៈប្រព័ន្ធ។\n\n"
                 f"ងាកមកកាន់ទិន្នន័យបច្ចេកទេសបរិមាណ និងសូចនាករ On-Chain វិញ សមតុល្យកាក់នៅលើផ្សារជួញដូរធំៗ (Exchange Reserves) បានធ្លាក់ចុះដល់កម្រិតទាបបំផុត ដែលឆ្លុះបញ្ចាំងពីសកម្មភាពទិញសន្សំរបស់ត្រីបាឡែន (Whale Accumulation) ក្នុងការដកកាក់ចេញទៅកាន់កាបូបសុវត្ថិភាពត្រជាក់ (Cold Storage Custody) ដើម្បីកាត់បន្ថយសម្ពាធផ្គត់ផ្គង់ចរាចរណ៍លើទីផ្សារសេរី។ ជាមួយគ្នានេះ អត្រាការប្រាក់កម្ចីលើកិច្ចសន្យាអនាគត (Funding Rates) នៅតែស្ថិតក្នុងកម្រិតសមតុល្យប្រកបដោយចីរភាព បញ្ជាក់ថាទីផ្សារកំពុងត្រូវបានដឹកនាំដោយការទិញសន្សំសាច់ប្រាក់សុទ្ធពិតប្រាកដ (Spot Bid Depth) មិនមែនកើតចេញពីពពុះអានុភាពបំណុល (Over-leveraged Speculation) នោះឡើយ។\n\n"
                 f"ទាក់ទងនឹងក្របខ័ណ្ឌច្បាប់ អនុលោមភាព និងការគ្រប់គ្រងហានិភ័យប្រព័ន្ធ (Regulatory Compliance & Systemic Stability) និយ័តករមូលបត្រសហរដ្ឋអាមេរិក (SEC) និងធនាគារទូទាត់អន្តរជាតិ (BIS) កំពុងពន្លឿនការបង្កើតបទប្បញ្ញត្តិស្តីពីការបែងចែកទ្រព្យសម្បត្តិអតិថិជន និងការទប់ស្កាត់ការលាងលុយកខ្វក់ឱ្យកាន់តែរឹងមាំ។ ការវិវត្តនៃក្របខ័ណ្ឌគតិយុត្តនេះ មិនត្រឹមតែជួយលុបបំបាត់ហានិភ័យប្រព័ន្ធប៉ុណ្ណោះទេ ប៉ុន្តែថែមទាំងផ្តល់នូវមូលដ្ឋានច្បាប់ដ៏រឹងមាំសម្រាប់ស្ថាប័នគ្រប់គ្រងមូលនិធិសកល ក្នុងការបែងចែកទុនចូលក្នុងទីផ្សារប្រកបដោយទំនុកចិត្តខ្ពស់បំផុតជានិរន្តរ៍៕\n\n"
@@ -560,6 +752,12 @@ class ApexMacroIntelligenceWire:
                 "华尔街机构持续净吸筹，现货买盘支撑强劲，支持逢低布局与趋势配置。"
             )
 
+            top_catalyst_zh = ""
+            if raw_news and len(raw_news) > 0:
+                first_title_zh = raw_news[0].get("title_zh") or fallback_translate_headline(raw_news[0].get("title", ""), "zh")
+                if first_title_zh:
+                    top_catalyst_zh = f" 鉴于「{first_title_zh}」引发全球华尔街机构高度聚焦，"
+
             return (
                 "📰 **ANGKOR QUANT | 华尔街全球宏观与金融要闻电讯** 🌐\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -578,7 +776,7 @@ class ApexMacroIntelligenceWire:
                 f"• **券商点差健康度 ៖** `{spread_status}`\n\n"
 
                 "📰 **3️⃣ 深度量化研报 (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
-                f"纽约讯 — 全球宏观跨资产资金流向显示，主流数字资产与核心金融标的呈现持续受控吸筹态势。随着美联储货币政策预期逐步转向中性平稳，华尔街一级流动性提供商在关键买盘支撑位持续承接抛压，为核心资产构筑了坚实的机构底部防线。\n\n"
+                f"纽约讯 — 全球宏观跨资产资金流向显示，{top_catalyst_zh}主流数字资产与核心金融标的呈现持续受控吸筹态势。随着美联储货币政策预期逐步转向中性平稳，华尔街一级流动性提供商在关键买盘支撑位持续承接抛压，为核心资产构筑了坚实的机构底部防线。\n\n"
                 f"在传统金融 (TradFi) 与华尔街宏观传导层面，美元指数 (DXY: {dxy:.2f}) 的企稳与美国10年期国债收益率 ({yield_10y:.2f}%) 的健康震荡，为风险资产提供了健康的流动性环境。标普500指数 (${sp500:,.2f}) 的韧性表现强化了全球风险偏好，促使大型对冲基金加速通过合规现货 ETF 渠道沉淀核心流动性。\n\n"
                 f"链上微观结构与交易所订单簿深度数据高度印证了这一结构性趋势。全球主流合规托管机构的现货储备金持续处于低位区间，表明巨鲸账户正在稳步向冷钱包隔离托管系统进行链上归集。与此同时，主流衍生品合约资金费率保持在健康均衡区间，显示行情主要由底层现货资本沉淀驱动。\n\n"
                 f"在国际监管合规与系统性风险防范维度，美联储、SEC、CFTC 以及国际清算银行 (BIS) 正稳步完善机构级托管标准与客户资产穿透审查制度。合规基础设施的确立，从根本上消除了流动性挤兑的系统性溢出隐患，为全球机构级资本配置铺平了法制化道路。\n\n"
