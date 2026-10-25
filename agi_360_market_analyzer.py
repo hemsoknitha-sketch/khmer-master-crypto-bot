@@ -76,7 +76,7 @@ def fetch_asset_candles(
         try:
             import capital_engine
             eng = capital_engine.get_capital_engine()
-            res_code = "MINUTE_15" if interval in ["15m", "15"] else ("HOUR_4" if interval in ["4h", "240"] else "MINUTE_5")
+            res_code = "MINUTE_15" if interval in ["15m", "15"] else ("HOUR_4" if interval in ["4h", "240"] else ("HOUR" if interval in ["1h", "60"] else ("MINUTE_5" if interval in ["5m", "5"] else "MINUTE_15")))
             raw_candles = eng.get_historical_prices(clean_sym, resolution=res_code, max_bars=limit)
             if raw_candles and len(raw_candles) >= 5:
                 rows = []
