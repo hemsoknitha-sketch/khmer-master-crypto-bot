@@ -5081,11 +5081,11 @@ class TelegramBotThread(BaseThread):
             ])
 
             loading_text = (
-                "📰 **ANGKOR QUANT | GLOBAL MACRO & CRYPTO WIRE v14.00**\n\n_Synthesizing real-time TradFi & Crypto breaking news with Google Satellite Macro confluence..._"
+                "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & QUANTITATIVE WIRE v14.50**\n\n_Synthesizing Nano-Trie <0.05ms matching, $6T US Net Liquidity Formula & Red Folder Blackout Guard..._"
                 if user_lang == 'en' else
-                ("📰 **ANGKOR QUANT | 全球宏观与加密行业电讯 v14.00**\n\n_正在汇聚 TradFi 宏观与加密突发新闻，并由 AGI 撰写深度量化分析..._"
+                ("📰 **ANGKOR QUANT | 华尔街全球宏观与量化情报电讯 v14.50**\n\n_正在执行内存纳米字典树匹配、6万亿美元净流动性公式与红标事件防御审计..._"
                  if user_lang == 'zh' else
-                 "📰 **ANGKOR QUANT | GLOBAL MACRO & CRYPTO WIRE v14.00**\n\n_កំពុងទាញយកព័ត៌មានទាន់ហេតុការណ៍ TradFi + Crypto និងសំយោគទិន្នន័យផ្កាយរណបម៉ាក្រូសេដ្ឋកិច្ចកម្រិតស្ថាប័ន..._")
+                 "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & QUANTITATIVE WIRE v14.50**\n\n_កំពុងស្កេន Nano-Trie <0.05ms, រូបមន្តសាច់ប្រាក់សកល $6T US Net Liquidity & របាំងការពារ Red Folder Blackout..._")
             )
 
             status_msg = None

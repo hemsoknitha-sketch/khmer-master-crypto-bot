@@ -643,9 +643,16 @@ def _build_rich_dynamic_fallback(
 def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = None) -> NewsReportResult:
     """
     Generates an institutional 1,500 - 2,500 character TradFi Macro & Crypto Journalistic Report
-    in target language (KM/EN/ZH) v14.00 Angkor Quant.
-    Combines live high-speed feeds with Google Macro Intelligence Satellite data.
+    in target language (KM/EN/ZH) v14.50 Angkor Quant.
+    Integrates Nano-Trie <0.05ms Matching, $6T US Net Liquidity Formula,
+    Economic Calendar Red Folder Blackout, and Dynamic Quant Sentiment Feed.
     """
+    try:
+        import apex_macro_intelligence_wire as amw
+        return amw.generate_apex_macro_news_report(symbol=symbol, user_lang=lang, ai_engine=ai_engine)
+    except Exception as e_wire:
+        print(f"⚠️ ApexMacroWire fallback to standard pipeline: {e_wire}")
+
     sym_str = str(symbol).upper().strip() if symbol else ""
     target_sym_cmd = sym_str.replace("USDT", "") if sym_str else "BTC"
 
