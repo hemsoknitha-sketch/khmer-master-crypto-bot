@@ -5031,6 +5031,72 @@ class TelegramBotThread(BaseThread):
                     await context.bot.send_message(chat_id=chat_id, text=err_txt)
 
 
+        async def conference_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            args = context.args if hasattr(context, 'args') else []
+            sub_cmd = str(args[0]).upper().strip() if args and len(args) > 0 else "STATUS"
+
+            import live_conference_speech_engine as lce
+            engine = lce.CONFERENCE_ENGINE
+
+            if sub_cmd in ["SIMULATE", "SIM", "REPLAY", "TEST"]:
+                lce.run_powell_fomc_simulation()
+            elif sub_cmd in ["START", "ON", "LISTEN"]:
+                engine.start_conference(stream_key="FED")
+            elif sub_cmd in ["STOP", "OFF", "RESET"]:
+                engine.reset_to_idle()
+            elif sub_cmd in ["QA", "Q&A"]:
+                engine.transition_to_qa()
+
+            assessment_text = engine.generate_assessment(user_lang=user_lang)
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh Stream", callback_data="btn_conf_refresh"),
+                    InlineKeyboardButton("🧪 Simulate Powell FOMC", callback_data="btn_conf_simulate")
+                ],
+                [
+                    InlineKeyboardButton("🎙️ Toggle Listening", callback_data="btn_conf_toggle"),
+                    InlineKeyboardButton("🛡️ Spread Guard Audit", callback_data="btn_conf_spread")
+                ],
+                [
+                    InlineKeyboardButton("📰 Macro News Wire", callback_data="btn_news_refresh"),
+                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            if update.callback_query:
+                try: await update.callback_query.answer()
+                except Exception: pass
+                try:
+                    await update.callback_query.message.reply_text(assessment_text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await update.callback_query.message.reply_text(assessment_text.replace('*', '').replace('`', ''), reply_markup=keyboard)
+            else:
+                try:
+                    await (update.effective_message or update.message).reply_text(assessment_text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await (update.effective_message or update.message).reply_text(assessment_text.replace('*', '').replace('`', ''), reply_markup=keyboard)
+
+
         async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -8000,6 +8066,18 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_news_macro_event", "btn_macro_event"]:
                 context.args = ["EVENT"]
                 await news_command(update, context)
+            elif data in ["btn_conf_refresh", "btn_conference"]:
+                context.args = ["STATUS"]
+                await conference_command(update, context)
+            elif data == "btn_conf_simulate":
+                context.args = ["SIMULATE"]
+                await conference_command(update, context)
+            elif data == "btn_conf_toggle":
+                context.args = ["START"]
+                await conference_command(update, context)
+            elif data == "btn_conf_spread":
+                context.args = ["STATUS"]
+                await conference_command(update, context)
             elif data in ["btn_add_api_prompt", "btn_menu_api"]:
                 await add_api_command(update, context)
             elif data == "btn_lang_km":
@@ -20311,6 +20389,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("cancel_alert", cancel_alert_command))
         self.app.add_handler(CommandHandler("top", top_command))
         self.app.add_handler(CommandHandler("news", news_command))
+        self.app.add_handler(CommandHandler("conference", conference_command))
+        self.app.add_handler(CommandHandler("fed_live", conference_command))
+        self.app.add_handler(CommandHandler("live_speech", conference_command))
+        self.app.add_handler(CommandHandler("powell", conference_command))
         # v13.00 Flagship Quantitative Engines & Market Intelligence Handlers
         self.app.add_handler(CommandHandler("flash_loan", flash_loan_command))
         self.app.add_handler(CommandHandler("flash_loan_keeper", keeper_command))
@@ -28697,6 +28779,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("angkor_crash", flash_crash_command))
         self.app.add_handler(CommandHandler("angkor_radar", pre_pump_command))
         self.app.add_handler(CommandHandler("angkor_news", news_command))
+        self.app.add_handler(CommandHandler("angkor_conference", conference_command))
+        self.app.add_handler(CommandHandler("aq_conference", conference_command))
         self.app.add_handler(CommandHandler("angkor_analyze", analyze_command))
         self.app.add_handler(CommandHandler("angkor_predict", predict_command))
         self.app.add_handler(CommandHandler("aq_admin", admin_panel_command))

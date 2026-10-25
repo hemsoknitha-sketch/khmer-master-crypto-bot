@@ -86,6 +86,7 @@ def get_registered_commands():
         BotCommand("analyze", "Deep Market Analysis"),
         BotCommand("predict", "Market Trend Forecast"),
         BotCommand("news", "Global Market News"),
+        BotCommand("conference", "Live Conference & Speech Wire"),
         BotCommand("top", "Market Movers & Volatility"),
         BotCommand("set_pin", "2FA Security PIN"),
         BotCommand("admin_agreements", "User Legal Contracts"),
