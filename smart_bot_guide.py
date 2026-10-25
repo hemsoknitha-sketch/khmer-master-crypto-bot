@@ -83,6 +83,147 @@ def build_smart_bot_payload(chat_id: int, user_lang: Optional[str] = None, categ
         return _build_home_view(is_admin, user_lang, mode_badge)
 
 
+def build_master_control_panel_payload(chat_id: int, user_lang: Optional[str] = None) -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Builds the Institutional APEX AGI ENGINE v13.00 Master Control Panel (/menu) payload.
+    Features:
+    - Universal APEX AGI Engine v13.00 Header with 24/7 Online status, <15ms latency, 5-Model Swarm + 12 Wall Street ML Active.
+    - Role badge: 👑 SUPER ADMIN for Admin; 💎 VERIFIED VIP QUANT INVESTOR for VIP Users.
+    - The 5 Institutional Engine Pillars:
+      • 🟢 Spot Engines (0% Risk) ➔ /compound_grid, /infinity_matrix
+      • 🟡 Futures & Hedge Suite ➔ /wealth, /turbo_hedge, /smartx
+      • 🔵 TradFi Global & MT5 ➔ /capital, /capital_scalp, /mt5
+      • 🟣 AI Intelligence & Radars ➔ /whales, /analyze, /predict
+      • 🔴 Portfolio & Security ➔ /portfolio, /balance, /stop
+    - Interactive 1-tap inline buttons for all 5 categories + essential tools.
+    """
+    if not user_lang:
+        user_lang = get_user_lang(chat_id)
+    is_admin = is_user_admin(chat_id)
+
+    try:
+        import trading_engine
+        is_paper = getattr(trading_engine, "PAPER_TRADING", False)
+        mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
+    except Exception:
+        mode_badge = "🚀 REAL LIVE TRADING"
+
+    role_badge = "👑 SUPER ADMIN" if is_admin else "💎 VERIFIED VIP QUANT INVESTOR"
+
+    if user_lang == 'en':
+        apex_header = (
+            "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
+            "════════════\n"
+            "⚡ **SYSTEM STATUS** ៖ `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
+            "🧠 **AGI SUPER BRAIN** ៖ `5-Model Swarm + 12 Wall Street ML Active`\n"
+            f"🛡️ **SECURITY GUARD** ៖ `ISOLATED MARGIN` | `{mode_badge}`\n"
+            "════════════\n"
+        )
+        menu_text = (
+            f"{apex_header}"
+            "🎛️ **ANGKOR QUANT | MASTER CONTROL PANEL** 🎛️\n"
+            "══════════════════════════════\n"
+            f"👤 **ROLE**: `{role_badge}`\n"
+            "⚡ **SYSTEM STATUS**: `🟢 24/7 ONLINE` | `Latency: <15ms`\n"
+            f"🛡️ **RISK CITADEL**: `ISOLATED MARGIN` | `{mode_badge}`\n"
+            "══════════════════════════════\n\n"
+            "🏛️ **SELECT AN INSTITUTIONAL ENGINE CATEGORY:**\n"
+            "• 🟢 **Spot Engines (0% Risk)** ➔ `/compound_grid`, `/infinity_matrix`\n"
+            "• 🟡 **Futures & Hedge Suite** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
+            "• 🔵 **TradFi Global & MT5** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
+            "• 🟣 **AI Intelligence & Radars** ➔ `/whales`, `/analyze`, `/predict`\n"
+            "• 🔴 **Portfolio & Security** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
+            "👇 _Tap an interactive category below for 1-tap controls & instant execution:_"
+        )
+    elif user_lang == 'zh':
+        apex_header = (
+            "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
+            "════════════\n"
+            "⚡ **系统状态** ៖ `🟢 24/7 在线` | `延迟: <15ms`\n"
+            "🧠 **AGI 超级大脑** ៖ `5模型 Swarm + 12 Wall Street ML 激活`\n"
+            f"🛡️ **安全防护** ៖ `隔离保证金` | `{mode_badge}`\n"
+            "════════════\n"
+        )
+        zh_role = '👑 超级管理员' if is_admin else '💎 VERIFIED VIP 量化投资会员'
+        menu_text = (
+            f"{apex_header}"
+            "🎛️ **ANGKOR QUANT | 机构级主控控制台** 🎛️\n"
+            "══════════════════════════════\n"
+            f"👤 **用户身份**: `{zh_role}`\n"
+            "⚡ **系统状态**: `🟢 24/7 全天候在线` | `延迟: <15ms`\n"
+            f"🛡️ **风控护盾**: `逐仓保证金` | `{mode_badge}`\n"
+            "══════════════════════════════\n\n"
+            "🏛️ **请选择您要操作的量化模块：**\n"
+            "• 🟢 **现货投资引擎 (0% 风险)** ➔ `/compound_grid`, `/infinity_matrix`\n"
+            "• 🟡 **合约对冲引擎 (高频对冲)** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
+            "• 🔵 **TradFi 全球市场与 MT5** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
+            "• 🟣 **AI 智能与数据雷达** ➔ `/whales`, `/analyze`, `/predict`\n"
+            "• 🔴 **资金账户与风控** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
+            "👇 _点击下方分类按钮，即可进入对应模块并一键启动：_"
+        )
+    else:  # Khmer (Default)
+        apex_header = (
+            "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
+            "════════════\n"
+            "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
+            "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
+            f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
+            "════════════\n"
+        )
+        menu_text = (
+            f"{apex_header}"
+            "🎛️ **ANGKOR QUANT | ផ្ទាំងបញ្ជាធំ MASTER CONTROL PANEL** 🎛️\n"
+            "══════════════════════════════\n"
+            f"👤 **តួនាទី ៖** `{role_badge}`\n"
+            "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
+            f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
+            "══════════════════════════════\n\n"
+            "🏛️ **សូមជ្រើសរើសផ្នែកយន្តការវិនិយោគដែលលោកអ្នកចង់បញ្ជា ៖**\n"
+            "• 🟢 **Spot Engines (គ្មានហានិភ័យ 0%)** ➔ `/compound_grid`, `/infinity_matrix`\n"
+            "• 🟡 **Futures & Hedge (ផលចំណេញខ្ពស់)** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
+            "• 🔵 **TradFi Global & MT5 (មាស/ភាគហ៊ុន)** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
+            "• 🟣 **AI Intelligence & Radars** ➔ `/whales`, `/analyze`, `/predict`\n"
+            "• 🔴 **Portfolio & Security** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
+            "👇 _សូមចុចលើប៊ូតុងផ្នែកនីមួយៗខាងក្រោម ដើម្បីបញ្ជា 1-Tap ដោយមិនបាច់វាយអក្សរ ៖_"
+        )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🟢 1. Spot Engines (0% Risk)", callback_data="smart_cat_spot"),
+            InlineKeyboardButton("🟡 2. Futures & Hedge", callback_data="smart_cat_futures")
+        ],
+        [
+            InlineKeyboardButton("🔵 3. TradFi & MT5 Suite", callback_data="smart_cat_tradfi"),
+            InlineKeyboardButton("🟣 4. AI Radars & Intelligence", callback_data="smart_cat_radars")
+        ],
+        [
+            InlineKeyboardButton("🔴 5. Portfolio & Security", callback_data="smart_cat_security"),
+            InlineKeyboardButton("💼 Portfolio & PnL", callback_data="btn_menu_portfolio")
+        ],
+        [
+            InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh"),
+            InlineKeyboardButton("🧠 Super Smart Guide", callback_data="smart_cat_guide")
+        ],
+        [
+            InlineKeyboardButton("🛑 Emergency Stop ALL", callback_data="stopall_confirm_prompt"),
+            InlineKeyboardButton("📱 Mini App Web GUI", callback_data="btn_webapp")
+        ]
+    ]
+
+    if is_admin:
+        keyboard.append([
+            InlineKeyboardButton("👑 Super Admin Fleet Command", callback_data="smart_cat_admin"),
+            InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
+        ])
+
+    keyboard.append([
+        InlineKeyboardButton("🔄 Refresh Control Panel", callback_data="btn_menu_refresh"),
+        InlineKeyboardButton("🌐 Language", callback_data=("btn_lang_en" if user_lang == 'km' else ('btn_lang_km' if user_lang == 'zh' else 'btn_lang_km')))
+    ])
+
+    return menu_text, InlineKeyboardMarkup(keyboard)
+
+
 # ==============================================================================
 # 1. MASTER HOME VIEW (Zero Confusion Executive Hub)
 # ==============================================================================

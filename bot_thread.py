@@ -2603,143 +2603,8 @@ class TelegramBotThread(BaseThread):
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
             
-            is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
-            
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km').lower().strip()
-            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
-                user_lang = 'km'
-            elif user_lang in ['en', 'english']:
-                user_lang = 'en'
-            elif user_lang in ['zh', 'chinese']:
-                user_lang = 'zh'
-            else:
-                user_lang = 'km'
-            
-            import trading_engine
-            is_paper = getattr(trading_engine, "PAPER_TRADING", False)
-            mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
-            
-            admin_header = ""
-            if is_admin:
-                if user_lang == 'en':
-                    admin_header = (
-                        "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
-                        "════════════\n"
-                        "⚡ **SYSTEM STATUS** ៖ `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
-                        "🧠 **AGI SUPER BRAIN** ៖ `5-Agent Swarm + 12 Wall Street ML Active`\n"
-                        f"🛡️ **SECURITY GUARD** ៖ `ISOLATED MARGIN` | `{mode_badge}`\n"
-                        "════════════\n"
-                    )
-                elif user_lang == 'zh':
-                    admin_header = (
-                        "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
-                        "════════════\n"
-                        "⚡ **系统状态** ៖ `🟢 24/7 在线` | `延迟: <15ms`\n"
-                        "🧠 **AGI 超级大脑** ៖ `5模型 Swarm + 12 Wall Street ML 激活`\n"
-                        f"🛡️ **安全防护** ៖ `隔离保证金` | `{mode_badge}`\n"
-                        "════════════\n"
-                    )
-                else:
-                    admin_header = (
-                        "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
-                        "════════════\n"
-                        "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
-                        "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
-                        f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
-                        "════════════\n"
-                    )
-
-            # Visual Dashboard Card (Sleek, Modern, Institutional 5 Pillars)
-            if user_lang == 'en':
-                menu_text = (
-                    f"{admin_header}"
-                    "🎛️ **ANGKOR QUANT | MASTER CONTROL PANEL** 🎛️\n"
-                    "══════════════════════════════\n"
-                    f"👤 **ROLE**: `{'👑 SUPER ADMIN' if is_admin else '💎 VERIFIED VIP QUANT INVESTOR'}`\n"
-                    "⚡ **SYSTEM STATUS**: `🟢 24/7 ONLINE` | `Latency: <15ms`\n"
-                    f"🛡️ **RISK CITADEL**: `ISOLATED MARGIN` | `{mode_badge}`\n"
-                    "══════════════════════════════\n\n"
-                    "🏛️ **SELECT AN INSTITUTIONAL ENGINE CATEGORY:**\n"
-                    "• 🟢 **Spot Engines (0% Risk)** ➔ `/compound_grid`, `/infinity_matrix`\n"
-                    "• 🟡 **Futures & Hedge Suite** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
-                    "• 🔵 **TradFi Global & MT5** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
-                    "• 🟣 **AI Intelligence & Radars** ➔ `/whales`, `/analyze`, `/predict`\n"
-                    "• 🔴 **Portfolio & Security** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
-                    "👇 _Tap an interactive category below for 1-tap controls & instant execution:_"
-                )
-            elif user_lang == 'zh':
-                menu_text = (
-                    f"{admin_header}"
-                    "🎛️ **ANGKOR QUANT | 机构级主控控制台** 🎛️\n"
-                    "══════════════════════════════\n"
-                    f"👤 **用户身份**: `{'👑 超级管理员' if is_admin else '💎 VERIFIED VIP 量化投资会员'}`\n"
-                    "⚡ **系统状态**: `🟢 24/7 全天候在线` | `延迟: <15ms`\n"
-                    f"🛡️ **风控护盾**: `逐仓保证金` | `{mode_badge}`\n"
-                    "══════════════════════════════\n\n"
-                    "🏛️ **请选择您要操作的量化模块：**\n"
-                    "• 🟢 **现货投资引擎 (0% 风险)** ➔ `/compound_grid`, `/infinity_matrix`\n"
-                    "• 🟡 **合约对冲引擎 (高频对冲)** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
-                    "• 🔵 **TradFi 全球市场与 MT5** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
-                    "• 🟣 **AI 智能与数据雷达** ➔ `/whales`, `/analyze`, `/predict`\n"
-                    "• 🔴 **资金账户与风控** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
-                    "👇 _点击下方分类按钮，即可进入对应模块并一键启动：_"
-                )
-            else:
-                menu_text = (
-                    f"{admin_header}"
-                    "🎛️ **ANGKOR QUANT | ផ្ទាំងបញ្ជាធំ MASTER CONTROL PANEL** 🎛️\n"
-                    "══════════════════════════════\n"
-                    f"👤 **តួនាទី ៖** `{'👑 SUPER ADMIN' if is_admin else '💎 VERIFIED VIP QUANT INVESTOR'}`\n"
-                    "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
-                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
-                    "══════════════════════════════\n\n"
-                    "🏛️ **សូមជ្រើសរើសផ្នែកយន្តការវិនិយោគដែលលោកអ្នកចង់បញ្ជា ៖**\n"
-                    "• 🟢 **Spot Engines (គ្មានហានិភ័យ 0%)** ➔ `/compound_grid`, `/infinity_matrix`\n"
-                    "• 🟡 **Futures & Hedge (ផលចំណេញខ្ពស់)** ➔ `/wealth`, `/turbo_hedge`, `/smartx`\n"
-                    "• 🔵 **TradFi Global & MT5 (មាស/ភាគហ៊ុន)** ➔ `/capital`, `/capital_scalp`, `/mt5`\n"
-                    "• 🟣 **AI Intelligence & Radars** ➔ `/whales`, `/analyze`, `/predict`\n"
-                    "• 🔴 **Portfolio & Security** ➔ `/portfolio`, `/balance`, `/stop`\n\n"
-                    "👇 _សូមចុចលើប៊ូតុងផ្នែកនីមួយៗខាងក្រោម ដើម្បីបញ្ជា 1-Tap ដោយមិនបាច់វាយអក្សរ ៖_"
-                )
-
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-            keyboard = [
-                [
-                    InlineKeyboardButton("🟢 1. Spot Engines (0% Risk)", callback_data="smart_cat_spot"),
-                    InlineKeyboardButton("🟡 2. Futures & Hedge", callback_data="smart_cat_futures")
-                ],
-                [
-                    InlineKeyboardButton("🔵 3. TradFi & MT5 Suite", callback_data="smart_cat_tradfi"),
-                    InlineKeyboardButton("🟣 4. AI Radars & Intelligence", callback_data="smart_cat_radars")
-                ],
-                [
-                    InlineKeyboardButton("💼 Portfolio & PnL", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
-                ],
-                [
-                    InlineKeyboardButton("🧠 Super Smart Guide", callback_data="smart_cat_guide"),
-                    InlineKeyboardButton("📱 Mini App Web GUI", callback_data="btn_webapp")
-                ],
-                [
-                    InlineKeyboardButton("🛑 Emergency Stop ALL", callback_data="stopall_confirm_prompt"),
-                    InlineKeyboardButton("🔒 2FA Security PIN", callback_data="smart_cat_security")
-                ]
-            ]
-
-            if is_admin:
-                keyboard.append([
-                    InlineKeyboardButton("👑 Super Admin Fleet Command", callback_data="smart_cat_admin"),
-                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
-                ])
-
-            keyboard.append([
-                InlineKeyboardButton("🔄 Refresh Control Panel", callback_data="btn_menu_refresh"),
-                InlineKeyboardButton("🌐 Language", callback_data=("btn_lang_en" if user_lang == 'km' else ('btn_lang_km' if user_lang == 'zh' else 'btn_lang_km')))
-            ])
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            import smart_bot_guide
+            menu_text, reply_markup = smart_bot_guide.build_master_control_panel_payload(chat_id)
 
             if update.callback_query:
                 try:
@@ -20357,6 +20222,10 @@ class TelegramBotThread(BaseThread):
             return
 
         self.app.add_handler(CommandHandler("menu", menu_command))
+        self.app.add_handler(CommandHandler("main_menu", menu_command))
+        self.app.add_handler(CommandHandler("master_menu", menu_command))
+        self.app.add_handler(CommandHandler("control_panel", menu_command))
+        self.app.add_handler(CommandHandler("panel", menu_command))
         self.app.add_handler(CommandHandler("start", start_command))
         self.app.add_handler(CommandHandler("admin", admin_panel_command))
 
@@ -28769,6 +28638,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("citadel_status", citadel_command))
 
         # --- ANGKOR QUANT COMPATIBILITY & TRANSITION ALIASES ---
+        self.app.add_handler(CommandHandler("angkor_menu", menu_command))
+        self.app.add_handler(CommandHandler("aq_menu", menu_command))
         self.app.add_handler(CommandHandler("command", skynet_command))
         self.app.add_handler(CommandHandler("angkor_command", skynet_command))
         self.app.add_handler(CommandHandler("angkor_wealth", wealth_command))
