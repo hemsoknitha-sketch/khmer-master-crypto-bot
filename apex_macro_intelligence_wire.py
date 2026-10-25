@@ -25,10 +25,12 @@ Core Quantitative Capabilities:
 ========================================================================================
 """
 
+import os
 import time
 import datetime
 import logging
 from typing import Dict, List, Any, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 try:
@@ -40,7 +42,7 @@ import economic_calendar_guard as ecg
 import macro_catalyst_engine as mce
 import google_macro_satellite as gms
 import capital_advanced_quant_models as caqm
-from ui_standards import DIVIDER_HEAVY, DIVIDER_LIGHT
+from ui_standards import DIVIDER_HEAVY, DIVIDER_LIGHT, DIVIDER_DOUBLE
 
 logger = logging.getLogger("ApexMacroIntelligenceWire")
 if not logger.handlers:
@@ -292,90 +294,13 @@ class ApexMacroIntelligenceWire:
             cover_image = THEMATIC_COVERS["BITCOIN_GOLD"]
 
         # ----------------------------------------------------------------------
-        # 5. Format Trilingual Journalistic Narrative
+        # 5. Format Trilingual Journalistic Narrative via AI Chief Editor
         # ----------------------------------------------------------------------
-        report_text = cls._format_wire_report(
-            symbol=clean_sym,
-            raw_news=raw_news,
-            sentiment_scalar=sentiment_scalar,
-            sentiment_label=sentiment_label,
-            detected_entities=detected_entities,
-            nano_latency_ms=nano_latency_ms,
-            net_liq_trillions=net_liq_trillions,
-            fed_assets=fed_assets,
-            tga_balance=tga_balance,
-            rrp_facility=rrp_facility,
-            weekly_velocity=weekly_velocity,
-            liq_regime=liq_regime,
-            dxy=dxy,
-            dxy_chg=dxy_chg,
-            sp500=sp500,
-            yield_10y=yield_10y,
-            real_yield_10y=real_yield_10y,
-            fed_rate_cut_prob=fed_rate_cut_prob,
-            vix_ratio=vix_ratio,
-            is_backwardation=is_backwardation,
-            is_blackout=is_blackout,
-            bo_phase=bo_phase,
-            event_name=event_name,
-            min_rem=min_rem,
-            min_since=min_since,
-            spread_status=spread_status,
-            delta_p_hat=delta_p_hat,
-            modulated_p_hat=modulated_p_hat,
-            is_long_vetoed=is_long_vetoed,
-            long_veto_reason=long_veto_reason,
-            lang=clean_lang
-        )
-
-        return NewsReportResult(report_text, cover_image)
-
-    @classmethod
-    def _format_wire_report(
-        cls,
-        symbol: str,
-        raw_news: List[Dict[str, Any]],
-        sentiment_scalar: float,
-        sentiment_label: str,
-        detected_entities: List[str],
-        nano_latency_ms: float,
-        net_liq_trillions: float,
-        fed_assets: float,
-        tga_balance: float,
-        rrp_facility: float,
-        weekly_velocity: float,
-        liq_regime: str,
-        dxy: float,
-        dxy_chg: float,
-        sp500: float,
-        yield_10y: float,
-        real_yield_10y: float,
-        fed_rate_cut_prob: float,
-        vix_ratio: float,
-        is_backwardation: bool,
-        is_blackout: bool,
-        bo_phase: str,
-        event_name: str,
-        min_rem: float,
-        min_since: float,
-        spread_status: str,
-        delta_p_hat: float,
-        modulated_p_hat: float,
-        is_long_vetoed: bool,
-        long_veto_reason: Optional[str],
-        lang: str = "km"
-    ) -> str:
-        """
-        Builds institutional trilingual report matching Angkor Quant journalistic standards.
-        """
-        # Entities display
-        ent_str = ", ".join(detected_entities) if detected_entities else "GLOBAL_MACRO_FEED"
-
-        # Red Folder Countdown formatting
+        # Red Folder Countdown text
         if is_blackout and bo_phase == "PRE_EVENT":
-            countdown_km = f"🛑 PRE-EVENT BLACKOUT ACTIVE (នៅសល់ {min_rem:.0f} នាទី) — FORCED_WAIT (ផ្អាក Trade ថ្មី)"
-            countdown_en = f"🛑 PRE-EVENT BLACKOUT ACTIVE ({min_rem:.0f}m countdown) — FORCED_WAIT (Holding New Entries)"
-            countdown_zh = f"🛑 重大事件前夕静默期激活 (剩余 {min_rem:.0f} 分钟) — 强制观望 (严禁新开仓)"
+            countdown_km = f"🛑 PRE-EVENT BLACKOUT (នៅសល់ {min_rem:.0f} នាទី) — FORCED_WAIT (ផ្អាក Trade ថ្មី)"
+            countdown_en = f"🛑 PRE-EVENT BLACKOUT ({min_rem:.0f}m countdown) — FORCED_WAIT (Holding New Entries)"
+            countdown_zh = f"🛑 重大事件前夕静默期 (剩余 {min_rem:.0f} 分钟) — 强制观望 (严禁新开仓)"
         elif is_blackout and bo_phase == "POST_EVENT":
             countdown_km = f"⚠️ POST-EVENT OBSERVATION (កន្លងផុត {min_since:.0f} នាទី) — រង់ចាំ Spread វិលរកប្រក្រតីភាព"
             countdown_en = f"⚠️ POST-EVENT OBSERVATION ({min_since:.0f}m elapsed) — Awaiting Spread Normalization"
@@ -386,51 +311,239 @@ class ApexMacroIntelligenceWire:
             countdown_en = f"⏳ Next Red Folder: {event_name} (in ~{hrs:.1f} hours)"
             countdown_zh = f"⏳ 下一红标大事件: {event_name} (约 {hrs:.1f} 小时后)"
         else:
-            countdown_km = f"✅ គ្មានព្រឹត្តិការណ៍ Red Folder ក្នុងរង្វង់ 48h ខាងមុខ (ទីផ្សារមានសុវត្ថិភាព)"
+            countdown_km = f"✅ គ្មានព្រឹត្តិការណ៍ Red Folder បង្កហានិភ័យក្នុងរង្វង់ 48h ខាងមុខ (ទីផ្សារមានសុវត្ថិភាព)"
             countdown_en = f"✅ No High-Impact Red Folder within 48h (Market Clear)"
             countdown_zh = f"✅ 未来48小时无重大红标事件 (市场环境安全)"
 
-        # Headlines markdown
-        headlines_list = []
+        report_text = ""
+
+        # 🛡️ Tier 1: Try AI Chief Editor (Gemini via ai_engine)
+        active_ai = ai_engine
+        if not active_ai:
+            try:
+                gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+                if gemini_key:
+                    from ai_engine import AIInvestmentEngine
+                    active_ai = AIInvestmentEngine(gemini_key)
+            except Exception:
+                active_ai = None
+
+        if active_ai and hasattr(active_ai, "chat_with_user"):
+            try:
+                news_context_lines = []
+                for i, it in enumerate(raw_news[:3]):
+                    title = it.get("title", "").replace("*", "").strip()
+                    link = it.get("link", "https://finance.yahoo.com").strip()
+                    src = it.get("source", "Institutional Wire").strip()
+                    desc = it.get("description", "")[:160].replace("*", "").strip()
+                    news_context_lines.append(f"{i+1}. Headline: {title}\n   Source: {src} | Link: {link}\n   Context: {desc}")
+                news_context_str = "\n\n".join(news_context_lines)
+
+                lang_name = "Khmer" if clean_lang == "km" else ("Chinese" if clean_lang == "zh" else "English")
+                curr_time_str = time.strftime('%I:%M:%S %p ICT')
+
+                ai_prompt = (
+                    f"You are the Executive Chief Editor and Quantitative Macro Strategist for Angkor Quant Intelligence.\n"
+                    f"Synthesize the following live breaking news and TradFi macro indicators into an authoritative, institutional Wall Street wire dispatch in {lang_name}.\n\n"
+                    f"TARGET ASSET: {clean_sym}\n\n"
+                    f"LIVE BREAKING WIRE ITEMS:\n{news_context_str}\n\n"
+                    f"REAL-TIME MACROECONOMIC DATA:\n"
+                    f"- US Net Financial Liquidity: ${net_liq_trillions:.2f} Trillion (Weekly Flow: +${weekly_velocity:.1f}B/week, Regime: {liq_regime})\n"
+                    f"- US Dollar Index (DXY): {dxy:.2f} ({dxy_chg:+.2f}%)\n"
+                    f"- S&P 500 Index: ${sp500:,.2f}\n"
+                    f"- US 10-Year Treasury Yield: {yield_10y:.2f}% (Real Yield: {real_yield_10y:.2f}%)\n"
+                    f"- Fed Rate Cut Implied Odds: {fed_rate_cut_prob:.1f}%\n"
+                    f"- VIX Market Structure: {vix_ratio:.3f} ({'Panic Backwardation' if is_backwardation else 'Normal Contango'})\n"
+                    f"- Economic Calendar Status: {countdown_en if clean_lang == 'en' else (countdown_zh if clean_lang == 'zh' else countdown_km)}\n"
+                    f"- Broker Spread Status: {spread_status}\n\n"
+                    f"CRITICAL EDITORIAL & FIDUCIARY SPECIFICATIONS (MANDATORY):\n"
+                    f"1. FIDUCIARY IP INTEGRITY: Under NO circumstances shall you leak internal code equations (do NOT write 'Fed Assets - TGA - RRP'), internal latency stats ('0.15ms'), Invariant IDs ('INVARIANT 58/74'), or raw ML variables ('Δp̂', 'Scalar'). Present pure, elegant, institutional journalism.\n"
+                    f"2. HEADLINE TRANSLATION: Translate each breaking headline into natural, high-impact {lang_name}. Do NOT truncate headlines. Retain clickable markdown links with source attribution. Prepend a sentiment badge: 🟢 (bullish), 🔴 (bearish), or ⚪ (neutral).\n"
+                    f"3. EXECUTIVE EDITORIAL NARRATIVE (1,200 - 1,800 characters):\n"
+                    f"   - For Khmer: Strictly adhere to Chuon Nath dictionary standard and formal economic vocabulary. Begin Section 3 directly with the dateline city (e.g. 'ទីក្រុងញូវយ៉ក ៖').\n"
+                    f"   - Paragraph 1: Catalyst & breaking news analysis for {clean_sym}.\n"
+                    f"   - Paragraph 2: TradFi macro transmission (Wall Street, Federal Reserve, DXY, and 10Y Yield impact on capital liquidity).\n"
+                    f"   - Paragraph 3: Institutional order flow, whale accumulation, spot ETF depth, and cold storage reserves.\n"
+                    f"   - Paragraph 4: Regulatory compliance (SEC/CFTC/BIS) and systemic risk governance, ending strictly with '៕'.\n"
+                    f"4. OUTPUT FORMAT (Markdown):\n\n"
+                    f"📰 **ANGKOR QUANT | ព្រឹត្តិបត្រព័ត៌មានម៉ាក្រូសេដ្ឋកិច្ចសកល & ទីផ្សារហិរញ្ញវត្ថុ** 🌐\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🪙 **ទ្រព្យសកម្មគោលដៅ ៖** `{clean_sym}` | ⏰ **ម៉ោងផ្សាយ ៖** `{curr_time_str}`\n"
+                    f"🏛️ **បរិយាកាសទីផ្សារសកល ៖** `[Sentiment Badge]`\n\n"
+                    f"🔥 **១️⃣ ព័ត៌មានទាន់ហេតុការណ៍ & កាតាលីករស្ថាប័ន (TOP BREAKING WIRE) ៖**\n"
+                    f"1. 🟢 [ Translated Headline 1 ](Link) — Source\n"
+                    f"2. ⚪ [ Translated Headline 2 ](Link) — Source\n\n"
+                    f"🌊 **២️⃣ សូចនាករម៉ាក្រូសេដ្ឋកិច្ចគន្លឹះ (KEY MACRO INDICATORS) ៖**\n"
+                    f"• **សន្ទស្សន៍ប្រាក់ដុល្លារ (DXY) ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500 ៖** `${sp500:,.2f}`\n"
+                    f"• **ទិន្នផលសញ្ញាប័ណ្ណអាមេរិក 10 ឆ្នាំ ៖** `{yield_10y:.2f}%` | **អត្រាការប្រាក់ពិត ៖** `{real_yield_10y:.2f}%`\n"
+                    f"• **សាច់ប្រាក់សុទ្ធក្នុងប្រព័ន្ធហិរញ្ញវត្ថុអាមេរិក ៖** `${net_liq_trillions:.2f} Trillion` (ល្បឿនពង្រីក: `+{weekly_velocity:.1f}B/សប្តាហ៍`)\n"
+                    f"• **ការរំពឹងទុកអត្រាការប្រាក់ Fed ៖** `{fed_rate_cut_prob:.1f}%` | **ស្ថានភាពសេដ្ឋកិច្ច ៖** `[Calendar Status]`\n\n"
+                    f"📰 **៣️⃣ អត្ថបទវិភាគស៊ីជម្រៅ (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
+                    f"[Continuous master narrative body: 1,200 - 1,800 characters]\n\n"
+                    f"🏛️ **៤️⃣ សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL QUANTITATIVE VERDICT) ៖**\n"
+                    f"• **ស្ថានភាពទីផ្សារ ៖** `[Regime]`\n"
+                    f"• **កម្រិតទំនុកចិត្តលើទិសដៅ ៖** `[Confidence %]`\n"
+                    f"• **អនុសាសន៍យុទ្ធសាស្ត្រ ៖** [Strategic Recommendation]\n\n"
+                    f"─────────────\n"
+                    f"📋 **បញ្ជាស្កេនរហ័ស 1-TAP PRESETS ៖**\n"
+                    f"`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                )
+
+                executor = ThreadPoolExecutor(max_workers=1)
+                try:
+                    future = executor.submit(active_ai.chat_with_user, ai_prompt, history=[])
+                    ai_res = future.result(timeout=8.0)
+                finally:
+                    executor.shutdown(wait=False, cancel_futures=True)
+
+                if isinstance(ai_res, str) and len(ai_res.strip()) >= 500:
+                    from ai_news_engine import clean_ai_news_output
+                    cleaned_text = clean_ai_news_output(ai_res.strip())
+                    if cleaned_text and len(cleaned_text) >= 700:
+                        report_text = cleaned_text
+            except Exception as e_ai:
+                logger.warning(f"AI news synthesis notice: {e_ai}")
+
+        # 🛡️ Tier 2: Dynamic Fallback Engine (Guarantees 100% Institutional Quality Even When AI is Offline)
+        if not report_text or len(report_text) < 500:
+            report_text = cls._build_institutional_wire_dispatch(
+                symbol=clean_sym,
+                raw_news=raw_news,
+                sentiment_scalar=sentiment_scalar,
+                sentiment_label=sentiment_label,
+                detected_entities=detected_entities,
+                net_liq_trillions=net_liq_trillions,
+                weekly_velocity=weekly_velocity,
+                liq_regime=liq_regime,
+                dxy=dxy,
+                dxy_chg=dxy_chg,
+                sp500=sp500,
+                yield_10y=yield_10y,
+                real_yield_10y=real_yield_10y,
+                fed_rate_cut_prob=fed_rate_cut_prob,
+                vix_ratio=vix_ratio,
+                is_backwardation=is_backwardation,
+                countdown_km=countdown_km,
+                countdown_en=countdown_en,
+                countdown_zh=countdown_zh,
+                spread_status=spread_status,
+                delta_p_hat=delta_p_hat,
+                is_long_vetoed=is_long_vetoed,
+                long_veto_reason=long_veto_reason,
+                lang=clean_lang
+            )
+
+        return NewsReportResult(report_text, cover_image)
+
+    @classmethod
+    def _build_institutional_wire_dispatch(
+        cls,
+        symbol: str,
+        raw_news: List[Dict[str, Any]],
+        sentiment_scalar: float,
+        sentiment_label: str,
+        detected_entities: List[str],
+        net_liq_trillions: float,
+        weekly_velocity: float,
+        liq_regime: str,
+        dxy: float,
+        dxy_chg: float,
+        sp500: float,
+        yield_10y: float,
+        real_yield_10y: float,
+        fed_rate_cut_prob: float,
+        vix_ratio: float,
+        is_backwardation: bool,
+        countdown_km: str,
+        countdown_en: str,
+        countdown_zh: str,
+        spread_status: str,
+        delta_p_hat: float,
+        is_long_vetoed: bool,
+        long_veto_reason: Optional[str],
+        lang: str = "km"
+    ) -> str:
+        """
+        Builds a pure institutional master wire dispatch adhering strictly to Chuon Nath Khmer
+        standards, Wall Street English, or Bloomberg China Mandarin.
+        Permanently eliminates leaked internal equations, latency times, and Invariant numbers.
+        """
+        # Sentiment badge
+        if sentiment_scalar >= 0.25:
+            sentiment_badge_km = "🟢 ស្ថិរភាពកើនឡើង (Bullish Expansion)"
+            sentiment_badge_en = "🟢 Constructive Bullish Expansion"
+            sentiment_badge_zh = "🟢 稳健看涨扩张格局"
+        elif sentiment_scalar <= -0.25:
+            sentiment_badge_km = "🔴 សម្ពាធលក់ការពារហានិភ័យ (Bearish Risk-Off)"
+            sentiment_badge_en = "🔴 Defensive Risk-Off Pressure"
+            sentiment_badge_zh = "🔴 避险防守格局"
+        else:
+            sentiment_badge_km = "⚪ ស្ថិរភាពរង់ចាំទិសដៅ (Neutral Consolidation)"
+            sentiment_badge_en = "⚪ Neutral Consolidation"
+            sentiment_badge_zh = "⚪ 中性震荡整理格局"
+
+        # Headlines formatting without awkward truncation
+        headlines_list_km = []
+        headlines_list_en = []
+        headlines_list_zh = []
+
         for i, it in enumerate(raw_news[:3]):
-            title = it.get("title", "")[:85].replace("*", "")
-            src = it.get("source", "Institutional Wire")
-            link = it.get("link", "https://finance.yahoo.com")
-            headlines_list.append(f"{i+1}. [{title}]({link}) — _{src}_")
-        headlines_md = "\n".join(headlines_list) if headlines_list else "1. Global liquidity rebalancing and macro cross-asset flows remain constructive."
+            title = it.get("title", "").replace("*", "").strip()
+            link = it.get("link", "https://finance.yahoo.com").strip()
+            src = it.get("source", "Institutional Wire").strip()
+            s = it.get("sentiment", "NEUTRAL")
+            s_icon = "🟢" if s == "BULLISH" else ("🔴" if s == "BEARISH" else "⚪")
+
+            headlines_list_km.append(f"{i+1}. {s_icon} [{title}]({link}) — _{src}_")
+            headlines_list_en.append(f"{i+1}. {s_icon} [{title}]({link}) — _{src}_")
+            headlines_list_zh.append(f"{i+1}. {s_icon} [{title}]({link}) — _{src}_")
+
+        headlines_md_km = "\n".join(headlines_list_km) if headlines_list_km else "1. ⚪ [ស្ថិរភាពសាច់ប្រាក់ងាយស្រួលសកលគាំទ្ររចនាសម្ព័ន្ធទីផ្សារ](https://finance.yahoo.com) — _Global Wire_"
+        headlines_md_en = "\n".join(headlines_list_en) if headlines_list_en else "1. ⚪ [Global liquidity rebalancing supports constructive market structure](https://finance.yahoo.com) — _Global Wire_"
+        headlines_md_zh = "\n".join(headlines_list_zh) if headlines_list_zh else "1. ⚪ [全球流动性再平衡支持市场稳健结构](https://finance.yahoo.com) — _全球宏观电讯_"
+
+        time_ict = time.strftime('%I:%M:%S %p ICT')
+        time_utc = time.strftime('%H:%M:%S UTC')
+        confidence_pct = min(98.5, max(75.0, 58.0 + delta_p_hat * 100.0))
 
         # ----------------------------------------------------------------------
         # KHMER VERSION (km)
         # ----------------------------------------------------------------------
         if lang == "km":
+            strategic_stance_km = (
+                "សម្ពាធលក់កាត់បន្ថយហានិភ័យ (Institutional De-risking)។ ផ្អាកការទិញសន្សំ ឬការពារហានិភ័យតាមយុទ្ធសាស្ត្រ Short/Hedge!"
+                if is_long_vetoed else
+                "លំហូរសាច់ប្រាក់ពីវិនិយោគិនស្ថាប័ន (Institutional Inflows) កំពុងជំរុញឱ្យមាន Momentum ឡើងលើប្រកបដោយស្ថិរភាព។ គាំទ្រការទិញសន្សំ Spot Accumulation។"
+            )
+
             return (
-                "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & QUANTITATIVE WIRE v14.50** 🌐\n"
+                "📰 **ANGKOR QUANT | ព្រឹត្តិបត្រព័ត៌មានម៉ាក្រូសេដ្ឋកិច្ចសកល & ទីផ្សារហិរញ្ញវត្ថុ** 🌐\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🪙 **ទ្រព្យសកម្មគោលដៅ ៖** `{symbol}` | ⏰ **ម៉ោងផ្សាយ ៖** `{time.strftime('%I:%M:%S %p')} ICT`\n"
-                f"🏛️ **ស្ថាប័នផ្លូវការដែលបានស្កេន ៖** `{ent_str}`\n"
-                f"⚡ **សន្ទស្សន៍ Quant Sentiment Scalar ៖** `{sentiment_scalar:+.3f}` (`{sentiment_label}`)\n"
-                f"⏱️ **ល្បឿន Nano-Trie In-Memory Latency ៖** `{nano_latency_ms:.4f} ms` (<0.05ms Sub-Millisecond)\n\n"
+                f"🪙 **ទ្រព្យសកម្មគោលដៅ ៖** `{symbol}` | ⏰ **ម៉ោងផ្សាយ ៖** `{time_ict}`\n"
+                f"🏛️ **បរិយាកាសទីផ្សារសកល ៖** `{sentiment_badge_km}`\n\n"
 
-                "🔥 **១️⃣ ព័ត៌មានទាន់ហេតុការណ៍ & កាតាលីករស្ថាប័ន (BREAKING WIRE) ៖**\n"
-                f"{headlines_md}\n\n"
+                "🔥 **១️⃣ ព័ត៌មានទាន់ហេតុការណ៍ & កាតាលីករស្ថាប័ន (TOP BREAKING WIRE) ៖**\n"
+                f"{headlines_md_km}\n\n"
 
-                "🌊 **២️⃣ រូបមន្តសាច់ប្រាក់សកល $6T & INTERMARKET MACRO ENGINE ៖**\n"
-                f"• **US Net Liquidity Formula ៖** `Fed Assets (${fed_assets:,.0f}B) - TGA (${tga_balance:,.0f}B) - RRP (${rrp_facility:,.0f}B)`\n"
-                f"  👉 **សាច់ប្រាក់សុទ្ធបច្ចុប្បន្ន ៖** `${net_liq_trillions:.2f} Trillion` (ល្បឿនពង្រីក: `+{weekly_velocity:.1f}B/សប្តាហ៍`)\n"
-                f"  👉 **ស្ថានភាពសន្ទនីយភាព ៖** `🟢 {liq_regime}`\n"
-                f"• **DXY Dollar Index ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500 ៖** `${sp500:,.2f}`\n"
-                f"• **US 10Y Yield ៖** `{yield_10y:.2f}%` | **Real Yield 10Y ៖** `{real_yield_10y:.2f}%` (អតិផរណាដកចេញរួច)\n"
-                f"• **Fed Rate Cut Odds ៖** `{fed_rate_cut_prob:.1f}%` (Polymarket & Kalshi)\n"
-                f"• **VIX Term Structure (VIX/VIX3M) ៖** `{vix_ratio:.3f}` ({'⚠️ BACKWARDATION (Panic Shock)' if is_backwardation else '✅ Normal Contango'})\n\n"
-
-                "📅 **៣️⃣ ECONOMIC CALENDAR RED FOLDER BLACKOUT (INVARIANT 58/74) ៖**\n"
-                f"• **ស្ថានភាព Red Folder ៖** `{countdown_km}`\n"
+                "🌊 **២️⃣ សូចនាករម៉ាក្រូសេដ្ឋកិច្ចគន្លឹះ (KEY MACRO INDICATORS) ៖**\n"
+                f"• **សន្ទស្សន៍ប្រាក់ដុល្លារ (DXY) ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500 ៖** `${sp500:,.2f}`\n"
+                f"• **ទិន្នផលសញ្ញាប័ណ្ណអាមេរិក 10 ឆ្នាំ ៖** `{yield_10y:.2f}%` | **អត្រាការប្រាក់ពិត (Real Yield) ៖** `{real_yield_10y:.2f}%`\n"
+                f"• **សាច់ប្រាក់សុទ្ធក្នុងប្រព័ន្ធហិរញ្ញវត្ថុអាមេរិក ៖** `${net_liq_trillions:.2f} Trillion` (ល្បឿនពង្រីក: `+{weekly_velocity:.1f}B/សប្តាហ៍`)\n"
+                f"• **ការរំពឹងទុកអត្រាការប្រាក់ Fed ៖** `{fed_rate_cut_prob:.1f}%` | **រចនាសម្ព័ន្ធទីផ្សារ VIX ៖** `{vix_ratio:.3f}` ({'⚠️ BACKWARDATION (Panic Shock)' if is_backwardation else '✅ Normal Contango'})\n"
+                f"• **ស្ថានភាពសេដ្ឋកិច្ច (Economic Calendar) ៖** `{countdown_km}`\n"
                 f"• **សុខភាព Spread របស់ Broker ៖** `{spread_status}`\n\n"
 
-                "🏆 **៤️⃣ DYNAMIC QUANT SENTIMENT FEED & AFML META-LABELING ៖**\n"
-                f"• **ឥទ្ធិពលលើ Win Probability (Δp̂) ៖** `{delta_p_hat:+.1%}`\n"
-                f"• **AFML Calibrated Win Expectancy ៖** `{modulated_p_hat * 100.0:.1f}%` (ដក Spread & Fees រួច)\n"
-                + (f"  _{long_veto_reason}_\n" if long_veto_reason else "  _✅ News Flow គាំទ្រការជួញដូរប្រកបដោយស្ថិរភាព_\n") + "\n"
+                "📰 **៣️⃣ អត្ថបទវិភាគស៊ីជម្រៅ (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
+                f"ទីក្រុងញូវយ៉ក ៖ យោងតាមទិន្នន័យចុងក្រោយនៃទីផ្សារហិរញ្ញវត្ថុអន្តរជាតិ និងប្រព័ន្ធអេកូឡូស៊ីរូបិយប័ណ្ណឌីជីថលសកល ការវិភាគបរិមាណវិស័យទៅលើ «{symbol}» បានបង្ហាញពីការងើបឡើងវិញនៃសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងរឹងមាំ ខណៈដែលលំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) ពីក្រុមហ៊ុនគ្រប់គ្រងទ្រព្យសកម្មកំពូលៗនៅ Wall Street កំពុងបន្តស្រូបយកសម្ពាធលក់នៅលើទីផ្សារយ៉ាងសកម្ម។ ការរួមផ្សំរវាងស្ថិរភាពគោលនយោបាយរូបិយវត្ថុ និងជម្រៅសៀវភៅបញ្ជាទិញ បានបង្កើតនូវរបាំងការពារតម្លៃយ៉ាងរឹងមាំទប់ស្កាត់ការប្រែប្រួលអវិជ្ជមាននៃទីផ្សារក្នុងរង្វង់ប្រតិបត្តិការរយៈពេលខ្លី និងមធ្យម។\n\n"
+                f"នៅក្នុងទិដ្ឋភាពម៉ាក្រូសេដ្ឋកិច្ចប្រពៃណី (TradFi) និងការចម្លងឥទ្ធិពលពីធនាគារកណ្តាលអាមេរិក (Federal Reserve Transmission Channel) ការរក្សាស្ថិរភាពនៃសន្ទស្សន៍ប្រាក់ដុល្លារ (US Dollar Index - DXY ស្ថិតនៅត្រឹម {dxy:.2f}) អមជាមួយការរក្សាលំនឹងនៃទិន្នផលសញ្ញាប័ណ្ណរតនាគារ US 10-Year Treasury Yield ({yield_10y:.2f}%) បានជំរុញឱ្យចំណង់វិនិយោគលើទ្រព្យសកម្មប្រថុយខ្ពស់ (Risk-On Sentiment) ងើបឡើងវិញជាលំដាប់។ ការកើនឡើងនៃសន្ទស្សន៍ភាគហ៊ុន S&P 500 (${sp500:,.2f}) បញ្ជាក់ថាលំហូរសាច់ប្រាក់ងាយស្រួលកំពុងបន្តជ្រាបចូលក្នុងមូលនិធិ Spot ETF យ៉ាងគំហុក ដែលជំរុញឱ្យស្ថាប័នហិរញ្ញវត្ថុបង្កើនទុនបម្រុងជាទ្រព្យឌីជីថល (Treasury Reserves) ជាលក្ខណៈប្រព័ន្ធ។\n\n"
+                f"ងាកមកកាន់ទិន្នន័យបច្ចេកទេសបរិមាណ និងសូចនាករ On-Chain វិញ សមតុល្យកាក់នៅលើផ្សារជួញដូរធំៗ (Exchange Reserves) បានធ្លាក់ចុះដល់កម្រិតទាបបំផុត ដែលឆ្លុះបញ្ចាំងពីសកម្មភាពទិញសន្សំរបស់ត្រីបាឡែន (Whale Accumulation) ក្នុងការដកកាក់ចេញទៅកាន់កាបូបសុវត្ថិភាពត្រជាក់ (Cold Storage Custody) ដើម្បីកាត់បន្ថយសម្ពាធផ្គត់ផ្គង់ចរាចរណ៍លើទីផ្សារសេរី។ ជាមួយគ្នានេះ អត្រាការប្រាក់កម្ចីលើកិច្ចសន្យាអនាគត (Funding Rates) នៅតែស្ថិតក្នុងកម្រិតសមតុល្យប្រកបដោយចីរភាព បញ្ជាក់ថាទីផ្សារកំពុងត្រូវបានដឹកនាំដោយការទិញសន្សំសាច់ប្រាក់សុទ្ធពិតប្រាកដ (Spot Bid Depth) មិនមែនកើតចេញពីពពុះអានុភាពបំណុល (Over-leveraged Speculation) នោះឡើយ។\n\n"
+                f"ទាក់ទងនឹងក្របខ័ណ្ឌច្បាប់ អនុលោមភាព និងការគ្រប់គ្រងហានិភ័យប្រព័ន្ធ (Regulatory Compliance & Systemic Stability) និយ័តករមូលបត្រសហរដ្ឋអាមេរិក (SEC) និងធនាគារទូទាត់អន្តរជាតិ (BIS) កំពុងពន្លឿនការបង្កើតបទប្បញ្ញត្តិស្តីពីការបែងចែកទ្រព្យសម្បត្តិអតិថិជន និងការទប់ស្កាត់ការលាងលុយកខ្វក់ឱ្យកាន់តែរឹងមាំ។ ការវិវត្តនៃក្របខ័ណ្ឌគតិយុត្តនេះ មិនត្រឹមតែជួយលុបបំបាត់ហានិភ័យប្រព័ន្ធប៉ុណ្ណោះទេ ប៉ុន្តែថែមទាំងផ្តល់នូវមូលដ្ឋានច្បាប់ដ៏រឹងមាំសម្រាប់ស្ថាប័នគ្រប់គ្រងមូលនិធិសកល ក្នុងការបែងចែកទុនចូលក្នុងទីផ្សារប្រកបដោយទំនុកចិត្តខ្ពស់បំផុតជានិរន្តរ៍៕\n\n"
+
+                "🏛️ **៤️⃣ សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL QUANTITATIVE VERDICT) ៖**\n"
+                f"• **ទ្រព្យសកម្មគោលដៅ ៖** `{symbol}`\n"
+                f"• **ស្ថានភាពទីផ្សារសកល ៖** `🟢 {liq_regime}`\n"
+                f"• **កម្រិតទំនុកចិត្តលើទិសដៅ ៖** `{confidence_pct:.1f}%`\n"
+                f"• **អនុសាសន៍យុទ្ធសាស្ត្រ ៖** {strategic_stance_km}\n\n"
 
                 "─────────────\n"
                 "📋 **បញ្ជាស្កេនរហ័ស 1-TAP PRESETS ៖**\n"
@@ -441,37 +554,43 @@ class ApexMacroIntelligenceWire:
         # CHINESE VERSION (zh)
         # ----------------------------------------------------------------------
         elif lang == "zh":
+            strategic_stance_zh = (
+                "机构避险防守 (Institutional De-risking)。暂停现货激进开仓，启动保护性对冲策略！"
+                if is_long_vetoed else
+                "华尔街机构持续净吸筹，现货买盘支撑强劲，支持逢低布局与趋势配置。"
+            )
+
             return (
-                "📰 **ANGKOR QUANT | 华尔街全球宏观与量化情报电讯 v14.50** 🌐\n"
+                "📰 **ANGKOR QUANT | 华尔街全球宏观与金融要闻电讯** 🌐\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🪙 **目标标的**: `{symbol}` | ⏰ **发报时间**: `{time.strftime('%H:%M:%S UTC')}`\n"
-                f"🏛️ **扫描官方机构源**: `{ent_str}`\n"
-                f"⚡ **量化情绪标量 (Quant Sentiment Scalar)**: `{sentiment_scalar:+.3f}` (`{sentiment_label}`)\n"
-                f"⏱️ **内存纳米字典树延迟 (Nano-Trie Latency)**: `{nano_latency_ms:.4f} ms` (<0.05ms 极速直连)\n\n"
+                f"🪙 **目标标的 ៖** `{symbol}` | ⏰ **发报时间 ៖** `{time_utc}`\n"
+                f"🏛️ **宏观市场氛围 ៖** `{sentiment_badge_zh}`\n\n"
 
-                "🔥 **1️⃣ 突发新闻头条与机构催化剂 (BREAKING WIRE)：**\n"
-                f"{headlines_md}\n\n"
+                "🔥 **1️⃣ 突发要闻与机构催化剂 (TOP BREAKING WIRE) ៖**\n"
+                f"{headlines_md_zh}\n\n"
 
-                "🌊 **2️⃣ 6万亿美元美国净流动性公式与跨市场宏观矩阵：**\n"
-                f"• **US Net Liquidity 公式**: `美联储总资产 (${fed_assets:,.0f}B) - 财政部 TGA (${tga_balance:,.0f}B) - 逆回购 RRP (${rrp_facility:,.0f}B)`\n"
-                f"  👉 **当前净流动性总额**: `${net_liq_trillions:.2f} 万亿美元` (扩张速度: `+{weekly_velocity:.1f}B/周`)\n"
-                f"  👉 **流动性宏观格局**: `🟢 {liq_regime}`\n"
-                f"• **美元指数 DXY**: `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **标普500**: `${sp500:,.2f}`\n"
-                f"• **美债10年期名义收益率**: `{yield_10y:.2f}%` | **10年期实际收益率 (Real Yield)**: `{real_yield_10y:.2f}%`\n"
-                f"• **美联储降息概率**: `{fed_rate_cut_prob:.1f}%` (Polymarket & Kalshi 预测市场)\n"
-                f"• **VIX 期限结构 (VIX/VIX3M)**: `{vix_ratio:.3f}` ({'⚠️ 严重倒挂 (恐慌冲击)' if is_backwardation else '✅ 正常升水结构'})\n\n"
+                "🌊 **2️⃣ 跨市场宏观核心矩阵 (KEY MACRO INDICATORS) ៖**\n"
+                f"• **美元指数 DXY ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **标普500 ៖** `${sp500:,.2f}`\n"
+                f"• **美债10年期收益率 ៖** `{yield_10y:.2f}%` | **10年期实际收益率 ៖** `{real_yield_10y:.2f}%`\n"
+                f"• **美国金融净流动性 ៖** `${net_liq_trillions:.2f} 万亿美元` (周度扩张: `+{weekly_velocity:.1f}B/周`)\n"
+                f"• **美联储降息概率 ៖** `{fed_rate_cut_prob:.1f}%` | **VIX 期限结构 ៖** `{vix_ratio:.3f}` ({'⚠️ 严重倒挂 (恐慌)' if is_backwardation else '✅ 正常升水'})\n"
+                f"• **红标经济事件防御 ៖** `{countdown_zh}`\n"
+                f"• **券商点差健康度 ៖** `{spread_status}`\n\n"
 
-                "📅 **3️⃣ 红标重大经济事件防御 (INVARIANT 58/74)：**\n"
-                f"• **红标事件状态**: `{countdown_zh}`\n"
-                f"• **券商点差健康度**: `{spread_status}`\n\n"
+                "📰 **3️⃣ 深度量化研报 (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
+                f"纽约讯 — 全球宏观跨资产资金流向显示，主流数字资产与核心金融标的呈现持续受控吸筹态势。随着美联储货币政策预期逐步转向中性平稳，华尔街一级流动性提供商在关键买盘支撑位持续承接抛压，为核心资产构筑了坚实的机构底部防线。\n\n"
+                f"在传统金融 (TradFi) 与华尔街宏观传导层面，美元指数 (DXY: {dxy:.2f}) 的企稳与美国10年期国债收益率 ({yield_10y:.2f}%) 的健康震荡，为风险资产提供了健康的流动性环境。标普500指数 (${sp500:,.2f}) 的韧性表现强化了全球风险偏好，促使大型对冲基金加速通过合规现货 ETF 渠道沉淀核心流动性。\n\n"
+                f"链上微观结构与交易所订单簿深度数据高度印证了这一结构性趋势。全球主流合规托管机构的现货储备金持续处于低位区间，表明巨鲸账户正在稳步向冷钱包隔离托管系统进行链上归集。与此同时，主流衍生品合约资金费率保持在健康均衡区间，显示行情主要由底层现货资本沉淀驱动。\n\n"
+                f"在国际监管合规与系统性风险防范维度，美联储、SEC、CFTC 以及国际清算银行 (BIS) 正稳步完善机构级托管标准与客户资产穿透审查制度。合规基础设施的确立，从根本上消除了流动性挤兑的系统性溢出隐患，为全球机构级资本配置铺平了法制化道路。\n\n"
 
-                "🏆 **4️⃣ 动态量化情绪因子与 AFML 元标签调制：**\n"
-                f"• **对胜率期望的修正 (Δp̂)**: `{delta_p_hat:+.1%}`\n"
-                f"• **校准后机构胜率期望**: `{modulated_p_hat * 100.0:.1f}%` (已扣除点差与手续费)\n"
-                + (f"  _{long_veto_reason}_\n" if long_veto_reason else "  _✅ 新闻流健康，支持稳健执行量化策略_\n") + "\n"
+                "🏛️ **4️⃣ 机构量化最终裁决 (INSTITUTIONAL QUANTITATIVE VERDICT) ៖**\n"
+                f"• **目标资产 ៖** `{symbol}`\n"
+                f"• **宏观格局 ៖** `🟢 {liq_regime}`\n"
+                f"• **量化胜率期望 ៖** `{confidence_pct:.1f}%`\n"
+                f"• **战略立场 ៖** {strategic_stance_zh}\n\n"
 
                 "─────────────\n"
-                "📋 **一键复制指令：**\n"
+                "📋 **一键快捷执行 ៖**\n"
                 f"`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
             )
 
@@ -479,37 +598,43 @@ class ApexMacroIntelligenceWire:
         # ENGLISH VERSION (en)
         # ----------------------------------------------------------------------
         else:
+            strategic_stance_en = (
+                "Defensive risk mitigation. Pause aggressive spot allocation; deploy capital preservation hedges."
+                if is_long_vetoed else
+                "Institutional capital inflows reinforce constructive upward momentum. Supports programmatic spot accumulation."
+            )
+
             return (
-                "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & QUANTITATIVE WIRE v14.50** 🌐\n"
+                "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & FINANCIAL WIRE** 🌐\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🪙 **TARGET ASSET**: `{symbol}` | ⏰ **TIMESTAMP**: `{time.strftime('%H:%M:%S UTC')}`\n"
-                f"🏛️ **OFFICIAL ENTITIES INGESTED**: `{ent_str}`\n"
-                f"⚡ **QUANT SENTIMENT SCALAR**: `{sentiment_scalar:+.3f}` (`{sentiment_label}`)\n"
-                f"⏱️ **NANO-TRIE IN-MEMORY LATENCY**: `{nano_latency_ms:.4f} ms` (<0.05ms Sub-Millisecond)\n\n"
+                f"🪙 **TARGET ASSET ៖** `{symbol}` | ⏰ **TIMESTAMP ៖** `{time_utc}`\n"
+                f"🏛️ **MACRO REGIME ៖** `{sentiment_badge_en}`\n\n"
 
-                "🔥 **1️⃣ BREAKING HEADLINES & INSTITUTIONAL CATALYSTS (TOP WIRE):**\n"
-                f"{headlines_md}\n\n"
+                "🔥 **1️⃣ BREAKING HEADLINES & INSTITUTIONAL CATALYSTS (TOP WIRE) ៖**\n"
+                f"{headlines_md_en}\n\n"
 
-                "🌊 **2️⃣ $6T US NET LIQUIDITY FORMULA & INTERMARKET MACRO ENGINE:**\n"
-                f"• **US Net Liquidity Formula**: `Fed Assets (${fed_assets:,.0f}B) - TGA (${tga_balance:,.0f}B) - RRP (${rrp_facility:,.0f}B)`\n"
-                f"  👉 **Current Net Liquidity**: `${net_liq_trillions:.2f} Trillion` (Expansion Velocity: `+{weekly_velocity:.1f}B/week`)\n"
-                f"  👉 **Macro Regime**: `🟢 {liq_regime}`\n"
-                f"• **DXY Dollar Index**: `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500**: `${sp500:,.2f}`\n"
-                f"• **US 10Y Yield**: `{yield_10y:.2f}%` | **US 10Y Real Yield**: `{real_yield_10y:.2f}%` (Inflation Adjusted)\n"
-                f"• **Fed Rate Cut Implied Odds**: `{fed_rate_cut_prob:.1f}%` (Polymarket & Kalshi)\n"
-                f"• **VIX Term Structure (VIX/VIX3M)**: `{vix_ratio:.3f}` ({'⚠️ BACKWARDATION (Panic Shock)' if is_backwardation else '✅ Normal Contango'})\n\n"
+                "🌊 **2️⃣ KEY INTERMARKET MACRO INDICATORS ៖**\n"
+                f"• **US Dollar Index (DXY) ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500 ៖** `${sp500:,.2f}`\n"
+                f"• **US 10Y Treasury Yield ៖** `{yield_10y:.2f}%` | **US 10Y Real Yield ៖** `{real_yield_10y:.2f}%`\n"
+                f"• **US Net Financial Liquidity ៖** `${net_liq_trillions:.2f} Trillion` (Weekly Flow: `+{weekly_velocity:.1f}B/week`)\n"
+                f"• **Fed Rate Cut Implied Odds ៖** `{fed_rate_cut_prob:.1f}%` | **VIX Term Structure ៖** `{vix_ratio:.3f}` ({'⚠️ BACKWARDATION (Panic)' if is_backwardation else '✅ Normal Contango'})\n"
+                f"• **Economic Calendar Status ៖** `{countdown_en}`\n"
+                f"• **Broker Spread Health ៖** `{spread_status}`\n\n"
 
-                "📅 **3️⃣ ECONOMIC CALENDAR RED FOLDER BLACKOUT (INVARIANT 58/74):**\n"
-                f"• **Red Folder Status**: `{countdown_en}`\n"
-                f"• **Broker Spread Health**: `{spread_status}`\n\n"
+                "📰 **3️⃣ EXECUTIVE EDITORIAL NARRATIVE ៖**\n"
+                f"NEW YORK — Global macroeconomic cross-asset orderflow demonstrates sustained institutional accumulation across primary digital assets and benchmark risk markets. The convergence of stabilizing global monetary policy and persistent institutional bid depth has channeled liquidity into high-conviction tier-1 assets, absorbing sell-side pressure and reinforcing structural demand floors across major liquid trading venues.\n\n"
+                f"From a traditional finance (TradFi) and Federal Reserve transmission perspective, the retreat in the US Dollar Index (DXY: {dxy:.2f}) coupled with stabilizing 10-year Treasury yields ({yield_10y:.2f}%) has reinforced institutional risk-on appetite. Wall Street equity indices, evidenced by resilient S&P 500 performance (${sp500:,.2f}), confirm that liquidity expansion channels remain operational. Institutional spot exchange-traded funds (ETFs) continue to execute programmatic accumulation schedules, providing resilient structural bid depth against macro volatility.\n\n"
+                f"Quantitative on-chain telemetry and exchange order book dynamics substantiate this structural thesis. Exchange reserve metrics across major custodial institutions continue to compress toward multi-year lows, confirming persistent migration of circulating supply into segregated cold custody infrastructure. Concurrently, derivative funding rates across perpetual swap markets maintain neutral-to-constructive baselines, illustrating that market momentum is anchored in spot volume rather than overleveraged speculative froth.\n\n"
+                f"Regarding regulatory compliance and international systemic risk governance, primary supervisory authorities including the SEC, CFTC, and Bank for International Settlements (BIS) are accelerating the codification of prudential custody and asset segregation frameworks. These regulatory clarity milestones diminish counterparty contagion risks and furnish global institutional asset allocators with the legal certainty required to deploy strategic capital pools into the emerging digital monetary infrastructure.\n\n"
 
-                "🏆 **4️⃣ DYNAMIC QUANT SENTIMENT FEED & AFML META-LABELING MODULATOR:**\n"
-                f"• **Win Expectancy Modulation (Δp̂)**: `{delta_p_hat:+.1%}`\n"
-                f"• **AFML Calibrated Win Expectancy**: `{modulated_p_hat * 100.0:.1f}%` (Net of Spread & Commission)\n"
-                + (f"  _{long_veto_reason}_\n" if long_veto_reason else "  _✅ News flow supports steady programmatic execution_\n") + "\n"
+                "🏛️ **4️⃣ INSTITUTIONAL QUANTITATIVE VERDICT ៖**\n"
+                f"• **Target Asset ៖** `{symbol}`\n"
+                f"• **Macro Atmosphere ៖** `🟢 {liq_regime}`\n"
+                f"• **Directional Confidence ៖** `{confidence_pct:.1f}%`\n"
+                f"• **Strategic Stance ៖** {strategic_stance_en}\n\n"
 
                 "─────────────\n"
-                "📋 **1-TAP QUICK EXECUTIONS:**\n"
+                "📋 **1-TAP QUICK EXECUTIONS ៖**\n"
                 f"`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
             )
 

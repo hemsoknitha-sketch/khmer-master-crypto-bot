@@ -5012,11 +5012,11 @@ class TelegramBotThread(BaseThread):
             ])
 
             loading_text = (
-                "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & QUANTITATIVE WIRE v14.50**\n\n_Synthesizing Nano-Trie <0.05ms matching, $6T US Net Liquidity Formula & Red Folder Blackout Guard..._"
+                "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & FINANCIAL WIRE**\n\n_Synthesizing global macro intelligence, institutional order flow & latest wire updates..._"
                 if user_lang == 'en' else
-                ("📰 **ANGKOR QUANT | 华尔街全球宏观与量化情报电讯 v14.50**\n\n_正在执行内存纳米字典树匹配、6万亿美元净流动性公式与红标事件防御审计..._"
+                ("📰 **ANGKOR QUANT | 华尔街全球宏观与金融电讯**\n\n_正在汇总全球宏观情报、机构资金流向与实时要闻..._"
                  if user_lang == 'zh' else
-                 "📰 **ANGKOR QUANT | APEX GLOBAL MACRO & QUANTITATIVE WIRE v14.50**\n\n_កំពុងស្កេន Nano-Trie <0.05ms, រូបមន្តសាច់ប្រាក់សកល $6T US Net Liquidity & របាំងការពារ Red Folder Blackout..._")
+                 "📰 **ANGKOR QUANT | ព្រឹត្តិបត្រព័ត៌មានម៉ាក្រូសេដ្ឋកិច្ចសកល & ទីផ្សារហិរញ្ញវត្ថុ**\n\n_កំពុងសំយោគព័ត៌មានម៉ាក្រូសេដ្ឋកិច្ចសកល លំហូរទុនស្ថាប័ន Wall Street & ហេតុការណ៍ក្តៅៗ..._")
             )
 
             status_msg = None
@@ -5036,22 +5036,23 @@ class TelegramBotThread(BaseThread):
             if not image_url and hasattr(report, "image_url"):
                 image_url = report.image_url
 
-            # Append concise 1-Tap Execution Presets
-            if user_lang == 'en':
-                report_text += (
-                    "\n\n📋 **1-TAP QUICK SCAN ៖**\n"
-                    "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
-                )
-            elif user_lang == 'zh':
-                report_text += (
-                    "\n\n📋 **一键快捷扫描 ៖**\n"
-                    "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
-                )
-            else:
-                report_text += (
-                    "\n\n📋 **បញ្ជាស្កេនរហ័ស 1-TAP ៖**\n"
-                    "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
-                )
+            # Append concise 1-Tap Execution Presets (Guarantees zero duplicate footers)
+            if "1-TAP" not in report_text and "បញ្ជាស្កេនរហ័ស" not in report_text and "一键" not in report_text:
+                if user_lang == 'en':
+                    report_text += (
+                        "\n\n📋 **1-TAP QUICK SCAN ៖**\n"
+                        "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                    )
+                elif user_lang == 'zh':
+                    report_text += (
+                        "\n\n📋 **一键快捷扫描 ៖**\n"
+                        "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                    )
+                else:
+                    report_text += (
+                        "\n\n📋 **បញ្ជាស្កេនរហ័ស 1-TAP ៖**\n"
+                        "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                    )
 
             delivered = False
             # 🛡️ APEX UNIFIED COVER PHOTO DISPATCH (100% Genuine Full-Resolution Delivery)
