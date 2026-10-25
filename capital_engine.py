@@ -8333,6 +8333,14 @@ class CapitalKellyPositionSizer:
         except Exception:
             pass
 
+        # Direct Whale Orderflow & VPIN Toxicity Feedback Governor (Invariant 90 & 101)
+        try:
+            import onchain_whale_radar
+            whale_kelly_mult = onchain_whale_radar.get_whale_kelly_multiplier(clean_epic)
+            scale_mult *= whale_kelly_mult
+        except Exception:
+            pass
+
         # Dynamic Target Margin Sizing: Allocates full $10.00 - $15.00 actual margin per trade
         try:
             import capital_tri_regional_universe as ctru

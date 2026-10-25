@@ -3447,6 +3447,18 @@ class SuperSmartCapitalCitadel:
         except Exception as e_vpin_gate:
             logger.debug(f"VPIN gatekeeper evaluation note: {e_vpin_gate}")
 
+        # Pillar 0.895: On-Chain Whale Inflow Dumping Risk Guard (Invariant 90)
+        try:
+            import onchain_whale_radar
+            is_dump, rem_dump = onchain_whale_radar.is_dumping_risk_active(s_epic)
+            norm_dir = "BUY" if str(direction or "").upper() in ["BUY", "LONG"] else "SELL"
+            if is_dump and norm_dir == "BUY":
+                reason = f"WHALE_DUMP_RISK_VETO: Active on-chain whale inflow dump risk on {s_epic} ({rem_dump}m remaining)."
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                return False, reason, {"is_approved": False, "rejection_reason": reason}
+        except Exception as e_dump_gate:
+            logger.debug(f"Whale dump risk gatekeeper evaluation note: {e_dump_gate}")
+
         # Pillar 0.90: Institutional Order Flow Delta Absorption & Bull/Bear Exhaustion Gatekeeper (Invariant 102 & AQ84 Pillar 3)
         try:
             import order_flow_delta_absorption_engine as ofda

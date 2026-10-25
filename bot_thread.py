@@ -7981,7 +7981,12 @@ class TelegramBotThread(BaseThread):
                 sym = data.replace("btn_predict_", "")
                 context.args = [sym]
                 await predict_command(update, context)
+            elif data.startswith("btn_whales_"):
+                sym = data.replace("btn_whales_", "")
+                context.args = [] if sym in ["refresh", ""] else [sym]
+                await whales_command(update, context)
             elif data in ["btn_whales_refresh", "btn_whales"]:
+                context.args = []
                 await whales_command(update, context)
             elif data in ["btn_news_refresh", "btn_news"]:
                 await news_command(update, context)
@@ -19906,32 +19911,39 @@ class TelegramBotThread(BaseThread):
             else:
                 user_lang = 'km'
 
+            target_symbol = None
+            if hasattr(context, 'args') and context.args and len(context.args) > 0:
+                raw_arg = str(context.args[0]).upper().strip()
+                if raw_arg not in ['SCAN', 'ALL', 'OVERVIEW', 'NONE']:
+                    target_symbol = raw_arg
+
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🔄 Refresh Whale Radar", callback_data="btn_whales_refresh"),
-                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
+                    InlineKeyboardButton("🔄 Refresh Radar", callback_data="btn_whales_refresh"),
+                    InlineKeyboardButton("🐋 Whale BTC", callback_data="btn_whales_BTCUSDT")
+                ],
+                [
+                    InlineKeyboardButton("🐋 Whale SOL", callback_data="btn_whales_SOLUSDT"),
+                    InlineKeyboardButton("🐋 Whale ETH", callback_data="btn_whales_ETHUSDT")
                 ],
                 [
                     InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
+                    InlineKeyboardButton("🧠 5-Agent Analysis", callback_data="btn_analyze_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                ],
-                [
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
                     InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ])
 
             loading_msg = (
-                "🐋 **APEX SUPER AGI v13.00 ៖** Scanning Ethereum On-Chain Hot Wallets & Binance Orderbook Depth Walls..."
+                "🐋 **APEX SUPER AGI v14.50 ៖** Ingesting Cross-Chain Flows (BTC, ETH, SOL, TRON), VPIN Toxicity & CVD Microstructure..."
                 if user_lang == 'en' else
-                ("🐋 **APEX SUPER AGI v13.00 ៖** 正在扫描以太坊链上巨鲸钱包与 Binance 订单簿深度买卖墙..."
+                ("🐋 **APEX SUPER AGI v14.50 ៖** 正在实时扫描跨链大额转账 (BTC, ETH, SOL, TRON)、测算 VPIN 订单流毒性与 CVD 冰山吸收..."
                  if user_lang == 'zh' else
-                 "🐋 **APEX SUPER AGI v13.00 ៖** កំពុងស្កេនចលនា On-Chain Whale លើ Ethereum Blockchain & Binance Orderbook Depth Walls...")
+                 "🐋 **APEX SUPER AGI v14.50 ៖** កំពុងស្កេនចលនា Whale ឆ្លងកាត់ BTC, ETH, SOL, TRON, គណនា VPIN Toxicity & CVD Microstructure...")
             )
 
             status_msg = None
@@ -19943,116 +19955,8 @@ class TelegramBotThread(BaseThread):
                 status_msg = await (update.effective_message or update.message).reply_text(loading_msg, parse_mode="Markdown")
 
             try:
-                import requests
-                binance_hot_wallet = "0x28C6c06298d514Db089934071355E5743bf21d60"
-                url = f"https://eth.blockscout.com/api?module=account&action=tokentx&address={binance_hot_wallet}&page=1&offset=25&sort=desc"
-
-                tx_list = []
-                net_inflow = 0.0
-                net_outflow = 0.0
-
-                try:
-                    res = await asyncio.to_thread(requests.get, url, timeout=8)
-                    if res.status_code == 200:
-                        data = res.json()
-                        for tx in data.get("result", [])[:15]:
-                            token_symbol = tx.get("tokenSymbol")
-                            if token_symbol in ["USDT", "USDC", "ETH", "WBTC"]:
-                                decimals = int(tx.get("tokenDecimal", 18 if token_symbol == "ETH" else 6))
-                                value = float(tx.get("value", 0)) / (10 ** decimals)
-                                to_addr = tx.get("to", "").lower()
-                                is_deposit = (to_addr == binance_hot_wallet.lower())
-                                if value >= 100_000:
-                                    direction = "📥 INFLOW (Exchange Deposit)" if is_deposit else "📤 OUTFLOW (Cold Storage Accumulation)"
-                                    if is_deposit: net_inflow += value
-                                    else: net_outflow += value
-                                    tx_list.append(f"• `{token_symbol}` ៖ `${value:,.0f}` | {direction}")
-                except Exception as we:
-                    print(f"Whale fetch error: {we}")
-
-                # Orderbook Wall Scan (BTCUSDT & ETHUSDT)
-                btc_bid_wall = "$2,450,000 USDT @ $94,200"
-                btc_ask_wall = "$1,850,000 USDT @ $96,500"
-                try:
-                    ob_res = await asyncio.to_thread(requests.get, "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=20", timeout=5)
-                    if ob_res.status_code == 200:
-                        ob_data = ob_res.json()
-                        bids = ob_data.get("bids", [])
-                        asks = ob_data.get("asks", [])
-                        if bids:
-                            top_bid_val = float(bids[0][0]) * float(bids[0][1])
-                            btc_bid_wall = f"${top_bid_val:,.0f} USDT @ ${float(bids[0][0]):,.2f}"
-                        if asks:
-                            top_ask_val = float(asks[0][0]) * float(asks[0][1])
-                            btc_ask_wall = f"${top_ask_val:,.0f} USDT @ ${float(asks[0][0]):,.2f}"
-                except Exception: pass
-
-                bias_status = "🟢 BULLISH ACCUMULATION" if net_outflow >= net_inflow else "🔴 BEARISH DUMP RISK"
-                tx_formatted = "\n".join(tx_list[:4]) if tx_list else "• `USDT` ៖ `$15,450,000` | 📤 OUTFLOW (Cold Storage Accumulation)\n• `ETH` ៖ `$8,200,000` | 📥 INFLOW (Binance Hot Wallet Deposit)"
-
-                if user_lang == 'en':
-                    msg = (
-                        "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v13.00** ⚡\n"
-                        "════════════\n\n"
-                        "🤖 **AI Microstructure Radar** ៖ `Institutional Orderflow Intelligence™`\n"
-                        "🌐 **Institutions Monitored** ៖ `BlackRock` | `Fidelity` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
-                        "⚡ **Strategy** ៖ `Sub-Second Front-Run Execution ($1M - $100M+ Orderflow Inflow)`\n\n"
-                        "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
-                        f"{tx_formatted}\n\n"
-                        "💰 **WHALE CAPITAL NET STATS (24H):**\n"
-                        f"• **Exchange Inflow (Sell Pressure)** ៖ `${net_inflow:,.0f} USDT` 🔴\n"
-                        f"• **Cold Wallet Outflow (Accumulation)** ៖ `${net_outflow:,.0f} USDT` 🟢\n"
-                        f"• **Whale Sentiment Bias** ៖ `{bias_status}` 🚀\n\n"
-                        "🧱 **BINANCE ORDERBOOK HEAVY WALLS (BTC/USDT):**\n"
-                        f"• **Institutional Bid Support Wall** ៖ `{btc_bid_wall}` 🛡️\n"
-                        f"• **Whale Resistance Ask Wall** ៖ `{btc_ask_wall}` ⚔️\n\n"
-                        "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
-                        "👉 **Scan Live Whale Movement Radar ៖**\n`` `/whales SCAN` ``\n\n"
-                        "👉 **Track Single-Coin Whale Orderbook (SOL / BTC) ៖**\n`` `/whales SOL` ``\n"
-                        "`` `/whales BTC` ``"
-                    )
-                elif user_lang == 'zh':
-                    msg = (
-                        "🐋 **巨鲸资金流向与暗盘抢跑交易雷达 (Front-Running Radar) v13.00** ⚡\n"
-                        "════════════\n\n"
-                        "🤖 **AI 深度微观结构雷达** ៖ `机构级订单流高频智能感知引擎™`\n"
-                        "🌐 **监控机构清单** ៖ `贝莱德 (BlackRock)` | `富达 (Fidelity)` | `微策 (MicroStrategy)` | `Binance 冷钱包` | `Coinbase Prime`\n"
-                        "⚡ **核心策略** ៖ `毫秒级抢跑入场 (Front-Run Execution $1M - $100M+ 机构大单)`\n\n"
-                        "📊 **链上巨鲸大额转账流向 (机构级追踪)：**\n"
-                        f"{tx_formatted}\n\n"
-                        "💰 **巨鲸资金净流向统计 (24H)：**\n"
-                        f"• **交易所净流入 (抛压风险)** ៖ `${net_inflow:,.0f} USDT` 🔴\n"
-                        f"• **冷钱包净流出 (抄底囤货)** ៖ `${net_outflow:,.0f} USDT` 🟢\n"
-                        f"• **巨鲸情绪偏向** ៖ `{bias_status}` 🚀\n\n"
-                        "🧱 **BINANCE 订单簿重仓挂单墙 (BTC/USDT)：**\n"
-                        f"• **机构买盘支撑墙** ៖ `{btc_bid_wall}` 🛡️\n"
-                        f"• **巨鲸卖盘阻力墙** ៖ `{btc_ask_wall}` ⚔️\n\n"
-                        "📋 **一键复制指令：**\n\n"
-                        "👉 **扫描实时巨鲸资金流向 ៖**\n`` `/whales SCAN` ``\n\n"
-                        "👉 **追踪单币种巨鲸订单簿 (SOL / BTC) ៖**\n`` `/whales SOL` ``\n"
-                        "`` `/whales BTC` ``"
-                    )
-                else:
-                    msg = (
-                        "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v13.00** ⚡\n"
-                        "════════════\n\n"
-                        "🤖 **AI Models សហការ ៖** `Institutional Orderflow Intelligence™`\n"
-                        "🌐 **ស្ថាប័នមហាសេដ្ឋីតាមដាន ៖** `BlackRock` | `Fidelity` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
-                        "⚡ **យុទ្ធសាស្ត្រប្រតិបត្តិ ៖** `ចូលទិញមុន (Front-Run) ក្នុងកម្រិត Sub-Second រួចយកចំណេញពេល Whale រុញថ្លៃ`\n\n"
-                        "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
-                        f"{tx_formatted}\n\n"
-                        "💰 **WHALE CAPITAL NET STATS (24H):**\n"
-                        f"• **Exchange Inflow (សំពាធលក់)** ៖ `${net_inflow:,.0f} USDT` 🔴\n"
-                        f"• **Cold Wallet Outflow (ការទិញសន្សំ)** ៖ `${net_outflow:,.0f} USDT` 🟢\n"
-                        f"• **Whale Sentiment Bias** ៖ `{bias_status}` 🚀\n\n"
-                        "🧱 **BINANCE ORDERBOOK HEAVY WALLS (BTC/USDT):**\n"
-                        f"• **Institutional Bid Support Wall** ៖ `{btc_bid_wall}` 🛡️\n"
-                        f"• **Whale Resistance Ask Wall** ៖ `{btc_ask_wall}` ⚔️\n\n"
-                        "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
-                        "👉 **ស្កេនតាមដានចលនា Whale ធំៗ Real-Time ៖**\n`` `/whales SCAN` ``\n\n"
-                        "👉 **តាមដាន Orderbook Imbalance លើកាក់ទោល (SOL / BTC) ៖**\n`` `/whales SOL` ``\n"
-                        "`` `/whales BTC` ``"
-                    )
+                import onchain_whale_radar
+                msg = await asyncio.to_thread(onchain_whale_radar.get_whale_radar_report, target_symbol, user_lang)
 
                 if status_msg:
                     await status_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
