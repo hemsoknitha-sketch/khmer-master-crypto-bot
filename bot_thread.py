@@ -4391,11 +4391,15 @@ class TelegramBotThread(BaseThread):
                         ],
                         [
                             InlineKeyboardButton("🔍 Analyze SOL", callback_data="btn_analyze_SOLUSDT"),
-                            InlineKeyboardButton("🔍 Analyze PAXG (Gold)", callback_data="btn_analyze_PAXGUSDT")
+                            InlineKeyboardButton("🏆 Analyze GOLD", callback_data="btn_analyze_GOLD")
+                        ],
+                        [
+                            InlineKeyboardButton("📊 Analyze US100", callback_data="btn_analyze_US100"),
+                            InlineKeyboardButton("💻 Analyze NVDA", callback_data="btn_analyze_NVDA")
                         ],
                         [
                             InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
-                            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                            InlineKeyboardButton("🐋 Whale Radar", callback_data="btn_whales_refresh")
                         ],
                         [
                             InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
@@ -4406,113 +4410,160 @@ class TelegramBotThread(BaseThread):
                     
                     if user_lang == 'en':
                         usage_msg = (
-                            "🧠 **ANGKOR QUANT | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
-                            "════════════\n\n"
-                            "📊 **5-AGENT AGI SWARM ARCHITECTURE:**\n"
-                            "• 1️⃣ **Trend Agent** ៖ EMA 20/50/200 Cross, Supertrend, Market Structure\n"
-                            "• 2️⃣ **Volatility Agent** ៖ ATR Band Expansion, Bollinger Squeeze\n"
-                            "• 3️⃣ **Momentum Agent** ៖ RSI Divergence, MACD Momentum\n"
-                            "• 4️⃣ **Orderbook Agent** ៖ Bid/Ask Imbalance & Liquidity Depth Walls\n"
-                            "• 5️⃣ **Macro Agent** ៖ Global Sentiment, BTC Dominance & DXY Correlation\n\n"
+                            "🧠 **ANGKOR QUANT | 5-AGENT AGI 360° MARKET ANALYZER v14.50** 🧠\n"
+                            "═════════════════════════════════════\n\n"
+                            "📊 **5-AGENT INSTITUTIONAL QUANT ARCHITECTURE:**\n"
+                            "• 1️⃣ **AFML Meta-Labeling Agent (Inv 85 & 96)**: Model 1 Technical Citadel Confluence + Model 2 Triple Stacking Classifier (XGBoost + LightGBM + CatBoost) Fee-Cleared Win Expectancy ($\hat{p} \ge 0.55$).\n"
+                            "• 2️⃣ **Gaussian HMM & Dealing Range Agent (Inv 86 & 103)**: Trend / Shock / Chop regime detection + 35%-65% Dealing Range Equilibrium Chop Armor (`BLOCK_CHOP_ZONE`).\n"
+                            "• 3️⃣ **Smart Money Concepts & Turtle Soup Agent (Inv 95)**: BSL/SSL Liquidity Sweeps, Absorption Wicks ($\ge 40\%$), Structural Stop Loss & Breakeven Armor Net Floor.\n"
+                            "• 4️⃣ **Orderflow & Microstructure Agent (Inv 97 & 101)**: CVD Microstructure Absorption & VPIN Order Flow Toxicity.\n"
+                            "• 5️⃣ **Tri-Regional RAM Universe (Inv 89)**: 900-asset DNA covering Crypto (BTC, ETH, SOL) and TradFi (Spot Gold XAUUSD, US100 Nasdaq, US500, NVDA, TSLA).\n\n"
                             "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
-                            "👉 **Analyze Single-Coin 360° Technicals + 4H Chart ៖**\n`` `/analyze BTCUSDT` ``\n"
-                            "`` `/analyze SOL` ``\n"
-                            "`` `/analyze PAXG` ``\n\n"
-                            "👉 **Analyze with Custom Question ៖**\n`` `/analyze BTCUSDT Should I Buy Long or Short now?` ``"
+                            "👉 **Analyze Crypto (Binance):**\n"
+                            "`` `/analyze BTCUSDT` ``\n"
+                            "`` `/analyze SOLUSDT` ``\n"
+                            "`` `/analyze ETHUSDT` ``\n\n"
+                            "👉 **Analyze TradFi Equities & Commodities (Capital.com):**\n"
+                            "`` `/analyze GOLD` ``\n"
+                            "`` `/analyze US100` ``\n"
+                            "`` `/analyze NVDA` ``\n"
+                            "`` `/analyze TSLA` ``\n\n"
+                            "👉 **Analyze with Custom Question:**\n"
+                            "`` `/analyze BTCUSDT Should I Buy Long or Short now?` ``"
                         )
                     elif user_lang == 'zh':
                         usage_msg = (
-                            "🧠 **ANGKOR QUANT | 5-Agent AGI 360° 智能市场分析师 v13.00** 🧠\n"
-                            "════════════\n\n"
-                            "📊 **5-AGENT AGI 蜂群研判架构：**\n"
-                            "• 1️⃣ **趋势 Agent** ៖ EMA 20/50/200 交叉、Supertrend 结构\n"
-                            "• 2️⃣ **波动率 Agent** ៖ ATR 扩张、布林带挤压状态\n"
-                            "• 3️⃣ **动量 Agent** ៖ RSI 背离、MACD 柱状图动量\n"
-                            "• 4️⃣ **订单簿 Agent** ៖ 买卖盘深度挂单墙与不平衡度\n"
-                            "• 5️⃣ **宏观 Agent** ៖ 市场情绪、BTC 市占率及 DXY 关联度\n\n"
-                            "📋 **一键复制指令：**\n\n"
-                            "👉 **360° 深度技术面 + 4小时 K 线图分析 ៖**\n`` `/analyze BTCUSDT` ``\n"
-                            "`` `/analyze SOL` ``\n"
-                            "`` `/analyze PAXG` ``\n\n"
-                            "👉 **自定义策略提问分析 ៖**\n`` `/analyze BTCUSDT 现在应该做多还是做空？` ``"
+                            "🧠 **ANGKOR QUANT | 5-Agent AGI 360° 全方位量化市场分析系统 v14.50** 🧠\n"
+                            "═════════════════════════════════════\n\n"
+                            "📊 **5-AGENT 机构级量化蜂群架构：**\n"
+                            "• 1️⃣ **AFML 二阶段元标注 Agent (准则 85 & 96)**：Model 1 城堡结构方向 + Model 2 异构三模型融合 (XGBoost+LightGBM+CatBoost) 扣除点差佣金净期望胜率 ($\hat{p} \ge 0.55$)。\n"
+                            "• 2️⃣ **高斯 HMM 与交易区间 Agent (准则 86 & 103)**：趋势/剧震/震荡状态识别 + 35%-65% 平衡震荡陷阱防御 (`BLOCK_CHOP_ZONE`)。\n"
+                            "• 3️⃣ **聪明的钱 (SMC) 与海龟汤 Agent (准则 95)**：BSL/SSL 流动性假突破与吸收影线 ($\ge 40\%$)、保本护甲 Net Floor 与结构性止损。\n"
+                            "• 4️⃣ **微观订单流 Agent (准则 97 & 101)**：CVD 累积成交量差吸收与 VPIN 订单流毒性分析。\n"
+                            "• 5️⃣ **三区内存资产宇宙 (准则 89)**：900 资产 DNA 覆盖 Crypto (BTC, ETH, SOL) 与 TradFi (现货黄金 XAUUSD, 纳斯达克 US100, 标普 US500, 英伟达 NVDA)。\n\n"
+                            "📋 **一键复制执行指令：**\n\n"
+                            "👉 **分析加密资产 (币安)：**\n"
+                            "`` `/analyze BTCUSDT` ``\n"
+                            "`` `/analyze SOLUSDT` ``\n\n"
+                            "👉 **分析 TradFi 美股与大宗商品 (Capital.com)：**\n"
+                            "`` `/analyze GOLD` ``\n"
+                            "`` `/analyze US100` ``\n"
+                            "`` `/analyze NVDA` ``\n\n"
+                            "👉 **带自定义策略提问分析：**\n"
+                            "`` `/analyze BTCUSDT 现在应该做多还是做空？` ``"
                         )
                     else:
                         usage_msg = (
-                            "🧠 **ANGKOR QUANT | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
-                            "════════════\n\n"
-                            "📊 **5-AGENT AGI SWARM ARCHITECTURE (ស្ថាបត្យកម្ម AI វិភាគ ៥ ជំនាញ) ៖**\n"
-                            "• 1️⃣ **Trend Agent** ៖ វិភាគនិន្នាការ EMA 20/50/200 Cross & Market Structure\n"
-                            "• 2️⃣ **Volatility Agent** ៖ វិភាគភាពប្រែប្រួល ATR & Bollinger Band Squeeze\n"
-                            "• 3️⃣ **Momentum Agent** ៖ វិភាគកម្លាំងទិញ/លក់ RSI Divergence & MACD\n"
-                            "• 4️⃣ **Orderbook Agent** ៖ វិភាគ Orderbook Depth Walls & Inflow/Outflow\n"
-                            "• 5️⃣ **Macro Agent** ៖ វិភាគសេដ្ឋកិច្ចសកល BTC Dominance & DXY\n\n"
-                            "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
-                            "👉 **វិភាគកាក់បច្ចេកទេស 360° + Chart ផ្កាយ 4-Hour ៖**\n`` `/analyze BTCUSDT` ``\n"
-                            "`` `/analyze SOL` ``\n"
-                            "`` `/analyze PAXG` ``\n\n"
-                            "👉 **វិភាគកាក់ជាមួយសំណួរផ្ទាល់ខ្លួន ៖**\n`` `/analyze BTCUSDT Should I Buy Long or Short now?` ``"
+                            "🧠 **ANGKOR QUANT | 5-AGENT AGI 360° TECHNICAL & STRUCTURAL ANALYZER v14.50** 🧠\n"
+                            "═════════════════════════════════════\n\n"
+                            "📊 **5-AGENT AGI SWARM ARCHITECTURE (ស្ថាបត្យកម្ម AI វិភាគស្ថាប័ន ៥ ជំនាញ) ៖**\n"
+                            "• 1️⃣ **AFML Meta-Labeling Agent (Invariant 85 & 96)** ៖ វិភាគ ២ ជាន់ — Model 1 Citadel Confluence រកទិសដៅ + Model 2 Multi-Model Stacking Classifier (XGBoost + LightGBM + CatBoost) គណនា **Win Expectancy ($\hat{p} \ge 0.55$)** កាត់កង Spread & Fee រួចជាស្រេច\n"
+                            "• 2️⃣ **Gaussian HMM 3-State Regime & Dealing Range Agent (Invariant 86 & 103)** ៖ បែងចែក Trend / Volatility Shock / Chop Zone ច្បាស់ៗ រួមទាំងប្រកាសអាសន្ន `BLOCK_CHOP_ZONE` ពេលតម្លៃស្ថិតក្នុងចន្លោះ 35%-65% Dealing Range\n"
+                            "• 3️⃣ **Smart Money Concepts (SMC) & Turtle Soup Agent (Invariant 95)** ៖ ចាប់កូអរដោនេ Liquidity Sweeps (BSL/SSL), Fair Value Gaps (FVG), Order Blocks, និង Breakeven Armor Net Floor ($\text{Entry} \pm 0.5\times\text{Spread}$)\n"
+                            "• 4️⃣ **Orderflow & Microstructure Agent (Invariant 97 & 101)** ៖ វិភាគ CVD Microstructure Absorption & VPIN Order Flow Toxicity Wave Guard\n"
+                            "• 5️⃣ **Tri-Regional RAM Universe (Invariant 89)** ៖ ទាញយក Institutional DNA សម្រាប់ 900 ទ្រព្យសកម្ម ទាំង Crypto (BTC, ETH, SOL) និង TradFi (Spot Gold XAUUSD, US100 Nasdaq, US500, NVDA, TSLA)\n\n"
+                            "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ភ្លាមៗ) ៖**\n\n"
+                            "👉 **វិភាគ Crypto (Binance Deep Liquidity) ៖**\n"
+                            "`` `/analyze BTCUSDT` ``\n"
+                            "`` `/analyze SOLUSDT` ``\n"
+                            "`` `/analyze ETHUSDT` ``\n\n"
+                            "👉 **វិភាគ TradFi Equities & Commodities (Capital.com 900 Assets) ៖**\n"
+                            "`` `/analyze GOLD` ``\n"
+                            "`` `/analyze US100` ``\n"
+                            "`` `/analyze NVDA` ``\n"
+                            "`` `/analyze TSLA` ``\n\n"
+                            "👉 **វិភាគកាក់ជាមួយសំណួរយុទ្ធសាស្ត្រផ្ទាល់ខ្លួន ៖**\n"
+                            "`` `/analyze BTCUSDT Should I Buy Long or Short now?` ``"
                         )
                     await (update.effective_message or update.message).reply_text(usage_msg, parse_mode="Markdown", reply_markup=reply_markup)
                     return
                     
-                symbol = str(context.args[0]).upper().strip()
-                if not symbol.endswith("USDT"): symbol += "USDT"
+                raw_sym = str(context.args[0]).upper().strip()
+                is_tradfi_epic = any(raw_sym.startswith(p) for p in [
+                    "GOLD", "XAU", "US100", "US500", "US30", "DE40", "GERMANY40",
+                    "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "OIL", "SILVER"
+                ]) or raw_sym in ["PAXG", "PAXGUSDT"]
+
+                if is_tradfi_epic and not raw_sym.endswith("USDT"):
+                    symbol = raw_sym
+                else:
+                    symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
                 if symbol == "DODOUSDT": symbol = "DODOXUSDT"
 
                 custom_question = " ".join([str(a) for a in context.args[1:]]) if len(context.args) > 1 else ""
                 
-                await context.bot.send_message(chat_id=chat_id, text=f"🔍 **កំពុងទាញយកទិន្នន័យ Candle, Orderbook & ML Predictor សម្រាប់ `{symbol}`...**", parse_mode="Markdown")
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"🧠 **[5-AGENT AGI 360°] កំពុងដំណើរការម៉ូដែល AFML Meta-Labeling, HMM Regimes & SMC Radar សម្រាប់ `{symbol}`...**",
+                    parse_mode="Markdown"
+                )
                 
-                import market_data
-                df, summary, fetched_symbol = await asyncio.to_thread(market_data.fetch_binance_data, symbol)
-                
-                if df is None:
-                    await context.bot.send_message(chat_id=chat_id, text=f"❌ {summary}")
-                    return
-                    
-                chart_path = await asyncio.to_thread(market_data.generate_chart, df, fetched_symbol)
-                
-                await context.bot.send_message(chat_id=chat_id, text=f"📊 **កំពុងគូរ Real-time Technical Chart ជាមួយ Indicators សម្រាប់ `{fetched_symbol}`...**", parse_mode="Markdown")
-                
-                import ml_predictor
-                import orderbook_engine
-                ml_summary = await asyncio.to_thread(ml_predictor.predict_price, fetched_symbol)
-                imbalance = await asyncio.to_thread(orderbook_engine.get_imbalance, fetched_symbol)
-                summary += f"\n\n{ml_summary}\n\n[INSTITUTIONAL ORDERBOOK METRICS]\nBid/Ask Depth Imbalance Ratio: {imbalance:.2f}x"
+                import agi_360_market_analyzer
+                agi_res = await asyncio.to_thread(agi_360_market_analyzer.analyze_market_asset, symbol, user_lang)
+                fetched_symbol = agi_res.get("symbol", symbol)
+                analysis_result = agi_res.get("report_text", "")
 
-                if custom_question:
-                    summary += f"\n\nUser Question: {custom_question}"
-                    
-                if user_lang not in ['auto', 'en']:
-                    summary += f"\n\n[CRITICAL INSTRUCTION: The user has explicitly set their preferred language to {user_lang_upper}. You MUST respond fluently in {user_lang_upper} regardless of the input language.]"
-                    
-                db.add_chat_history(chat_id, 'user', f"Please analyze {fetched_symbol}. {custom_question}")
-                chat_history = db.get_chat_history(chat_id, limit=10)
-                analysis_result = await asyncio.to_thread(self.ai_engine.chat_with_user, summary, history=chat_history)
-                if not isinstance(analysis_result, str): analysis_result = str(analysis_result or "")
-                analysis_result = ui_standards.sanitize_anti_guarantee_text(analysis_result)
-                db.add_chat_history(chat_id, 'model', analysis_result)
-                
+                # Generate Real-time Technical Chart
+                chart_path = None
+                try:
+                    df, _, _, _, _ = await asyncio.to_thread(agi_360_market_analyzer.fetch_asset_candles, fetched_symbol, "15m", 40)
+                    if df is not None and not df.empty and len(df) >= 10:
+                        import market_data
+                        chart_file = f"chart_{chat_id}_{int(time.time())}.png"
+                        chart_path = await asyncio.to_thread(market_data.generate_chart, df, fetched_symbol, chart_file)
+                except Exception as e_ch:
+                    self.log_signal.emit(f"Chart gen note: {e_ch}")
+
+                # If custom question, augment analysis with conversational response
+                if custom_question and hasattr(self, 'ai_engine') and self.ai_engine:
+                    try:
+                        db.add_chat_history(chat_id, 'user', f"Please analyze {fetched_symbol}. {custom_question}")
+                        chat_history = db.get_chat_history(chat_id, limit=6)
+                        prompt = (
+                            f"{analysis_result}\n\n"
+                            f"[USER CUSTOM STRATEGY QUESTION]: {custom_question}\n"
+                            f"[CRITICAL: Answer concisely as an institutional quant incorporating the 5-Agent AGI findings above in {user_lang_upper}]."
+                        )
+                        ai_answer = await asyncio.to_thread(self.ai_engine.chat_with_user, prompt, history=chat_history)
+                        if ai_answer:
+                            analysis_result += f"\n\n💬 **STRATEGY CONSULTATION:**\n{ai_answer}"
+                        db.add_chat_history(chat_id, 'model', analysis_result)
+                    except Exception as e_ai:
+                        self.log_signal.emit(f"AI consultation note: {e_ai}")
+
                 action_keyboard = InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                        InlineKeyboardButton("🏓 Scalp Symbol", callback_data=f"btn_scalp_{fetched_symbol}")
+                        InlineKeyboardButton(f"🏓 Scalp {fetched_symbol}", callback_data=f"btn_scalp_{fetched_symbol}")
                     ],
                     [
-                        InlineKeyboardButton("📊 Refresh Analysis", callback_data=f"btn_analyze_{fetched_symbol}"),
+                        InlineKeyboardButton(f"📊 Refresh {fetched_symbol}", callback_data=f"btn_analyze_{fetched_symbol}"),
+                        InlineKeyboardButton(f"🐋 Whales {fetched_symbol}", callback_data=f"btn_whales_{fetched_symbol}")
+                    ],
+                    [
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
 
                 try:
-                    with open(chart_path, 'rb') as photo:
-                        await context.bot.send_photo(chat_id=chat_id, photo=photo, caption=f"📈 **TECHNICAL CHART ANALYSIS**: `{fetched_symbol}`", parse_mode="Markdown")
+                    if chart_path and os.path.exists(chart_path):
+                        with open(chart_path, 'rb') as photo:
+                            await context.bot.send_photo(
+                                chat_id=chat_id,
+                                photo=photo,
+                                caption=f"📈 **5-AGENT AGI TECHNICAL CHART**: `{fetched_symbol}`",
+                                parse_mode="Markdown"
+                            )
+                        try:
+                            os.remove(chart_path)
+                        except Exception:
+                            pass
                     await send_long_message(context, chat_id, analysis_result, reply_markup=action_keyboard)
                 except Exception as e:
                     self.log_signal.emit(f"⚠️ Error sending chart/analysis: {e}")
                     await send_long_message(context, chat_id, analysis_result, reply_markup=action_keyboard)
                     
-                self.log_signal.emit(f"✅ Live Analysis & Chart sent to VIP Chat ID: {chat_id}")
+                self.log_signal.emit(f"✅ 5-Agent AGI 360° Analysis sent to VIP Chat ID: {chat_id}")
                 
                 await execute_auto_trade_if_applicable(context, chat_id, user_lang, fetched_symbol, analysis_result)
             finally:
