@@ -1580,7 +1580,7 @@ class MT5BridgeEngine:
 
         # Real-time Virtual Multi-User Ledger Profit Harvester & Treasury Inflow Engine (Invariant 44)
         try:
-            super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+            super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52135153", "52133938"})
             if account_id in super_admins or not account_id:
                 sym_rec = normalize_mt5_symbol(symbol or meta.get("symbol", ""))
                 dist_res = db.record_virtual_trade_pnl(ticket=ticket, symbol=sym_rec or "TRADE", total_pnl=pnl, close_price=close_price)
@@ -2249,9 +2249,9 @@ class MT5BridgeEngine:
                         clients_reached += 1
             # 2. Master Signal Bridge / Cloud Copy-Trade Fallback for VIP accounts
             elif target_account:
-                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52135153", "52133938"})
                 if target_account in super_admins:
-                    for master_acc in ["52135153", "52133938"]:
+                    for master_acc in ["52171861", "52135153", "52133938"]:
                         if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
                             target_found = True
                             m_sess = self.clients[master_acc]
@@ -2350,9 +2350,9 @@ class MT5BridgeEngine:
                     clients_reached += 1
             elif target_account:
                 # Master Signal Bridge / Cloud Copy-Trade Fallback
-                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52135153", "52133938"})
                 if target_account in super_admins:
-                    for master_acc in ["52135153", "52133938"]:
+                    for master_acc in ["52171861", "52135153", "52133938"]:
                         if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
                             m_sess = self.clients[master_acc]
                             if m_sess.socket_conn and self._send_raw_socket(m_sess.socket_conn, payload):
@@ -3877,13 +3877,13 @@ class MT5BridgeEngine:
                     continue
 
                 eligible_vip_users = []
-                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52135153", "52133938"})
                 all_cycle_tickets = set()
 
                 for chat_id in active_users:
                     now_ts = time.time()
                     is_real_admin = (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
-                    super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+                    super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52135153", "52133938"})
 
                     cfg = db.get_user_mt5_config(chat_id)
                     raw_acc = str(cfg.get("login", "")).strip() if cfg else ""
@@ -3892,12 +3892,12 @@ class MT5BridgeEngine:
 
                     # Super Admin Fallback: Auto-resolve to Master Trading Account if not explicitly bound
                     if not acc_id and is_real_admin:
-                        for master_acc in ["52135153", "52133938"]:
+                        for master_acc in ["52171861", "52135153", "52133938"]:
                             if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
                                 acc_id = master_acc
                                 break
                         if not acc_id:
-                            acc_id = getattr(db, "MT5_SUPER_ADMIN_TRADING_ACCOUNT", "52135153")
+                            acc_id = getattr(db, "MT5_SUPER_ADMIN_TRADING_ACCOUNT", "52171861")
 
                     if not acc_id:
                         continue
@@ -3941,7 +3941,7 @@ class MT5BridgeEngine:
                             open_positions = list(getattr(s, "positions", []) or [])
                         elif is_real_admin:
                             # Master Signal Bridge / Cloud Copy-Trade Fallback ONLY for true Admin
-                            for master_acc in ["52135153", "52133938"]:
+                            for master_acc in ["52171861", "52135153", "52133938"]:
                                 if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
                                     session = self.clients[master_acc]
                                     acc_id = master_acc

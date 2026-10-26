@@ -61,13 +61,13 @@ TARGET_DIR=""
 INSTANCE_NAME=""
 
 # Auto-detect target instance directory
-if [ "$ACCOUNT_ID" == "52135153" ]; then
+if [ "$ACCOUNT_ID" == "52171861" ] || [ "$ACCOUNT_ID" == "52135153" ]; then
     if [ -d "$MT5_PLATFORM" ]; then
         TARGET_DIR="$MT5_PLATFORM"
     else
         TARGET_DIR="$MT5_ADMIN"
     fi
-    INSTANCE_NAME="Super Admin MT5 (52135153)"
+    INSTANCE_NAME="Super Admin PAMM MT5 ($ACCOUNT_ID)"
 elif [ "$ACCOUNT_ID" == "52133938" ]; then
     TARGET_DIR="$MT5_ADMIN"
     INSTANCE_NAME="Legacy Admin MT5 (52133938)"

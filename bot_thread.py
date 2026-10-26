@@ -22807,7 +22807,7 @@ class TelegramBotThread(BaseThread):
                                 f"• <b>Master Deposit Address ៖</b>\n"
                                 f"<code>0x71C83D43c19b12a98402A8b255755106b83f3db3</code>\n\n"
                                 f"🔹 <b>ជម្រើសទី ៣ (Bank / Broker Internal Transfer) ៖</b>\n"
-                                f"• <b>Broker Transfer ៖</b> GTCFX Account #<code>52135153</code>\n"
+                                f"• <b>Broker Transfer ៖</b> GTCFX Account #<code>52171861</code>\n"
                                 f"• <b>Local Bank (ABA) ៖</b> ទាក់ទង Super Admin @KhmerMasterCrypto\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"<i>ចុចប៊ូតុងខាងក្រោមដើម្បីជ្រើសរើសកញ្ចប់ទុនភ្លាមៗ ៖</i>"
@@ -23033,7 +23033,7 @@ class TelegramBotThread(BaseThread):
                     t_maint = t_metrics.get("total_maintenance_fee_usd", 0.0)
                     t_rebate = t_metrics.get("total_rebate_usd", 0.0)
                     t_bal = t_metrics.get("total_balance_usd", 0.0)
-                    t_trading_admin = t_metrics.get("super_admin_trading_account", "52135153")
+                    t_trading_admin = t_metrics.get("super_admin_trading_account", getattr(db, "MT5_SUPER_ADMIN_TRADING_ACCOUNT", "52171861"))
                     t_txs = t_metrics.get("recent_transactions", [])
 
                     t_tx_lines = []
@@ -23099,7 +23099,7 @@ class TelegramBotThread(BaseThread):
                         clean_digits = re.sub(r'[^0-9]', '', raw_acc)
                         acc_id = clean_digits if clean_digits else raw_acc
 
-                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52135153", "52133938"})
                         if not is_admin_user and acc_id in super_admins:
                             msg_admin_err = (
                                 f"⚠️ <b>[MT5 ACCESS CONTROL NOTICE]</b>\n"
@@ -23433,7 +23433,7 @@ class TelegramBotThread(BaseThread):
                             break
                 # 3. Fallback to active online session (Admin or single VPS instance)
                 if not target_account:
-                    for master_acc in ["52135153", "52133938"]:
+                    for master_acc in ["52171861", "52135153", "52133938"]:
                         if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
                             target_account = master_acc
                             break

@@ -46,7 +46,7 @@ import ui_standards as ui
 logger = logging.getLogger("GTCPAMMEngine")
 
 # Master PAMM System Constants
-GTC_PAMM_MASTER_TRADING_ACCOUNT = "52135153"
+GTC_PAMM_MASTER_TRADING_ACCOUNT = "52171861"
 GTC_PAMM_TREASURY_ACCOUNT = "52133938"
 GTC_PAMM_TREASURY_WALLET = "130237694"
 GTC_PAMM_BASE_AUM = 125000.0  # Base Institutional Anchor Fund ($125k)

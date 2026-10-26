@@ -68,10 +68,10 @@ GTC_OFFICIAL_INVITE_CODE = GTC_PRO_INVITE_CODE
 GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"]
 
 # MT5 Architectural Specialization:
-MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52135153"  # MT5's Super ADMIN (Trading Master)
+MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52171861"  # MT5's Super ADMIN / PAMM Master
 MT5_TREASURY_REBATE_ACCOUNT = "52133938"     # Real Super Treasury & Rebate Collector
 MT5_TREASURY_WALLET_ID = "130237694"          # Treasury Wallet ID
-SUPER_ADMIN_MT5_ACCOUNTS = {MT5_SUPER_ADMIN_TRADING_ACCOUNT, MT5_TREASURY_REBATE_ACCOUNT}
+SUPER_ADMIN_MT5_ACCOUNTS = {MT5_SUPER_ADMIN_TRADING_ACCOUNT, "52135153", MT5_TREASURY_REBATE_ACCOUNT}
 
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
@@ -2897,7 +2897,7 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                     "message": f"🚨 គណនី #{target_account} កំពុងជាប់សោ Prop Shield! សូមវាយបញ្ជា /mt5 RESET ក្នុង Telegram ដើម្បីដោះសោ!"
                 }, status=400)
             else:
-                is_admin_acc = str(target_account) in ["52135153", "52133938"]
+                is_admin_acc = str(target_account) in ["52171861", "52135153", "52133938"]
                 if is_admin_acc:
                     solve_hint = "👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ឬ run លើ VPS ៖ `` `bash reset_and_launch_mt5.sh` ``!"
                 else:
@@ -2966,7 +2966,7 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
         cfg = db.get_user_mt5_config(chat_id)
         target_account = str(cfg.get("login", "")).strip()
         if not target_account and chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]:
-            target_account = "52135153"
+            target_account = "52171861"
         if not target_account:
             return web.json_response({
                 "status": "error",
@@ -3005,7 +3005,7 @@ async def handle_api_mt5_reset_prop(request: web.Request) -> web.Response:
         cfg = db.get_user_mt5_config(chat_id)
         target_account = data.get("account_id") or cfg.get("login")
         if not target_account and chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]:
-            target_account = "52135153"
+            target_account = "52171861"
         if not target_account:
             return web.json_response({
                 "status": "error",

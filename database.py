@@ -6193,15 +6193,15 @@ GTC_OFFICIAL_INVITE_CODE = GTC_STD_L15_INVITE_CODE
 GTC_VALID_INVITE_CODES = {"LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"}
 
 # Architectural Role Specialization:
-# 1. Trading Master Controller: Executes Super Brain AI trades & signals (MT5's Super ADMIN)
-MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52135153"
+# 1. Trading Master Controller: Executes Super Brain AI trades & signals (MT5's Super ADMIN / PAMM Master)
+MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52171861"
 
 # 2. Treasury & Rebate Collector: Real Super Account receiving 20% Cloud Maintenance Fee & 100% full referral rebates (Wallet: 130237694)
 MT5_TREASURY_REBATE_ACCOUNT = "52133938"
 MT5_TREASURY_WALLET_ID = "130237694"
 
 # Set of all Super Admin tier accounts (authorized for elevated access & zero lockouts)
-SUPER_ADMIN_MT5_ACCOUNTS = {"52135153", "52133938"}
+SUPER_ADMIN_MT5_ACCOUNTS = {"52171861", "52135153", "52133938"}
 
 def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     """

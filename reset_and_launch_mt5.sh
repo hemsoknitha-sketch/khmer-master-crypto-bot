@@ -4,8 +4,8 @@
 # MT5 DUAL INSTANCE MASTER RESTORER & PERSISTENCE ENGINE
 # ==============================================================================
 # Restores & Launches:
-# 1. Super Admin Master MT5 (#52135153)
-# 2. Platform / Secondary MT5 (#52135153)
+# 1. Super Admin Master PAMM MT5 (#52171861)
+# 2. Platform / Secondary MT5 (#52171861)
 # ==============================================================================
 
 set -e
@@ -19,7 +19,7 @@ NC='\033[0m'
 
 echo -e "${CYAN}==============================================================================${NC}"
 echo -e "${BOLD}${GREEN}   🏛️ KHMER MASTER CRYPTO — SUPER ADMIN MT5 MASTER RESTORER 🏛️${NC}"
-echo -e "${YELLOW}   Unlocks & Restores: Super Admin MT5 (#52135153)${NC}"
+echo -e "${YELLOW}   Unlocks & Restores: Super Admin PAMM MT5 (#52171861)${NC}"
 echo -e "${CYAN}==============================================================================${NC}"
 
 TARGET_USER="${SUDO_USER:-$USER}"
@@ -130,10 +130,10 @@ for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
 done
 echo -e "   ${GREEN}✅ Compilation and sync check completed!${NC}"
 
-# 4. Configure startup.ini for Super Admin MT5 (52135153) (Auto-Attach Bridge EA Shield)
+# 4. Configure startup.ini for Super Admin PAMM MT5 (52171861) (Auto-Attach Bridge EA Shield)
 cat << 'EOF' > "$MT5_PLATFORM/startup.ini"
 [Common]
-Login=52135153
+Login=52171861
 Server=GTCGlobalSA-Server 2
 
 [StartUp]
@@ -158,7 +158,7 @@ chown "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM/startup.ini"
 
 cat << 'EOF' > "$MT5_ADMIN/startup.ini"
 [Common]
-Login=52135153
+Login=52171861
 Server=GTCGlobalSA-Server 2
 
 [StartUp]
@@ -181,8 +181,8 @@ Expert=KhmerMasterCrypto_Bridge
 EOF
 chown "$TARGET_USER:$TARGET_USER" "$MT5_ADMIN/startup.ini"
 
-# Launch Super Admin MT5 (#52135153)
-echo -e "${YELLOW}[4/5] 🚀 Launching Primary Super Admin MT5 (#52135153)...${NC}"
+# Launch Super Admin PAMM MT5 (#52171861)
+echo -e "${YELLOW}[4/5] 🚀 Launching Primary Super Admin PAMM MT5 (#52171861)...${NC}"
 PLATFORM_LOG="$TARGET_HOME/mt5_platform_launch.log"
 sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini > '$PLATFORM_LOG' 2>&1 &"
 sleep 3
@@ -198,10 +198,10 @@ TARGET_HOME="$HOME"
 MT5_PLATFORM="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"
 CURRENT_DISP="${DISPLAY:-:10.0}"
 
-# Start Super Admin MT5 (52135153)
+# Start Super Admin PAMM MT5 (52171861)
 cd "$MT5_PLATFORM" && nohup wine terminal64.exe /portable /config:startup.ini > "$TARGET_HOME/mt5_platform_launch.log" 2>&1 &
 
-notify-send "Khmer Master Crypto" "Super Admin MT5 (52135153) launched successfully!" 2>/dev/null || true
+notify-send "Khmer Master Crypto" "Super Admin PAMM MT5 (52171861) launched successfully!" 2>/dev/null || true
 EOF
     chmod +x "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
     chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
@@ -211,8 +211,8 @@ EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=▶️ START SUPER ADMIN MT5 (52135153)
-Comment=Launch Super Admin MetaTrader 5 Terminal 24/7
+Name=▶️ START SUPER ADMIN PAMM MT5 (52171861)
+Comment=Launch Super Admin PAMM MetaTrader 5 Terminal 24/7
 Exec=bash "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
 Icon=wine
 Terminal=false
