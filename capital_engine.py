@@ -2685,6 +2685,8 @@ class CapitalComEngine:
         """
         Executes an institutional risk-managed trade with automated SL/TP based on ATR.
         """
+        import database as db
+
         # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
         user_cid = getattr(self, "_custom_chat_id", None)
         if getattr(self, "is_guest", False):
@@ -2704,7 +2706,6 @@ class CapitalComEngine:
 
         # Pillar 0.1: Capital.com Crypto CFD Kill-Switch Guard (Invariant 80)
         if is_crypto_cfd_instrument(resolved_epic):
-            import database as db
             if not db.is_capital_crypto_enabled():
                 return {
                     "success": False,
