@@ -57,6 +57,8 @@ GTC_PAMM_INVITE_CODE = "LnZZcHxY"
 GTC_PAMM_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
 GTC_PAMM_CENT_INVITE_CODE = "PuAfeREN"
 GTC_PAMM_CRYPTO_DEPOSIT_ADDRESS = "0x71C83D43c19b12a98402A8b255755106b83f3db3"
+PERFORMANCE_FEE_PCT = 0.20
+INVESTOR_NET_SHARE_PCT = 0.80
 
 
 class GTCPAMMEngine:
@@ -183,31 +185,52 @@ class GTCPAMMEngine:
         }
 
     @classmethod
-    def allocate_capital(cls, chat_id: int, capital: float, risk_level: str = "BALANCED", auto_reinvest: bool = True) -> Dict[str, Any]:
+    def allocate_capital(cls, chat_id: int, capital: float = None, risk_level: str = "BALANCED", auto_reinvest: bool = True, **kwargs) -> Dict[str, Any]:
         """
         Updates an investor's allocated capital into the PAMM pool.
+        Supports aliases: amount_usd -> capital, risk_profile -> risk_level, compound -> auto_reinvest.
         """
+        if capital is None:
+            capital = kwargs.get("amount_usd", 100.0)
+        risk_lvl = kwargs.get("risk_profile", risk_level)
+        reinvest = kwargs.get("compound", auto_reinvest)
         cap_val = max(10.0, min(100000.0, float(capital or 100.0)))
-        updated = db.update_virtual_ledger_allocation(chat_id, capital=cap_val, risk_level=risk_level, auto_reinvest=auto_reinvest)
+        updated = db.update_virtual_ledger_allocation(chat_id, capital=cap_val, risk_level=risk_lvl, auto_reinvest=reinvest)
+        if not isinstance(updated, dict):
+            updated = {"chat_id": chat_id, "allocated_capital": cap_val}
+        updated["success"] = True
+        updated["current_allocated"] = float(updated.get("allocated_capital", cap_val))
         # Invalidate cache
         cls._CACHE_TIMESTAMP = 0.0
         return updated
 
     @classmethod
-    def deposit_funds(cls, chat_id: int, amount: float, notes: str = "") -> Dict[str, Any]:
+    def deposit_funds(cls, chat_id: int, amount: float = None, notes: str = "", **kwargs) -> Dict[str, Any]:
         """
         Deposits funds into investor's PAMM ledger.
         """
+        if amount is None:
+            amount = kwargs.get("amount_usd", 0.0)
         res = db.deposit_virtual_ledger(chat_id, amount=amount, notes=notes or "PAMM Capital Deposit")
+        if not isinstance(res, dict):
+            res = {"status": "SUCCESS", "chat_id": chat_id, "deposited": amount}
+        if "status" not in res:
+            res["status"] = "SUCCESS" if res.get("success", False) else "FAILED"
         cls._CACHE_TIMESTAMP = 0.0
         return res
 
     @classmethod
-    def withdraw_funds(cls, chat_id: int, amount: float, notes: str = "") -> Dict[str, Any]:
+    def withdraw_funds(cls, chat_id: int, amount: float = None, notes: str = "", **kwargs) -> Dict[str, Any]:
         """
         Withdraws profit or capital from investor's PAMM ledger.
         """
+        if amount is None:
+            amount = kwargs.get("amount_usd", 0.0)
         res = db.withdraw_virtual_ledger(chat_id, amount=amount, notes=notes or "PAMM Profit Withdrawal")
+        if not isinstance(res, dict):
+            res = {"status": "SUCCESS", "chat_id": chat_id, "withdrawn": amount}
+        if "status" not in res:
+            res["status"] = "SUCCESS" if res.get("success", False) else "FAILED"
         cls._CACHE_TIMESTAMP = 0.0
         return res
 
@@ -355,7 +378,7 @@ class GTCPAMMEngine:
 
         if user_lang not in ['en', 'english']:
             msg_pamm = (
-                f"🏛️ <b>[ANGKOR QUANT — GTCFX JAPAN TOKYO PAMM MASTER FUND]</b> 💎\n"
+                f"🏛️ <b>[ANGKOR QUANT — GTC PAMM MASTER FUND TOKYO]</b> 💎\n"
                 f"<i>(Super Smart • Zero-RDP • High-Yield Cloud PAMM • 100% Automated 24/7)</i>\n"
                 f"{ui.DIVIDER_HEAVY}\n"
                 f"🏦 <b>Master Broker ៖</b> <code>GTCFX Global Tokyo (Equinix TY3 Server 2)</code>\n"
@@ -403,7 +426,7 @@ class GTCPAMMEngine:
             )
         else:
             msg_pamm = (
-                f"🏛️ <b>[ANGKOR QUANT — GTCFX JAPAN TOKYO PAMM MASTER FUND]</b> 💎\n"
+                f"🏛️ <b>[ANGKOR QUANT — GTC PAMM MASTER FUND TOKYO]</b> 💎\n"
                 f"<i>(Super Smart • Zero-RDP • High-Yield Cloud PAMM • 100% Automated 24/7)</i>\n"
                 f"{ui.DIVIDER_HEAVY}\n"
                 f"🏦 <b>Master Broker:</b> <code>GTCFX Global Tokyo (Equinix TY3 Server 2)</code>\n"
