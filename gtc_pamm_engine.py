@@ -536,10 +536,14 @@ class GTCPAMMEngine:
         return msg_with, with_kb
 
     @classmethod
-    def build_pamm_stats_ui(cls, user_lang: str = "km") -> Tuple[str, InlineKeyboardMarkup]:
+    def build_pamm_stats_ui(cls, chat_id: Optional[int] = None, user_lang: str = "km") -> Tuple[str, InlineKeyboardMarkup]:
         """
         Builds the PAMM Historical Audit & Performance Statistics Screen.
+        Handles both build_pamm_stats_ui(user_lang) and build_pamm_stats_ui(chat_id, user_lang).
         """
+        if isinstance(chat_id, str):
+            user_lang = chat_id
+            chat_id = None
         pool = cls.get_pamm_pool_telemetry()
         leaders = cls.get_leaderboard(limit=5)
 
