@@ -5967,6 +5967,76 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["POSITIONS"]
                 await mt5_command(update, context)
+            elif data in ["btn_mt5_pamm", "btn_mt5_pamm_refresh"]:
+                try:
+                    await update.callback_query.answer("🔄 ធ្វើបច្ចុប្បន្នភាព GTC PAMM Master Fund...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data in ["btn_mt5_pamm_alloc_100", "btn_mt5_pamm_alloc_250", "btn_mt5_pamm_alloc_500", "btn_mt5_pamm_alloc_1000"]:
+                cap_val = data.replace("btn_mt5_pamm_alloc_", "")
+                try:
+                    await update.callback_query.answer(f"💰 ចូលរួមទុន PAMM Pool: ${cap_val} USD...")
+                except Exception:
+                    pass
+                context.args = ["ALLOC", cap_val]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_pamm_deposit":
+                try:
+                    await update.callback_query.answer("📥 ដំណើរការបញ្ចូលទុន PAMM...")
+                except Exception:
+                    pass
+                context.args = ["DEPOSIT"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_pamm_withdraw":
+                try:
+                    await update.callback_query.answer("📤 ដំណើរការដកប្រាក់ចំណេញ PAMM...")
+                except Exception:
+                    pass
+                context.args = ["WITHDRAW"]
+                await mt5_command(update, context)
+            elif data in ["btn_mt5_pamm_with_50", "btn_mt5_pamm_with_100", "btn_mt5_pamm_with_all"]:
+                try:
+                    await update.callback_query.answer("📤 កំពុងដំណើរការដកប្រាក់...")
+                except Exception:
+                    pass
+                with_arg = "ALL" if "all" in data else data.replace("btn_mt5_pamm_with_", "")
+                context.args = ["WITHDRAW", with_arg]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_pamm_compound_toggle":
+                try:
+                    import gtc_pamm_engine
+                    new_reinv = gtc_pamm_engine.GTCPAMMEngine.toggle_compound(chat_id)
+                    toast = "🔄 Compound Grid: 🟢 ON (Auto-Reinvest)" if new_reinv else "🔄 Compound Grid: ⚪ OFF (Cash Pocket)"
+                    await update.callback_query.answer(toast)
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_mt5_pamm_risk_cycle":
+                try:
+                    import gtc_pamm_engine
+                    new_r = gtc_pamm_engine.GTCPAMMEngine.cycle_risk_level(chat_id)
+                    await update.callback_query.answer(f"🛡️ កម្រិត Risk ប្តូរទៅ: {new_r}!")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_mt5_pamm_stats":
+                try:
+                    await update.callback_query.answer("📊 ស្ថិតិ PAMM Performance & Leaderboard...")
+                except Exception:
+                    pass
+                context.args = ["STATS"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_pamm_treasury":
+                try:
+                    await update.callback_query.answer("🏛️ Master Treasury & Rebate Vault (52133938)...")
+                except Exception:
+                    pass
+                context.args = ["TREASURY"]
+                await mt5_command(update, context)
             elif data == "btn_mt5_vault":
                 try:
                     await update.callback_query.answer("🏛️ Master Cloud Virtual Vault & Ledger...")
@@ -22001,6 +22071,105 @@ class TelegramBotThread(BaseThread):
             if args:
                 sub = str(args[0]).upper().strip()
 
+                # --- 0.0 GTC PAMM MASTER FUND COMMANDS ---
+                if sub in ["PAMM", "DASHBOARD", "HOME", "MAIN"]:
+                    import gtc_pamm_engine
+                    msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)
+                    try:
+                        await update.effective_message.reply_text(msg_pamm, parse_mode="HTML", reply_markup=kb_pamm)
+                    except Exception:
+                        clean_pamm = re.sub(r'<[^>]+>', '', msg_pamm)
+                        await update.effective_message.reply_text(clean_pamm, reply_markup=kb_pamm)
+                    return
+
+                if sub in ["STATS", "PERFORMANCE", "LEADERBOARD"]:
+                    import gtc_pamm_engine
+                    msg_s, kb_s = gtc_pamm_engine.GTCPAMMEngine.build_pamm_stats_ui(user_lang=user_lang)
+                    try:
+                        await update.effective_message.reply_text(msg_s, parse_mode="HTML", reply_markup=kb_s)
+                    except Exception:
+                        clean_s = re.sub(r'<[^>]+>', '', msg_s)
+                        await update.effective_message.reply_text(clean_s, reply_markup=kb_s)
+                    return
+
+                if sub in ["REGISTER", "SIGNUP", "LINK", "INVITE", "IB"]:
+                    import gtc_pamm_engine
+                    reg_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🌐 ចុះឈ្មោះ GTCFX PAMM ផ្លូវការ", url=gtc_pamm_engine.GTC_PAMM_REFERRAL_URL)],
+                        [InlineKeyboardButton("🪙 ចុះឈ្មោះ Cent Account ($10-$100)", url=gtc_pamm_engine.GTC_PAMM_CENT_REFERRAL_URL)],
+                        [InlineKeyboardButton("🏛️ ត្រឡប់ទៅ PAMM", callback_data="btn_mt5_pamm_refresh"), InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
+                    ])
+                    reg_text = (
+                        f"🌐 <b>[GTCFX JAPAN TOKYO PAMM REGISTRATION]</b> 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ <b>Master Broker ៖</b> <code>GTCFX Global Tokyo (Server 2)</code>\n"
+                        f"🤝 <b>Official Partner Invite Code ៖</b> <code>{gtc_pamm_engine.GTC_PAMM_INVITE_CODE}</code>\n"
+                        f"🔗 <b>Link ចុះឈ្មោះផ្លូវការ ៖</b>\n"
+                        f"{gtc_pamm_engine.GTC_PAMM_REFERRAL_URL}\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"💡 <i>ពេលចុះឈ្មោះក្រោម Link នេះ គណនីរបស់អ្នកនឹងទទួលបាន ៖</i>\n"
+                        f"• ✅ 100% Swap-Free គ្មានថ្លៃកាត់ឆ្លងយប់\n"
+                        f"• ✅ Zero Spread Drag & Ultra-Low Latency (&lt; 0.5ms TY3)\n"
+                        f"• ✅ ភ្ជាប់ស្វ័យប្រវត្តិកើបចំណេញជាមួយ Angkor Quant PAMM Master Fund 24/5!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}"
+                    )
+                    try:
+                        await update.effective_message.reply_text(reg_text, parse_mode="HTML", reply_markup=reg_kb)
+                    except Exception:
+                        clean_r = re.sub(r'<[^>]+>', '', reg_text)
+                        await update.effective_message.reply_text(clean_r, reply_markup=reg_kb)
+                    return
+
+                if sub in ["ALLOC", "ALLOCATE", "JOIN"] and len(args) >= 2:
+                    raw_val = str(args[1]).replace("$", "").replace("USD", "").strip()
+                    if raw_val.replace(".", "", 1).isdigit():
+                        new_cap = float(raw_val)
+                        import gtc_pamm_engine
+                        gtc_pamm_engine.GTCPAMMEngine.allocate_capital(chat_id, new_cap)
+                        msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)
+                        notice = f"🎉 <b>[GTC PAMM ALLOCATION UPDATED]</b>\n✅ បានកំណត់ដើមទុន <b>${new_cap:,.2f} USD</b> ចូលរួមក្នុង GTC PAMM Master Fund ដោយជោគជ័យ!\n\n"
+                        try:
+                            await update.effective_message.reply_text(notice + msg_pamm, parse_mode="HTML", reply_markup=kb_pamm)
+                        except Exception:
+                            clean_p = re.sub(r'<[^>]+>', '', notice + msg_pamm)
+                            await update.effective_message.reply_text(clean_p, reply_markup=kb_pamm)
+                        return
+
+                if sub in ["COMPOUND", "REINVEST"]:
+                    import gtc_pamm_engine
+                    if len(args) >= 2:
+                        reinv_val = str(args[1]).upper().strip() in ["ON", "TRUE", "1", "YES"]
+                        v_curr = db.get_or_create_virtual_ledger(chat_id)
+                        db.update_virtual_ledger_allocation(chat_id, capital=v_curr.get("allocated_capital", 100.0), risk_level=v_curr.get("risk_level", "BALANCED"), auto_reinvest=reinv_val)
+                    else:
+                        reinv_val = gtc_pamm_engine.GTCPAMMEngine.toggle_compound(chat_id)
+                    msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)
+                    notice = f"🔄 <b>ប្រព័ន្ធ Compound Grid ៖</b> <code>{'ON (Auto-Reinvest)' if reinv_val else 'OFF (Cash Pocket)'}</code>!\n\n"
+                    try:
+                        await update.effective_message.reply_text(notice + msg_pamm, parse_mode="HTML", reply_markup=kb_pamm)
+                    except Exception:
+                        clean_p = re.sub(r'<[^>]+>', '', notice + msg_pamm)
+                        await update.effective_message.reply_text(clean_p, reply_markup=kb_pamm)
+                    return
+
+                if sub in ["RISK"]:
+                    import gtc_pamm_engine
+                    if len(args) >= 2:
+                        new_r = str(args[1]).upper().strip()
+                        if new_r in ["CONSERVATIVE", "BALANCED", "AGGRESSIVE"]:
+                            v_curr = db.get_or_create_virtual_ledger(chat_id)
+                            db.update_virtual_ledger_allocation(chat_id, capital=v_curr.get("allocated_capital", 100.0), risk_level=new_r, auto_reinvest=v_curr.get("auto_reinvest", True))
+                    else:
+                        new_r = gtc_pamm_engine.GTCPAMMEngine.cycle_risk_level(chat_id)
+                    msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)
+                    notice = f"🛡️ <b>កម្រិតការពារ Risk ត្រូវបានប្តូរទៅជា ៖</b> <code>{new_r}</code>!\n\n"
+                    try:
+                        await update.effective_message.reply_text(notice + msg_pamm, parse_mode="HTML", reply_markup=kb_pamm)
+                    except Exception:
+                        clean_p = re.sub(r'<[^>]+>', '', notice + msg_pamm)
+                        await update.effective_message.reply_text(clean_p, reply_markup=kb_pamm)
+                    return
+
                 # --- 0.0 SUPER SMART MT5 CITADEL SUITE ---
                 if sub in ["SMART", "CITADEL", "RADAR"]:
                     context.args = args[1:]
@@ -23037,316 +23206,15 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(guide_text, parse_mode="HTML", reply_markup=ea_kb)
                     return
 
-            # --- DEFAULT DASHBOARD TELEMETRY ---
-            status_data = bridge.get_bridge_status()
-            online_count = status_data["online_clients"]
-            total_count = status_data["total_clients"]
-            avg_ping = status_data["avg_ping_ms"]
-            if 950.0 <= avg_ping <= 1050.0:
-                avg_ping = 0.3
-            all_clients = status_data.get("clients", [])
-            # Multi-Tenant Isolation: If not Admin, show ONLY this VIP user's terminal!
-            if is_admin_user:
-                clients = all_clients
-            else:
-                clients = [
-                    c for c in all_clients
-                    if (chat_id and c.get("chat_id") == chat_id) or (user_login and str(c.get("account_id")) == str(user_login))
-                ]
-
-            # Multi-Tenant Isolated Virtual Ledger Telemetry (Invariant 44)
-            v_ledger = db.get_or_create_virtual_ledger(chat_id)
-            v_pool = db.get_virtual_pool_metrics()
-            v_eq = v_ledger.get('virtual_equity', 100.0)
-            v_cap = v_ledger.get('allocated_capital', 100.0)
-            v_pnl = v_ledger.get('realized_profit', 0.0)
-            v_pnl_badge = f"+${v_pnl:,.2f} 🟢" if v_pnl >= 0 else f"-${abs(v_pnl):,.2f} 🔴"
-            v_reinv = "🟢 ON (Compound)" if v_ledger.get('auto_reinvest') else "⚪ OFF"
-            v_risk = v_ledger.get('risk_level', 'BALANCED')
-            v_share = v_ledger.get('pool_share_pct', 0.0)
-
-            clients_text_kh = ""
-            clients_text_en = ""
-            if clients:
-                for c in clients:
-                    c_status_icon = "🟢" if c["status"] == "ONLINE" else "🔴"
-                    prop_badge = "✅ SAFE" if c["compliant"] else "🚨 BREACH"
-                    safe_broker = str(c.get('broker', 'GTCFX')).replace('_', ' ')
-                    safe_firm = str(c.get('firm_name', 'GTCFX_Tokyo')).replace('_', ' ')
-                    acc_num = str(c['account_id'])
-                    is_admin_acc = acc_num in ["52135153", "52133938"]
-                    admin_tag = " 👑 SUPER ADMIN" if is_admin_acc else ""
-                    acc_label = f"#{acc_num}{admin_tag}" if acc_num != "0" else "#0 (Unlogged Guest)"
-                    is_broker_offline = (acc_num == "0") or (not c.get('broker')) or (c.get('is_broker_connected') is False)
-                    if is_broker_offline and c['balance'] == 0.0:
-                        unlogged_note_kh = "  ⚠️ _(MT5 លើ VPS មិនទាន់ Login Broker ៖ សូមបើក MT5 វាយ Password ក្នុង File -> Login to Trade Account)_\n"
-                        unlogged_note_en = "  ⚠️ _(MT5 on VPS not logged into Broker ៖ Please enter Password via File -> Login to Trade Account)_\n"
-                    else:
-                        unlogged_note_kh = ""
-                        unlogged_note_en = ""
-
-                    display_ping = c['ping_ms']
-                    if 950.0 <= display_ping <= 1050.0:
-                        display_ping = 0.3
-                    elif display_ping > 5000.0 or display_ping <= 0:
-                        display_ping = 0.8
-
-                    clients_text_kh += (
-                        f"{c_status_icon} **Acc {acc_label}** ({safe_broker or 'GTCFX'} / {safe_firm})\n"
-                        f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
-                        f"  • Latency: `{display_ping:.1f} ms` | Prop Shield: `{prop_badge}`\n"
-                        f"  • Master Cloud Vault ៖ `${v_eq:,.2f} USD` (ទុន: `${v_cap:,.2f}` | ចំណេញ: `{v_pnl_badge}`)\n"
-                        f"{unlogged_note_kh}"
-                    )
-                    clients_text_en += (
-                        f"{c_status_icon} **Acc {acc_label}** ({safe_broker or 'GTCFX'} / {safe_firm})\n"
-                        f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
-                        f"  • Latency: `{display_ping:.1f} ms` | Prop Shield: `{prop_badge}`\n"
-                        f"  • Master Cloud Vault: `${v_eq:,.2f} USD` (Cap: `${v_cap:,.2f}` | Profit: `{v_pnl_badge}`)\n"
-                        f"{unlogged_note_en}"
-                    )
-            elif user_login:
-                # User has bound their account on Web GUI or via config, standing by for EA
-                broker_name = cfg.get("broker", "GTCFX")
-                firm_label = cfg.get("firm_name", "Personal")
-                sync_hint_kh = "  👉 _Admin Note: សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` ដើម្បី Sync!_" if is_admin_user else "  👉 _គណនីរួចរាល់ ១០០% សម្រាប់ដំណើរការជួញដូរ Super Smart 24/7!_"
-                sync_hint_en = "  👉 _Admin Note: Please attach EA `KhmerMasterCrypto_Bridge.mq5` in MT5 to sync!_" if is_admin_user else "  👉 _Account 100% ready for Super Smart 24/7 trading!_"
-                is_admin_acc = str(user_login) in ["52135153", "52133938"]
-                admin_tag = " 👑 SUPER ADMIN" if is_admin_acc else ""
-                # Query saved balance telemetry from Bridge Database
-                db_client_list = db.get_mt5_bridge_clients(chat_id)
-                db_bal = 0.0
-                db_eq = 0.0
-                if db_client_list:
-                    for dbc in db_client_list:
-                        if str(dbc.get("account_id")) == str(user_login):
-                            db_bal = float(dbc.get("balance", 0.0))
-                            db_eq = float(dbc.get("equity", 0.0))
-                            break
-                    if db_bal == 0.0 and db_client_list[0].get("balance"):
-                        db_bal = float(db_client_list[0].get("balance", 0.0))
-                        db_eq = float(db_client_list[0].get("equity", 0.0))
-
-                bal_line_kh = f"  • GTCFX Balance ៖ `${db_bal:,.2f}` | Equity: `${db_eq:,.2f}`\n" if db_bal > 0 else "  • GTCFX Balance ៖ ⏳ _កំពុងរង់ចាំ Sync ទិន្នន័យផ្ទាល់ពី Broker (សូមវាយ Password ក្នុង Web GUI ដើម្បី Login)_\n"
-                bal_line_en = f"  • GTCFX Balance: `${db_bal:,.2f}` | Equity: `${db_eq:,.2f}`\n" if db_bal > 0 else "  • GTCFX Balance: ⏳ _Awaiting live broker sync (enter password in Web GUI to login)_\n"
-
-                clients_text_kh = (
-                    f"🟡 **Acc #{user_login}{admin_tag}** ({broker_name} / {firm_label})\n"
-                    f"  • ស្ថានភាព ៖ 🟢 **Standby / រួចរាល់សម្រាប់ដំណើរការជួញដូរ**\n"
-                    f"{bal_line_kh}"
-                    f"  • Web GUI ៖ 🔗 បានចងភ្ជាប់គណនីរួចរាល់ | ⚡ Latency ៖ `< 0.5ms TY3`\n"
-                    f"  • Prop Shield ៖ `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
-                    f"  • Master Cloud Vault ៖ `${v_eq:,.2f} USD` (ទុន: `${v_cap:,.2f}` | ចំណេញ: `{v_pnl_badge}`)\n"
-                    f"{sync_hint_kh}"
-                )
-                clients_text_en = (
-                    f"🟡 **Acc #{user_login}{admin_tag}** ({broker_name} / {firm_label})\n"
-                    f"  • Status: 🟢 **Standby / Ready for Super Smart Trading**\n"
-                    f"{bal_line_en}"
-                    f"  • Web GUI: 🔗 Bound & Configured | ⚡ Latency: `< 0.5ms TY3`\n"
-                    f"  • Prop Shield: `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
-                    f"  • Master Cloud Vault: `${v_eq:,.2f} USD` (Cap: `${v_cap:,.2f}` | Profit: `{v_pnl_badge}`)\n"
-                    f"{sync_hint_en}"
-                )
-            else:
-                clients_text_kh = (
-                    f"🏛️ **Master Cloud Virtual Sub-Account Vault (Zero-RDP 24/7)**\n"
-                    f"  • សមតុល្យក្នុង Vault (Equity) ៖ `${v_eq:,.2f} USD`\n"
-                    f"  • ដើមទុនវិនិយោគ (Allocated) ៖ `${v_cap:,.2f} USD`\n"
-                    f"  • ផលចំណេញសុទ្ធកើបបាន ៖ `{v_pnl_badge}` (Net 80%)\n"
-                    f"  • យុទ្ធសាស្ត្រ Risk Armor ៖ `{v_risk}` (1.5% Risk) | Compound: `{v_reinv}`\n"
-                    f"  • ចំណែកក្នុង Master Pool ៖ `{v_share}%` (Pool AUM: `${v_pool.get('total_pool_aum', 125100.0):,.2f}`)\n"
-                    f"  👉 _គណនីរបស់អ្នកកំពុងកើបចំណេញស្វ័យប្រវត្តិកម្រិត Cloud មិនបាច់បើកកុំព្យូទ័រចោល!_"
-                )
-                clients_text_en = (
-                    f"🏛️ **Master Cloud Virtual Sub-Account Vault (Zero-RDP 24/7)**\n"
-                    f"  • Vault Equity: `${v_eq:,.2f} USD`\n"
-                    f"  • Allocated Capital: `${v_cap:,.2f} USD`\n"
-                    f"  • Net Realized Profit: `{v_pnl_badge}` (Net 80%)\n"
-                    f"  • Risk Armor: `{v_risk}` (1.5% Risk) | Compound: `{v_reinv}`\n"
-                    f"  • Master Pool Share: `{v_share}%` (Pool AUM: `${v_pool.get('total_pool_aum', 125100.0):,.2f}`)\n"
-                    f"  👉 _Account harvesting profits autonomously on Cloud 24/7!_"
-                )
-
-            # --- BUILD OPEN POSITIONS TELEMETRY ---
-            all_active_positions = []
-            for c in clients:
-                for p in c.get("positions", []):
-                    all_active_positions.append(p)
-
-            # Fallback to recent filled orders in database if no live positions in memory
-            if not all_active_positions:
-                recent_orders = db.get_mt5_bridge_recent_orders(limit=5, account_id=target_account if not is_admin_user else None)
-                for ro in recent_orders:
-                    if ro.get("status") == "FILLED" and ro.get("ticket"):
-                        all_active_positions.append({
-                            "ticket": ro.get("ticket"),
-                            "symbol": ro.get("symbol"),
-                            "type": ro.get("action"),
-                            "lots": ro.get("lot"),
-                            "open_price": ro.get("open_price"),
-                            "profit": ro.get("pnl", 0.0)
-                        })
-
-            if all_active_positions:
-                pos_lines_kh = []
-                pos_lines_en = []
-                for p in all_active_positions[:6]:
-                    t_sym = str(p.get("symbol", "XAUUSD"))
-                    t_type = str(p.get("type", "BUY")).upper()
-                    t_lot = float(p.get("lots", 0.01))
-                    t_op = float(p.get("open_price", 0.0))
-                    t_pnl = float(p.get("profit", 0.0))
-                    t_ticket = int(p.get("ticket", 0))
-                    pnl_badge = f"+${t_pnl:.2f} 🟢" if t_pnl >= 0 else f"-${abs(t_pnl):.2f} 🔴"
-                    type_emoji = "🟢 BUY" if t_type == "BUY" else "🔴 SELL"
-
-                    pos_lines_kh.append(
-                        f"• #{t_ticket} **{t_sym}** {type_emoji} `{t_lot:.2f}` lots @ `{t_op}`\n"
-                        f"   └ PnL: `{pnl_badge}` | បិទ ៖ `` `/mt5 CLOSE {t_ticket}` ``"
-                    )
-                    pos_lines_en.append(
-                        f"• #{t_ticket} **{t_sym}** {type_emoji} `{t_lot:.2f}` lots @ `{t_op}`\n"
-                        f"   └ PnL: `{pnl_badge}` | Close: `` `/mt5 CLOSE {t_ticket}` ``"
-                    )
-                positions_summary_kh = "\n".join(pos_lines_kh)
-                positions_summary_en = "\n".join(pos_lines_en)
-            else:
-                positions_summary_kh = (
-                    "🟢 គ្មាន Position កំពុងបើកចំហទេ\n"
-                    "👉 AI Swarm កំពុង Scan រកឱកាសល្អបំផុតពី GTCFX Tokyo!"
-                )
-                positions_summary_en = (
-                    "🟢 No active open positions currently.\n"
-                    "👉 AI Swarm scanning for optimal setups on GTCFX Tokyo!"
-                )
-
-            # --- INTERACTIVE BUTTON KEYBOARD (SUPER SMART & BEAUTIFUL) ---
-            ai_enabled = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
-            ai_badge = "🤖 AI Auto-Trade: 🟢 ON" if ai_enabled else "🤖 AI Auto-Trade: ⚪ OFF"
-            kb_mt5 = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🧠 Super Smart MT5 Citadel", callback_data="btn_mt5_smart"),
-                    InlineKeyboardButton("👑 Reachsey Gold Apex", callback_data="btn_mt5_reachsey_gold")
-                ],
-                [
-                    InlineKeyboardButton(ai_badge, callback_data="btn_mt5_toggle_auto"),
-                    InlineKeyboardButton("🏛️ Virtual Vault", callback_data="btn_mt5_vault")
-                ],
-                [
-                    InlineKeyboardButton("📥 ទាញយក EA Bridge (.mq5)", callback_data="btn_mt5_download_ea"),
-                    InlineKeyboardButton("🔗 ភ្ជាប់គណនីផ្ទាល់ខ្លួន (Bind)", callback_data="btn_mt5_bind_guide")
-                ],
-                [
-                    InlineKeyboardButton("⚡ BUY Gold 0.01", callback_data="btn_mt5_buy_gold"),
-                    InlineKeyboardButton("⚡ SELL Gold 0.01", callback_data="btn_mt5_sell_gold")
-                ],
-                [
-                    InlineKeyboardButton("📈 BUY EURUSD 0.02", callback_data="btn_mt5_buy_eurusd"),
-                    InlineKeyboardButton("📉 SELL EURUSD 0.02", callback_data="btn_mt5_sell_eurusd")
-                ],
-                [
-                    InlineKeyboardButton("📊 Open Positions", callback_data="btn_mt5_positions"),
-                    InlineKeyboardButton("🛡️ Prop Shield", callback_data="btn_mt5_prop_shield"),
-                    InlineKeyboardButton("🔄 Reset Shield", callback_data="btn_mt5_reset_shield")
-                ],
-                [
-                    InlineKeyboardButton("🚨 Panic CLOSE ALL", callback_data="btn_mt5_close_all"),
-                    InlineKeyboardButton("🏆 Prop Challenge", callback_data="btn_prop_firm_menu")
-                ],
-                [
-                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_refresh"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ]
-            ])
-
-            sample_ticket = 108821
-            if all_active_positions and all_active_positions[0].get("ticket"):
-                try:
-                    sample_ticket = int(all_active_positions[0]["ticket"])
-                except Exception:
-                    sample_ticket = 108821
-
-            if user_lang not in ['en', 'english']:
-                msg_mt5 = (
-                    f"⚡ **APEX INSTITUTIONAL MT5 TRADING TERMINAL** ⚡\n"
-                    f"🏛️ **GTCFX Japan Tokyo Gateway (TY3 Co-Location)**\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"📡 **ស្ថានភាព Bridge ៖** `🟢 ACTIVE & STREAMING (< 0.5ms)`\n"
-                    f"🇯🇵 **Broker Gateway ៖** `GTCFX Global / Tokyo Financial Center`\n"
-                    f"👥 **Terminals ភ្ជាប់ ៖** `{online_count} Online / {total_count} Total`\n"
-                    f"⚡ **Latency (Ping) ៖** `{avg_ping:.1f} ms` (Zero DLL Direct Socket)\n"
-                    f"🛡️ **Prop Risk Shield ៖** `Daily -3.5% | Max Drawdown -7.0%`\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"📋 **ស្ថានភាពគណនី GTCFX & ទិន្នន័យដើមទុន ៖**\n"
-                    f"{clients_text_kh}\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"📊 **សកម្មភាពវិនិយោគ & Positions បើកចំហ ៖**\n"
-                    f"{positions_summary_kh}\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🎯 **កូដបញ្ជាវិនិយោគរហ័ស (1-Tap Presets) ៖**\n"
-                    f"• ភ្ជាប់គណនីផ្ទាល់ខ្លួន ៖ `` `/mt5 BIND 52135153` ``\n"
-                    f"• ទាញយក EA Bridge ៖ `` `/mt5 EA` ``\n"
-                    f"• មើល Virtual Vault ៖ `` `/mt5 VAULT` `` (ឬកែទុន: `` `/mt5 VAULT 250` ``)\n"
-                    f"• Auto Super Smart ($100 / 10 Assets) ៖ `` `/mt5 AUTO ON 100 10` ``\n"
-                    f"• Auto Super Smart ($100 / 5 Assets) ៖ `` `/mt5 AUTO ON 100 5` ``\n"
-                    f"• Auto Super Smart ($50 / 3 Assets) ៖ `` `/mt5 AUTO ON 50 3` ``\n"
-                    f"• បើក AI Swarm ៖ `` `/mt5 AUTO ON` ``\n"
-                    f"• បិទ AI Swarm ៖ `` `/mt5 AUTO OFF` ``\n"
-                    f"• បើក Order មាស ៖ `` `/mt5 BUY XAUUSD 0.01` ``\n"
-                    f"• បើក Order រូបិយប័ណ្ណ ៖ `` `/mt5 BUY EURUSD 0.02` ``\n"
-                    f"• Scalp Sniper មាស ៖ `` `/mt5 SCALP XAUUSD` ``\n"
-                    f"• បិទ Order ជាក់លាក់ ៖ `` `/mt5 CLOSE {sample_ticket}` ``\n"
-                    f"• បិទ Position ទាំងអស់ជាបន្ទាន់ ៖ `` `/mt5 CLOSEALL` ``\n"
-                    f"• សាកល្បងល្បឿន Ping ៖ `` `/mt5 TEST` ``\n"
-                    f"• ដោះសោរ Prop Risk Shield ៖ `` `/mt5 RESET` ``\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Angkor Quant_\n"
-                    f"_APEX SUPER BRAIN AI_\n"
-                    f"Institutional GTCFX Tokyo MT5 Bridge Active 24/7!"
-                )
-            else:
-                msg_mt5 = (
-                    f"⚡ **APEX INSTITUTIONAL MT5 TRADING TERMINAL** ⚡\n"
-                    f"🏛️ **GTCFX Japan Tokyo Gateway (TY3 Co-Location)**\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"📡 **Bridge Status:** `🟢 ACTIVE & STREAMING (< 0.5ms)`\n"
-                    f"🇯🇵 **Broker Gateway:** `GTCFX Global / Tokyo Financial Center`\n"
-                    f"👥 **Connected Terminals:** `{online_count} Online / {total_count} Total`\n"
-                    f"⚡ **Network Latency:** `{avg_ping:.1f} ms` (Zero DLL Direct Socket)\n"
-                    f"🛡️ **Prop Risk Shield:** `Daily -3.5% | Max Drawdown -7.0%`\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"📋 **GTCFX Account Health & Capital Telemetry:**\n"
-                    f"{clients_text_en}\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"📊 **Investment Activity & Open Positions:**\n"
-                    f"{positions_summary_en}\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🎯 **Quick Trading Commands (1-Tap Presets):**\n"
-                    f"• Master Virtual Vault: `` `/mt5 VAULT` `` (or set capital: `` `/mt5 VAULT 250` ``)\n"
-                    f"• Auto Super Smart ($100 / 10 Assets): `` `/mt5 AUTO ON 100 10` ``\n"
-                    f"• Auto Super Smart ($100 / 5 Assets): `` `/mt5 AUTO ON 100 5` ``\n"
-                    f"• Auto Super Smart ($50 / 3 Assets): `` `/mt5 AUTO ON 50 3` ``\n"
-                    f"• AI Swarm Auto: `` `/mt5 AUTO ON` ``\n"
-                    f"• Pause AI Swarm: `` `/mt5 AUTO OFF` ``\n"
-                    f"• BUY Gold Order: `` `/mt5 BUY XAUUSD 0.01` ``\n"
-                    f"• BUY Forex Order: `` `/mt5 BUY EURUSD 0.02` ``\n"
-                    f"• AI Scalp Sniper: `` `/mt5 SCALP XAUUSD` ``\n"
-                    f"• Close Specific Order: `` `/mt5 CLOSE {sample_ticket}` ``\n"
-                    f"• Panic Close All: `` `/mt5 CLOSEALL` ``\n"
-                    f"• Test Latency: `` `/mt5 TEST` ``\n"
-                    f"• Reset Prop Risk Shield: `` `/mt5 RESET` ``\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Angkor Quant_\n"
-                    f"_APEX SUPER BRAIN AI_\n"
-                    f"Institutional GTCFX Tokyo MT5 Bridge Active 24/7!"
-                )
-
+            # --- DEFAULT: FLAGSHIP GTC PAMM MASTER FUND TELEMETRY & DASHBOARD ---
+            import gtc_pamm_engine
+            msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)
             try:
-                await update.effective_message.reply_text(msg_mt5, parse_mode="Markdown", reply_markup=kb_mt5)
-            except Exception as e_send_err:
-                clean_mt5 = msg_mt5.replace("*", "").replace("_", "")
-                await update.effective_message.reply_text(clean_mt5, reply_markup=kb_mt5)
+                await update.effective_message.reply_text(msg_pamm, parse_mode="HTML", reply_markup=kb_pamm)
+            except Exception:
+                clean_pamm = re.sub(r'<[^>]+>', '', msg_pamm)
+                await update.effective_message.reply_text(clean_pamm, reply_markup=kb_pamm)
+            return
 
         async def mt5_smart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """

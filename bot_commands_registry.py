@@ -78,7 +78,7 @@ def get_registered_commands():
         BotCommand("auto_trade", "Autonomous Trading Engine"),
         BotCommand("capital", "Global Markets Suite"),
         BotCommand("capital_scalp", "Global Trend Scalping"),
-        BotCommand("mt5", "Institutional MT5 Gateway"),
+        BotCommand("mt5", "GTC PAMM Institutional Gateway"),
         BotCommand("mt5_smart", "Smart Institutional Trading"),
         BotCommand("csx", "CSX Equities Navigator"),
         BotCommand("academy", "Angkor Investment Academy"),
