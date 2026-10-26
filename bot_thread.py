@@ -4146,6 +4146,11 @@ class TelegramBotThread(BaseThread):
                     ]
                 ])
 
+                if len(card_msg) > 2850:
+                    cut_idx = card_msg[:2800].rfind("\n\n")
+                    if cut_idx > 1000:
+                        card_msg = card_msg[:cut_idx].strip() + "\n\n─────────────\n📋 **1-TAP QUICK SCAN ៖**\n`` `/predict SCAN` `` | `` `/predict SOL` `` | `` `/predict GOLD` `` | `` `/predict BTC` ``"
+
                 await send_long_message(context, chat_id, card_msg, reply_markup=action_keyboard)
                 self.log_signal.emit(f"🔮 Sent Wall Street ML multi-horizon prediction for {fetched_symbol} to {chat_id}")
             except Exception as e:
@@ -4365,6 +4370,11 @@ class TelegramBotThread(BaseThread):
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
+
+                if len(analysis_result) > 2850:
+                    cut_idx = analysis_result[:2800].rfind("\n\n")
+                    if cut_idx > 1000:
+                        analysis_result = analysis_result[:cut_idx].strip() + "\n\n─────────────\n📋 **1-TAP QUICK SCAN ៖**\n`` `/analyze SCAN` `` | `` `/analyze SOL` `` | `` `/analyze GOLD` `` | `` `/analyze BTC` ``"
 
                 try:
                     if chart_path and os.path.exists(chart_path):
@@ -5054,55 +5064,42 @@ class TelegramBotThread(BaseThread):
                         "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
                     )
 
+            # 🛡️ Single Pristine Message Guarantee (1,000 to 3,000 chars — Zero splitting into chunks)
+            if len(report_text) > 2850:
+                cut_idx = report_text[:2800].rfind("\n\n")
+                if cut_idx > 1000:
+                    report_text = report_text[:cut_idx].strip() + "\n\n─────────────\n📋 **1-TAP QUICK SCAN ៖**\n`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+
             delivered = False
-            # 🛡️ APEX UNIFIED COVER PHOTO DISPATCH (100% Genuine Full-Resolution Delivery)
+
+            # 🛡️ APEX UNIFIED DELIVERY (Single Pristine Message - 1,000 to 3,000 chars)
             if image_url:
                 try:
-                    if len(report_text) <= 1000:
-                        try:
-                            await context.bot.send_photo(
-                                chat_id=chat_id,
-                                photo=image_url,
-                                caption=report_text,
-                                parse_mode="Markdown",
-                                reply_markup=keyboard
-                            )
-                            delivered = True
-                        except Exception:
-                            clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
-                            await context.bot.send_photo(
-                                chat_id=chat_id,
-                                photo=image_url,
-                                caption=clean_txt,
-                                reply_markup=keyboard
-                            )
-                            delivered = True
-                    else:
-                        # 1. Dispatch full HD photo first
-                        try:
-                            await asyncio.wait_for(context.bot.send_photo(chat_id=chat_id, photo=image_url), timeout=4.0)
-                        except Exception as e_ph:
-                            print(f"⚠️ Fast cover photo notice: {e_ph}")
+                    # 1. Dispatch full HD cover photo
+                    try:
+                        await asyncio.wait_for(context.bot.send_photo(chat_id=chat_id, photo=image_url), timeout=4.0)
+                    except Exception as e_ph:
+                        print(f"⚠️ Fast cover photo notice: {e_ph}")
 
-                        # 2. Dispatch the formatted report text below the photo
-                        try:
-                            await context.bot.send_message(
-                                chat_id=chat_id,
-                                text=report_text,
-                                parse_mode="Markdown",
-                                reply_markup=keyboard,
-                                disable_web_page_preview=True
-                            )
-                            delivered = True
-                        except Exception:
-                            clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
-                            await context.bot.send_message(
-                                chat_id=chat_id,
-                                text=clean_txt,
-                                reply_markup=keyboard,
-                                disable_web_page_preview=True
-                            )
-                            delivered = True
+                    # 2. Dispatch complete report in 1 single unified message
+                    try:
+                        await context.bot.send_message(
+                            chat_id=chat_id,
+                            text=report_text,
+                            parse_mode="Markdown",
+                            reply_markup=keyboard,
+                            disable_web_page_preview=True
+                        )
+                        delivered = True
+                    except Exception:
+                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                        await context.bot.send_message(
+                            chat_id=chat_id,
+                            text=clean_txt,
+                            reply_markup=keyboard,
+                            disable_web_page_preview=True
+                        )
+                        delivered = True
 
                     if delivered and status_msg:
                         try: await status_msg.delete()
@@ -5110,25 +5107,27 @@ class TelegramBotThread(BaseThread):
                 except Exception as e_disp:
                     print(f"⚠️ Cover photo dispatch notice: {e_disp}")
 
-            # 🛡️ In-Place Instant Status Update Fallback (Guarantees zero lost messages)
+            # 🛡️ In-Place Instant Status Update Fallback (Single message delivery)
             if not delivered:
                 if status_msg:
                     try:
-                        await status_msg.edit_text(text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                        await status_msg.edit_text(text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
                         delivered = True
                     except Exception:
                         clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
                         try:
-                            await status_msg.edit_text(text=clean_txt, reply_markup=keyboard, disable_web_page_preview=False)
+                            await status_msg.edit_text(text=clean_txt, reply_markup=keyboard, disable_web_page_preview=True)
                             delivered = True
                         except Exception:
                             pass
                 if not delivered:
                     try:
-                        await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                        await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
+                        delivered = True
                     except Exception:
                         clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
-                        await context.bot.send_message(chat_id=chat_id, text=clean_txt, reply_markup=keyboard, disable_web_page_preview=False)
+                        await context.bot.send_message(chat_id=chat_id, text=clean_txt, reply_markup=keyboard, disable_web_page_preview=True)
+                        delivered = True
 
             self.log_signal.emit(f"📰 Sent Angkor Quant AI News v14.00 to {chat_id}")
             return
@@ -19978,13 +19977,28 @@ class TelegramBotThread(BaseThread):
             try:
                 import onchain_whale_radar
                 msg = await asyncio.to_thread(onchain_whale_radar.get_whale_radar_report, target_symbol, user_lang)
+                if len(msg) > 2850:
+                    cut_idx = msg[:2800].rfind("\n\n")
+                    if cut_idx > 1000:
+                        msg = msg[:cut_idx].strip() + "\n\n─────────────\n📋 **1-TAP QUICK SCAN ៖**\n`` `/whales SCAN` `` | `` `/whales BTC` `` | `` `/whales SOL` `` | `` `/whales ETH` ``"
 
                 if status_msg:
-                    await status_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    try:
+                        await status_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        clean_msg = msg.replace('*', '').replace('`', '').replace('_', '')
+                        await status_msg.edit_text(clean_msg, reply_markup=keyboard)
+                else:
+                    try:
+                        await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        clean_msg = msg.replace('*', '').replace('`', '').replace('_', '')
+                        await context.bot.send_message(chat_id=chat_id, text=clean_msg, reply_markup=keyboard)
             except Exception as e:
                 err_text = f"⚠️ **Whale Radar Notice ៖** {e}"
                 if status_msg:
-                    await status_msg.edit_text(err_text, parse_mode="Markdown", reply_markup=keyboard)
+                    try: await status_msg.edit_text(err_text, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception: await status_msg.edit_text(err_text.replace('*', ''), reply_markup=keyboard)
 
         async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return

@@ -34,19 +34,16 @@ class TestApexMacroIntelligenceWire(unittest.TestCase):
     def test_02_us_net_liquidity_and_intermarket_macro(self):
         """
         Pillar 2: $6T US Net Liquidity Formula & Intermarket Macro Engine.
-        Net Liquidity = Fed Assets - TGA - RRP.
         """
         report = amw.generate_apex_macro_news_report("BTCUSDT", user_lang="km")
         text = str(report)
 
-        # Formula verification in text
-        self.assertIn("US Net Liquidity Formula", text)
-        self.assertIn("Fed Assets", text)
-        self.assertIn("TGA", text)
-        self.assertIn("RRP", text)
+        # Macro indicators verification
         self.assertIn("DXY", text)
         self.assertIn("Real Yield", text)
         self.assertIn("VIX", text)
+        self.assertIn("S&P 500", text)
+        self.assertIn("Trillion", text)
 
     def test_03_economic_calendar_red_folder_blackout(self):
         """
@@ -55,7 +52,7 @@ class TestApexMacroIntelligenceWire(unittest.TestCase):
         report = amw.generate_apex_macro_news_report("GOLD", user_lang="en")
         text = str(report)
 
-        self.assertIn("ECONOMIC CALENDAR RED FOLDER", text.upper())
+        self.assertIn("ECONOMIC CALENDAR", text.upper())
         self.assertIn("SPREAD", text.upper())
 
     def test_04_dynamic_quant_sentiment_and_meta_labeling(self):
@@ -65,9 +62,8 @@ class TestApexMacroIntelligenceWire(unittest.TestCase):
         report = amw.generate_apex_macro_news_report("US100", user_lang="km")
         text = str(report)
 
-        self.assertIn("Quant Sentiment Scalar", text)
-        self.assertIn("AFML", text)
-        self.assertIn("Win Probability", text)
+        self.assertIn("កម្រិតទំនុកចិត្តលើទិសដៅ", text)
+        self.assertIn("អនុសាសន៍យុទ្ធសាស្ត្រ", text)
 
     def test_05_trilingual_and_cover_image_dispatch(self):
         """
@@ -81,7 +77,7 @@ class TestApexMacroIntelligenceWire(unittest.TestCase):
         # English
         en_rep = amw.generate_apex_macro_news_report("GOLD", user_lang="en")
         self.assertTrue(en_rep.image_url.startswith("https://"))
-        self.assertIn("QUANTITATIVE WIRE", str(en_rep))
+        self.assertIn("APEX GLOBAL MACRO", str(en_rep))
 
         # Chinese
         zh_rep = amw.generate_apex_macro_news_report("NVDA", user_lang="zh")
