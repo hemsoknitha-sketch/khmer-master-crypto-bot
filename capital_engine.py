@@ -22,7 +22,7 @@ import concurrent.futures
 from collections import deque
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Set
 from dotenv import load_dotenv
 import database as db
 
@@ -6631,6 +6631,7 @@ class CapitalOpeningRangeBreakoutEngine:
         self._session_trades = set()                           # "{session}_{date}_{epic}"
         self._armed_traps: Dict[str, Dict[str, Any]] = {}     # trap_key -> trap_dict
         self._arming_in_progress = set()                       # In-flight arming lock preventing duplicate submissions
+        self._broadcasted_radar_traps: Set[str] = set()        # trap_key -> already broadcasted to VIPs in this session
         self._active_orb_deals: Dict[str, Dict[str, Any]] = {} # deal_id -> {tier, tp1, tp2, tp3, sl_dist, direction, ...}
         self._last_cycle_ts = 0.0
         self._last_oco_check_ts = 0.0
@@ -7132,7 +7133,7 @@ class CapitalOpeningRangeBreakoutEngine:
             resolved_epic = EPIC_MAP.get(epic, epic)
             trap_key = f"{session_name}_{date_str}_{resolved_epic}"
 
-            if trap_key in self._armed_traps or trap_key in self._session_trades or trap_key in self._arming_in_progress:
+            if trap_key in self._armed_traps or trap_key in self._session_trades or trap_key in self._arming_in_progress or trap_key in self._broadcasted_radar_traps:
                 continue
 
             range_data = self.compute_opening_range(resolved_epic, session_name)
@@ -7263,6 +7264,12 @@ class CapitalOpeningRangeBreakoutEngine:
                 max_affordable_buy = max(0.0, (user_avail * 0.85) / max(1.0, buy_trigger * m_factor))
                 max_affordable_sell = max(0.0, (user_avail * 0.85) / max(1.0, sell_trigger * m_factor))
 
+                # Ensure affordable lot size respects broker min_deal
+                if allow_buy_trap and (max_affordable_buy >= min_deal) and float(buy_size or 0.0) < min_deal:
+                    buy_size = min_deal
+                if allow_sell_trap and (max_affordable_sell >= min_deal) and float(sell_size or 0.0) < min_deal:
+                    sell_size = min_deal
+
                 # Risk guard: a 0 size from the sizer means min lot would bust the risk cap
                 user_allow_buy = allow_buy_trap and (max_affordable_buy >= min_deal) and float(buy_size or 0.0) >= min_deal
                 user_allow_sell = allow_sell_trap and (max_affordable_sell >= min_deal) and float(sell_size or 0.0) >= min_deal
@@ -7376,9 +7383,13 @@ class CapitalOpeningRangeBreakoutEngine:
                         except Exception as notif_trap_e:
                             logger.debug(f"ORB trap notification error: {notif_trap_e}")
 
+            # In-Memory Virtual Radar is ALWAYS recorded in RAM so engine monitors price breakout and NEVER duplicates alerts
+            self._armed_traps[trap_key] = trap_entry
+            self._broadcasted_radar_traps.add(trap_key)
             if trap_entry["user_orders"]:
-                self._armed_traps[trap_key] = trap_entry
                 logger.info(f"✅ [ORB 15M] Successfully armed Virtual Radar for {resolved_epic} across {len(trap_entry['user_orders'])} accounts!")
+            else:
+                logger.info(f"🎯 [ORB 15M] Armed In-Memory Virtual Radar for {resolved_epic} (Tracking breakout price in RAM).")
 
             # ==================================================================
             # 👑 UNIVERSAL VIP INSTITUTIONAL RADAR ARMED BROADCAST ⚡
@@ -7910,8 +7921,8 @@ class CapitalKellyPositionSizer:
         "SP500": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
         "US100": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
         "NASDAQ": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "OIL": {"base_low": 0.3, "base_high": 0.8, "min_lot": 0.1, "max_lot": 5.0, "lot_step": 0.1, "precision": 1},
-        "OIL_CRUDE": {"base_low": 0.3, "base_high": 0.8, "min_lot": 0.1, "max_lot": 5.0, "lot_step": 0.1, "precision": 1},
+        "OIL": {"base_low": 1.0, "base_high": 3.0, "min_lot": 1.0, "max_lot": 10.0, "lot_step": 1.0, "precision": 0},
+        "OIL_CRUDE": {"base_low": 1.0, "base_high": 3.0, "min_lot": 1.0, "max_lot": 10.0, "lot_step": 1.0, "precision": 0},
         "DAX": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
         "DE40": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
         "GERMANY40": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
@@ -8493,7 +8504,7 @@ class CapitalKellyPositionSizer:
             if clean_epic in ["NATURALGAS", "GAS"]:
                 final_lot = min(15.0, max(10.0, final_lot))
             elif clean_epic in ["OIL", "OIL_CRUDE"]:
-                final_lot = min(0.5, max(0.3, final_lot))
+                final_lot = min(2.0, max(rule["min_lot"], final_lot))
 
         # Accounts < $500: Clamps US100 <= 0.05, US500 <= 0.10, Mega-Cap Stocks <= 0.20
         if eff_cap < 500:
