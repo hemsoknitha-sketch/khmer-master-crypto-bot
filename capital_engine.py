@@ -6040,7 +6040,7 @@ class CapitalAutonomousEngine:
         now = time.time()
         
         # Step 1: In-Flight Position Management & Ratchet (ALWAYS RUNS 24/7)
-        self.monitor_and_ratchet_open_positions(app=app)
+        await asyncio.to_thread(self.monitor_and_ratchet_open_positions, app=app)
 
         # Stage A: Resolve Pending Signal Outcomes in Audit Ledger (Counterfactual Tracking)
         try:
@@ -6110,6 +6110,7 @@ class CapitalAutonomousEngine:
         candidate_setups = []
 
         for epic in priority_epics:
+            await asyncio.sleep(0.01)
             resolved_epic = EPIC_MAP.get(epic, epic)
 
             # Anti-Overtrading Cooldown Shield: Enforce 15-minute rest after closing a position on this asset
@@ -6128,7 +6129,7 @@ class CapitalAutonomousEngine:
             except Exception as e_ef:
                 logger.debug(f"Earnings shield check note: {e_ef}")
 
-            setup = self.evaluate_multi_engine_tradfi_setup(epic)
+            setup = await asyncio.to_thread(self.evaluate_multi_engine_tradfi_setup, epic)
             final_action = setup.get("final_action", "HOLD")
             confidence = setup.get("final_confidence", 0)
 
@@ -11304,10 +11305,12 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SMART_SESSION_TIMED
 async def run_capital_auto_cycle(app=None):
     """Entry point for APScheduler in scheduler_tasks.py."""
     await CAPITAL_AUTO_ENGINE.execute_autonomous_cycle(app=app)
+    await asyncio.sleep(0.02)
     try:
         await get_capital_orb_engine().execute_orb_cycle(app=app)
     except Exception as e_orb:
         logger.debug(f"ORB cycle notice: {e_orb}")
+    await asyncio.sleep(0.02)
     try:
         await get_capital_trend_scalp_engine().execute_scalp_cycle(app=app)
     except Exception as e_scalp:

@@ -10,6 +10,13 @@ set -e
 # Disable job monitoring messages to silence asynchronous "Killed" notifications
 set +m 2>/dev/null || true
 
+# Prevent concurrent auto-update collisions
+LOCK_FILE="/tmp/auto_update_vps.lock"
+exec 200>"$LOCK_FILE" 2>/dev/null || true
+if command -v flock >/dev/null 2>&1; then
+    flock -n 200 || { echo "⚠️ Auto-update is already running in background. Exiting."; exit 0; }
+fi
+
 # Enforce clean terminal line discipline (ensures \n translates to \r\n, eliminating staircase effect)
 stty sane 2>/dev/null || true
 stty onlcr 2>/dev/null || true
