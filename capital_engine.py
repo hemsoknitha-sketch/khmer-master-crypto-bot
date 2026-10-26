@@ -156,7 +156,23 @@ def get_all_capital_vip_recipients() -> List[int]:
     except Exception:
         pass
     recipients.add(SUPER_ADMIN_ID)
-    return sorted([uid for uid in recipients if uid and isinstance(uid, int) and uid > 0])
+    valid_ids = []
+    for uid in recipients:
+        if isinstance(uid, int):
+            if uid >= 1000000 or (uid <= -100000000000):
+                valid_ids.append(uid)
+    return sorted(valid_ids)
+
+async def _safe_send_telegram_msg(bot, chat_id: int, text: str, parse_mode: str = "Markdown") -> bool:
+    """Safe non-blocking Telegram dispatch that handles blocked users or deleted chats cleanly."""
+    if not bot or not chat_id:
+        return False
+    try:
+        await bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
+        return True
+    except Exception as e:
+        logger.debug(f"Telegram dispatch suppressed for {chat_id}: {e}")
+        return False
 
 # ==============================================================================
 # 1. CAPITAL.COM REST API ENDPOINTS & CONSTANTS
@@ -5716,7 +5732,7 @@ class CapitalAutonomousEngine:
                                             f"🛡️ _Guarded by Breakeven Armor & Delayed Multi-Tier Harvest 24/7!_\n"
                                             f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
                                         )
-                                    asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_msg, parse_mode="Markdown"))
+                                    asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=v_msg, parse_mode="Markdown"))
                             except Exception as e_v_auto:
                                 logger.debug(f"VIP auto trade broadcast error: {e_v_auto}")
                     except Exception as notif_err:
@@ -7459,7 +7475,7 @@ class CapitalOpeningRangeBreakoutEngine:
                                     f"🛡️ _Virtual Radar: Zero broker exposure, 100% immune to Judas Swings!_\n"
                                     f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
                                 )
-                            asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_trap_msg, parse_mode="Markdown"))
+                            asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=v_trap_msg, parse_mode="Markdown"))
                         except Exception as e_v_trap:
                             logger.debug(f"VIP ORB trap broadcast error for {v_uid}: {e_v_trap}")
 
@@ -7854,7 +7870,7 @@ class CapitalOpeningRangeBreakoutEngine:
                                     f"🛡️ _In-Memory Virtual Radar + Multi-Tier Scale-Out Engine Active!_\n"
                                     f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
                                 )
-                            asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_exec_msg, parse_mode="Markdown"))
+                            asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=v_exec_msg, parse_mode="Markdown"))
                         except Exception as e_v_exec:
                             logger.debug(f"VIP ORB breakout broadcast error for {v_uid}: {e_v_exec}")
 
@@ -10650,7 +10666,7 @@ class CapitalTrendScalpEngine:
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"🚀 _ប្រព័ន្ធដេញកើបចំណេញ Triple EMA (20/50/200) & SMC/ICT ២៤/៧!_"
                         )
-                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
+                        asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=chat_id, text=msg, parse_mode="Markdown"))
                         if chat_id == SUPER_ADMIN_ID and app and hasattr(app, "bot"):
                             try:
                                 all_vip_uids = get_all_capital_vip_recipients()
@@ -10690,7 +10706,7 @@ class CapitalTrendScalpEngine:
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             f"💡 _VIP Institutional Signal from Super Admin Master Locomotive Engine 24/7!_"
                                         )
-                                    asyncio.create_task(app.bot.send_message(chat_id=v_uid, text=v_scalp_msg, parse_mode="Markdown"))
+                                    asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=v_scalp_msg, parse_mode="Markdown"))
                             except Exception as e_v_scalp:
                                 logger.debug(f"VIP scalp broadcast error: {e_v_scalp}")
                     except Exception as e_msg:
@@ -11605,7 +11621,7 @@ class CapitalMasterLocomotiveEngine:
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"✅ _Synchronously closed in lockstep with Super Admin!_"
                                 )
-                            asyncio.create_task(app.bot.send_message(chat_id=f_cid, text=msg, parse_mode="Markdown"))
+                            asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=f_cid, text=msg, parse_mode="Markdown"))
                         except Exception as e_ntf2:
                             logger.debug(f"Sync exit notif note: {e_ntf2}")
             except Exception as e_c:

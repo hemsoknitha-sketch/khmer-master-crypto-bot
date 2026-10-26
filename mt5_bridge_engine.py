@@ -4396,9 +4396,14 @@ class MT5BridgeEngine:
                         is_quarantined = (
                             self._symbol_lockout_until.get(streak_key, 0.0) > now_ts
                             or self._symbol_lockout_until.get(all_key, 0.0) > now_ts
+                            or self._account_trade_disabled_until.get(str(acc_id), 0.0) > now_ts
                         )
+                        min_reachsey_bal = 50.0 if is_cent_account else 5.0
+                        has_min_reachsey_bal = (raw_bal >= min_reachsey_bal) if is_cent_account else (real_usd_balance >= min_reachsey_bal)
+
                         can_deploy_reachsey = (
                             not is_quarantined
+                            and has_min_reachsey_bal
                             and len(active_reachsey_baskets) < max_reachsey_baskets
                             and len(reachsey_open_positions) < (5 * max_reachsey_baskets)
                         )
@@ -4414,6 +4419,13 @@ class MT5BridgeEngine:
 
                         if (now_ts - last_reachsey_scan) >= 60.0:
                             self._last_reachsey_auto_scan[str(acc_id)] = now_ts
+                            if not has_min_reachsey_bal:
+                                low_reachsey_k = f"low_reachsey_{acc_id}"
+                                if (now_ts - self._last_auth_log.get(low_reachsey_k, 0.0)) >= 900.0:
+                                    self._last_auth_log[low_reachsey_k] = now_ts
+                                    logger.warning(f"⚠️ [REACHSEY BALANCE GUARD] Account #{acc_id} has ${real_usd_balance:.2f} USD (< ${min_reachsey_bal:.0f} min margin for 5-pos matrix). Pausing Reachsey auto-deploy until funded.")
+                                continue
+
                             logger.info(f"👑 [REACHSEY AUTO-RADAR] User {chat_id} (Acc #{acc_id}): Active Baskets ({len(active_reachsey_baskets)}/{max_reachsey_baskets}, Open Pos: {len(reachsey_open_positions)}) | Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | Real Bal: ${real_usd_balance:,.2f} | Scanning Top Volatility Assets...")
 
                             if can_deploy_reachsey:
