@@ -138,6 +138,27 @@ class TestContinuousAutonomousSecurity(unittest.TestCase):
         self.assertIn("pillar3_anomaly_model", health)
         self.assertIn("pillar5_self_healing", health)
 
+    def test_08_spring_and_java_rce_defense(self):
+        """Pillar 2 & Ingress: Validates interception of Oracle Java SE & Spring Framework RCE probes."""
+        # 1. Verify signatures are in RAM
+        from autonomous_security_daily_learner import DEFAULT_THREAT_PATTERNS
+        signatures = [p.name for p in DEFAULT_THREAT_PATTERNS]
+        self.assertTrue(any("Spring4Shell" in s for s in signatures))
+        self.assertTrue(any("Log4Shell" in s for s in signatures))
+        self.assertTrue(any("Actuator" in s for s in signatures))
+        self.assertTrue(any("Java Object Deserialization" in s for s in signatures))
+
+        # 2. Verify fuzzing suite blocks all Spring & Java RCE mutations
+        fuzz_res = self.engine.run_adversarial_fuzzing_simulation(trials=50)
+        self.assertEqual(fuzz_res.get("interception_rate_pct"), 100.0)
+        self.assertEqual(fuzz_res.get("escaped"), 0)
+
+        # 3. Verify IP auto-quarantine for malicious Spring scanner
+        attacker_ip = "192.0.2.123"
+        self.cache.update_rules(banned_ips=[attacker_ip])
+        self.assertTrue(self.cache.is_ip_banned(attacker_ip))
+
 
 if __name__ == "__main__":
     unittest.main()
+

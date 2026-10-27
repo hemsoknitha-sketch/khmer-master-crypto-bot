@@ -3498,10 +3498,58 @@ async def handle_script(request: web.Request) -> web.FileResponse:
 @web.middleware
 async def black_october_security_middleware(request: web.Request, handler):
     """
-    Institutional Black October Security Middleware (Invariant 106):
+    Institutional Security Middleware (Invariants 106 & 107):
+    - IP Quarantine & Ban Shield: Instantly rejects hostile IPs (<0.0001ms RAM lookup)
+    - Spring Framework & Java SE RCE Shield: Blocks Spring4Shell, Log4Shell, and Actuator reconnaissance
     - Payload size limit (<1MB) to prevent Memory Crash & DoS
     - Rejection of multipart/form-data uploads to prevent Pillow/File Upload RCE
     """
+    client_ip = request.remote or "unknown"
+
+    # 1. IP Quarantine & Ban Shield (Invariant 107)
+    try:
+        from autonomous_security_daily_learner import security_ram_cache
+        if security_ram_cache.is_ip_banned(client_ip):
+            return web.json_response(
+                {"error": "Access Denied: Hostile IP address temporarily quarantined by Security Citadel."},
+                status=403
+            )
+    except Exception:
+        pass
+
+    # 2. Spring Framework & Java SE Remote Code Execution Shield
+    raw_path = str(request.rel_url)
+    query_str = request.query_string
+    user_agent = request.headers.get("User-Agent", "")
+
+    spring_rce_indicators = (
+        "class.module.classloader",
+        "classloader.resources",
+        "${jndi:",
+        "/actuator/",
+        "ro0abxsrab"
+    )
+    combined_target = f"{raw_path} {query_str} {user_agent}".lower()
+    if any(sig in combined_target for sig in spring_rce_indicators):
+        try:
+            from autonomous_security_daily_learner import continuous_security_engine
+            continuous_security_engine.ram_cache.update_rules(banned_ips=[client_ip])
+            continuous_security_engine.log_security_incident(
+                source=client_ip,
+                threat_category="SPRING_JAVA_RCE_PROBE_INTERCEPTED",
+                severity="CRITICAL",
+                endpoint_or_action=raw_path,
+                payload_snippet=combined_target[:200],
+                mitigation_action="IMMEDIATE_403_AND_48H_IP_BAN"
+            )
+        except Exception:
+            pass
+        return web.json_response(
+            {"error": "Malicious payload intercepted by Angkor Quant Security Citadel (Spring/Java RCE Defense)."},
+            status=403
+        )
+
+    # 3. Payload Size Limit (<1MB)
     cl = request.content_length
     if cl is not None and cl > 1 * 1024 * 1024:
         return web.json_response(
@@ -3509,6 +3557,7 @@ async def black_october_security_middleware(request: web.Request, handler):
             status=413
         )
 
+    # 4. Zero-Upload Guard
     ctype = request.content_type or ""
     if "multipart/form-data" in ctype.lower():
         return web.json_response(

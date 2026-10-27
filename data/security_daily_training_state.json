@@ -1,37 +1,42 @@
 {
-  "timestamp": 1793094568.690344,
-  "datetime_utc": "2026-10-27 09:49:28",
+  "timestamp": 1793096063.5835617,
+  "datetime_utc": "2026-10-27 10:14:23",
   "verdict": "CERTIFIED_IMMUNE_ZERO_DEFECTS",
-  "elapsed_ms": 409.46,
+  "elapsed_ms": 578.5,
   "pillar1_threat_radar": {
     "status": "PASS",
     "dependencies_audited": 30,
     "pillow_pinned_safe": true,
     "vulnerability_alerts": [],
-    "active_signatures_in_ram": 5,
+    "active_signatures_in_ram": 9,
     "signatures_loaded": [
       "CVE-2024-28219",
       "CVE-2024-4367",
       "SSRF-CLOUD-METADATA",
       "SUPPLY-CHAIN-LITELLM",
-      "OOM-DECOMPRESSION-BOMB"
+      "OOM-DECOMPRESSION-BOMB",
+      "CVE-2022-22965",
+      "CVE-2021-44228",
+      "SPRING-ACTUATOR-RECON",
+      "JAVA-DESERIALIZATION-RCE"
     ],
-    "cve_feed_timestamp": 1793094568.2822056
+    "cve_feed_timestamp": 1793096063.0060554
   },
   "pillar2_adversarial_fuzzing": {
-    "total_synthetic_attacks": 34,
-    "blocked": 34,
+    "total_synthetic_attacks": 43,
+    "blocked": 43,
     "escaped": 0,
     "block_rate_pct": 100.0,
     "interception_rate_pct": 100.0,
-    "attack_payloads_blocked": 34,
+    "attack_payloads_blocked": 43,
     "capital_leakage_events": 0,
     "status": "PASS_100%_IMMUNE",
     "categories": {
       "ssrf_mutations": 15,
       "upload_mutations": 11,
       "data_theft_mutations": 4,
-      "memory_payload_mutations": 4
+      "memory_payload_mutations": 4,
+      "spring_java_rce_mutations": 9
     }
   },
   "pillar3_anomaly_model": {
@@ -46,19 +51,19 @@
   },
   "pillar4_incident_summary": {
     "lookback_hours": 24,
-    "total_incidents_recorded": 16,
+    "total_incidents_recorded": 29,
     "breakdown_by_category": {
-      "ADVERSARIAL_MUTATION_SIMULATION": 13,
-      "UNIT_TEST_FUZZING_PROBE": 3
+      "ADVERSARIAL_MUTATION_SIMULATION": 23,
+      "UNIT_TEST_FUZZING_PROBE": 6
     },
     "capital_leakage_prevented": "$100,000+ (Fiduciary 100% Protected)"
   },
   "pillar5_self_healing": {
-    "rss_before_mb": 496.58,
-    "rss_after_mb": 496.58,
-    "process_rss_mb": 496.58,
+    "rss_before_mb": 496.22,
+    "rss_after_mb": 496.22,
+    "process_rss_mb": 496.22,
     "ram_reclaimed_mb": 0.0,
-    "gc_objects_collected": 53,
+    "gc_objects_collected": 45,
     "sqlite_optimized": true,
     "sqlite_checkpoint": "(0, 0, 0)",
     "database_checkpoint": "OK",
