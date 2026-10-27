@@ -7,6 +7,7 @@
 
 import os
 import sys
+import subprocess
 import time
 import json
 import glob
@@ -19,7 +20,7 @@ try:
     from huggingface_hub import HfApi, hf_hub_download
 except ImportError:
     print("⚠️ [HF TRAINER] huggingface_hub not installed. Installing...")
-    os.system(f"{sys.executable} -m pip install huggingface_hub")
+    subprocess.run([sys.executable, "-m", "pip", "install", "huggingface_hub"], check=True)  # nosec B603
     from huggingface_hub import HfApi, hf_hub_download
 
 HF_REPO_ID = os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models")

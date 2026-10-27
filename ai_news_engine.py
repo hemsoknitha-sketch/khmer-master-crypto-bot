@@ -15,7 +15,10 @@ Features:
 import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-import xml.etree.ElementTree as ET
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET  # nosec B314
 import time
 import re
 from typing import List, Dict, Any, Tuple
@@ -230,7 +233,7 @@ def fetch_live_news(symbol: str = None, limit: int = 5) -> List[Dict[str, Any]]:
     def _fetch_feed(feed_url: str) -> List[Dict[str, Any]]:
         items_found = []
         try:
-            res = requests.get(feed_url, timeout=(2.5, 4.0), headers=HEADERS, verify=False)
+            res = requests.get(feed_url, timeout=(2.5, 4.0), headers=HEADERS, verify=True)
             if res.status_code == 200:
                 root = ET.fromstring(res.content)
                 for item in root.findall(".//item"):

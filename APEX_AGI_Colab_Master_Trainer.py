@@ -8,6 +8,7 @@
 
 import os
 import sys
+import subprocess
 import time
 import json
 import random
@@ -32,7 +33,7 @@ try:
     IN_COLAB = True
     print("🟢 [ENVIRONMENT] Running inside Google Colab GPU Instance!")
     print("📦 Installing required Wall Street Machine Learning packages...")
-    os.system("pip install -q pandas numpy scikit-learn xgboost catboost lightgbm hmmlearn yfinance requests joblib huggingface_hub deap causal-learn tensorflow")
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pandas", "numpy", "scikit-learn", "xgboost", "catboost", "lightgbm", "hmmlearn", "yfinance", "requests", "joblib", "huggingface_hub", "deap", "causal-learn", "tensorflow"], check=True)  # nosec B603
 except ImportError:
     IN_COLAB = False
     print("🟢 [ENVIRONMENT] Running in Local/Cloud Server Instance!")

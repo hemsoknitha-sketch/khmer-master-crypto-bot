@@ -7,7 +7,10 @@ from telegram.ext import Application
 import database as db
 import market_data
 import requests
-import xml.etree.ElementTree as ET
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET  # nosec B314
 import re
 import localization as loc
 import trading_engine

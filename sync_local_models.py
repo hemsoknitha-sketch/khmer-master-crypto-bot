@@ -8,6 +8,7 @@
 
 import os
 import sys
+import subprocess
 import json
 import shutil
 import joblib
@@ -40,7 +41,7 @@ try:
     from huggingface_hub import hf_hub_download, HfApi, list_repo_files
 except ImportError:
     print("[HF SYNC] Installing huggingface_hub package...")
-    os.system(f"{sys.executable} -m pip install --upgrade huggingface_hub")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "huggingface_hub"], check=True)  # nosec B603
     from huggingface_hub import hf_hub_download, HfApi, list_repo_files
 
 try:

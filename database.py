@@ -3468,12 +3468,17 @@ def disable_all_capital_users(engine: str = "ALL", preserve_super_admin: bool = 
     updated_count = 0
     try:
         eng = engine.upper()
-        where_clause = "WHERE chat_id != 859271875" if preserve_super_admin else ""
         if eng in ["ALL", "AUTO"]:
-            cursor.execute(f"UPDATE capital_auto_config SET is_enabled = 0 {where_clause}")
+            if preserve_super_admin:
+                cursor.execute("UPDATE capital_auto_config SET is_enabled = 0 WHERE chat_id != ?", (859271875,))
+            else:
+                cursor.execute("UPDATE capital_auto_config SET is_enabled = 0")
             updated_count += max(0, cursor.rowcount)
         if eng in ["ALL", "SCALP"]:
-            cursor.execute(f"UPDATE capital_scalp_config SET is_enabled = 0 {where_clause}")
+            if preserve_super_admin:
+                cursor.execute("UPDATE capital_scalp_config SET is_enabled = 0 WHERE chat_id != ?", (859271875,))
+            else:
+                cursor.execute("UPDATE capital_scalp_config SET is_enabled = 0")
             updated_count += max(0, cursor.rowcount)
         conn.commit()
     except Exception as e:

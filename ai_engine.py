@@ -889,7 +889,7 @@ class AIInvestmentEngine:
                 "👉 _សូមឆ្លើយតប ឬសួរសំណួរដោយ Reply សារនេះ!_"
             )
 
-        cache_key = hashlib.md5(user_input.encode('utf-8')).hexdigest()
+        cache_key = hashlib.md5(user_input.encode('utf-8'), usedforsecurity=False).hexdigest()  # nosec B324
         if cache_key in self._cache:
             cache_time, cached_response = self._cache[cache_key]
             if time.time() - cache_time < self.CACHE_TTL:

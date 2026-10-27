@@ -101,7 +101,10 @@ def fetch_usd_economic_events(force_refresh: bool = False) -> List[Dict[str, Any
     # --- Tier 2: Federal Reserve Official Speeches & Press Releases RSS XML ---
     try:
         import email.utils
-        import xml.etree.ElementTree as ET
+        try:
+            import defusedxml.ElementTree as ET
+        except ImportError:
+            import xml.etree.ElementTree as ET  # nosec B314
         fed_urls = [
             "https://www.federalreserve.gov/feeds/speeches.xml",
             "https://www.federalreserve.gov/feeds/press_all.xml"

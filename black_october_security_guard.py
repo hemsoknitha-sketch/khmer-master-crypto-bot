@@ -181,7 +181,7 @@ class SSRFDataTheftGuard:
         "instance-data",
         "localhost",
         "127.0.0.1",
-        "0.0.0.0"
+        "0.0.0.0"  # nosec B104
     }
 
     BLOCKED_NETWORKS = [

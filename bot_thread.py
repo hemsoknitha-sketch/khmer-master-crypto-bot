@@ -95,7 +95,7 @@ def get_persistent_bot_bar_keyboard(chat_id: int = 0) -> ReplyKeyboardMarkup:
     """
     env_url = os.getenv("TELEGRAM_MINI_APP_URL") or os.getenv("WEB_GUI_URL")
     if not env_url or "localhost" in env_url or "127.0.0.1" in env_url:
-        for path in ["/tmp/cloudflared_url.txt", "/opt/khmer-master-crypto-bot/.cloudflare_tunnel_url", os.path.expanduser("~/.cloudflare_tunnel_url")]:
+        for path in ["/tmp/cloudflared_url.txt", "/opt/khmer-master-crypto-bot/.cloudflare_tunnel_url", os.path.expanduser("~/.cloudflare_tunnel_url")]:  # nosec B108
             if os.path.exists(path):
                 try:
                     with open(path, "r", encoding="utf-8") as f:
@@ -17405,7 +17405,7 @@ class TelegramBotThread(BaseThread):
             env_url = os.getenv("TELEGRAM_MINI_APP_URL") or os.getenv("WEB_GUI_URL")
             if not env_url or "localhost" in env_url or "127.0.0.1" in env_url:
                 # Check for dynamic tunnel file on VPS
-                for path in ["/tmp/cloudflared_url.txt", "/opt/khmer-master-crypto-bot/.cloudflare_tunnel_url", os.path.expanduser("~/.cloudflare_tunnel_url")]:
+                for path in ["/tmp/cloudflared_url.txt", "/opt/khmer-master-crypto-bot/.cloudflare_tunnel_url", os.path.expanduser("~/.cloudflare_tunnel_url")]:  # nosec B108
                     if os.path.exists(path):
                         try:
                             with open(path, "r", encoding="utf-8") as f:

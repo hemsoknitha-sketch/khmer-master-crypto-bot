@@ -232,7 +232,7 @@ class EventRingBuffer:
     def is_duplicate(self, text: str, author: str) -> bool:
         now = time.time()
         event_str = f"{author.lower()}_{text.strip().lower()}"
-        event_hash = hashlib.md5(event_str.encode('utf-8')).hexdigest()
+        event_hash = hashlib.md5(event_str.encode('utf-8'), usedforsecurity=False).hexdigest()  # nosec B324
         
         with self.lock:
             # Purge hashes older than 60 seconds

@@ -20,7 +20,10 @@ Integrates Google Ecosystem & TradFi Macro Confluence into Khmer Master Crypto:
 import time
 import requests
 import json
-import xml.etree.ElementTree as ET
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET  # nosec B314
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 

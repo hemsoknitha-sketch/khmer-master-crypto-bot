@@ -30,7 +30,7 @@ for filename in os.listdir(models_dir):
         elif filename.endswith(".pth"):
             try:
                 import torch
-                t = torch.load(filepath, map_location="cpu")
+                t = torch.load(filepath, map_location="cpu", weights_only=True)  # nosec B614
                 print(f"  [PASS] {filename}: PyTorch state dict verified ({type(t).__name__})")
                 passed += 1
             except ImportError:

@@ -26,6 +26,7 @@
 
 import os
 import sys
+import subprocess
 import time
 import json
 import joblib
@@ -34,7 +35,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-# Colab / GPU Environment Dependencies Check
 # Colab / GPU Environment Dependencies Check
 def install_dependencies():
     print("📦 [ENVIRONMENT SETUP] Checking and installing required quant dependencies...")
@@ -47,7 +47,7 @@ def install_dependencies():
             __import__(pkg)
         except ImportError:
             print(f"  └─ Installing {pkg}...")
-            os.system(f"{sys.executable} -m pip install --quiet {pkg}")
+            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", pkg], check=True)  # nosec B603
     print("✅ [ENVIRONMENT SETUP] All dependencies verified!")
 
 # ==============================================================================
