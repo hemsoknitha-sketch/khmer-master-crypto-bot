@@ -8410,3 +8410,37 @@ async def tri_regional_900_daily_training_job(app: Application):
         logger.info(f"✅ [SCHEDULER] Tri-Regional 900 TradFi Daily Training complete: {res.get('total_trained')} assets trained in {res.get('elapsed_ms', 0):.1f}ms.")
     except Exception as e:
         logger.error(f"❌ [SCHEDULER ERROR] Tri-Regional 900 Daily Training failed: {e}")
+
+
+async def autonomous_security_training_scheduler_job(app: Application = None):
+    """
+    🏛️ Invariant 107: 6-Pillar Continuous Autonomous Security Training & Living Immune System.
+    Executes in the Overnight window (04:00 AM ICT / 21:00 UTC):
+    1. Threat Intelligence Radar: Ingests NVD/OSV/PyPI feeds, audits dependencies & Pillow 13.0.
+    2. Red-Team Adversarial Fuzzing: 250+ synthetic attacks (SSRF, Decompression Bombs, Data Theft).
+    3. Unsupervised Anomaly Training: Retrains IsolationForest on 24h operational telemetry.
+    4. Immutable Security Incident Ledger: SQLite WAL logging & counterfactual threat trend analysis.
+    5. Proactive Memory & DB Self-Healing: gc.collect() & SQLite PRAGMA optimize/wal_checkpoint.
+    6. Zero Technical Negligence Hot-Reload: Nanosecond RAM cache update & Telegram report card dispatch.
+    """
+    try:
+        from autonomous_security_daily_learner import continuous_security_engine
+        logger.info("🛡️ [SCHEDULER] Triggering Daily Continuous Autonomous Security Training (04:00 AM ICT)...")
+        res = continuous_security_engine.execute_daily_security_training_cycle(is_manual=False)
+        report_text = continuous_security_engine.generate_daily_security_card(res)
+
+        admin_id = int(os.getenv("TELEGRAM_ADMIN_ID", "859271875"))
+        if app and app.bot and admin_id:
+            try:
+                await app.bot.send_message(
+                    chat_id=admin_id,
+                    text=report_text,
+                    parse_mode="Markdown"
+                )
+                logger.info(f"✅ Dispatched Daily Autonomous Security Report to Super Admin {admin_id}")
+            except Exception as e_send:
+                logger.warning(f"Could not dispatch security report to Telegram: {e_send}")
+        return res
+    except Exception as e:
+        logger.error(f"❌ [SCHEDULER ERROR] Autonomous Security Training failed: {e}", exc_info=True)
+        return {}

@@ -3524,6 +3524,26 @@ async def handle_api_security_black_october(request: web.Request) -> web.Respons
     return web.json_response(res)
 
 
+async def handle_api_security_daily_train(request: web.Request) -> web.Response:
+    """
+    Triggers or retrieves the Autonomous Security Daily Training & Living Immune System status.
+    Executes red-team adversarial fuzzing, updates isolation forest anomaly weights,
+    and returns full 6-pillar defense diagnostic JSON.
+    """
+    try:
+        from autonomous_security_daily_learner import continuous_security_engine
+        force = request.method == "POST" or request.query.get("force", "0") in ("1", "true", "True")
+        if force:
+            loop = asyncio.get_running_loop()
+            res = await loop.run_in_executor(None, continuous_security_engine.execute_daily_security_training_cycle, True)
+        else:
+            status = continuous_security_engine.get_health_status()
+            res = {"status": "success", "health": status}
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
 # ==============================================================================
 # SERVER LIFECYCLE CONTROLLER
 # ==============================================================================
@@ -3607,6 +3627,10 @@ def create_web_gui_app() -> web.Application:
 
     # Black October Institutional Security Citadel route (Invariant 106)
     app.router.add_get("/api/security/black_october", handle_api_security_black_october)
+
+    # Continuous Autonomous Security Training & Threat Immunity Engine (Invariant 107)
+    app.router.add_get("/api/security/daily_train", handle_api_security_daily_train)
+    app.router.add_post("/api/security/daily_train", handle_api_security_daily_train)
 
     return app
 

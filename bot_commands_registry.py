@@ -106,6 +106,7 @@ def get_registered_commands():
         BotCommand("mt5_hf", "MT5 HF Edge Worker"),
         BotCommand("capital_kelly", "Capital Kelly Sizer"),
         BotCommand("capital_spread", "Capital Spread Drag Manager"),
+        BotCommand("security_train", "Autonomous Security Training & Immune System"),
     ]
 
 

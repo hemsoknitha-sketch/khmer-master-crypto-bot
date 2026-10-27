@@ -28599,6 +28599,24 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("train_tradfi", train_tradfi_command))
         self.app.add_handler(CommandHandler("aq_train_tradfi", train_tradfi_command))
 
+        async def security_train_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Executes 6-Pillar Continuous Autonomous Security Training & Diagnostic on demand (Invariant 107)."""
+            user_id = update.effective_user.id if update.effective_user else 0
+            if int(user_id) not in [859271875, 537186806]:
+                await update.message.reply_text("⛔ Super Admin access only.")
+                return
+            wait_msg = await update.message.reply_text("🛡️ **[SECURITY CITADEL]** កំពុងដំណើរការ 6-Pillar Continuous Security Training & Fuzzing...", parse_mode="Markdown")
+            try:
+                from autonomous_security_daily_learner import continuous_security_engine
+                res = continuous_security_engine.execute_daily_security_training_cycle(is_manual=True, chat_id=user_id)
+                card = continuous_security_engine.generate_daily_security_card(res)
+                await wait_msg.edit_text(card, parse_mode="Markdown")
+            except Exception as e:
+                await wait_msg.edit_text(f"❌ Error during Security Training: {e}")
+
+        self.app.add_handler(CommandHandler("security_train", security_train_command))
+        self.app.add_handler(CommandHandler("security_audit", security_train_command))
+
         # --- SUPER SMART BOT COMMAND & ZERO-CONFUSION NAVIGATOR (ADMIN & VIP) ---
         self.app.add_handler(CommandHandler("smart", smart_bot_command))
         self.app.add_handler(CommandHandler("smart_bot", smart_bot_command))
@@ -28913,6 +28931,18 @@ class TelegramBotThread(BaseThread):
             timezone="Asia/Phnom_Penh",
             args=[self.app],
             id="vip_8hour_executive_report_job"
+        )
+
+        # 🛡️ CONTINUOUS AUTONOMOUS SECURITY TRAINING & LIVING IMMUNE SYSTEM (INVARIANT 107)
+        self.scheduler.add_job(
+            scheduler_tasks.autonomous_security_training_scheduler_job,
+            'cron',
+            hour=4,
+            minute=0,
+            max_instances=1,
+            coalesce=True,
+            args=[self.app],
+            id='autonomous_security_training_scheduler_job'
         )
 
         self.scheduler.add_job(
