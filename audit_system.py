@@ -5242,7 +5242,7 @@ def run_audit():
         log_fail(str(e))
 
     # 84. Institutional GTC PAMM Master Fund Architecture, Zero-Resource Virtual Ledger & Dual-Revenue Engine (Invariant 105)
-    print("\n[CHECK 84/84] Verifying GTC PAMM Master Fund Architecture, Virtual Ledger & Dual-Revenue Engine (Invariant 105)...")
+    print("\n[CHECK 84/85] Verifying GTC PAMM Master Fund Architecture, Virtual Ledger & Dual-Revenue Engine (Invariant 105)...")
     try:
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_code = f.read()
@@ -5312,6 +5312,88 @@ def run_audit():
             log_fail("Invariant 105 GTC PAMM Master Fund verification failed!")
     except Exception as e:
         failures.append(f"Invariant 105 check failed: {e}")
+        log_fail(str(e))
+
+    # 85. Institutional Black October Python Ecosystem Defense, Pillow 13.0 Zero-Upload, LiteLLM Supply Chain & SAP Cloud SDK SSRF 10.0 Guard (Invariant 106)
+    print("\n[CHECK 85/85] Verifying Black October Python Ecosystem Defense, Zero-Upload Pillow 13.0, LiteLLM Supply Chain & SAP SSRF 10.0 Guard (Invariant 106)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_code = f.read()
+        with open("requirements.txt", "r", encoding="utf-8") as f:
+            req_code = f.read()
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        with open("web_gui_server.py", "r", encoding="utf-8") as f:
+            wg_code = f.read()
+
+        has_inv106_agents = "Invariant 106" in agents_code and "Black October" in agents_code
+        has_inv106_gemini = "Invariant 106" in gemini_code and "Black October" in gemini_code
+        has_pillow_req = "Pillow>=11.0.0,<=13.0.0" in req_code
+
+        import black_october_security_guard as bg
+        guard = getattr(bg, "black_october_guard", None)
+        audit_res = guard.audit_full_system() if guard else {}
+
+        # 1. Pillow Hardening & Zero-Upload Verification
+        upload_blocked, upload_reason = guard.pillow_guard.validate_upload_attempt(source="AUDIT_TEST", filename="hack.png")
+        pillow_ok = (
+            not upload_blocked and
+            guard.pillow_guard.ALLOW_USER_UPLOADS is False and
+            guard.pillow_guard.is_hardened is True and
+            "13.0" in str(guard.pillow_guard.pillow_version)
+        )
+
+        # 2. LiteLLM Supply Chain & Docker Jailbreak Verification
+        supply_ok, supply_msg = guard.litellm_guard.verify_supply_chain_integrity()
+
+        # 3. SAP Cloud SDK SSRF 10.0 & Data Theft Verification
+        ssrf_blocked_cloud, _ = guard.ssrf_guard.validate_outgoing_url_ssrf("http://169.254.169.254/latest/meta-data/")
+        ssrf_blocked_rfc, _ = guard.ssrf_guard.validate_outgoing_url_ssrf("http://10.0.0.1/admin")
+        ssrf_blocked_file, _ = guard.ssrf_guard.validate_outgoing_url_ssrf("file:///etc/passwd")
+        ssrf_valid_url, _ = guard.ssrf_guard.validate_outgoing_url_ssrf("https://api.binance.com")
+        ssrf_ok = (not ssrf_blocked_cloud) and (not ssrf_blocked_rfc) and (not ssrf_blocked_file) and ssrf_valid_url
+
+        data_theft_caught, _ = guard.ssrf_guard.validate_outbound_data_theft("Payload containing MASTER_KEY leak: " + (os.getenv("MASTER_KEY") or "TEST_SECRET_ABC123"))
+        clean_payload_ok, _ = guard.ssrf_guard.validate_outbound_data_theft("Normal ticker query BTCUSDT")
+        theft_ok = (not data_theft_caught) and clean_payload_ok
+
+        # 4. Memory Crash & DoS Protection Verification
+        payload_size_blocked, _ = guard.memory_governor.validate_payload_size(2 * 1024 * 1024)
+        payload_size_ok, _ = guard.memory_governor.validate_payload_size(500)
+        mem_info = guard.memory_governor.check_memory_headroom()
+        mem_ok = (not payload_size_blocked) and payload_size_ok and ("process_rss_mb" in mem_info)
+
+        # 5. Handler & Middleware Integration
+        handlers_ok = (
+            "handle_blocked_upload" in bt_code and
+            "filters.ATTACHMENT" in bt_code and
+            "black_october_security_middleware" in wg_code and
+            "/api/security/black_october" in wg_code
+        )
+
+        all_inv106_passed = (
+            has_inv106_agents and has_inv106_gemini and has_pillow_req and
+            pillow_ok and supply_ok and ssrf_ok and theft_ok and mem_ok and handlers_ok and
+            audit_res.get("overall_status") == "CERTIFIED_IMMUNE_TO_BLACK_OCTOBER"
+        )
+
+        if all_inv106_passed:
+            log_pass(
+                "Black October Python Ecosystem Defense, Zero-Upload Pillow 13.0, LiteLLM Supply Chain & SAP SSRF 10.0 Guard (Invariant 106) "
+                "are 100% certified! (Zero User Uploads, Pillow v13.0.0 & 10MP Bomb Clamp, Native TLS AI SDKs, Docker Socket Isolation, "
+                "RFC1918 / Cloud Metadata SSRF Blocked, Outbound Data Theft Prevention, <1MB Request Clamping & OOM Auto-GC Active)"
+            )
+        else:
+            failures.append(
+                f"Invariant 106 check failed: agents={has_inv106_agents}, gemini={has_inv106_gemini}, "
+                f"req={has_pillow_req}, pillow={pillow_ok}, supply={supply_ok}, ssrf={ssrf_ok}, "
+                f"theft={theft_ok}, mem={mem_ok}, handlers={handlers_ok}"
+            )
+            log_fail("Invariant 106 Black October verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 106 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

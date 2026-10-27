@@ -1953,7 +1953,29 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - Restrict running MT5 instances on VPS to only the Master PAMM terminal (`#52171861`).
      - Any duplicate or inactive terminals (`52135153`, `55688250`) must be pruned or closed to prevent memory leaks and zombie wine processes.
 
+### Invariant 106: Black October Python Ecosystem Institutional Defense, Pillow 13.0 Zero-Upload, LiteLLM Supply Chain & SAP Cloud SDK SSRF 10.0 Data Theft Shield (AQ106 Standard - របាំងការពារបរិស្ថាន Python អន្តរជាតិ Black October, បិទ User Uploads ១០០% & Update Pillow 13.0, Supply Chain LiteLLM & Docker Isolation, និង SAP SSRF 10.0 ប្រឆាំង Data Theft & Memory Crash)
+- **Location:** `black_october_security_guard.py` (`BlackOctoberMasterGuard`, `PillowZeroUploadGuard`, `LiteLLMSupplyChainGuard`, `SSRFDataTheftGuard`, `MemoryCrashGovernor`), `requirements.txt` (`Pillow>=11.0.0,<=13.0.0`), `system_security_citadel.py` (Layer 6 Security Citadel), `bot_thread.py` (`handle_blocked_upload`), `web_gui_server.py` (`black_october_security_middleware`, `/api/security/black_october`), `audit_system.py` [CHECK 85]
+- **Objective:** Establish an airtight multi-pillar cybersecurity defense shielding the entire Python ecosystem against the critical late-2024 / Black October vulnerability wave, zero-day exploit agents, and enterprise supply-chain risks:
+  1. **Pillar 1: Pillow 13.0 Hardening & Zero-Upload Gatekeeper (របាំងបិទការ Upload រូបភាព និងឯកសារ ១០០% & ការពារ Decompression Bomb):**
+     - Completely prohibits user file and image uploads across all interfaces (`ALLOW_USER_UPLOADS = False`). Rejects any incoming file or media upload with `UploadForbiddenError` / `BLOCKED_UPLOAD_DISALLOWED`.
+     - Hardens the Pillow (PIL) runtime: Enforces `Image.MAX_IMAGE_PIXELS = 10_000_000` (10MP safety cap), treats `DecompressionBombWarning` as critical error, and eliminates buffer overflow risks (CVE-2023-4863, CVE-2024-28219) and DoS attacks.
+     - Pinned in `requirements.txt` to `Pillow>=11.0.0,<=13.0.0` (installed and verified at `13.0.0`).
+  2. **Pillar 2: LiteLLM Supply Chain & Docker Jailbreak Guard (របាំងការពារ Supply Chain PyPI & Docker Container Isolation):**
+     - Eliminates reliance on unvetted, vulnerable third-party LiteLLM proxy daemons or compromised PyPI packages. AI Inference is conducted directly via native, official SDKs (`google-generativeai` and `huggingface_hub`) over direct authenticated TLS connections.
+     - Audits `sys.modules` to reject typosquats and rogue packages (`litellm_proxy`, `litellm_admin`, `litellm_core`, `litellm_patch`).
+     - Docker Container Jailbreak Shield: Strictly blocks exposure of `/var/run/docker.sock` to the application space, preventing container breakout and host privilege escalation.
+  3. **Pillar 3: SAP Cloud SDK SSRF 10.0 & Cloud Metadata / Data Theft Shield (CVSS 10.0 SSRF & Secret Exfiltration Guard):**
+     - Neutralizes critical Server-Side Request Forgery (SSRF CVSS 10.0) vectors on all outbound network dispatches (`validate_outgoing_url_ssrf`).
+     - Strict Whitelist Schemes: Permits only `https://` and `wss://`. Strictly rejects `file://`, `gopher://`, `dict://`, `ftp://`, `ldap://`, `http://`, `php://`.
+     - Complete Subnet Blacklist: Prohibits requests to RFC 1918 private IPs (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Loopback (`127.0.0.0/8`), Link-Local & Cloud Metadata (`169.254.0.0/16`, specifically `169.254.169.254`), and IPv6 local subnets (`::1`, `fc00::/7`, `fe80::/10`).
+     - Hostname & Anti-DNS Rebinding Audit: Resolves DNS before request and blocks `metadata.google.internal`, `metadata.goog`, `169.254.169.254`, and `instance-data`.
+     - Data Theft Sentinel (`validate_outbound_data_theft`): Scans outbound request payloads and URLs to ensure zero leakage of `MASTER_KEY`, API keys, tokens, or environment credentials.
+  4. **Pillar 4: Memory Crash & DoS Protection (OOM Sentinel & Allocation Governor):**
+     - Payload Size Enforcement: Clamps incoming REST/JSON payload sizes to `MAX_REQUEST_PAYLOAD_BYTES = 1 * 1024 * 1024` (1MB max), with 0 bytes permitted for file uploads.
+     - Process RSS & System RAM Watchdog: Actively monitors memory via `psutil`. If process RSS exceeds 2.5 GB or system RAM exceeds 85%, automatically triggers aggressive garbage collection (`gc.collect()`), clears transient cache, and raises `MemoryExhaustionPrevented` to reject excessive allocations, permanently eliminating kernel OOM kills.
+
 ---
+
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:

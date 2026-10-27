@@ -28613,6 +28613,26 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("admin_guide", smart_bot_command))
         self.app.add_handler(CommandHandler("admin_commands", smart_bot_command))
 
+        async def handle_blocked_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Blocks user file/image/attachment uploads (Invariant 106 Pillow Zero-Upload Standard)."""
+            try:
+                file_name = "media_or_attachment"
+                if update.message and update.message.document:
+                    file_name = getattr(update.message.document, "file_name", "document")
+                from black_october_security_guard import black_october_guard
+                black_october_guard.pillow_guard.validate_upload_attempt(source="TELEGRAM_BOT", filename=file_name)
+                msg = (
+                    "⛔ **[SECURITY CITADEL - BLACK OCTOBER DEFENSE (INVARIANT 106)]**\n\n"
+                    "⚠️ **ការបញ្ចូលឯកសារ ឬរូបភាពត្រូវបានបិទទាំងស្រុង (File & Image Uploads are 100% Prohibited)!**\n"
+                    "• **មូលហេតុ:** ការពារប្រព័ន្ធពី Decompression Bombs, Pillow Buffer Overflows, RCE និង DoS Attacks។\n"
+                    "• **វិធានការ:** ប្រព័ន្ធទទួលតែ Text Commands ផ្លូវការប៉ុណ្ណោះ។ សូមប្រើប្រាស់ Menu ឬ Commands ជំនួសវិញ។"
+                )
+                if update.message:
+                    await update.message.reply_text(msg, parse_mode="Markdown")
+            except Exception as e_up:
+                logger.warning(f"Error handling blocked upload: {e_up}")
+
+        self.app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.VOICE | filters.AUDIO | filters.ATTACHMENT, handle_blocked_upload))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(admin_license_callback, pattern="^lic_"))

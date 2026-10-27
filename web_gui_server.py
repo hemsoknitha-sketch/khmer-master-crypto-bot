@@ -3495,13 +3495,42 @@ async def handle_script(request: web.Request) -> web.FileResponse:
     return resp
 
 
+@web.middleware
+async def black_october_security_middleware(request: web.Request, handler):
+    """
+    Institutional Black October Security Middleware (Invariant 106):
+    - Payload size limit (<1MB) to prevent Memory Crash & DoS
+    - Rejection of multipart/form-data uploads to prevent Pillow/File Upload RCE
+    """
+    cl = request.content_length
+    if cl is not None and cl > 1 * 1024 * 1024:
+        return web.json_response(
+            {"error": "Payload Too Large (>1MB). Protected by Invariant 106 Memory Governor."},
+            status=413
+        )
+
+    ctype = request.content_type or ""
+    if "multipart/form-data" in ctype.lower():
+        return web.json_response(
+            {"error": "File/Image uploads are strictly prohibited under Black October Zero-Upload standard."},
+            status=403
+        )
+
+    return await handler(request)
+
+async def handle_api_security_black_october(request: web.Request) -> web.Response:
+    from black_october_security_guard import black_october_guard
+    res = black_october_guard.audit_full_system()
+    return web.json_response(res)
+
+
 # ==============================================================================
 # SERVER LIFECYCLE CONTROLLER
 # ==============================================================================
 
 def create_web_gui_app() -> web.Application:
     """Creates and configures the aiohttp Application with CORS & Routes."""
-    app = web.Application()
+    app = web.Application(middlewares=[black_october_security_middleware])
 
     # Static UI routes
     app.router.add_get("/", handle_index)
@@ -3575,6 +3604,9 @@ def create_web_gui_app() -> web.Application:
 
     # Live Quantitative Performance & Scientific Edge Dashboard route
     app.router.add_get("/api/quant_dashboard", handle_api_quant_dashboard)
+
+    # Black October Institutional Security Citadel route (Invariant 106)
+    app.router.add_get("/api/security/black_october", handle_api_security_black_october)
 
     return app
 
