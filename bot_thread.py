@@ -28919,8 +28919,20 @@ class TelegramBotThread(BaseThread):
             'cron',
             hour=7,
             minute=0,
+            timezone="Asia/Phnom_Penh",
             args=[self.app, self.ai_engine],
             id='daily_market_brief'
+        )
+
+        # 🏛️ AQ84 INVARIANT 58 & 74: DAILY 07:00 AM ICT MACRO ECONOMIC BRIEFING
+        self.scheduler.add_job(
+            scheduler_tasks.daily_macro_economic_briefing_job,
+            'cron',
+            hour=7,
+            minute=0,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id='daily_macro_economic_briefing_job'
         )
 
         self.scheduler.add_job(

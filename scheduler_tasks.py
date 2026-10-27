@@ -8447,3 +8447,61 @@ async def autonomous_security_training_scheduler_job(app: Application = None):
     except Exception as e:
         logger.error(f"❌ [SCHEDULER ERROR] Autonomous Security Training failed: {e}", exc_info=True)
         return {}
+
+
+async def daily_macro_economic_briefing_job(app: Application):
+    """
+    🏛️ AQ84 INVARIANT 58 & 74: Institutional Daily 07:00 AM ICT Macro Economic Briefing.
+    Dispatches a comprehensive, multi-event aggregated macroeconomic briefing covering:
+    - Today's high-impact releases with ICT & UTC timestamps and consensus forecasts.
+    - Intermarket Tri-Market Pulse (DXY, US 10Y Real Yield, Fed Implied Rate Cut Odds, Net Liquidity).
+    - Weekly Institutional Macro Radar Grid (Durable Goods, GDP, PCE, Jobless Claims, FOMC...).
+    Directly to Super Admin (859271875) & active VIP subscribers in their preferred language.
+    """
+    try:
+        logger.info("🌅 [DAILY MACRO BRIEFING] Executing Daily 07:00 AM ICT Macro Briefing...")
+        import economic_calendar_guard as ecg
+        
+        recipients, _ = get_alert_target_recipients("daily_macro_briefing")
+        if not recipients:
+            recipients = db.get_vip_users_with_lang()
+        if not recipients:
+            recipients = [(ui_standards.SUPER_ADMIN_ID, 'khmer')]
+        elif not any(r[0] == ui_standards.SUPER_ADMIN_ID for r in recipients):
+            recipients.append((ui_standards.SUPER_ADMIN_ID, 'khmer'))
+
+        # Determine target languages
+        needed_langs = set()
+        for _, l in recipients:
+            code = str(l or 'km').lower().strip()
+            if code in ['en', 'english']:
+                needed_langs.add('en')
+            elif code in ['zh', 'chinese', 'cn']:
+                needed_langs.add('zh')
+            else:
+                needed_langs.add('km')
+
+        if not needed_langs:
+            needed_langs.add('km')
+
+        briefings = {}
+        for l_code in needed_langs:
+            try:
+                briefings[l_code] = ecg.generate_daily_macro_morning_briefing(lang=l_code)
+            except Exception as e_br:
+                logger.error(f"⚠️ [DAILY MACRO BRIEFING] Failed for lang '{l_code}': {e_br}")
+                briefings[l_code] = ecg.generate_daily_macro_morning_briefing(lang="km")
+
+        def get_macro_briefing_payload(lang):
+            code = str(lang or 'km').lower().strip()
+            if code in ['en', 'english']:
+                return briefings.get('en') or briefings.get('km', '')
+            elif code in ['zh', 'chinese', 'cn']:
+                return briefings.get('zh') or briefings.get('km', '')
+            return briefings.get('km') or briefings.get('en', '')
+
+        await parallel_broadcast(app, recipients, get_macro_briefing_payload, parse_mode="Markdown")
+        logger.info(f"✅ [DAILY MACRO BRIEFING] Dispatched 07:00 AM briefing to {len(recipients)} recipients.")
+    except Exception as e:
+        logger.error(f"❌ [SCHEDULER ERROR] Daily Macro Briefing failed: {e}", exc_info=True)
+

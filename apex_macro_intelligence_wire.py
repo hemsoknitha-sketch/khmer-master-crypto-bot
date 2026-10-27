@@ -404,6 +404,32 @@ class ApexMacroIntelligenceWire:
             clean_lang = "zh"
 
         # ----------------------------------------------------------------------
+        # 0. SUPER SMART MACRO EVENT & CALENDAR INTERCEPTOR (Zero Missed Catalysts)
+        # ----------------------------------------------------------------------
+        if clean_sym in ["CALENDAR", "CAL", "SCHEDULE", "AGENDA", "EVENTS"]:
+            calendar_report = ecg.generate_daily_macro_morning_briefing(lang=clean_lang)
+            return NewsReportResult(calendar_report, THEMATIC_COVERS["FED_WALLSTREET"])
+
+        if clean_sym in ["EVENT", "MACRO", "FED", "WARSH", "CPI", "NFP", "FOMC", "PCE", "GDP", "CLAIMS", "NEWS_EVENT"]:
+            bo_info = ecg.get_active_or_upcoming_economic_event(hours_ahead=24)
+            if bo_info.get("is_blackout"):
+                ev_dict = {
+                    "title": bo_info.get("event_name"),
+                    "combined_title": bo_info.get("event_name"),
+                    "events_list": bo_info.get("events_list", []),
+                    "currency": "USD",
+                    "time_utc": bo_info.get("event_time_utc", "")
+                }
+                if bo_info.get("phase") == "POST_EVENT":
+                    event_report = ecg.generate_post_event_outcome(ev_dict, lang=clean_lang)
+                else:
+                    event_report = ecg.generate_pre_event_assessment(ev_dict, lang=clean_lang)
+                return NewsReportResult(event_report, THEMATIC_COVERS["FED_WALLSTREET"])
+            else:
+                calendar_report = ecg.generate_daily_macro_morning_briefing(lang=clean_lang)
+                return NewsReportResult(calendar_report, THEMATIC_COVERS["FED_WALLSTREET"])
+
+        # ----------------------------------------------------------------------
         # 1. PILLAR 1: Nano-Trie <0.05ms Matching & Breaking Wire Ingestion
         # ----------------------------------------------------------------------
         import ai_news_engine
@@ -529,12 +555,14 @@ class ApexMacroIntelligenceWire:
 
                 lang_name = "Khmer" if clean_lang == "km" else ("Chinese" if clean_lang == "zh" else "English")
                 curr_time_str = time.strftime('%I:%M:%S %p ICT')
+                radar_grid_prompt = ecg.get_weekly_macro_radar_grid(lang=clean_lang, limit=5)
 
                 ai_prompt = (
                     f"You are the Executive Chief Editor and Quantitative Macro Strategist for Angkor Quant Intelligence.\n"
                     f"Synthesize the following live breaking news and TradFi macro indicators into an authoritative, institutional Wall Street wire dispatch in {lang_name}.\n\n"
                     f"TARGET ASSET: {clean_sym}\n\n"
                     f"LIVE BREAKING WIRE ITEMS:\n{news_context_str}\n\n"
+                    f"WEEKLY INSTITUTIONAL MACRO RADAR GRID:\n{radar_grid_prompt}\n\n"
                     f"REAL-TIME MACROECONOMIC DATA:\n"
                     f"- US Net Financial Liquidity: ${net_liq_trillions:.2f} Trillion (Weekly Flow: +${weekly_velocity:.1f}B/week, Regime: {liq_regime})\n"
                     f"- US Dollar Index (DXY): {dxy:.2f} ({dxy_chg:+.2f}%)\n"
@@ -548,7 +576,7 @@ class ApexMacroIntelligenceWire:
                     f"1. FIDUCIARY IP INTEGRITY: Under NO circumstances shall you leak internal code equations (do NOT write 'Fed Assets - TGA - RRP'), internal latency stats ('0.15ms'), Invariant IDs ('INVARIANT 58/74'), or raw ML variables ('Δp̂', 'Scalar'). Present pure, elegant, institutional journalism.\n"
                     f"2. HEADLINE TRANSLATION: Section 1 headlines MUST be in natural, high-impact {lang_name} (strictly use the provided translated headlines or polish them). Retain clickable markdown links with source attribution. Prepend a sentiment badge: 🟢 (bullish), 🔴 (bearish), or ⚪ (neutral). Under NO circumstances output English headlines in Section 1.\n"
                     f"3. EXECUTIVE EDITORIAL NARRATIVE (800 - 1,200 characters):\n"
-                    f"   - For Khmer: Strictly adhere to Chuon Nath dictionary standard and formal economic vocabulary. Begin Section 3 directly with the dateline city (e.g. 'ទីក្រុងញូវយ៉ក ៖'). Weave the breaking catalyst into the market narrative.\n"
+                    f"   - For Khmer: Strictly adhere to Chuon Nath dictionary standard and formal economic vocabulary. Begin Section 4 directly with the dateline city (e.g. 'ទីក្រុងញូវយ៉ក ៖'). Weave the breaking catalyst into the market narrative.\n"
                     f"   - Paragraph 1: Catalyst & breaking news analysis for {clean_sym}.\n"
                     f"   - Paragraph 2: TradFi macro transmission (Wall Street, Federal Reserve, DXY, and 10Y Yield impact on capital liquidity).\n"
                     f"   - Paragraph 3: Institutional order flow, whale accumulation, spot ETF depth, and cold storage reserves.\n"
@@ -561,20 +589,23 @@ class ApexMacroIntelligenceWire:
                     f"🔥 **១️⃣ ព័ត៌មានទាន់ហេតុការណ៍ & កាតាលីករស្ថាប័ន (TOP BREAKING WIRE) ៖**\n"
                     f"1. 🟢 [ Translated Headline 1 in {lang_name} ](Link) — Source\n"
                     f"2. ⚪ [ Translated Headline 2 in {lang_name} ](Link) — Source\n\n"
-                    f"🌊 **២️⃣ សូចនាករម៉ាក្រូសេដ្ឋកិច្ចគន្លឹះ (KEY MACRO INDICATORS) ៖**\n"
+                    f"🏛️ **២️⃣ រ៉ាដាប្រតិទិនសេដ្ឋកិច្ចម៉ាក្រូប្រចាំសប្តាហ៍ (WEEKLY INSTITUTIONAL MACRO RADAR GRID) ៖**\n"
+                    f"{radar_grid_prompt}\n"
+                    f"• **ប្រតិទិនម៉ាក្រូបន្ទាប់ ៖** `[Calendar Status]`\n\n"
+                    f"🌊 **៣️⃣ សូចនាករម៉ាក្រូសេដ្ឋកិច្ចគន្លឹះ (KEY MACRO INDICATORS) ៖**\n"
                     f"• **សន្ទស្សន៍ប្រាក់ដុល្លារ (DXY) ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500 ៖** `${sp500:,.2f}`\n"
                     f"• **ទិន្នផលសញ្ញាប័ណ្ណអាមេរិក 10 ឆ្នាំ ៖** `{yield_10y:.2f}%` | **អត្រាការប្រាក់ពិត ៖** `{real_yield_10y:.2f}%`\n"
                     f"• **សាច់ប្រាក់សុទ្ធក្នុងប្រព័ន្ធហិរញ្ញវត្ថុអាមេរិក ៖** `${net_liq_trillions:.2f} Trillion` (ល្បឿនពង្រីក: `+{weekly_velocity:.1f}B/សប្តាហ៍`)\n"
-                    f"• **ការរំពឹងទុកអត្រាការប្រាក់ Fed ៖** `{fed_rate_cut_prob:.1f}%` | **ស្ថានភាពសេដ្ឋកិច្ច ៖** `[Calendar Status]`\n\n"
-                    f"📰 **៣️⃣ អត្ថបទវិភាគស៊ីជម្រៅ (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
+                    f"• **ការរំពឹងទុកអត្រាការប្រាក់ Fed ៖** `{fed_rate_cut_prob:.1f}%`\n\n"
+                    f"📰 **៤️⃣ អត្ថបទវិភាគស៊ីជម្រៅ (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
                     f"[Continuous master narrative body: 800 - 1,200 characters]\n\n"
-                    f"🏛️ **៤️⃣ សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL QUANTITATIVE VERDICT) ៖**\n"
+                    f"🏛️ **៥️⃣ សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL QUANTITATIVE VERDICT) ៖**\n"
                     f"• **ស្ថានភាពទីផ្សារ ៖** `[Regime]`\n"
                     f"• **កម្រិតទំនុកចិត្តលើទិសដៅ ៖** `[Confidence %]`\n"
                     f"• **អនុសាសន៍យុទ្ធសាស្ត្រ ៖** [Strategic Recommendation]\n\n"
                     f"─────────────\n"
                     f"📋 **បញ្ជាស្កេនរហ័ស 1-TAP PRESETS ៖**\n"
-                    f"`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                    f"`` `/news SCAN` `` | `` `/news CALENDAR` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
                 )
 
                 executor = ThreadPoolExecutor(max_workers=1)
@@ -759,6 +790,9 @@ class ApexMacroIntelligenceWire:
             except Exception:
                 pass
 
+        # Weekly Institutional Macro Radar Grid (AQ84 Invariant 58 & 74)
+        radar_grid = ecg.get_weekly_macro_radar_grid(lang=lang, limit=5)
+
         # ----------------------------------------------------------------------
         # KHMER VERSION (km)
         # ----------------------------------------------------------------------
@@ -777,18 +811,19 @@ class ApexMacroIntelligenceWire:
 
             if is_live_conf:
                 conf_section_km = (
-                    "🎙️ **២️⃣ សន្និសីទសារព័ត៌មានផ្ទាល់ (LIVE PRESS CONFERENCE WIRE) ៖**\n"
+                    "🎙️ **២️⃣ សន្និសីទសារព័ត៌មានផ្ទាល់ & រ៉ាដាប្រតិទិនសេដ្ឋកិច្ចម៉ាក្រូ ៖**\n"
                     f"• **ព្រឹត្តិការណ៍ & វាគ្មិន ៖** `{conf_event}` (`{conf_speaker}`)\n"
                     f"• **ស្ថានភាព ៖** `🎙️ កំពុងថ្លែងសុន្ទរកថាផ្ទាល់ ({int(mins_active)} នាទី)` | **សន្ទស្សន៍សម្លេង (Tilt) ៖** `{conf_tilt:+.2f}`\n"
                     f"• **សម្រង់ពាក្យថ្លែងផ្ទាល់ (<500ms ASR) ៖**\n"
                     f"> _«{conf_snippet or 'កំពុងទាញយកទិន្នន័យសំឡេង Streaming...'}»_\n"
                     "• **ចំណាត់ការប្រព័ន្ធ ៖** `🛑 FORCED WAIT (ផ្អាក Market Order | Stealth Radar ចាំស្ទាក់ក្នុង RAM)`\n\n"
+                    f"📅 **រ៉ាដាប្រតិទិនសេដ្ឋកិច្ចប្រចាំសប្តាហ៍ ៖**\n{radar_grid}\n\n"
                 )
             else:
                 conf_section_km = (
-                    "🎙️ **២️⃣ ប្រព័ន្ធស្ទាក់ចាប់សន្និសីទផ្ទាល់ (LIVE PRESS CONFERENCE RADAR) ៖**\n"
-                    "• **ស្ថាប័នតាមដាន ២៤/៧ ៖** `Federal Reserve (Jerome Powell) | ECB (Christine Lagarde) | White House`\n"
-                    "• **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 Standby ស្ទាក់ចាប់ Streaming Audio (<500ms) ក្នុង RAM | ការពារ Spread Shock`\n"
+                    "🏛️ **២️⃣ រ៉ាដាប្រតិទិនសេដ្ឋកិច្ចម៉ាក្រូប្រចាំសប្តាហ៍ (WEEKLY INSTITUTIONAL MACRO RADAR GRID) ៖**\n"
+                    f"{radar_grid}\n"
+                    "• **ស្ថានភាពស្ទាក់ចាប់ ៖** `🟢 Standby ស្ទាក់ចាប់ ២៤/៧ ក្នុង RAM | ការពារ Spread Shock`\n"
                     f"• **ប្រតិទិនម៉ាក្រូបន្ទាប់ ៖** `{countdown_km}`\n\n"
                 )
 
@@ -829,7 +864,7 @@ class ApexMacroIntelligenceWire:
 
                 "─────────────\n"
                 "📋 **បញ្ជាស្កេនរហ័ស 1-TAP PRESETS ៖**\n"
-                f"`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                f"`` `/news SCAN` `` | `` `/news CALENDAR` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
             )
 
 
@@ -852,18 +887,19 @@ class ApexMacroIntelligenceWire:
 
             if is_live_conf:
                 conf_section_zh = (
-                    "🎙️ **2️⃣ 实时新闻发布会与高官讲话 (LIVE PRESS CONFERENCE) ៖**\n"
+                    "🎙️ **2️⃣ 实时新闻发布会与宏观日历雷达 ៖**\n"
                     f"• **事件与发言人 ៖** `{conf_event}` (`{conf_speaker}`)\n"
                     f"• **实时状态 ៖** `🎙️ 正在直播发言中 ({int(mins_active)} 分钟)` | **鹰鸽政策倾斜 ៖** `{conf_tilt:+.2f}`\n"
                     f"• **最新现场原话引用 (<500ms) ៖**\n"
                     f"> _\"{conf_snippet or '正在接收现场音频流...'}\"_\n"
                     "• **量化防御执行 ៖** `🛑 强制冻结市价开仓 | 内存双向隐形雷达待命`\n\n"
+                    f"📅 **本周机构宏观日历雷达 ៖**\n{radar_grid}\n\n"
                 )
             else:
                 conf_section_zh = (
-                    "🎙️ **2️⃣ 全球新闻发布会实时雷达 ៖**\n"
-                    "• **24/7 监控机构 ៖** `美联储 (鲍威尔) | 欧洲央行 (拉加德) | 白宫经济团队`\n"
-                    "• **系统防护状态 ៖** `🟢 超低延迟语音流实时解析待命中 | 严防点差骤扩与洗盘陷阱`\n"
+                    "🏛️ **2️⃣ 本周机构宏观经济日历雷达 (WEEKLY MACRO RADAR GRID) ៖**\n"
+                    f"{radar_grid}\n"
+                    "• **系统防护状态 ៖** `🟢 内存24/7实时监控待命中 | 严防点差骤扩与洗盘陷阱`\n"
                     f"• **下一红标宏观事件 ៖** `{countdown_zh}`\n\n"
                 )
 
@@ -878,7 +914,7 @@ class ApexMacroIntelligenceWire:
 
                 f"{conf_section_zh}"
 
-                "🌊 **2️⃣ 跨市场宏观核心矩阵 (KEY MACRO INDICATORS) ៖**\n"
+                "🌊 **3️⃣ 跨市场宏观核心矩阵 (KEY MACRO INDICATORS) ៖**\n"
                 f"• **美元指数 DXY ៖** `{dxy:.2f}` (`{dxy_chg:+.2f}%`) | **标普500 ៖** `${sp500:,.2f}`\n"
                 f"• **美债10年期收益率 ៖** `{yield_10y:.2f}%` | **10年期实际收益率 ៖** `{real_yield_10y:.2f}%`\n"
                 f"• **美国金融净流动性 ៖** `${net_liq_trillions:.2f} 万亿美元` (周度扩张: `+{weekly_velocity:.1f}B/周`)\n"
@@ -886,11 +922,11 @@ class ApexMacroIntelligenceWire:
                 f"• **红标宏观事件 (Economic Calendar) ៖** `{countdown_zh}`\n"
                 f"• **券商点差健康度 ៖** `{spread_status}`\n\n"
 
-                "📰 **3️⃣ 深度量化研报 (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
+                "📰 **4️⃣ 深度量化研报 (EXECUTIVE EDITORIAL NARRATIVE) ៖**\n"
                 f"纽约讯 — 全球宏观跨资产资金流向显示，{top_catalyst_zh}主流数字资产与核心金融标的呈现持续受控吸筹态势。随着美联储货币政策预期逐步转向中性平稳，华尔街一级流动性提供商在关键买盘支撑位持续承接抛压，为核心资产构筑了坚实的机构底部防线。链上储备金持续处于低位，显示巨鲸正稳步向冷钱包托管归集。\n\n"
                 f"在传统金融 (TradFi) 与华尔街宏观传导层面，美元指数 (DXY: {dxy:.2f}) 的企稳与美债10年期收益率 ({yield_10y:.2f}%) 的健康震荡，为风险资产提供了健康的流动性环境。标普500指数 (${sp500:,.2f}) 的韧性表现强化了全球风险偏好。同时，SEC 与国际清算银行 (BIS) 稳步推进托管穿透制度，为机构资本配置铺平了法制化道路。\n\n"
 
-                "🏛️ **4️⃣ 机构量化最终裁决 (INSTITUTIONAL QUANTITATIVE VERDICT) ៖**\n"
+                "🏛️ **5️⃣ 机构量化最终裁决 (INSTITUTIONAL QUANTITATIVE VERDICT) ៖**\n"
                 f"• **目标资产 ៖** `{symbol}`\n"
                 f"• **宏观格局 ៖** `🟢 {liq_regime}`\n"
                 f"• **量化胜率期望 ៖** `{confidence_pct:.1f}%`\n"
@@ -898,7 +934,7 @@ class ApexMacroIntelligenceWire:
 
                 "─────────────\n"
                 "📋 **一键快捷执行 ៖**\n"
-                f"`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                f"`` `/news SCAN` `` | `` `/news CALENDAR` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
             )
 
         # ----------------------------------------------------------------------
@@ -913,18 +949,19 @@ class ApexMacroIntelligenceWire:
 
             if is_live_conf:
                 conf_section_en = (
-                    "🎙️ **2️⃣ LIVE PRESS CONFERENCE & SPEECH WIRE ៖**\n"
+                    "🎙️ **2️⃣ LIVE PRESS CONFERENCE & WEEKLY MACRO RADAR ៖**\n"
                     f"• **Event & Speaker ៖** `{conf_event}` (`{conf_speaker}`)\n"
                     f"• **Status ៖** `🎙️ In-Speech Active ({int(mins_active)}m)` | **Policy Tilt Scalar ៖** `{conf_tilt:+.2f}`\n"
                     f"• **Real-Time Transcript Quote (<500ms) ៖**\n"
                     f"> _\"{conf_snippet or 'Ingesting streaming audio chunks...'}\"_\n"
                     "• **Execution Action ៖** `🛑 FORCED WAIT (Market Orders Frozen | RAM Stealth Radar Armed)`\n\n"
+                    f"📅 **Weekly Macro Economic Radar ៖**\n{radar_grid}\n\n"
                 )
             else:
                 conf_section_en = (
-                    "🎙️ **2️⃣ LIVE PRESS CONFERENCE RADAR ៖**\n"
-                    "• **Monitored Institutions ៖** `Federal Reserve (Jerome Powell) | ECB (Christine Lagarde) | White House`\n"
-                    "• **Quant System Status ៖** `🟢 24/7 Low-Latency Audio ASR (<500ms) in RAM | Anti-Spread Protection`\n"
+                    "🏛️ **2️⃣ WEEKLY INSTITUTIONAL MACRO RADAR GRID ៖**\n"
+                    f"{radar_grid}\n"
+                    "• **Quant System Status ៖** `🟢 24/7 Low-Latency RAM Radar Active | Anti-Spread Protection`\n"
                     f"• **Upcoming Macro Event ៖** `{countdown_en}`\n\n"
                 )
 
@@ -959,7 +996,7 @@ class ApexMacroIntelligenceWire:
 
                 "─────────────\n"
                 "📋 **1-TAP QUICK EXECUTIONS ៖**\n"
-                f"`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
+                f"`` `/news SCAN` `` | `` `/news CALENDAR` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
             )
 
 

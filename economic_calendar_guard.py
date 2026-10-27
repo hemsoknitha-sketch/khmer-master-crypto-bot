@@ -28,13 +28,19 @@ _LAST_MACRO_ALERT_REPORT: Dict[str, Any] = {}
 _TRI_MARKET_CACHE: Dict[str, Any] = {}
 _TRI_MARKET_CACHE_TTL = 30.0  # 30-second TTL cache for sub-millisecond execution
 
-# High-impact USD keywords
+# High-impact USD & Global Macro keywords (Institutional Macro Expansion)
 RED_FOLDER_KEYWORDS = [
     "CPI", "CONSUMER PRICE", "NON-FARM", "NFP", "FOMC", "FEDERAL FUNDS",
     "INTEREST RATE", "PCE", "UNEMPLOYMENT RATE", "GDP", "POWELL",
     "JACKSON HOLE", "CORE INFLATION", "WARSH", "FED SPEAKS", "CHAIRMAN",
     "RATE DECISION", "POLICY STATEMENT", "TESTIFIES", "PRESS CONFERENCE",
-    "SPEECH", "TESTIMONY", "ECB", "BOJ", "TREASURY", "YELLEN"
+    "SPEECH", "TESTIMONY", "ECB", "BOJ", "TREASURY", "YELLEN",
+    # 🏛️ Institutional Macro Catalysts (AQ84 Invariant 58/74)
+    "DURABLE GOODS", "NEW HOME SALES", "HOME SALES", "JOBLESS CLAIMS",
+    "INITIAL CLAIMS", "UNEMPLOYMENT CLAIMS", "CONTINUING CLAIMS",
+    "PERSONAL INCOME", "PERSONAL OUTLAYS", "OUTLAYS", "CONSUMER CONFIDENCE",
+    "RETAIL SALES", "PPI", "PRODUCER PRICE", "ISM MANUFACTURING", "ISM SERVICES",
+    "JOLTS", "EMPLOYMENT COST"
 ]
 
 PRE_EVENT_MINUTES = 30.0
@@ -321,8 +327,8 @@ def format_event_ict_datetime(dt_utc: datetime.datetime) -> Tuple[str, str, str]
 def check_red_folder_blackout() -> Dict[str, Any]:
     """
     Evaluates current time against high-impact USD & Global Macro economic events.
-    Supports 3 distinct operational phases:
-    1. PRE_EVENT: 30 minutes before release countdown.
+    Supports 3 distinct operational phases with Institutional Multi-Event Aggregation (AQ84 Invariant 58/74):
+    1. PRE_EVENT: 30 minutes before release countdown (Aggregates all concurrent releases).
     2. PRESS_CONFERENCE_LIVE: Active speech / press conference underway (up to 45m).
     3. POST_EVENT: 15 minutes post-release spread cooling and reaction window.
     """
@@ -336,6 +342,7 @@ def check_red_folder_blackout() -> Dict[str, Any]:
                 "is_blackout": True,
                 "phase": "FAIL_SAFE_ECONOMIC_STANDBY",
                 "event_name": "US Macro Economic Window (Feed Offline Guard)",
+                "events_list": ["US Macro Economic Window (Feed Offline Guard)"],
                 "minutes_remaining": 30.0,
                 "datetime_utc": now_utc,
                 "event_time_utc": now_utc.strftime("%H:%M UTC"),
@@ -345,11 +352,18 @@ def check_red_folder_blackout() -> Dict[str, Any]:
             "is_blackout": False,
             "phase": "NORMAL",
             "event_name": "",
+            "events_list": [],
             "minutes_remaining": 0.0,
             "reason": "Normal trading regime (No Red Folder economic events active)"
         }
 
     now_ts = now_utc.timestamp()
+
+    # Multi-Event Collision Classifier (Aggregates concurrent events within same release window)
+    pre_event_cluster: List[Dict[str, Any]] = []
+    live_event_cluster: List[Dict[str, Any]] = []
+    post_event_cluster: List[Dict[str, Any]] = []
+
     for ev in events:
         ev_ts = ev["timestamp"]
         diff_sec = ev_ts - now_ts
@@ -361,57 +375,91 @@ def check_red_folder_blackout() -> Dict[str, Any]:
 
         # Phase 1: Pre-event blackout (30 mins before)
         if 0.0 <= diff_min <= PRE_EVENT_MINUTES:
-            return {
-                "is_blackout": True,
-                "phase": "PRE_EVENT",
-                "event_name": ev["title"],
-                "minutes_remaining": round(diff_min, 1),
-                "datetime_utc": ev["datetime_utc"],
-                "event_time_utc": ev["datetime_utc"].strftime("%H:%M UTC"),
-                "reason": f"Red Folder Event '{ev['title']}' scheduled in {int(diff_min)}m"
-            }
+            pre_event_cluster.append(ev)
 
         # Phase 2: Live Press Conference / Speech in progress (first 45 mins)
         if is_speech_or_conf and -45.0 <= diff_min < 0.0:
-            since_min = abs(diff_min)
-            return {
-                "is_blackout": True,
-                "phase": "PRESS_CONFERENCE_LIVE",
-                "event_name": ev["title"],
-                "minutes_since": round(since_min, 1),
-                "datetime_utc": ev["datetime_utc"],
-                "event_time_utc": ev["datetime_utc"].strftime("%H:%M UTC"),
-                "reason": f"Live Press Conference '{ev['title']}' in progress ({int(since_min)}m elapsed)"
-            }
+            live_event_cluster.append(ev)
 
         # Phase 3: Post-event blackout (15 mins after for data, 45-60m for speeches)
         post_window = 60.0 if is_speech_or_conf else POST_EVENT_MINUTES
         if -post_window <= diff_min < 0.0:
-            since_min = abs(diff_min)
-            return {
-                "is_blackout": True,
-                "phase": "POST_EVENT",
-                "event_name": ev["title"],
-                "minutes_since": round(since_min, 1),
-                "datetime_utc": ev["datetime_utc"],
-                "event_time_utc": ev["datetime_utc"].strftime("%H:%M UTC"),
-                "reason": f"Red Folder Event '{ev['title']}' released {int(since_min)}m ago (Cooling spread)"
-            }
+            post_event_cluster.append(ev)
+
+    def _format_cluster(cluster: List[Dict[str, Any]]) -> Tuple[str, List[str], datetime.datetime, float]:
+        cluster.sort(key=lambda x: x["timestamp"])
+        target_ev = cluster[0]
+        # Aggregate titles of events within 15 minutes of target_ev
+        focal_events = [e for e in cluster if abs(e["timestamp"] - target_ev["timestamp"]) <= 900.0]
+        titles = []
+        for e in focal_events:
+            t = e["title"].strip()
+            if t not in titles:
+                titles.append(t)
+        combined_title = " + ".join(titles) if len(titles) <= 2 else f"{titles[0]} + {len(titles)-1} other catalysts"
+        return combined_title, titles, target_ev["datetime_utc"], target_ev["timestamp"]
+
+    # Evaluate Phase 2 first (Live speeches are active right now)
+    if live_event_cluster:
+        c_title, c_list, dt_utc, ev_ts = _format_cluster(live_event_cluster)
+        since_min = round(abs(ev_ts - now_ts) / 60.0, 1)
+        return {
+            "is_blackout": True,
+            "phase": "PRESS_CONFERENCE_LIVE",
+            "event_name": c_title,
+            "events_list": c_list,
+            "minutes_since": since_min,
+            "datetime_utc": dt_utc,
+            "event_time_utc": dt_utc.strftime("%H:%M UTC"),
+            "reason": f"Live Press Conference '{c_title}' in progress ({int(since_min)}m elapsed)"
+        }
+
+    # Evaluate Phase 1 next (Upcoming releases in 0-30m)
+    if pre_event_cluster:
+        c_title, c_list, dt_utc, ev_ts = _format_cluster(pre_event_cluster)
+        diff_min = round((ev_ts - now_ts) / 60.0, 1)
+        return {
+            "is_blackout": True,
+            "phase": "PRE_EVENT",
+            "event_name": c_title,
+            "events_list": c_list,
+            "minutes_remaining": diff_min,
+            "datetime_utc": dt_utc,
+            "event_time_utc": dt_utc.strftime("%H:%M UTC"),
+            "reason": f"Red Folder Event '{c_title}' scheduled in {int(diff_min)}m"
+        }
+
+    # Evaluate Phase 3 (Recent releases in 0-15m cooling)
+    if post_event_cluster:
+        post_event_cluster.sort(key=lambda x: x["timestamp"], reverse=True)
+        c_title, c_list, dt_utc, ev_ts = _format_cluster(post_event_cluster)
+        since_min = round(abs(now_ts - ev_ts) / 60.0, 1)
+        return {
+            "is_blackout": True,
+            "phase": "POST_EVENT",
+            "event_name": c_title,
+            "events_list": c_list,
+            "minutes_since": since_min,
+            "datetime_utc": dt_utc,
+            "event_time_utc": dt_utc.strftime("%H:%M UTC"),
+            "reason": f"Red Folder Event '{c_title}' released {int(since_min)}m ago (Cooling spread)"
+        }
 
     return {
         "is_blackout": False,
         "phase": "NORMAL",
         "event_name": "",
+        "events_list": [],
         "minutes_remaining": 0.0,
         "reason": "Normal trading regime (No Red Folder economic events active)"
     }
 
 
-def get_active_or_upcoming_economic_event() -> Dict[str, Any]:
+def get_active_or_upcoming_economic_event(hours_ahead: float = 48.0) -> Dict[str, Any]:
     """
     Intelligently discovers the most relevant Red Folder economic event relative to right now:
-    1. Active Blackout (PRE_EVENT or POST_EVENT) if currently within -30m to +15m window.
-    2. Next Upcoming Scheduled Event if within the next 48 hours.
+    1. Active Blackout (PRE_EVENT, PRESS_CONFERENCE_LIVE, POST_EVENT) with Multi-Event Aggregation.
+    2. Next Upcoming Scheduled Event if within the next hours_ahead (Clusters concurrent releases).
     3. Most Recent Completed Event (e.g. Fed Chairman Speech released 1-12 hours ago).
     Permanently eliminates selection of stale events from days earlier in the week!
     """
@@ -428,6 +476,7 @@ def get_active_or_upcoming_economic_event() -> Dict[str, Any]:
             "is_blackout": False,
             "phase": "NORMAL",
             "event_name": "Federal Reserve Strategic Monetary Assessment",
+            "events_list": ["Federal Reserve Strategic Monetary Assessment"],
             "minutes_remaining": 0.0,
             "datetime_utc": now_utc,
             "event_time_utc": now_utc.strftime("%H:%M UTC")
@@ -436,14 +485,24 @@ def get_active_or_upcoming_economic_event() -> Dict[str, Any]:
     upcoming = sorted([e for e in events if e["timestamp"] >= now_ts], key=lambda x: x["timestamp"])
     past = sorted([e for e in events if e["timestamp"] < now_ts], key=lambda x: x["timestamp"], reverse=True)
 
-    # If there is an upcoming event in the next 48 hours
-    if upcoming and (upcoming[0]["timestamp"] - now_ts) <= 172800.0:
-        ev = upcoming[0]
+    # If there is an upcoming event in the next hours_ahead (Aggregates concurrent events within 15 mins)
+    max_ahead_sec = max(3600.0, float(hours_ahead) * 3600.0)
+    if upcoming and (upcoming[0]["timestamp"] - now_ts) <= max_ahead_sec:
+        target_ts = upcoming[0]["timestamp"]
+        cluster = [e for e in upcoming if abs(e["timestamp"] - target_ts) <= 900.0]
+        titles = []
+        for e in cluster:
+            t = e["title"].strip()
+            if t not in titles:
+                titles.append(t)
+        combined_title = " + ".join(titles) if len(titles) <= 2 else f"{titles[0]} + {len(titles)-1} other catalysts"
+        ev = cluster[0]
         diff_min = (ev["timestamp"] - now_ts) / 60.0
         return {
             "is_blackout": False,
             "phase": "UPCOMING",
-            "event_name": ev["title"],
+            "event_name": combined_title,
+            "events_list": titles,
             "minutes_remaining": round(diff_min, 1),
             "datetime_utc": ev["datetime_utc"],
             "event_time_utc": ev["datetime_utc"].strftime("%H:%M UTC")
@@ -451,12 +510,21 @@ def get_active_or_upcoming_economic_event() -> Dict[str, Any]:
 
     # If there is a recently completed event within the last 24 hours
     if past and (now_ts - past[0]["timestamp"]) <= 86400.0:
-        ev = past[0]
+        target_ts = past[0]["timestamp"]
+        cluster = [e for e in past if abs(e["timestamp"] - target_ts) <= 900.0]
+        titles = []
+        for e in cluster:
+            t = e["title"].strip()
+            if t not in titles:
+                titles.append(t)
+        combined_title = " + ".join(titles) if len(titles) <= 2 else f"{titles[0]} + {len(titles)-1} other catalysts"
+        ev = cluster[0]
         since_min = (now_ts - ev["timestamp"]) / 60.0
         return {
             "is_blackout": False,
             "phase": "RECENT_OUTCOME",
-            "event_name": ev["title"],
+            "event_name": combined_title,
+            "events_list": titles,
             "minutes_since": round(since_min, 1),
             "datetime_utc": ev["datetime_utc"],
             "event_time_utc": ev["datetime_utc"].strftime("%H:%M UTC")
@@ -464,12 +532,17 @@ def get_active_or_upcoming_economic_event() -> Dict[str, Any]:
 
     # Fallback to nearest upcoming event even if further away
     if upcoming:
-        ev = upcoming[0]
+        target_ts = upcoming[0]["timestamp"]
+        cluster = [e for e in upcoming if abs(e["timestamp"] - target_ts) <= 900.0]
+        titles = [e["title"].strip() for e in cluster]
+        combined_title = " + ".join(titles) if len(titles) <= 2 else f"{titles[0]} + {len(titles)-1} other catalysts"
+        ev = cluster[0]
         diff_min = (ev["timestamp"] - now_ts) / 60.0
         return {
             "is_blackout": False,
             "phase": "UPCOMING",
-            "event_name": ev["title"],
+            "event_name": combined_title,
+            "events_list": titles,
             "minutes_remaining": round(diff_min, 1),
             "datetime_utc": ev["datetime_utc"],
             "event_time_utc": ev["datetime_utc"].strftime("%H:%M UTC")
@@ -648,14 +721,216 @@ def fetch_tri_market_macro_pulse(force_refresh: bool = False) -> Dict[str, Any]:
     return result
 
 
-def generate_pre_event_assessment(blackout_info: Dict[str, Any]) -> str:
+# ==============================================================================
+# 🏛️ INSTITUTIONAL MACRO RADAR GRID & BILINGUAL TRANSLATION (AQ84 INVARIANT 58/74)
+# ==============================================================================
+MACRO_CATALYST_TRANSLATIONS = {
+    "DURABLE GOODS": ("ការបញ្ជាទិញទំនិញប្រើប្រាស់បានយូរ (Durable Goods Orders)", "US Durable Goods Orders", "美国耐用品订单"),
+    "NEW HOME SALES": ("ការលក់ផ្ទះថ្មីសហរដ្ឋអាមេរិក (New Home Sales)", "US New Home Sales", "美国新屋销售"),
+    "CONSUMER CONFIDENCE": ("ទំនុកចិត្តអ្នកប្រើប្រាស់អាមេរិក (Consumer Confidence)", "US Consumer Confidence", "美国咨商会消费者信心指数"),
+    "GROSS DOMESTIC PRODUCT": ("កំណើនសេដ្ឋកិច្ចជាតិអាមេរិក (Real GDP Growth)", "US Gross Domestic Product (GDP)", "美国实际GDP年化季率"),
+    "GDP": ("កំណើនសេដ្ឋកិច្ចជាតិអាមេរិក (US Real GDP)", "US Real GDP Growth", "美国实际GDP"),
+    "INITIAL JOBLESS CLAIMS": ("ចំនួនពាក្យសុំប្រាក់ឧបត្ថម្ភអ្នកគ្មានការងារធ្វើ (Initial Jobless Claims)", "US Initial Jobless Claims", "美国当周初请失业金人数"),
+    "UNEMPLOYMENT CLAIMS": ("ចំនួនពាក្យសុំប្រាក់ឧបត្ថម្ភអ្នកគ្មានការងារធ្វើ (Jobless Claims)", "US Jobless Claims", "美国当周初请失业金人数"),
+    "PERSONAL INCOME": ("ប្រាក់ចំណូល និងការចំណាយផ្ទាល់ខ្លួន (Personal Income & Outlays)", "US Personal Income & Outlays", "美国个人收入与个人消费支出"),
+    "PCE": ("អតិផរណាដែល Fed ស្រឡាញ់បំផុត (Core PCE Inflation)", "US Core PCE Price Index", "美国核心PCE物价指数"),
+    "FOMC": ("អត្រាការប្រាក់ Fed & សន្និសីទ Powell (FOMC Rate Decision)", "FOMC Rate Decision & Statement", "美联储利率决议与政策声明"),
+    "FEDERAL FUNDS": ("អត្រាការប្រាក់គោល Fed (Federal Funds Rate)", "Federal Funds Rate Decision", "美联储联邦基金利率决议"),
+    "CPI": ("អតិផរណាទំនិញប្រើប្រាស់ (Consumer Price Index)", "US Consumer Price Index (CPI)", "美国CPI消费者物价指数"),
+    "NON-FARM": ("ទីផ្សារការងារក្រៅកសិកម្មអាមេរិក (Non-Farm Payrolls)", "US Non-Farm Payrolls (NFP)", "美国非农就业人数 (NFP)"),
+    "NFP": ("ទីផ្សារការងារក្រៅកសិកម្ម (NFP)", "US Non-Farm Payrolls", "美国非农就业数据"),
+    "ISM MANUFACTURING": ("សន្ទស្សន៍ផលិតកម្មអាមេរិក (ISM Manufacturing PMI)", "US ISM Manufacturing PMI", "美国ISM制造业PMI"),
+    "ISM SERVICES": ("សន្ទស្សន៍វិស័យសេវាកម្មអាមេរិក (ISM Services PMI)", "US ISM Services PMI", "美国ISM非制造业服务业PMI"),
+    "RETAIL SALES": ("ទិន្នន័យការលក់រាយអាមេរិក (US Retail Sales)", "US Retail Sales", "美国零售销售数据"),
+    "JOLTS": ("ឱកាសការងារទំនេរអាមេរិក (JOLTS Job Openings)", "US JOLTS Job Openings", "美国JOLTs职位空缺"),
+    "EMPLOYMENT COST": ("សន្ទស្សន៍ថ្លៃដើមការងារអាមេរិក (Employment Cost Index)", "US Employment Cost Index", "美国劳动力成本指数"),
+    "BANK OF JAPAN": ("អត្រាការប្រាក់ធនាគារកណ្តាលជប៉ុន (BOJ Rate Decision)", "Bank of Japan Rate Decision", "日本央行基准利率决议"),
+    "ECB": ("អត្រាការប្រាក់ធនាគារកណ្តាលអឺរ៉ុប (ECB Rate Decision)", "ECB Interest Rate Decision", "欧洲央行利率决议"),
+    "BANK OF CANADA": ("អត្រាការប្រាក់ធនាគារកណ្តាលកាណាដា (BOC Rate Decision)", "Bank of Canada Rate Decision", "加拿大央行利率决议"),
+    "RBA": ("អត្រាការប្រាក់ធនាគារកណ្តាលអូស្ត្រាលី (RBA Rate Decision)", "RBA Rate Decision", "澳洲联储利率决议")
+}
+
+
+def translate_macro_event_title(title: str, lang: str = "km") -> str:
+    """Translates a macro economic event title into formal Khmer, English, or Chinese."""
+    u_title = str(title or "").upper()
+    for kw, (km_name, en_name, zh_name) in MACRO_CATALYST_TRANSLATIONS.items():
+        if kw in u_title:
+            if lang in ["km", "khmer"]: return km_name
+            elif lang in ["zh", "chinese"]: return zh_name
+            else: return en_name
+    return title
+
+
+def get_weekly_macro_radar_grid(lang: str = "km", limit: int = 8) -> str:
+    """
+    Returns a structured, institutional Weekly Macro Economic Radar Grid in target language (KM/EN/ZH).
+    Displays the week's high-impact and medium-impact economic catalysts:
+    (Durable Goods Orders, New Home Sales, GDP, PCE Inflation, Personal Income & Outlays, Jobless Claims, FOMC, etc.)
+    with exact Cambodian ICT (UTC+7) & UTC timestamps, impact ratings, and live status.
+    """
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    now_ts = now_utc.timestamp()
+    events = fetch_usd_economic_events()
+    clean_l = str(lang or "km").lower().strip()
+    if not events:
+        if clean_l in ["en", "english"]:
+            return "• _No high-impact macro economic catalysts scheduled within current horizon._"
+        elif clean_l in ["zh", "chinese"]:
+            return "• _当前周期内暂无重大宏观经济催化事件。_"
+        else:
+            return "• _គ្មានព្រឹត្តិការណ៍ម៉ាក្រូសេដ្ឋកិច្ចកម្រិតខ្ពស់ដែលបានកំណត់កាលវិភាគក្នុងរង្វង់នេះឡើយ។_"
+
+    blacklist_kw = ["TREASURY", "AUCTION", "BILL", "FRN", "NOTE AUCTION", "BOND AUCTION"]
+    filtered_events = []
+    for ev in events:
+        t_upper = ev["title"].upper()
+        if any(bkw in t_upper for bkw in blacklist_kw):
+            continue
+        filtered_events.append(ev)
+
+    min_ts = now_ts - 43200.0  # From past 12h up to next 7 days
+    active_events = [e for e in filtered_events if e["timestamp"] >= min_ts]
+    active_events.sort(key=lambda x: x["timestamp"])
+
+    if not active_events:
+        active_events = [e for e in events if e["timestamp"] >= min_ts]
+        active_events.sort(key=lambda x: x["timestamp"])
+
+    # Multi-Event Collision Classifier (Aggregates concurrent releases within 15 mins)
+    clustered_display: List[Dict[str, Any]] = []
+    seen_indices = set()
+
+    for i, ev in enumerate(active_events):
+        if i in seen_indices:
+            continue
+        cluster = [ev]
+        seen_indices.add(i)
+        for j in range(i + 1, len(active_events)):
+            if j not in seen_indices and abs(active_events[j]["timestamp"] - ev["timestamp"]) <= 900.0:
+                cluster.append(active_events[j])
+                seen_indices.add(j)
+
+        clustered_display.append({
+            "timestamp": ev["timestamp"],
+            "datetime_utc": ev["datetime_utc"],
+            "impact": "High" if any(c.get("impact") == "High" for c in cluster) else cluster[0].get("impact", "Medium"),
+            "titles": [c["title"] for c in cluster]
+        })
+        if len(clustered_display) >= limit:
+            break
+
+    grid_lines = []
+    for item in clustered_display:
+        dt_utc = item["datetime_utc"]
+        dt_ict = dt_utc + datetime.timedelta(hours=7)
+        diff_hrs = (item["timestamp"] - now_ts) / 3600.0
+        
+        if -0.25 <= diff_hrs <= 0.5:
+            status_badge = "🛑 BLACKOUT" if clean_l in ["en", "english"] else ("🛑 处于静默防御" if clean_l in ["zh", "chinese"] else "🛑 BLACKOUT សកម្ម")
+        elif diff_hrs < -0.25:
+            past_hrs = abs(diff_hrs)
+            status_badge = f"✅ Released ({past_hrs:.1f}h ago)" if clean_l in ["en", "english"] else (f"✅ 已公布 ({past_hrs:.1f}小时前)" if clean_l in ["zh", "chinese"] else f"✅ បានប្រកាស ({past_hrs:.1f}h មុន)")
+        else:
+            status_badge = f"⏳ In ~{diff_hrs:.1f}h" if clean_l in ["en", "english"] else (f"⏳ 约 {diff_hrs:.1f}小时后" if clean_l in ["zh", "chinese"] else f"⏳ ក្នុងរង្វង់ {diff_hrs:.1f}h ទៀត")
+
+        impact_icon = "🔴" if item["impact"] == "High" else "🟡"
+        date_str_ict = dt_ict.strftime("%d/%m %I:%M %p ICT")
+        time_str_utc = dt_utc.strftime("%H:%M UTC")
+
+        translated_titles = [translate_macro_event_title(t, lang=clean_l) for t in item["titles"]]
+        combined_title = " + ".join(translated_titles) if len(translated_titles) <= 2 else f"{translated_titles[0]} + {len(translated_titles)-1} other releases"
+
+        grid_lines.append(f"• {impact_icon} `{date_str_ict} ({time_str_utc})`\n  └ **{combined_title}** | `{status_badge}`")
+
+    return "\n".join(grid_lines)
+
+
+def generate_daily_macro_morning_briefing(lang: str = "km") -> str:
+    """
+    Generates the official Daily 07:00 AM ICT Institutional Macro Economic Briefing.
+    Scans today's high-impact releases (Durable Goods, GDP, PCE, Jobless Claims, FOMC, etc.),
+    computes Tri-Market reaction baselines, and outlines institutional fiduciary directives.
+    """
+    now_utc, now_ict, cur_date_km, cur_time_ict, cur_time_utc = get_current_ict_datetime()
+    events = fetch_usd_economic_events()
+    now_ts = now_utc.timestamp()
+    clean_l = str(lang or "km").lower().strip()
+
+    start_of_day_ict = datetime.datetime(now_ict.year, now_ict.month, now_ict.day, 0, 0, 0, tzinfo=now_ict.tzinfo)
+    end_of_day_ict = start_of_day_ict + datetime.timedelta(days=1)
+    
+    start_ts = start_of_day_ict.timestamp()
+    end_ts = end_of_day_ict.timestamp()
+
+    today_events = [e for e in events if start_ts <= e["timestamp"] < end_ts]
+    blacklist_kw = ["TREASURY", "AUCTION", "BILL", "FRN", "NOTE AUCTION", "BOND AUCTION"]
+    today_events = [e for e in today_events if not any(bkw in e["title"].upper() for bkw in blacklist_kw)]
+    today_events.sort(key=lambda x: x["timestamp"])
+
+    pulse = fetch_tri_market_macro_pulse(force_refresh=True)
+    g = pulse["gold"]
+    eq = pulse["equities"]
+    c = pulse["crypto"]
+    m = pulse["macro"]
+
+    gold_up_down_str = "📈 ឡើង" if g["change_pct"] >= 0 else "📉 ចុះ"
+    sp_up_down_str = "📈 ឡើង" if eq["sp500_change_pct"] >= 0 else "📉 ចុះ"
+    btc_up_down_str = "📈 ឡើង" if c["btc_change_pct"] >= 0 else "📉 ចុះ"
+
+    if today_events:
+        ev_items = []
+        for i, ev in enumerate(today_events):
+            dt_utc = ev["datetime_utc"]
+            dt_ict = dt_utc + datetime.timedelta(hours=7)
+            t_name = translate_macro_event_title(ev["title"], lang=clean_l)
+            imp_icon = "🔴" if ev.get("impact") == "High" else "🟡"
+            t_ict_str = dt_ict.strftime("%I:%M %p ICT")
+            t_utc_str = dt_utc.strftime("%H:%M UTC")
+            diff_h = (ev["timestamp"] - now_ts) / 3600.0
+            time_status = f"⏳ ក្នុងរង្វង់ {diff_h:.1f}h ទៀត" if diff_h > 0 else "✅ បានប្រកាសរួច"
+            ev_items.append(f"{i+1}. {imp_icon} `{t_ict_str} ({t_utc_str})` ៖ **{t_name}**\n   └ ស្ថានភាព ៖ `{time_status}` | សកម្មភាព ៖ `Pre-Event Blackout 30m`")
+        events_block = "\n".join(ev_items)
+        headline_summary = f"ថ្ងៃនេះមានព្រឹត្តិការណ៍ម៉ាក្រូសេដ្ឋកិច្ចសំខាន់ៗចំនួន {len(today_events)} ដែលត្រូវតាមដានយ៉ាងម៉ឺងម៉ាត់"
+    else:
+        events_block = "• 🟢 **ថ្ងៃនេះគ្មានព្រឹត្តិការណ៍ Red Folder បង្កហានិភ័យធ្ងន់ធ្ងរទេ**\n  └ បរិយាកាសទីផ្សារមានស្ថិរភាព (Clear Execution Regime) — ក្បួនជួញដូរបើកដំណើរការពេញលេញ 100%!"
+        headline_summary = "ថ្ងៃនេះទីផ្សារម៉ាក្រូសេដ្ឋកិច្ចមានសភាពស្ងប់ស្ងាត់ គ្មានហានិភ័យ Spread Blowout ឡើយ"
+
+    msg = (
+        f"🏛️ **[ANGKOR QUANT | ព្រឹត្តិបត្រម៉ាក្រូសេដ្ឋកិច្ចប្រចាំថ្ងៃ - 07:00 AM MORNING BRIEFING]** 🌐\n"
+        f"{ui_standards.DIVIDER_HEAVY}\n"
+        f"📅 **កាលបរិច្ឆេទ ៖** `{cur_date_km}`\n"
+        f"⏰ **ម៉ោងកម្ពុជា ៖** `07:00:00 AM ICT (UTC+7)` | 🌐 **ម៉ោងសកល ៖** `00:00:00 UTC`\n"
+        f"🔍 **ស្ថានភាពទិន្នន័យ ៖** `🟢 ស្រាវជ្រាវស្វ័យប្រវត្តផ្ទាល់ពី Wall Street & Federal Reserve Wire`\n"
+        f"{ui_standards.DIVIDER_LIGHT}\n"
+        f"📢 **សេចក្តីសង្ខេបបឋម ៖** {headline_summary}។\n\n"
+        f"📋 **កាលវិភាគបញ្ចេញទិន្នន័យម៉ាក្រូថ្ងៃនេះ (TODAY'S MACRO SCHEDULE) ៖**\n"
+        f"{events_block}\n\n"
+        f"{ui_standards.DIVIDER_LIGHT}\n"
+        f"📊 **ស្ថានភាពសូចនាករគន្លឹះព្រឹកនេះ (TRI-MARKET PULSE) ៖**\n"
+        f"• 🥇 **Spot Gold ៖** `${g['price']:,.2f}` (`{g['change_pct']:+.2f}%` {gold_up_down_str}) | ឱកាសឡើង ៖ `{g['prob_up']:.1f}%`\n"
+        f"• 📈 **S&P 500 ៖** `${eq['sp500_price']:,.2f}` (`{eq['sp500_change_pct']:+.2f}%` {sp_up_down_str})\n"
+        f"• 🚀 **Bitcoin ៖** `${c['btc_price']:,.2f}` (`{c['btc_change_pct']:+.2f}%` {btc_up_down_str})\n"
+        f"• 💵 **DXY ៖** `{m['dxy_index']}` | 🏦 **US 10Y Yield ៖** `{m['us10y_yield']:.2f}%` | 🔮 **Fed Cut Odds ៖** `{m['fed_rate_cut_prob']:.1f}%`\n\n"
+        f"🛡️ **ចំណាត់ការវិស្វកម្ម & ក្បួនការពារដើមទុនស្ថាប័ន (FIDUCIARY DIRECTIVES) ៖**\n"
+        f"1. **Pre-Event Blackout Gate (Invariant 58) ៖** ប្រព័ន្ធនឹងផ្អាកការបើក Position ថ្មីមុន ៣០ នាទីនៃការប្រកាសទិន្នន័យ ដើម្បីកម្ចាត់ Spread Blowout & Slippage ១០០%។\n"
+        f"2. **In-Memory Dual-Directional Stealth Radar (Invariant 76) ៖** Armed រួចរាល់ក្នុង RAM ដើម្បីត្រៀមស្ទាក់ចាប់ទាំង Breakout Thrust និង Turtle Soup Reversal ក្រោយពេលប្រកាស។\n"
+        f"3. **Zero Negative Expectancy (Pillar 0) ៖** ហាមដាច់ខាតដាក់ Pending Order លើ Broker — រាល់ការចូលផ្សារត្រូវធ្វើឡើងតាមរយៈ Boundary Confirmation តែប៉ុណ្ណោះ!\n\n"
+        f"{ui_standards.DIVIDER_HEAVY}\n"
+        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីពិនិត្យរ៉ាដាពេញលេញ ឬ ``/capital_scalp`` ដើម្បីពិនិត្យ Position សកម្ម!_"
+    )
+    return msg
+
+
+def generate_pre_event_assessment(blackout_info: Dict[str, Any], lang: str = "km") -> str:
     """
     Generates the high-register, Chuon Nath formal Khmer Pre-Event Intelligence Assessment
     with explicit Up/Down percentage changes and quantitative probabilities across Gold, Equities, and Crypto.
-    Includes exact Cambodian ICT (UTC+7) and UTC live timestamps and official event schedule.
+    Includes exact Cambodian ICT (UTC+7) and UTC live timestamps, Multi-Event Aggregation, and official event schedule.
     """
     now_utc, now_ict, cur_date_km, cur_time_ict, cur_time_utc = get_current_ict_datetime()
     event_name = blackout_info.get("event_name", "Major Economic Event")
+    events_list = blackout_info.get("events_list", [])
     mins_rem = float(blackout_info.get("minutes_remaining", 30.0))
 
     dt_utc = blackout_info.get("datetime_utc")
@@ -688,6 +963,13 @@ def generate_pre_event_assessment(blackout_info: Dict[str, Any]) -> str:
         else "📡 **ស្ថានភាពត្រៀម ៖** `PRE-FLIGHT MONITORING (ត្រៀម In-Memory Stealth Radar ស្ទាក់កើបចំណេញ)`"
     )
 
+    events_list = blackout_info.get("events_list", [])
+    if len(events_list) > 1:
+        ev_items_str = "\n".join([f"  • `{e}`" for e in events_list])
+        events_block = f"⚠️ **បណ្តុំព្រឹត្តិការណ៍សេដ្ឋកិច្ចសំខាន់ៗ ({len(events_list)}) ៖**\n{ev_items_str}"
+    else:
+        events_block = f"⚠️ **ព្រឹត្តិការណ៍សេដ្ឋកិច្ចសំខាន់ ៖** `{event_name}`"
+
     msg = (
         f"🏛️ **[SUPER SMART PRE-NEWS MACRO INTELLIGENCE & ASSESSMENT]** ⚡\n"
         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -695,7 +977,7 @@ def generate_pre_event_assessment(blackout_info: Dict[str, Any]) -> str:
         f"⏰ **ម៉ោងកម្ពុជា (ICT UTC+7) ៖** `{cur_time_ict}` | 🌐 **ម៉ោងសកល (UTC) ៖** `{cur_time_utc}`\n"
         f"🔍 **ស្ថានភាពស្រាវជ្រាវ ៖** `🟢 ស្រាវជ្រាវផ្ទាល់ Real-Time Live Wire (ស្រាវជ្រាវ < 30 វិនាទី) | គ្មានទិន្នន័យចាស់`\n"
         f"{ui_standards.DIVIDER_LIGHT}\n"
-        f"⚠️ **ព្រឹត្តិការណ៍សេដ្ឋកិច្ចសំខាន់ ៖** `{event_name}`\n"
+        f"{events_block}\n"
         f"⏳ **ដំណាក់កាល ៖** `មុនពេលប្រកាស (នៅសល់ {rem_str})`\n"
         f"📅 **កាលបរិច្ឆេទប្រកាស ៖** `{ev_date_km}`\n"
         f"⏰ **ម៉ោងប្រកាសផ្លូវការ ៖** `{ev_time_ict}` ICT (UTC+7) | `{ev_time_utc}`\n"
@@ -734,7 +1016,7 @@ def generate_pre_event_assessment(blackout_info: Dict[str, Any]) -> str:
     return msg
 
 
-def generate_post_event_outcome(blackout_info: Dict[str, Any]) -> str:
+def generate_post_event_outcome(blackout_info: Dict[str, Any], lang: str = "km") -> str:
     """
     Generates the official Post-Event Outcome & Reaction Report with updated market prices,
     reaction percentages (ឡើង/ចុះ %), spread normalization status, and scalp alpha execution.
@@ -770,6 +1052,13 @@ def generate_post_event_outcome(blackout_info: Dict[str, Any]) -> str:
     btc_up_down_str = "📈 ឡើង" if c["btc_change_pct"] >= 0 else "📉 ចុះ"
     eth_up_down_str = "📈 ឡើង" if c["eth_change_pct"] >= 0 else "📉 ចុះ"
 
+    events_list = blackout_info.get("events_list", [])
+    if len(events_list) > 1:
+        ev_items_str = "\n".join([f"  • `{e}`" for e in events_list])
+        events_block = f"⚠️ **បណ្តុំព្រឹត្តិការណ៍សេដ្ឋកិច្ចផ្លូវការ ({len(events_list)}) ៖**\n{ev_items_str}"
+    else:
+        events_block = f"⚠️ **ព្រឹត្តិការណ៍សេដ្ឋកិច្ចផ្លូវការ ៖** `{event_name}`"
+
     msg = (
         f"🏛️ **[SUPER SMART POST-NEWS MACRO OUTCOME & IMPACT REPORT]** ⚡\n"
         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -777,7 +1066,7 @@ def generate_post_event_outcome(blackout_info: Dict[str, Any]) -> str:
         f"⏰ **ម៉ោងកម្ពុជា (ICT UTC+7) ៖** `{cur_time_ict}` | 🌐 **ម៉ោងសកល (UTC) ៖** `{cur_time_utc}`\n"
         f"🔍 **ស្ថានភាពស្រាវជ្រាវ ៖** `🟢 ស្រាវជ្រាវផ្ទាល់ Real-Time Live Wire (ស្រាវជ្រាវ < 30 វិនាទី) | គ្មានទិន្នន័យចាស់`\n"
         f"{ui_standards.DIVIDER_LIGHT}\n"
-        f"⚠️ **ព្រឹត្តិការណ៍សេដ្ឋកិច្ចផ្លូវការ ៖** `{event_name}`\n"
+        f"{events_block}\n"
         f"⏱️ **ដំណាក់កាល ៖** `ក្រោយពេលប្រកាស ({since_str})` | `Spread Sensor: {spread_status}`\n"
         f"📅 **កាលបរិច្ឆេទប្រកាស ៖** `{ev_date_km}`\n"
         f"⏰ **ម៉ោងប្រកាសផ្លូវការ ៖** `{ev_time_ict}` ICT (UTC+7) | `{ev_time_utc}`\n"
