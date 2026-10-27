@@ -94,7 +94,7 @@ def get_registered_commands():
         BotCommand("admin_config", "System Configuration"),
         BotCommand("sync_brain", "Cloud AI Brain Weights"),
         BotCommand("hf_data", "Hugging Face Multi-Tier Storage"),
-        BotCommand("admin_capital", "Capital.com Live Approver"),
+        BotCommand("admin_capital", "Capital.com VIP Dossier & Cash Flow Auditor"),
         BotCommand("admin_mt5", "MT5 Live Approver"),
         BotCommand("master_sync", "Master Syndicate Sync"),
         BotCommand("master_close_all", "Master Close All Protocol"),

@@ -6807,6 +6807,61 @@ class TelegramBotThread(BaseThread):
                     f"បានបិទ Capital Auto Trade សម្រាប់ User `{target_uid}` រួចរាល់!",
                     parse_mode="Markdown"
                 )
+            elif data.startswith("btn_cap_admin_inspect_"):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                target_uid = int(data.replace("btn_cap_admin_inspect_", "").strip())
+                try:
+                    await update.callback_query.answer("🔍 កំពុងទាញយករបាយការណ៍វិនិយោគ & ចរន្តសាច់ប្រាក់...")
+                except Exception:
+                    pass
+                i_text, i_kb = await build_capital_user_inspection_ui(target_uid)
+                try:
+                    await update.effective_message.edit_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
+                except Exception:
+                    await update.effective_message.reply_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
+            elif data == "btn_cap_admin_balances":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                try:
+                    await update.callback_query.answer("💵 កំពុងគណនាចរន្តសាច់ប្រាក់ & Equity កងនាវាទាំងអស់...")
+                except Exception:
+                    pass
+                f_text, f_kb = await build_capital_fleet_balances_ui()
+                try:
+                    await update.effective_message.edit_text(f_text, parse_mode="Markdown", reply_markup=f_kb)
+                except Exception:
+                    await update.effective_message.reply_text(f_text, parse_mode="Markdown", reply_markup=f_kb)
+            elif data.startswith("btn_cap_admin_closeall_"):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                target_uid = int(data.replace("btn_cap_admin_closeall_", "").strip())
+                res = await asyncio.to_thread(capital_engine.close_all_tradfi, target_uid)
+                cnt = res.get("closed_count", 0)
+                try:
+                    await update.callback_query.answer(f"🚨 បានបិទ {cnt} Positions សម្រាប់ {target_uid}!", show_alert=True)
+                except Exception:
+                    pass
+                i_text, i_kb = await build_capital_user_inspection_ui(target_uid)
+                try:
+                    await update.effective_message.edit_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
+                except Exception:
+                    await update.effective_message.reply_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
             elif data == "btn_cap_admin_assets":
                 is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
                 if not is_sa:
@@ -25407,12 +25462,312 @@ class TelegramBotThread(BaseThread):
 
             return "\n".join(lines), InlineKeyboardMarkup(kb)
 
+        async def build_capital_user_inspection_ui(target_uid: int, u_record: Optional[Dict[str, Any]] = None) -> tuple:
+            """
+            Builds a comprehensive, real-time Capital.com VIP Investor Dossier & Cash Flow Audit
+            for Super Admin. Fetches live balances, open positions, recent broker transactions,
+            and database performance ledger.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            creds = u_record or db.get_user_capital_credentials(target_uid)
+            auto_cfg = db.get_capital_auto_config(target_uid)
+            
+            # Fetch username
+            uname = "N/A"
+            try:
+                prof = db.get_user_profile(target_uid)
+                if prof and prof.get("username"):
+                    uname = prof["username"]
+                elif creds and creds.get("username"):
+                    uname = creds["username"]
+                else:
+                    conn = db.get_db_connection()
+                    cur = conn.cursor()
+                    cur.execute("SELECT username FROM users WHERE chat_id = ?", (target_uid,))
+                    r_u = cur.fetchone()
+                    conn.close()
+                    if r_u and r_u[0]:
+                        uname = r_u[0]
+            except Exception:
+                uname = f"User_{target_uid}"
+
+            acc_id = (creds.get("account_id") if creds else None) or "Awaiting API"
+            is_verified = (creds.get("is_referral_verified", False) if creds else None)
+            if is_verified is None:
+                is_verified = db.is_capital_user_authorized(target_uid)
+            v_badge = "🟢 100% VERIFIED (az48cxia)" if is_verified else "🟡 UNVERIFIED"
+            
+            is_demo = bool(creds.get("is_demo", False)) if creds else bool(auto_cfg.get("is_demo", False))
+            if target_uid == 859271875:
+                is_demo = False
+            mode_lbl = "🟡 DEMO ($10,000)" if is_demo else "🟢 LIVE MAINNET (Real Funds)"
+            has_creds = bool(creds and (creds.get("api_key") or target_uid == 859271875))
+
+            bal_val = 0.0
+            avail_val = 0.0
+            margin_val = 0.0
+            equity_val = 0.0
+            pnl_val = 0.0
+            curr = "USD"
+            conn_status = "🟢 CONNECTED (Personal Vault)" if has_creds else "⚪ NOT CONNECTED (Awaiting API)"
+            open_pos = []
+            broker_txs = []
+
+            if has_creds:
+                try:
+                    u_eng = capital_engine.get_user_capital_engine(target_uid, is_demo=is_demo)
+                    # Parallel fetch: balance, open positions, transactions
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+                        f_bal = ex.submit(u_eng.get_account_balance)
+                        f_pos = ex.submit(u_eng.get_open_positions)
+                        f_tx = ex.submit(u_eng.get_account_transactions, 604800)
+                        
+                        try:
+                            b_data = f_bal.result(timeout=6.0)
+                            bal_val = float(b_data.get("balance", 0.0) or 0.0)
+                            avail_val = float(b_data.get("available", 0.0) or 0.0)
+                            margin_val = float(b_data.get("deposit", 0.0) or 0.0)
+                            pnl_val = float(b_data.get("pnl", 0.0) or 0.0)
+                            equity_val = float(b_data.get("equity", 0.0) or (bal_val + pnl_val))
+                            curr = str(b_data.get("currency", "USD"))
+                            acc_id = b_data.get("account_id") or acc_id
+                        except Exception as e_b:
+                            conn_status = f"⚠️ Balance Notice ({e_b})"
+
+                        try:
+                            raw_pos = f_pos.result(timeout=6.0)
+                            for p in raw_pos:
+                                pos = p.get("position", {})
+                                mkt = p.get("market", {})
+                                open_pos.append({
+                                    "epic": pos.get("epic") or mkt.get("instrumentName") or "CFD",
+                                    "direction": pos.get("direction", "BUY"),
+                                    "size": float(pos.get("size", 0.0) or 0.0),
+                                    "entry": float(pos.get("level", 0.0) or 0.0),
+                                    "upl": float(pos.get("upl", 0.0) or 0.0),
+                                    "sl": float(pos.get("stopLevel", 0.0) or 0.0),
+                                    "tp": float(pos.get("profitLevel", 0.0) or 0.0),
+                                    "deal_id": pos.get("dealId")
+                                })
+                        except Exception:
+                            pass
+
+                        try:
+                            broker_txs = f_tx.result(timeout=6.0) or []
+                        except Exception:
+                            broker_txs = []
+                except Exception as e_eng:
+                    conn_status = f"⚠️ Engine Notice ({e_eng})"
+
+            # Database PnL Summary
+            db_pnl = db.get_capital_auto_pnl_summary(target_uid)
+            tot_trades = db_pnl.get("total_trades", 0)
+            tot_wins = db_pnl.get("win_count", 0)
+            tot_losses = db_pnl.get("loss_count", 0)
+            tot_realized_pnl = db_pnl.get("total_pnl", 0.0)
+            wr_pct = db_pnl.get("win_rate", 0.0)
+
+            # Auto config details
+            auto_on = auto_cfg.get("enabled", False)
+            auto_budget = float(auto_cfg.get("budget", 50.0) or 50.0)
+            max_pos = int(auto_cfg.get("max_positions", 2) or 2)
+            sched_mode = auto_cfg.get("schedule_mode", "SMART_SESSION_TIMED")
+            is_sched_247 = sched_mode in ["24/7", "247", "RESET", "ALWAYS_ON"]
+            sched_lbl = "🔄 24/7 Continuous Mode" if is_sched_247 else "⏰ Mon-Fri Smart Session (07:00-23:50 ICT)"
+
+            import portfolio_circuit_breaker
+            is_limit_dis = portfolio_circuit_breaker.CapitalDailyAGIGovernor.is_daily_limits_disabled(target_uid)
+            limit_lbl = "🔓 DISABLED (ជួញដូរបន្តគ្មានដែនកំណត់)" if is_limit_dis else "🔒 ENABLED (+5% Profit Lock / -2.5% Loss Floor)"
+
+            margin_pct = round(margin_val / max(0.01, equity_val) * 100, 1) if equity_val > 0 else 0.0
+            upl_prefix = "🟢 +" if pnl_val >= 0 else "🔴 -"
+            realized_prefix = "🟢 +" if tot_realized_pnl >= 0 else "🔴 -"
+
+            lines = [
+                "👑 **[CAPITAL.COM VIP INVESTOR DOSSIER & CASH FLOW]** 💎",
+                f"{ui_standards.DIVIDER_HEAVY}",
+                f"👤 **អត្តសញ្ញាណវិនិយោគិន (Investor Identity) ៖**",
+                f"• ឈ្មោះ ៖ `{uname}` | Chat ID ៖ `{target_uid}`",
+                f"• VIP Referral ៖ `{v_badge}`",
+                f"• Account ID ៖ `{acc_id}` ({mode_lbl})",
+                f"• API Status ៖ `{conn_status}`",
+                f"{ui_standards.DIVIDER_LIGHT}",
+                f"💵 **របាយការណ៍ចរន្តសាច់ប្រាក់ផ្ទាល់ (Live Cash Flow & Balance) ៖**",
+                f"• សមតុល្យសរុប (Total Balance) ៖ `${bal_val:,.2f} {curr}`",
+                f"• សាច់ប្រាក់ទំនេរ (Available Cash) ៖ `${avail_val:,.2f} {curr}`",
+                f"• ដើមទុនសុទ្ធ (Net Equity) ៖ `${equity_val:,.2f} {curr}`",
+                f"• ទុនបញ្ចាំប្រើ (Margin Used) ៖ `${margin_val:,.2f} {curr}` ({margin_pct}%)",
+                f"• ប្រាក់ចំណេញរត់បច្ចុប្បន្ន (Open UPL) ៖ `{upl_prefix}${abs(pnl_val):,.2f} {curr}`",
+                f"{ui_standards.DIVIDER_LIGHT}",
+                f"📊 **មុខតំណែងកំពុងរត់ (Live Open Positions: {len(open_pos)}) ៖**"
+            ]
+
+            if not open_pos:
+                lines.append("• _គ្មាន Position កំពុងជួញដូរឡើយ (100% Flat Cash Safe Floor) 🛡️_")
+            else:
+                for p in open_pos:
+                    dir_icon = "🟢 BUY" if p["direction"] == "BUY" else "🔴 SELL"
+                    upl_str = f"+${p['upl']:,.2f}" if p['upl'] >= 0 else f"-${abs(p['upl']):,.2f}"
+                    lines.append(
+                        f"• **{p['epic']}** ({dir_icon}) Size: `{p['size']}`\n"
+                        f"  Entry: `${p['entry']:,.2f}` | UPL: `{upl_str}`\n"
+                        f"  SL: `${p['sl']:,.2f}` | TP: `${p['tp']:,.2f}`"
+                    )
+
+            lines.append(f"{ui_standards.DIVIDER_LIGHT}")
+            lines.append(f"📈 **កំណត់ត្រាប្រវត្តិជួញដូរ (Performance Ledger) ៖**")
+            lines.append(f"• ប្រតិបត្តិការបិទសរុប ៖ `{tot_trades} ជុំ` ({tot_wins} ឈ្នះ / {tot_losses} ចាញ់)")
+            lines.append(f"• អត្រាជោគជ័យ (Win Rate) ៖ `{wr_pct}%`")
+            lines.append(f"• ប្រាក់ចំណេញសុទ្ធបង្គរ (Realized Net PnL) ៖ `{realized_prefix}${abs(tot_realized_pnl):,.2f} USD`")
+
+            # Recent broker cash flow / transactions
+            if broker_txs:
+                lines.append(f"{ui_standards.DIVIDER_LIGHT}")
+                lines.append(f"📜 **ចរន្តសាច់ប្រាក់ថ្មីៗ (Recent Broker Cash Transactions) ៖**")
+                for tx in broker_txs[:4]:
+                    t_type = tx.get("transactionType", "TX")
+                    t_amt = float(tx.get("size", 0.0) or 0.0)
+                    t_inst = tx.get("instrumentName") or ""
+                    t_date = (tx.get("dateUtc") or tx.get("date") or "")[:10]
+                    sign = "+" if t_amt >= 0 else "-"
+                    lines.append(f"• `{t_date}` | `{t_type}` {t_inst} ៖ `{sign}${abs(t_amt):,.2f}`")
+
+            lines.append(f"{ui_standards.DIVIDER_LIGHT}")
+            lines.append(f"⚙️ **ការកំណត់ស្វ័យប្រវត្ត (Auto Configuration) ៖**")
+            a_status = f"🟢 ON (${auto_budget:,.2f}/Trade, Max {max_pos} Pos)" if auto_on else "🛑 OFF"
+            lines.append(f"• ស្ថានភាព Auto ៖ `{a_status}`")
+            lines.append(f"• កាលវិភាគ (Schedule) ៖ `{sched_lbl}`")
+            lines.append(f"• Daily Governor ៖ `{limit_lbl}`")
+            lines.append(f"{ui_standards.DIVIDER_HEAVY}")
+            lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
+            lines.append(f"• `` `/admin_capital on {target_uid} 400 live 10 24/7` ``")
+            lines.append(f"• `` `/admin_capital off {target_uid}` ``")
+            lines.append(f"• `` `/admin_capital closeall {target_uid}` ``")
+            lines.append(f"• `` `/admin_capital limit {target_uid} off` ``")
+
+            kb = [
+                [
+                    InlineKeyboardButton("🔄 Refresh Report", callback_data=f"btn_cap_admin_inspect_{target_uid}"),
+                    InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu")
+                ],
+                [
+                    InlineKeyboardButton(f"{'🛑 បិទ Auto' if auto_on else '🟢 បើក Auto'}", callback_data=f"{'btn_cap_admin_off_' if auto_on else 'btn_cap_admin_on_'}{target_uid}"),
+                    InlineKeyboardButton("🚨 Close All Pos", callback_data=f"btn_cap_admin_closeall_{target_uid}")
+                ],
+                [
+                    InlineKeyboardButton("💵 Fleet Cash Flow", callback_data="btn_cap_admin_balances"),
+                    InlineKeyboardButton("🎛️ Asset Controls", callback_data="btn_cap_admin_assets")
+                ]
+            ]
+            return "\n".join(lines), InlineKeyboardMarkup(kb)
+
+        async def build_capital_fleet_balances_ui() -> tuple:
+            """
+            Builds a comprehensive fleet-wide cash flow and balance overview table
+            across all registered Capital.com VIP accounts.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            all_users = db.get_all_capital_users_overview()
+            if not all_users:
+                return "ℹ️ មិនទាន់មានអ្នកប្រើប្រាស់ណាម្នាក់នៅក្នុង Database ឡើយ។", None
+
+            total_fleet_bal = 0.0
+            total_fleet_avail = 0.0
+            total_fleet_equity = 0.0
+            total_fleet_margin = 0.0
+            total_fleet_upl = 0.0
+            total_fleet_pos = 0
+
+            lines = [
+                "👑 **[CAPITAL.COM FLEET CASH FLOW & BALANCE AUDIT]** 💎",
+                f"{ui_standards.DIVIDER_HEAVY}",
+                "📊 **តារាងចរន្តសាច់ប្រាក់ & ដើមទុនកងនាវា VIP ទាំងអស់ ៖**\n"
+            ]
+
+            kb_rows = []
+
+            for u in all_users:
+                u_cid = u["chat_id"]
+                u_acc = u["account_id"] or "Awaiting API"
+                u_name = u["username"] or f"User_{u_cid}"
+                u_auto = "🟢 ON" if u["auto_enabled"] else "🛑 OFF"
+                
+                bal_val = 0.0
+                avail_val = 0.0
+                upl_val = 0.0
+                pos_count = 0
+
+                if u_acc != "Awaiting API" and u_acc != "N/A" and u_acc != "":
+                    try:
+                        u_eng = capital_engine.get_user_capital_engine(u_cid, is_demo=False)
+                        b_data = await asyncio.to_thread(u_eng.get_account_balance)
+                        bal_val = float(b_data.get("balance", 0.0) or 0.0)
+                        avail_val = float(b_data.get("available", 0.0) or 0.0)
+                        upl_val = float(b_data.get("pnl", 0.0) or 0.0)
+                        eq_val = float(b_data.get("equity", 0.0) or (bal_val + upl_val))
+                        margin_val = float(b_data.get("deposit", 0.0) or 0.0)
+
+                        pos_data = await asyncio.to_thread(u_eng.get_open_positions)
+                        pos_count = len(pos_data)
+
+                        total_fleet_bal += bal_val
+                        total_fleet_avail += avail_val
+                        total_fleet_equity += eq_val
+                        total_fleet_margin += margin_val
+                        total_fleet_upl += upl_val
+                        total_fleet_pos += pos_count
+                    except Exception:
+                        pass
+
+                sign = "+" if upl_val >= 0 else "-"
+                mode_str = "🟢 LIVE" if u["is_referral_verified"] else "🟡 UNVERIFIED"
+                lines.append(
+                    f"• **{u_name}** (`{u_cid}`)\n"
+                    f"  🏦 Acc: `{u_acc}` ({mode_str})\n"
+                    f"  💵 Bal: `${bal_val:,.2f}` | Avail: `${avail_val:,.2f}`\n"
+                    f"  📈 UPL: `{sign}${abs(upl_val):,.2f}` | Pos: `{pos_count}` | Auto: `{u_auto}`"
+                )
+                kb_rows.append([
+                    InlineKeyboardButton(f"🔍 ពិនិត្យ {u_name}", callback_data=f"btn_cap_admin_inspect_{u_cid}"),
+                    InlineKeyboardButton(f"{'🛑 OFF' if u['auto_enabled'] else '🟢 ON'}", callback_data=f"{'btn_cap_admin_off_' if u['auto_enabled'] else 'btn_cap_admin_on_'}{u_cid}")
+                ])
+
+            lines.append(f"{ui_standards.DIVIDER_HEAVY}")
+            lines.append(f"💰 **សរុបដើមទុនកងនាវា (Total Fleet Balance) ៖** `${total_fleet_bal:,.2f} USD`")
+            lines.append(f"📦 **សរុបសាច់ប្រាក់ទំនេរ (Total Available Cash) ៖** `${total_fleet_avail:,.2f} USD`")
+            lines.append(f"💎 **សរុបដើមទុនសុទ្ធ (Total Fleet Equity) ៖** `${total_fleet_equity:,.2f} USD`")
+            upl_sign = "+" if total_fleet_upl >= 0 else "-"
+            lines.append(f"📈 **សរុបប្រាក់ចំណេញរត់ (Total Fleet UPL) ៖** `{upl_sign}${abs(total_fleet_upl):,.2f} USD`")
+            lines.append(f"🚀 **សរុប Positions កំពុងរត់ ៖** `{total_fleet_pos} Positions`")
+            lines.append(f"{ui_standards.DIVIDER_HEAVY}")
+            lines.append("💡 _ចុចប៊ូតុង '🔍 ពិនិត្យ' លើឈ្មោះនីមួយៗ ដើម្បីពិនិត្យលម្អិតដាច់ដោយឡែក!_")
+
+            kb_rows.append([
+                InlineKeyboardButton("🔄 Refresh Fleet", callback_data="btn_cap_admin_balances"),
+                InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu")
+            ])
+            kb_rows.append([
+                InlineKeyboardButton("🎛️ Asset Controls", callback_data="btn_cap_admin_assets"),
+                InlineKeyboardButton("🔙 /capital Menu", callback_data="btn_cap_menu")
+            ])
+
+            return "\n".join(lines), InlineKeyboardMarkup(kb_rows)
+
         async def admin_capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
             Admin command to manage Capital.com VIP users:
             - /admin_capital (or /admin_capital list | users): Overview of all registered traders with interactive action buttons
+            - /admin_capital inspect <chat_id_or_account_id>: Full real-time dossier with live cash flow, balance, open positions & ledger
+            - /admin_capital balances: Consolidated fleet cash flow, balances & equity table
             - /admin_capital on <chat_id_or_account_id> [budget] [live|demo]: Instantly activates auto trade for user
             - /admin_capital off <chat_id_or_account_id>: Stops auto trade for user
+            - /admin_capital closeall <chat_id_or_account_id>: Emergency-closes all positions for a user to flat cash
             - /admin_capital approve <chat_id_or_account_id>: Approves Live Capital access
             - /admin_capital reject <chat_id_or_account_id>: Revokes Live Capital access
             - /admin_capital all_on: Enables Auto & Scalp trading for ALL Users
@@ -25535,39 +25890,48 @@ class TelegramBotThread(BaseThread):
                         f"  🏦 **Account ID ៖** `{u_acc}` ({u_mode})\n"
                         f"  🛡️ **Status ៖** {v_badge} | **Auto ៖** {a_badge}"
                     )
-                    btn_row = []
+                    btn_row = [
+                        InlineKeyboardButton(f"🔍 ពិនិត្យ ({u_cid})", callback_data=f"btn_cap_admin_inspect_{u_cid}")
+                    ]
                     if not u["auto_enabled"]:
-                        btn_row.append(InlineKeyboardButton(f"🟢 ON ({u_cid})", callback_data=f"btn_cap_admin_on_{u_cid}"))
+                        btn_row.append(InlineKeyboardButton(f"🟢 ON", callback_data=f"btn_cap_admin_on_{u_cid}"))
                     else:
-                        btn_row.append(InlineKeyboardButton(f"🛑 OFF ({u_cid})", callback_data=f"btn_cap_admin_off_{u_cid}"))
+                        btn_row.append(InlineKeyboardButton(f"🛑 OFF", callback_data=f"btn_cap_admin_off_{u_cid}"))
                     if not u["is_referral_verified"]:
                         btn_row.append(InlineKeyboardButton(f"✅ Approve", callback_data=f"btn_cap_appr_{u_cid}"))
                     kb_rows.append(btn_row)
 
                 kb_rows.append([
-                    InlineKeyboardButton("🎛️ Asset Controls (Stocks/Crypto)", callback_data="btn_cap_admin_assets"),
+                    InlineKeyboardButton("💵 Fleet Cash Flow & Balances", callback_data="btn_cap_admin_balances"),
                     InlineKeyboardButton("🔄 Refresh Directory", callback_data="btn_cap_admin_menu")
+                ])
+                kb_rows.append([
+                    InlineKeyboardButton("🎛️ Asset Controls (Stocks/Crypto)", callback_data="btn_cap_admin_assets"),
+                    InlineKeyboardButton("👑 Total Spread Audit (Live)", callback_data="btn_cap_admin_total_spread")
                 ])
                 kb_rows.append([
                     InlineKeyboardButton("🌐 ALL USERS: ON", callback_data="btn_cap_all_users_on"),
                     InlineKeyboardButton("🛑 ALL USERS: OFF", callback_data="btn_cap_all_users_off")
                 ])
                 kb_rows.append([
-                    InlineKeyboardButton("👑 Total Spread Audit (Live)", callback_data="btn_cap_admin_total_spread"),
                     InlineKeyboardButton("📄 Export JSON", callback_data="btn_cap_admin_spread_json")
                 ])
 
                 lines.append(f"{ui_standards.DIVIDER_HEAVY}")
                 lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
+                lines.append("• `` `/admin_capital inspect <Account_ID_or_User_ID>` `` (ពិនិត្យរបាយការណ៍វិនិយោគ & ចរន្តសាច់ប្រាក់)")
+                lines.append("• `` `/admin_capital balances` `` (ពិនិត្យចរន្តសាច់ប្រាក់ & Equity កងនាវាទាំងអស់)")
+                lines.append("• `` `/admin_capital on <Account_ID> 400 live 10 24/7` `` (បើក Auto Trade ១០ កាក់ ស្មើដៃ Admin ២៤/៧)")
+                lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade កម្រិតទូទៅ)")
+                lines.append("• `` `/admin_capital off <Account_ID>` `` (បិទ Auto Trade)")
+                lines.append("• `` `/admin_capital closeall <Account_ID>` `` (បិទគ្រប់ Position ជាបន្ទាន់)")
+                lines.append("• `` `/admin_capital approve <Account_ID>` `` (អនុម័តសិទ្ធិ Live)")
+                lines.append("• `` `/admin_capital limit <Account_ID> off` `` (ដក Daily Limit)")
                 lines.append("• `` `/admin_capital spread` `` (ពិនិត្យ Real Live Total Spread ប្រព័ន្ធទាំងមូល)")
                 lines.append("• `` `/admin_capital all_on` `` (បើក Auto & Scalp សម្រាប់ All Users ទាំងអស់)")
                 lines.append("• `` `/admin_capital all_off` `` (បិទ Auto & Scalp សម្រាប់ All Users ទាំងអស់)")
                 lines.append("• `` `/admin_capital asset NVDA off` `` (បិទ NVDA សម្រាប់ Users ទាំងអស់)")
                 lines.append("• `` `/admin_capital asset NVDA on` `` (បើក NVDA សម្រាប់ Users ទាំងអស់)")
-                lines.append("• `` `/admin_capital on <Account_ID> 400 live 10 24/7` `` (បើក Auto Trade ១០ កាក់ ស្មើដៃ Admin ២៤/៧)")
-                lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade កម្រិតទូទៅ)")
-                lines.append("• `` `/admin_capital off <Account_ID>` `` (បិទ Auto Trade)")
-                lines.append("• `` `/admin_capital approve <Account_ID>` `` (អនុម័តសិទ្ធិ Live)")
                 await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_rows) if kb_rows else None)
                 return
 
@@ -25740,6 +26104,46 @@ class TelegramBotThread(BaseThread):
                     f"🛡️ **ការការពារទុន ៖** `SL/TP, Breakeven Armor & Trailing Ratchet លើ Position នីមួយៗនៅតែការពារ ១០០%!`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🚀 _ប្រព័ន្ធនឹងជួញដូរតាមការកំណត់ភ្លាមៗ!_",
+                    parse_mode="Markdown"
+                )
+                return
+
+            # Command: /admin_capital INSPECT <chat_id_or_acc_id>
+            elif sub in ["INSPECT", "USER", "REPORT", "PORTFOLIO", "CASHFLOW", "AUDIT", "DETAIL", "DETAILS", "CHECK"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital inspect 330124951740830916` `` ឬ `` `/admin_capital inspect 1612591526` ``", parse_mode="Markdown")
+                    return
+                target_uid, u_record = _resolve_target(args[1])
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!", parse_mode="Markdown")
+                    return
+                i_text, i_kb = await build_capital_user_inspection_ui(target_uid, u_record)
+                await update.effective_message.reply_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
+                return
+
+            # Command: /admin_capital BALANCES (or /admin_capital fleet)
+            elif sub in ["BALANCES", "BALANCE", "FLEET", "CASHFLOWS", "ALL_BALANCES"]:
+                f_text, f_kb = await build_capital_fleet_balances_ui()
+                await update.effective_message.reply_text(f_text, parse_mode="Markdown", reply_markup=f_kb)
+                return
+
+            # Command: /admin_capital CLOSEALL <chat_id_or_acc_id>
+            elif sub in ["CLOSEALL", "CLOSE_ALL", "LIQUIDATE", "FLAT_CASH"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital closeall 330124951740830916` ``", parse_mode="Markdown")
+                    return
+                target_uid, u_record = _resolve_target(args[1])
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!", parse_mode="Markdown")
+                    return
+                res = await asyncio.to_thread(capital_engine.close_all_tradfi, target_uid)
+                cnt = res.get("closed_count", 0)
+                await update.effective_message.reply_text(
+                    f"🚨 **[EMERGENCY LIQUIDATION TO FLAT CASH COMPLETED]** 🏁\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👤 **User ID ៖** `{target_uid}`\n"
+                    f"🚪 **ចំនួន Position ដែលបានបិទ ៖** `{cnt}` Positions\n"
+                    f"💎 _គ្រប់មុខតំណែងត្រូវបានជម្រះជាសាច់ប្រាក់សុទ្ធ (Flat Cash) ១០០% ដោយសុវត្ថិភាព!_",
                     parse_mode="Markdown"
                 )
                 return

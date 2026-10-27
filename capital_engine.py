@@ -860,6 +860,23 @@ class CapitalComEngine:
         """Forces next get_accounts() call to fetch fresh balance from broker."""
         self._accounts_cache_time = 0.0
 
+    def get_account_transactions(self, last_period_seconds: int = 604800) -> List[Dict[str, Any]]:
+        """
+        Fetches direct broker transaction history (deposits, withdrawals, trades, funding)
+        from Capital.com REST API /history/transactions.
+        """
+        if getattr(self, "is_guest", False) or not self.ensure_session():
+            return []
+        try:
+            url = f"{self.base_url}/history/transactions?lastPeriod={last_period_seconds}"
+            headers = self.get_auth_headers()
+            res = self.session.get(url, headers=headers, timeout=8)
+            if res.status_code == 200:
+                return res.json().get("transactions", [])
+        except Exception as e:
+            logger.debug(f"Transactions fetch notice: {e}")
+        return []
+
     def sync_closed_positions(self, chat_id: Optional[int] = None) -> int:
         """
         Synchronizes broker-closed trades (Stop-Loss or Take-Profit hit on Capital.com)
