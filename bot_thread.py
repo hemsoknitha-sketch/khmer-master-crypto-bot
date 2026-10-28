@@ -6043,6 +6043,21 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["VAULT"]
                 await mt5_command(update, context)
+            elif data in ["btn_mt5_paper", "btn_mt5_paper_refresh"]:
+                try:
+                    await update.callback_query.answer("🧪 កំពុងបើក Super Admin Paper MT5 Terminal...")
+                except Exception:
+                    pass
+                context.args = ["PAPER"]
+                await mt5_command(update, context)
+            elif data in ["btn_mt5_paper_on", "btn_mt5_paper_off", "btn_mt5_paper_reset", "btn_mt5_paper_close_all"]:
+                try:
+                    await update.callback_query.answer("⚡ កំពុងដំណើរការ Paper Command...")
+                except Exception:
+                    pass
+                action = data.replace("btn_mt5_paper_", "").upper()
+                context.args = ["PAPER", action]
+                await mt5_command(update, context)
             elif data == "btn_mt5_treasury":
                 try:
                     await update.callback_query.answer("🏛️ Master Treasury & Rebate Vault (52133938)...")
@@ -22176,6 +22191,49 @@ class TelegramBotThread(BaseThread):
                 sub = str(args[0]).upper().strip()
 
                 # --- 0.0 GTC PAMM MASTER FUND COMMANDS ---
+                if sub in ["PAPER", "PAPER_TRADING", "SIM"]:
+                    import gtc_pamm_engine
+                    if not is_admin_user:
+                        denied_msg = (
+                            "⛔ <b>[ACCESS DENIED]</b> ៖ មុខងារ Paper Account ត្រូវបានចាក់សោរសម្រាប់តែ "
+                            "<b>Super Admin (859271875)</b> ប៉ុណ្ណោះ!"
+                        )
+                        await update.effective_message.reply_text(denied_msg, parse_mode="HTML")
+                        return
+
+                    p_action = str(args[1]).upper().strip() if len(args) >= 2 else "STATUS"
+                    notice = ""
+                    if p_action in ["ON", "START", "RUN"]:
+                        p_cap = 10000.0
+                        if len(args) >= 3:
+                            raw_c = str(args[2]).replace("$", "").replace("USD", "").strip()
+                            if raw_c.replace(".", "", 1).isdigit():
+                                p_cap = float(raw_c)
+                        gtc_pamm_engine.SuperAdminPaperMT5Engine.start(capital=p_cap)
+                        notice = f"🎉 <b>[PAPER ENGINE STARTED]</b> ដើមទុន Paper ៖ <b>${p_cap:,.2f} USD</b>\n\n"
+                    elif p_action in ["OFF", "STOP", "PAUSE"]:
+                        gtc_pamm_engine.SuperAdminPaperMT5Engine.stop()
+                        notice = "⏸️ <b>[PAPER ENGINE PAUSED]</b> ដំណើរការ Paper ត្រូវបានផ្អាក!\n\n"
+                    elif p_action in ["RESET", "CLEAR"]:
+                        p_cap = 10000.0
+                        if len(args) >= 3:
+                            raw_c = str(args[2]).replace("$", "").replace("USD", "").strip()
+                            if raw_c.replace(".", "", 1).isdigit():
+                                p_cap = float(raw_c)
+                        gtc_pamm_engine.SuperAdminPaperMT5Engine.reset(capital=p_cap)
+                        notice = f"🔄 <b>[PAPER LEDGER RESET]</b> សមតុល្យត្រូវបានកំណត់ឡើងវិញ ៖ <b>${p_cap:,.2f} USD</b>\n\n"
+                    elif p_action in ["CLOSE", "CLOSE_ALL", "PANIC"]:
+                        cnt = gtc_pamm_engine.SuperAdminPaperMT5Engine.close_all()
+                        notice = f"⛔ <b>[PAPER POSITIONS CLOSED]</b> បានបិទ Paper Trades ចំនួន <b>{cnt}</b> ដោយជោគជ័យ!\n\n"
+
+                    msg_paper, kb_paper = gtc_pamm_engine.SuperAdminPaperMT5Engine.build_paper_ui(chat_id, user_lang=user_lang)
+                    try:
+                        await update.effective_message.reply_text(notice + msg_paper, parse_mode="HTML", reply_markup=kb_paper)
+                    except Exception:
+                        clean_paper = re.sub(r'<[^>]+>', '', notice + msg_paper)
+                        await update.effective_message.reply_text(clean_paper, reply_markup=kb_paper)
+                    return
+
                 if sub in ["PAMM", "DASHBOARD", "HOME", "MAIN"]:
                     import gtc_pamm_engine
                     msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)
@@ -23019,13 +23077,13 @@ class TelegramBotThread(BaseThread):
                     real_broker_eq = float(client_sess.get("equity", 0.0)) if client_sess else 0.0
                     is_broker_online = (client_sess.get("status") == "ONLINE") if client_sess else False
 
-                    broker_bal_badge = f"${real_broker_bal:,.2f} USD 🟢 (LIVE)" if real_broker_bal > 0 else f"${real_broker_bal:,.2f} USD ⚪ (Unfunded / $0.00)"
-                    vault_type_badge = "🟢 REAL LIVE MASTER VAULT" if real_broker_bal > 0 else "🟡 VIRTUAL DEMO MIRROR (Simulation Mode)"
+                    broker_bal_badge = f"${real_broker_bal:,.2f} USD 🟢 (LIVE REAL)" if real_broker_bal > 0 else f"${real_broker_bal:,.2f} USD ⚪ (Unfunded / $0.00)"
+                    vault_type_badge = "🟢 REAL LIVE MASTER VAULT" if real_broker_bal > 0 else "🔴 REAL LIVE MT5 (UNFUNDED / $0.00 USD) ⛔ NO DEMO"
                     unfunded_notice = ""
                     if real_broker_bal <= 0:
                         unfunded_notice = (
                             f"⚠️ <i>ចំណាំស្មោះត្រង់ ៖ គណនី MT5 ជាក់ស្តែងលើ Broker មាន ${real_broker_bal:,.2f} USD (មិនទាន់មានលុយពិត)។ "
-                            f"តួលេខក្នុង Vault នេះជាទុននិម្មិត (Virtual Demo Mirror) សម្រាប់តេស្តតាមដាន Master AI Copy ប៉ុណ្ណោះ។</i>\n"
+                            f"ប្រព័ន្ធ Angkor Quant បានបិទ DEMO ទាំងស្រុង ១០០% (Zero Demo Fallback)។ មិនមានការបើក Trade ឬបង្កើតទិន្នន័យចំណេញនិម្មិតឡើយ!</i>\n"
                             f"{ui_standards.DIVIDER_LIGHT}\n"
                         )
 
@@ -23088,17 +23146,26 @@ class TelegramBotThread(BaseThread):
                         ]
                     ])
 
+                    if is_admin_user:
+                        vault_role_line = f"👑 <b>តួនាទី ៖</b> <code>Super Admin / Master Treasury Owner (ID: {chat_id})</code>\n"
+                        vault_split_line = f"⚖️ <b>រូបមន្តបែងចែកចំណេញ ៖</b> <code>100% Super Admin Treasury (0% Fee Charged on Self)</code>\n"
+                        active_vault_badge = "👑 SUPER ADMIN MASTER TREASURY VAULT"
+                    else:
+                        vault_role_line = f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code> (Vault ID: <code>#{v_ledger.get('account_id')}</code>)\n"
+                        vault_split_line = f"⚖️ <b>រូបមន្តបែងចែកចំណេញ ៖</b> <code>{v_split:.0f}% VIP / {100-v_split:.0f}% Super Admin</code>\n"
+                        active_vault_badge = vault_type_badge
+
                     msg_vault = (
                         f"🏛️ <b>[MASTER CLOUD VIRTUAL PORTFOLIO & LEDGER]</b> 💎\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"{action_msg}"
-                        f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code> (Vault ID: <code>#{v_ledger.get('account_id')}</code>)\n"
-                        f"🧪 <b>ប្រភេទគណនី ៖</b> <code>{vault_type_badge}</code>\n"
+                        f"{vault_role_line}"
+                        f"🧪 <b>ប្រភេទគណនី ៖</b> <code>{active_vault_badge}</code>\n"
                         f"🏦 <b>សមតុល្យពិតលើ MT5 Broker ៖</b> <b>{broker_bal_badge}</b>\n"
                         f"💰 <b>ដើមទុនបែងចែកក្នុង Vault ៖</b> <b>${v_cap:,.2f} USD</b>\n"
                         f"💎 <b>សមតុល្យបច្ចុប្បន្ន (Virtual Equity) ៖</b> <b>${v_eq:,.2f} USD</b>\n"
                         f"🟢 <b>ប្រាក់ចំណេញសុទ្ធកើបបាន ៖</b> <b>{v_pnl_str}</b> (Net {v_split:.0f}%)\n"
-                        f"⚖️ <b>រូបមន្តបែងចែកចំណេញ ៖</b> <code>{v_split:.0f}% VIP / {100-v_split:.0f}% Super Admin</code>\n"
+                        f"{vault_split_line}"
                         f"🔄 <b>ប្រព័ន្ធ Compound Grid ៖</b> <b>{v_reinv}</b>\n"
                         f"🛡️ <b>កម្រិតការពារ Risk ៖</b> <code>{v_risk}</code> ({v_ledger.get('risk_per_trade_pct', 1.5)}% / Trade)\n"
                         f"🌐 <b>ចំណែកក្នុង Master Pool ៖</b> <b>{v_share}%</b> (Pool AUM: ${pool_aum:,.2f})\n"

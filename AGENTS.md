@@ -1999,6 +1999,27 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 ---
 
 
+### Invariant 108: Super Admin Institutional Paper Account, Zero-Demo Hard-Lock & Universal PAMM Multi-Tier Decoupling Standard (AQ108 Standard - ស្ថាបត្យកម្មផ្តាច់ស្រឡះ PAMM Super Admin & VIP Users, លុបបំបាត់ Demo Mode ១០០% & ប្រព័ន្ធ Paper Account ស្រូបយកតាម /mt5 ជារៀងរហូត)
+- **Location:** `database.py` (`mt5_superadmin_paper_ledger`, `mt5_superadmin_paper_trades`, `get_or_create_paper_ledger`, `update_paper_ledger`, `reset_paper_ledger`, `record_paper_trade`, `close_paper_trade`, `get_paper_trades`, Zero-Demo `get_virtual_pool_metrics`), `gtc_pamm_engine.py` (`GTCPAMMEngine`, `SuperAdminPaperMT5Engine`, `GTC_PAMM_BASE_AUM = 0.0`), `bot_thread.py` (`/mt5 PAPER` controller, Super Admin 0% fee vault decoupling, `btn_mt5_paper` callbacks).
+- **Objective:** Deploy a mathematically rigorous, tamper-proof institutional segregation across all PAMM and MT5 portfolio operations, eliminating all virtual/demo illusions and empowering Super Admin with an autonomous Paper Account that dynamically mirrors 100% of live `/mt5` rules:
+  1. **Pillar 1: Universal Demo Account Elimination & Zero-Demo Hard-Lock (លុបបំបាត់ Demo Account & Virtual Mirror ១០០%):**
+     - Hardcoded fake base AUM reserves are strictly forbidden (`GTC_PAMM_BASE_AUM = 0.0`). Total PAMM Pool AUM strictly reflects verified real capital (`Real Master MT5 Balance + Real Verified Investor Capital`).
+     - If the broker MT5 trading account (`#52171861`) has a balance $\le \$0.00	ext{ USD}$, the system strictly displays `🔴 REAL LIVE MT5 (UNFUNDED / $0.00 USD) ⛔ NO DEMO` and locks live order dispatch.
+     - Zero fallback to Demo or Paper Mirror for real live trading. Simulated phantom balances, fake \$126k pool illusions, and artificial PnL records are completely purged from live user portfolios.
+  2. **Pillar 2: Strict Super Admin vs VIP Investor Decoupling (ផ្តាច់ចេញពីគ្នារវាងគណនី Super Admin និង VIP Users):**
+     - **Super Admin (`859271875` & System Administrators):**
+       * Acts exclusively as the **Master Treasury & Fund Architect** (`Master Treasury Account #52133938`, `Wallet #130237694`).
+       * Super Admin Dashboard displays live Master GTCFX Tokyo execution gateway status, real broker balance, total verified client capital, real pool AUM, and collected 20% performance fees and IB rebates.
+       * **0% Performance Fee on Self:** Under no circumstances shall the system deduct or display a 20% fee against the Super Admin himself. Master Treasury retains 100% of its capital and earnings (`100% Super Admin Treasury (0% Fee Charged on Self)`).
+     - **VIP Users (`is_admin=False`):**
+       * Sub-investors receiving isolated allocation ledgers, individual equity tracking, High-Water Mark profit calculation, and paying the institutional 20% cloud maintenance fee to Master Treasury.
+  3. **Pillar 3: Super Admin Institutional Paper Account Suite with 100% Dynamic /mt5 Parity (ប្រព័ន្ធ Paper Account សម្រាប់តែ Super Admin ស្រូបយកតាម /mt5 ជារៀងរហូត):**
+     - Exclusively accessible by Super Admin (`859271875`). Non-admin attempts to access `/mt5 PAPER` are rejected with immediate `ACCESS_DENIED`.
+     - **Dynamic /mt5 Operational Parity (ស្រូបយក និងបត់បែនតាម /mt5 ជានិច្ច ១០០%):**
+       * Super Admin Paper Engine (`SuperAdminPaperMT5Engine`) does not rely on duplicate static rules; it dynamically queries live `/mt5` operational parameters, algorithms, and risk rules in real time.
+       * Future upgrades, risk adjustments, or strategy refinements applied to `/mt5` (Citadel confluence $\ge 68.0$, dynamic breathing stop $\ge \max(2.20	imes	ext{ATR}, 3.5	imes	ext{Spread})$, Breakeven Armor at $+1.8R$, multi-target scale-out TP1/TP2/Runner, Red Folder news shield, session kill zones, and daily drawdown clamps) are automatically and dynamically inherited by the Paper Engine without code rewrites.
+     - **Ledger Isolation:** Paper trades, equity curves, and performance are recorded exclusively in `mt5_superadmin_paper_ledger` and `mt5_superadmin_paper_trades`, ensuring zero cross-tenant contamination with real broker or investor accounts.
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.

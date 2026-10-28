@@ -6754,6 +6754,45 @@ def _ensure_virtual_ledger_schema(cursor):
         INSERT OR IGNORE INTO mt5_treasury_vault (account_id, wallet_id, account_name, maintenance_fee_pct, total_maintenance_fee_usd, total_rebate_usd, total_balance_usd, is_active)
         VALUES ('52133938', '130237694', 'Real Super Treasury & Rebate Collector', 20.0, 0.0, 0.0, 0.0, 1)
     ''')
+    # Super Admin Dedicated Paper Account Schema (Strictly Isolated & Dynamic MT5 Parity - AQ101)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mt5_superadmin_paper_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id INTEGER DEFAULT 859271875,
+            allocated_capital REAL DEFAULT 10000.0,
+            current_balance REAL DEFAULT 10000.0,
+            paper_equity REAL DEFAULT 10000.0,
+            realized_profit REAL DEFAULT 0.0,
+            unrealized_profit REAL DEFAULT 0.0,
+            win_count INTEGER DEFAULT 0,
+            loss_count INTEGER DEFAULT 0,
+            total_trades INTEGER DEFAULT 0,
+            max_drawdown_pct REAL DEFAULT 0.0,
+            is_active BOOLEAN DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mt5_superadmin_paper_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket INTEGER DEFAULT 0,
+            symbol TEXT DEFAULT 'XAUUSD',
+            direction TEXT DEFAULT 'BUY',
+            lot_size REAL DEFAULT 0.10,
+            entry_price REAL DEFAULT 0.0,
+            sl_price REAL DEFAULT 0.0,
+            tp1_price REAL DEFAULT 0.0,
+            tp2_price REAL DEFAULT 0.0,
+            exit_price REAL DEFAULT 0.0,
+            pnl_usd REAL DEFAULT 0.0,
+            confluence_score REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'OPEN',
+            exit_reason TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            closed_at DATETIME
+        )
+    ''')
 
 def get_or_create_virtual_ledger(chat_id: int, initial_capital: float = 100.0, account_id: str = "") -> dict:
     """
@@ -7285,8 +7324,16 @@ def get_virtual_pool_metrics() -> dict:
     total_profit = float(row[2] or 0.0)
     conn.close()
 
-    base_pool_aum = 125000.0  # Master institutional reserve fund anchor
-    total_aum = base_pool_aum + user_capital
+    # Zero-Demo Hard-Lock: Dynamic Live Master Balance (NO fake $125k) - AQ101
+    real_master_bal = 0.0
+    try:
+        import mt5_bridge_engine
+        sess = mt5_bridge_engine.mt5_bridge.get_client_session("52171861")
+        if sess:
+            real_master_bal = float(sess.get("balance", 0.0))
+    except Exception:
+        real_master_bal = 0.0
+    total_aum = round(real_master_bal + user_capital, 2)
 
     return {
         "total_aum": total_aum,
@@ -11764,3 +11811,133 @@ except Exception:
 
 
 
+
+
+# ========================================================================================
+# SUPER ADMIN DEDICATED PAPER ACCOUNT DATABASE SUITE (AQ101)
+# ========================================================================================
+
+def get_or_create_paper_ledger(initial_capital: float = 10000.0) -> dict:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    cursor.execute("SELECT * FROM mt5_superadmin_paper_ledger ORDER BY id ASC LIMIT 1")
+    row = cursor.fetchone()
+    if not row:
+        init_c = max(100.0, float(initial_capital or 10000.0))
+        cursor.execute("""
+            INSERT INTO mt5_superadmin_paper_ledger 
+            (admin_id, allocated_capital, current_balance, paper_equity, realized_profit, is_active)
+            VALUES (859271875, ?, ?, ?, 0.0, 0)
+        """, (init_c, init_c, init_c))
+        conn.commit()
+        cursor.execute("SELECT * FROM mt5_superadmin_paper_ledger ORDER BY id ASC LIMIT 1")
+        row = cursor.fetchone()
+    conn.close()
+    return {
+        "id": row[0],
+        "admin_id": row[1],
+        "allocated_capital": float(row[2] or 10000.0),
+        "current_balance": float(row[3] or 10000.0),
+        "paper_equity": float(row[4] or 10000.0),
+        "realized_profit": float(row[5] or 0.0),
+        "unrealized_profit": float(row[6] or 0.0),
+        "win_count": int(row[7] or 0),
+        "loss_count": int(row[8] or 0),
+        "total_trades": int(row[9] or 0),
+        "max_drawdown_pct": float(row[10] or 0.0),
+        "is_active": bool(row[11]),
+        "created_at": str(row[12] or ""),
+        "updated_at": str(row[13] or "")
+    }
+
+def update_paper_ledger(updates: dict) -> dict:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    set_clauses = []
+    vals = []
+    for k, v in updates.items():
+        set_clauses.append(f"{k} = ?")
+        vals.append(v)
+    if set_clauses:
+        sql = f"UPDATE mt5_superadmin_paper_ledger SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM mt5_superadmin_paper_ledger LIMIT 1)"
+        cursor.execute(sql, tuple(vals))
+        conn.commit()
+    conn.close()
+    return get_or_create_paper_ledger()
+
+def reset_paper_ledger(capital: float = 10000.0) -> dict:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    cap_val = max(100.0, float(capital or 10000.0))
+    cursor.execute("""
+        UPDATE mt5_superadmin_paper_ledger 
+        SET allocated_capital = ?, current_balance = ?, paper_equity = ?, realized_profit = 0.0,
+            unrealized_profit = 0.0, win_count = 0, loss_count = 0, total_trades = 0, max_drawdown_pct = 0.0,
+            is_active = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT id FROM mt5_superadmin_paper_ledger LIMIT 1)
+    """, (cap_val, cap_val, cap_val))
+    cursor.execute("DELETE FROM mt5_superadmin_paper_trades")
+    conn.commit()
+    conn.close()
+    return get_or_create_paper_ledger(cap_val)
+
+def record_paper_trade(ticket: int, symbol: str, direction: str, lot_size: float, entry_price: float,
+                       sl_price: float, tp1_price: float, tp2_price: float, score: float = 75.0) -> int:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    cursor.execute("""
+        INSERT INTO mt5_superadmin_paper_trades 
+        (ticket, symbol, direction, lot_size, entry_price, sl_price, tp1_price, tp2_price, confluence_score, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+    """, (ticket, symbol, direction, lot_size, entry_price, sl_price, tp1_price, tp2_price, score))
+    trade_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return trade_id
+
+def close_paper_trade(trade_id_or_ticket: int, exit_price: float, pnl_usd: float, reason: str = "TP1_HIT") -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    cursor.execute("""
+        UPDATE mt5_superadmin_paper_trades 
+        SET exit_price = ?, pnl_usd = ?, status = 'CLOSED', exit_reason = ?, closed_at = CURRENT_TIMESTAMP
+        WHERE id = ? OR ticket = ?
+    """, (exit_price, pnl_usd, reason, trade_id_or_ticket, trade_id_or_ticket))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_paper_trades(limit: int = 10, open_only: bool = False) -> list:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    where_clause = "WHERE status = 'OPEN'" if open_only else ""
+    cursor.execute(f"SELECT * FROM mt5_superadmin_paper_trades {where_clause} ORDER BY id DESC LIMIT ?", (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    trades = []
+    for r in rows:
+        trades.append({
+            "id": r[0],
+            "ticket": r[1],
+            "symbol": r[2],
+            "direction": r[3],
+            "lot_size": float(r[4] or 0.0),
+            "entry_price": float(r[5] or 0.0),
+            "sl_price": float(r[6] or 0.0),
+            "tp1_price": float(r[7] or 0.0),
+            "tp2_price": float(r[8] or 0.0),
+            "exit_price": float(r[9] or 0.0),
+            "pnl_usd": float(r[10] or 0.0),
+            "confluence_score": float(r[11] or 0.0),
+            "status": str(r[12] or "OPEN"),
+            "exit_reason": str(r[13] or ""),
+            "created_at": str(r[14] or ""),
+            "closed_at": str(r[15] or "")
+        })
+    return trades

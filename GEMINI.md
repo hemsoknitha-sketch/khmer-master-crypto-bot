@@ -79,6 +79,10 @@
 
 ---
 
+- **Super Admin Institutional Paper Account, Zero-Demo Hard-Lock & Universal PAMM Multi-Tier Decoupling Standard (Invariant 108):** Eliminates all Demo/Virtual Mirror illusions (`GTC_PAMM_BASE_AUM = 0.0`); real pool AUM strictly reflects verified live master balance + verified investor capital; unfunded MT5 broker accounts display `🔴 REAL LIVE MT5 (UNFUNDED / $0.00 USD) ⛔ NO DEMO` and block live order placement; strict decoupling between Super Admin (`859271875`, 100% Treasury retained with 0% fee on self) and VIP users (80/20 HWM split); and deploys the Super Admin Institutional Paper Account Suite (`SuperAdminPaperMT5Engine`) exclusively for `859271875` with 100% dynamic `/mt5` operational parity (inherits all Citadel confluence, breathing stops, Breakeven Armor, scale-out TPs, news shields, and risk clamps in real time) with isolated database persistence (`mt5_superadmin_paper_ledger`).
+
+---
+
 ## 4. AUDIT & DEPLOYMENT PROTOCOL
 1. **Audit First:** Run `python audit_system.py` before and after any code modification. All 66 checks must remain 100% PASS with 0 defects.
 2. **Immediate Git Push:** Commit and push via `python git_push_vps.py "<Clear description>"` or `git add . && git commit -m "..." && git push origin main`.
