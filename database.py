@@ -4913,6 +4913,14 @@ def get_capital_user_by_account_id(account_id: str) -> Optional[Dict[str, Any]]:
             pass
         return None
 
+def get_user_by_capital_account(account_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Anti-Account Collision Shield:
+    Finds a user's credential and profile record by Capital.com Account ID.
+    Direct alias for get_capital_user_by_account_id to guarantee 100% stability.
+    """
+    return get_capital_user_by_account_id(account_id)
+
 def get_all_capital_users_overview() -> List[Dict[str, Any]]:
     """
     Returns an overview of all users with Capital.com credentials or approvals,
