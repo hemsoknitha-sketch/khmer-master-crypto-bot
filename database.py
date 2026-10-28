@@ -3015,7 +3015,11 @@ def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float)
     conn.close()
 
 def get_capital_auto_pnl_summary(chat_id: int) -> dict:
-    """Calculates cumulative PnL, win rate, and total trades for TradFi Auto engine."""
+    """
+    Calculates cumulative PnL, win rate, total trades, behavioral attribution
+    (Pure AI vs Manual Discretionary), System Fidelity / Adherence Ratio (%),
+    and the Institutional Quantitative Trust & Conviction Index.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -3023,7 +3027,11 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
             SELECT COUNT(*),
                    COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0),
                    COALESCE(SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(pnl), 0.0)
+                   COALESCE(SUM(pnl), 0.0),
+                   COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl > 0 THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl < 0 THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN pnl ELSE 0.0 END), 0.0)
             FROM capital_auto_trades
             WHERE chat_id = ? AND status = 'CLOSED'
         """, (chat_id,))
@@ -3035,7 +3043,11 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
                 SELECT COUNT(*),
                        COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0),
                        COALESCE(SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END), 0),
-                       COALESCE(SUM(pnl), 0.0)
+                       COALESCE(SUM(pnl), 0.0),
+                       COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl > 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl < 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN pnl ELSE 0.0 END), 0.0)
                 FROM capital_auto_trades
                 WHERE status = 'CLOSED'
             """)
@@ -3043,21 +3055,74 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
 
         conn.close()
         if row and row[0] > 0:
-            total = row[0]
-            wins = row[1]
-            losses = row[2]
-            tot_pnl = row[3]
+            total = int(row[0])
+            wins = int(row[1])
+            losses = int(row[2])
+            tot_pnl = float(row[3] or 0.0)
             win_rate = (wins / total * 100.0) if total > 0 else 0.0
+            
+            manual_trades = int(row[4] or 0)
+            manual_wins = int(row[5] or 0)
+            manual_losses = int(row[6] or 0)
+            manual_pnl = float(row[7] or 0.0)
+            manual_wr = (manual_wins / manual_trades * 100.0) if manual_trades > 0 else 0.0
+            
+            ai_trades = max(0, total - manual_trades)
+            ai_wins = max(0, wins - manual_wins)
+            ai_losses = max(0, losses - manual_losses)
+            ai_pnl = round(tot_pnl - manual_pnl, 2)
+            ai_wr = (ai_wins / ai_trades * 100.0) if ai_trades > 0 else 0.0
+            
+            fidelity_pct = round((ai_trades / total * 100.0), 1) if total > 0 else 100.0
+            manual_pct = round((manual_trades / total * 100.0), 1) if total > 0 else 0.0
+            
+            # Quantitative System Trust & Conviction Index (0 - 100%)
+            exp_factor = 1.0
+            if tot_pnl > 0:
+                exp_factor = min(1.15, 1.0 + (tot_pnl / max(100.0, total * 4.0)) * 0.1)
+            else:
+                exp_factor = max(0.65, 1.0 + (tot_pnl / max(100.0, total * 4.0)) * 0.2)
+            
+            trust_score = round(min(100.0, max(0.0, fidelity_pct * exp_factor)), 1)
+            if trust_score >= 90.0:
+                trust_badge = "💎 ពេជ្រ (Diamond Conviction 100% - វិន័យកម្រិតស្ថាប័ន)"
+            elif trust_score >= 75.0:
+                trust_badge = "🟢 ខ្ពស់ (High System Fidelity & Trust - ស្មោះត្រង់នឹងប្រព័ន្ធ)"
+            elif trust_score >= 50.0:
+                trust_badge = "🟡 មធ្យម (Moderate - មានការជ្រៀតជ្រែកដោយអារម្មណ៍ខ្លះៗ)"
+            else:
+                trust_badge = "🔴 ជ្រៀតជ្រែកខ្ពស់ (Severe Emotional Drag - សម្រេចចិត្តដោយដៃច្រើន)"
+
             return {
                 "total_trades": total,
                 "win_count": wins,
                 "loss_count": losses,
                 "total_pnl": tot_pnl,
-                "win_rate": round(win_rate, 1)
+                "win_rate": round(win_rate, 1),
+                "ai_trades": ai_trades,
+                "ai_win_count": ai_wins,
+                "ai_loss_count": ai_losses,
+                "ai_pnl": ai_pnl,
+                "ai_win_rate": round(ai_wr, 1),
+                "manual_trades": manual_trades,
+                "manual_win_count": manual_wins,
+                "manual_loss_count": manual_losses,
+                "manual_pnl": round(manual_pnl, 2),
+                "manual_win_rate": round(manual_wr, 1),
+                "system_fidelity_pct": fidelity_pct,
+                "manual_intervention_pct": manual_pct,
+                "trust_score": trust_score,
+                "trust_badge": trust_badge
             }
     except Exception:
         conn.close()
-    return {"total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0}
+    return {
+        "total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0,
+        "ai_trades": 0, "ai_win_count": 0, "ai_loss_count": 0, "ai_pnl": 0.0, "ai_win_rate": 0.0,
+        "manual_trades": 0, "manual_win_count": 0, "manual_loss_count": 0, "manual_pnl": 0.0, "manual_win_rate": 0.0,
+        "system_fidelity_pct": 100.0, "manual_intervention_pct": 0.0, "trust_score": 100.0,
+        "trust_badge": "💎 ពេជ្រ (Diamond Conviction 100%)"
+    }
 
 def record_capital_signal_audit(
     engine: str,

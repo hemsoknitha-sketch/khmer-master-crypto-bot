@@ -25544,6 +25544,9 @@ class TelegramBotThread(BaseThread):
                         
                         try:
                             b_data = f_bal.result(timeout=6.0)
+                            if not b_data.get("success"):
+                                err_txt = b_data.get("error", "Session Auth Failed")
+                                conn_status = f"⚠️ Notice ({err_txt})"
                             bal_val = float(b_data.get("balance", 0.0) or 0.0)
                             avail_val = float(b_data.get("available", 0.0) or 0.0)
                             margin_val = float(b_data.get("deposit", 0.0) or 0.0)
@@ -25603,6 +25606,28 @@ class TelegramBotThread(BaseThread):
             upl_prefix = "🟢 +" if pnl_val >= 0 else "🔴 -"
             realized_prefix = "🟢 +" if tot_realized_pnl >= 0 else "🔴 -"
 
+            bal_note = f"${bal_val:,.2f} {curr}"
+            if "⚠️" in conn_status:
+                bal_note = f"${bal_val:,.2f} {curr} ({conn_status})"
+            elif is_sa and bal_val == 0.0:
+                bal_note = f"$0.00 {curr} (Live មិនទាន់មាន Deposit / កំពុងដំណើរការ Demo Mirror $10,000 🛡️)"
+            elif bal_val == 0.0:
+                bal_note = f"$0.00 {curr} (Awaiting Live Cash Deposit)"
+
+            # Behavioral Fidelity & Trust Index (Invariant 108)
+            fidelity_pct = db_pnl.get("system_fidelity_pct", 100.0)
+            manual_pct = db_pnl.get("manual_intervention_pct", 0.0)
+            trust_score = db_pnl.get("trust_score", 100.0)
+            trust_badge = db_pnl.get("trust_badge", "💎 ពេជ្រ (Diamond Conviction 100%)")
+            ai_trades = db_pnl.get("ai_trades", tot_trades)
+            ai_wr = db_pnl.get("ai_win_rate", wr_pct)
+            ai_pnl = db_pnl.get("ai_pnl", tot_realized_pnl)
+            manual_trades = db_pnl.get("manual_trades", 0)
+            manual_wr = db_pnl.get("manual_win_rate", 0.0)
+            manual_pnl = db_pnl.get("manual_pnl", 0.0)
+            ai_pnl_prefix = "🟢 +" if ai_pnl >= 0 else "🔴 -"
+            man_pnl_prefix = "🟢 +" if manual_pnl >= 0 else "🔴 -"
+
             lines = [
                 "👑 **[CAPITAL.COM VIP INVESTOR DOSSIER & CASH FLOW]** 💎",
                 f"{ui_standards.DIVIDER_HEAVY}",
@@ -25613,7 +25638,7 @@ class TelegramBotThread(BaseThread):
                 f"• API Status ៖ `{conn_status}`",
                 f"{ui_standards.DIVIDER_LIGHT}",
                 f"💵 **របាយការណ៍ចរន្តសាច់ប្រាក់ផ្ទាល់ (Live Cash Flow & Balance) ៖**",
-                f"• សមតុល្យសរុប (Total Balance) ៖ `${bal_val:,.2f} {curr}`",
+                f"• សមតុល្យសរុប (Total Balance) ៖ `{bal_note}`",
                 f"• សាច់ប្រាក់ទំនេរ (Available Cash) ៖ `${avail_val:,.2f} {curr}`",
                 f"• ដើមទុនសុទ្ធ (Net Equity) ៖ `${equity_val:,.2f} {curr}`",
                 f"• ទុនបញ្ចាំប្រើ (Margin Used) ៖ `${margin_val:,.2f} {curr}` ({margin_pct}%)",
@@ -25635,10 +25660,14 @@ class TelegramBotThread(BaseThread):
                     )
 
             lines.append(f"{ui_standards.DIVIDER_LIGHT}")
-            lines.append(f"📈 **កំណត់ត្រាប្រវត្តិជួញដូរ (Performance Ledger) ៖**")
+            lines.append(f"📈 **កំណត់ត្រាប្រវត្តិជួញដូរ & វាយតម្លៃវិន័យវិនិយោគ (Performance & Fidelity) ៖**")
             lines.append(f"• ប្រតិបត្តិការបិទសរុប ៖ `{tot_trades} ជុំ` ({tot_wins} ឈ្នះ / {tot_losses} ចាញ់)")
-            lines.append(f"• អត្រាជោគជ័យ (Win Rate) ៖ `{wr_pct}%`")
-            lines.append(f"• ប្រាក់ចំណេញសុទ្ធបង្គរ (Realized Net PnL) ៖ `{realized_prefix}${abs(tot_realized_pnl):,.2f} USD`")
+            lines.append(f"• អត្រាជោគជ័យជារួម (Win Rate) ៖ `{wr_pct}%` | PnL ៖ `{realized_prefix}${abs(tot_realized_pnl):,.2f} USD`")
+            lines.append(f"• ភាពស្មោះត្រង់នឹងប្រព័ន្ធ (System Fidelity) ៖ `🤖 {fidelity_pct}% AI` vs `👤 {manual_pct}% Manual`")
+            lines.append(f"• 🤖 **Pure AI System (ស្វ័យប្រវត្ត) ៖** `{ai_trades} ជុំ` (WR: `{ai_wr}%` | `{ai_pnl_prefix}${abs(ai_pnl):,.2f} USD`)")
+            if manual_trades > 0:
+                lines.append(f"• 👤 **Manual Decision (សម្រេចចិត្តដោយដៃ) ៖** `{manual_trades} ជុំ` (WR: `{manual_wr}%` | `{man_pnl_prefix}${abs(manual_pnl):,.2f} USD`)")
+            lines.append(f"• សន្ទស្សន៍ទំនុកចិត្តលើប្រព័ន្ធ (System Trust Index) ៖ `{trust_score}/100` | {trust_badge}")
 
             # Recent broker cash flow / transactions
             if broker_txs:
