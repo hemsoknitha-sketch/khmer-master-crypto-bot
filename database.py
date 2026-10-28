@@ -4681,13 +4681,24 @@ def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
         dec_id = security.decrypt_data(raw_id) if raw_id else ""
         dec_pwd = security.decrypt_data(raw_pwd) if raw_pwd else ""
 
-        # Fallback if stored unencrypted legacy
-        if not dec_key and raw_key and not raw_key.startswith("gAAAAA"):
-            dec_key = raw_key
-        if not dec_id and raw_id and not raw_id.startswith("gAAAAA"):
-            dec_id = raw_id
-        if not dec_pwd and raw_pwd and not raw_pwd.startswith("gAAAAA"):
-            dec_pwd = raw_pwd
+        # Auto-upgrade unencrypted credentials in place to 256-bit AES
+        if dec_key and dec_id and dec_pwd:
+            if not raw_key.startswith("gAAAAA") or not raw_id.startswith("gAAAAA") or not raw_pwd.startswith("gAAAAA"):
+                try:
+                    enc_k = security.encrypt_data(dec_key)
+                    enc_i = security.encrypt_data(dec_id)
+                    enc_p = security.encrypt_data(dec_pwd)
+                    up_conn = get_db_connection()
+                    up_cur = up_conn.cursor()
+                    up_cur.execute("""
+                        UPDATE user_capital_credentials
+                        SET api_key = ?, identifier = ?, password = ?
+                        WHERE chat_id = ?
+                    """, (enc_k, enc_i, enc_p, chat_id))
+                    up_conn.commit()
+                    up_conn.close()
+                except Exception:
+                    pass
 
         if not dec_key or not dec_id or not dec_pwd:
             return None

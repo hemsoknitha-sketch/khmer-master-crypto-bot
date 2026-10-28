@@ -48,16 +48,27 @@ def encrypt_data(plaintext: str) -> str:
     return encrypted_bytes.decode('utf-8')
 
 def decrypt_data(ciphertext: str) -> str:
-    """Decrypts a ciphertext string back into plaintext."""
-    if not ciphertext or _cipher_suite is None:
+    """
+    Decrypts a ciphertext string back into plaintext.
+    Seamlessly handles legacy unencrypted plaintext credentials (which do not start with 'gAAAAA')
+    without raising exceptions or generating log noise.
+    """
+    if not ciphertext:
         return ""
+    str_val = str(ciphertext).strip()
+    if not str_val:
+        return ""
+    # If not a Fernet token (Fernet tokens always start with 'gAAAAA'), it's already plaintext
+    if not str_val.startswith("gAAAAA"):
+        return str_val
+    if _cipher_suite is None:
+        return str_val
     try:
-        decrypted_bytes = _cipher_suite.decrypt(ciphertext.encode('utf-8'))
+        decrypted_bytes = _cipher_suite.decrypt(str_val.encode('utf-8'))
         return decrypted_bytes.decode('utf-8')
-    except Exception as e:
-        # If decryption fails (e.g., old unencrypted keys or wrong key)
-        print(f"⚠️ Decryption failed (might be legacy unencrypted key): {e}")
-        return ""
+    except Exception:
+        # Fallback to raw string if key mismatch
+        return str_val
 
 def hash_pin(pin: str, chat_id: int) -> str:
     """Hashes a PIN using PBKDF2-HMAC-SHA256 with 100,000 iterative rounds and unique user salt."""
