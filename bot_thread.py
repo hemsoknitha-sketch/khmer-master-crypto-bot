@@ -25494,17 +25494,29 @@ class TelegramBotThread(BaseThread):
             except Exception:
                 uname = f"User_{target_uid}"
 
+            is_sa = (target_uid in [859271875, 537186806] or db.is_admin(target_uid))
+            sa_live_acc = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188").strip()
+
             acc_id = (creds.get("account_id") if creds else None) or "Awaiting API"
-            is_verified = (creds.get("is_referral_verified", False) if creds else None)
-            if is_verified is None:
-                is_verified = db.is_capital_user_authorized(target_uid)
-            v_badge = "🟢 100% VERIFIED (az48cxia)" if is_verified else "🟡 UNVERIFIED"
+            if is_sa and (not acc_id or acc_id in ["Awaiting API", "N/A"]):
+                acc_id = sa_live_acc
+
+            if is_sa:
+                is_verified = True
+                v_badge = "🟢 100% VERIFIED (Master Super Admin / az48cxia)"
+                if uname in ["N/A", f"User_{target_uid}"]:
+                    uname = "Soknitha (Super Admin)"
+            else:
+                is_verified = (creds.get("is_referral_verified", False) if creds else None)
+                if is_verified is None:
+                    is_verified = db.is_capital_user_authorized(target_uid)
+                v_badge = "🟢 100% VERIFIED (az48cxia)" if is_verified else "🟡 UNVERIFIED"
             
             is_demo = bool(creds.get("is_demo", False)) if creds else bool(auto_cfg.get("is_demo", False))
-            if target_uid == 859271875:
+            if is_sa:
                 is_demo = False
             mode_lbl = "🟡 DEMO ($10,000)" if is_demo else "🟢 LIVE MAINNET (Real Funds)"
-            has_creds = bool(creds and (creds.get("api_key") or target_uid == 859271875))
+            has_creds = bool((creds and (creds.get("api_key") or creds.get("account_id"))) or is_sa)
 
             bal_val = 0.0
             avail_val = 0.0
@@ -25512,7 +25524,12 @@ class TelegramBotThread(BaseThread):
             equity_val = 0.0
             pnl_val = 0.0
             curr = "USD"
-            conn_status = "🟢 CONNECTED (Personal Vault)" if has_creds else "⚪ NOT CONNECTED (Awaiting API)"
+            if is_sa:
+                conn_status = "🟢 CONNECTED (Master Global Vault)"
+            elif has_creds:
+                conn_status = "🟢 CONNECTED (Personal Vault)"
+            else:
+                conn_status = "⚪ NOT CONNECTED (Awaiting API)"
             open_pos = []
             broker_txs = []
 
@@ -25787,10 +25804,25 @@ class TelegramBotThread(BaseThread):
             def _resolve_target(target_input: str) -> tuple:
                 """Resolves chat_id and user record from chat_id or Capital account_id."""
                 raw = str(target_input or "").strip()
+                sa_live_acc = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188").strip()
+
+                # 0. Check Super Admin by chat_id or account_id
+                if raw in ["859271875", sa_live_acc] or (len(raw) >= 6 and raw in sa_live_acc):
+                    sa_rec = {
+                        "chat_id": 859271875,
+                        "account_id": sa_live_acc,
+                        "currency": "USD",
+                        "is_demo": False,
+                        "is_referral_verified": True,
+                        "username": "Soknitha (Super Admin)"
+                    }
+                    return 859271875, sa_rec
+
                 # 1. Lookup by Account ID
                 u_by_acc = db.get_capital_user_by_account_id(raw)
                 if u_by_acc:
                     return u_by_acc["chat_id"], u_by_acc
+
                 # 2. Lookup by direct numeric chat_id
                 try:
                     uid = int(raw)

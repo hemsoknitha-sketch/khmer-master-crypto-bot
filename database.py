@@ -3800,6 +3800,21 @@ def ensure_capital_super_admin_defaults():
 
         # 4. Disable Prop Firm mode for Super Admin so Super Admin is strictly on LIVE MAINNET
         cursor.execute("UPDATE prop_firm_challenge_config SET is_enabled = 0 WHERE chat_id = 859271875")
+
+        # 5. Ensure Super Admin is registered in user_capital_credentials as verified Live Master
+        sa_live_acc = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188").strip()
+        cursor.execute("""
+            INSERT INTO user_capital_credentials (
+                chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
+            ) VALUES (859271875, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', ?, 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                account_id = excluded.account_id,
+                is_demo = 0,
+                is_referral_verified = 1,
+                referral_code = 'az48cxia',
+                updated_at = CURRENT_TIMESTAMP
+        """, (sa_live_acc,))
+
         conn.commit()
         conn.close()
     except Exception as e_sd:
@@ -4771,6 +4786,19 @@ def get_capital_user_by_account_id(account_id: str) -> Optional[Dict[str, Any]]:
     clean_acc = str(account_id or "").strip()
     if not clean_acc:
         return None
+
+    # Priority 0: Check Super Admin Master Locomotive Account ID & Telegram ID
+    sa_live_acc = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188").strip()
+    if clean_acc in [sa_live_acc, "859271875"] or (len(clean_acc) >= 6 and clean_acc in sa_live_acc):
+        return {
+            "chat_id": 859271875,
+            "account_id": sa_live_acc,
+            "currency": "USD",
+            "is_demo": False,
+            "is_referral_verified": True,
+            "username": "Soknitha (Super Admin)"
+        }
+
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
