@@ -3014,31 +3014,34 @@ def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float)
     conn.commit()
     conn.close()
 
-def get_capital_auto_pnl_summary(chat_id: int) -> dict:
+def get_capital_auto_pnl_summary(chat_id: Optional[int] = None) -> dict:
     """
     Calculates cumulative PnL, win rate, total trades, behavioral attribution
     (Pure AI vs Manual Discretionary), System Fidelity / Adherence Ratio (%),
     and the Institutional Quantitative Trust & Conviction Index.
+
+    - If chat_id is provided (> 0), calculates STRICTLY for that specific user (Zero Spillover).
+    - If chat_id is None or 0, calculates fleet-wide aggregated performance across all users.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT COUNT(*),
-                   COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(pnl), 0.0),
-                   COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl > 0 THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl < 0 THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN pnl ELSE 0.0 END), 0.0)
-            FROM capital_auto_trades
-            WHERE chat_id = ? AND status = 'CLOSED'
-        """, (chat_id,))
-        row = cursor.fetchone()
-        
-        # Fallback for admin or single-vault instances: check all closed trades if user-specific query has 0
-        if (not row or row[0] == 0):
+        if chat_id and chat_id > 0:
+            cursor.execute("""
+                SELECT COUNT(*),
+                       COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(pnl), 0.0),
+                       COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl > 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN (tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1) AND pnl < 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN tranche_id = 'MANUAL' OR deal_reference LIKE 'MANUAL%' OR scale_tier = -1 THEN pnl ELSE 0.0 END), 0.0)
+                FROM capital_auto_trades
+                WHERE chat_id = ? AND status = 'CLOSED'
+            """, (chat_id,))
+            row = cursor.fetchone()
+        else:
+            # Fleet-wide aggregate across all users
             cursor.execute("""
                 SELECT COUNT(*),
                        COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0),
@@ -3114,14 +3117,23 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
                 "trust_score": trust_score,
                 "trust_badge": trust_badge
             }
+        else:
+            return {
+                "total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0,
+                "ai_trades": 0, "ai_win_count": 0, "ai_loss_count": 0, "ai_pnl": 0.0, "ai_win_rate": 0.0,
+                "manual_trades": 0, "manual_win_count": 0, "manual_loss_count": 0, "manual_pnl": 0.0, "manual_win_rate": 0.0,
+                "system_fidelity_pct": 100.0, "manual_intervention_pct": 0.0, "trust_score": 100.0,
+                "trust_badge": "🛡️ ត្រៀមជួញដូរ (Clean Slate - មិនទាន់មាន Trade បិទឡើយ)"
+            }
     except Exception:
-        conn.close()
+        try: conn.close()
+        except Exception: pass
     return {
         "total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0,
         "ai_trades": 0, "ai_win_count": 0, "ai_loss_count": 0, "ai_pnl": 0.0, "ai_win_rate": 0.0,
         "manual_trades": 0, "manual_win_count": 0, "manual_loss_count": 0, "manual_pnl": 0.0, "manual_win_rate": 0.0,
         "system_fidelity_pct": 100.0, "manual_intervention_pct": 0.0, "trust_score": 100.0,
-        "trust_badge": "💎 ពេជ្រ (Diamond Conviction 100%)"
+        "trust_badge": "🛡️ ត្រៀមជួញដូរ (Awaiting Trades)"
     }
 
 def record_capital_signal_audit(
@@ -3338,23 +3350,50 @@ def get_capital_signals_audit_summary(engine: Optional[str] = None, days: int = 
         "top_rejection_reasons": sorted(rejections_by_reason.items(), key=lambda x: x[1], reverse=True)[:5]
     }
 
-def get_capital_auto_trades(chat_id: int, limit: int = 50) -> list:
-    """Returns a list of recent TradFi / Forex auto trades for a user."""
+def get_capital_auto_trades(chat_id: Optional[int] = None, limit: int = 50, status: Optional[str] = None) -> list:
+    """
+    Returns a list of recent TradFi / Forex auto trades.
+    - If chat_id is provided (> 0), filters strictly by that user.
+    - If chat_id is None or 0, returns trades across ALL users with investor attribution.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT id, deal_id, deal_reference, epic, direction, size, entry_price, exit_price, sl, tp, pnl, status, created_at, closed_at
-            FROM capital_auto_trades
-            WHERE chat_id = ?
-            ORDER BY id DESC LIMIT ?
-        """, (chat_id, limit))
+        query = """
+            SELECT t.id, t.chat_id, t.deal_id, t.deal_reference, t.epic, t.direction, t.size,
+                   t.entry_price, t.exit_price, t.sl, t.tp, t.pnl, t.status, t.created_at, t.closed_at,
+                   t.scale_tier, t.tranche_id,
+                   COALESCE(u.username, '') as username,
+                   COALESCE(c.account_id, '') as account_id
+            FROM capital_auto_trades t
+            LEFT JOIN users u ON u.chat_id = t.chat_id
+            LEFT JOIN user_capital_credentials c ON c.chat_id = t.chat_id
+        """
+        conditions = []
+        params = []
+        if chat_id and chat_id > 0:
+            conditions.append("t.chat_id = ?")
+            params.append(chat_id)
+        if status:
+            conditions.append("t.status = ?")
+            params.append(status)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY t.id DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
         conn.close()
-        cols = ["id", "deal_id", "deal_reference", "epic", "direction", "size", "entry_price", "exit_price", "sl", "tp", "pnl", "status", "created_at", "closed_at"]
+        cols = ["id", "chat_id", "deal_id", "deal_reference", "epic", "direction", "size",
+                "entry_price", "exit_price", "sl", "tp", "pnl", "status", "created_at", "closed_at",
+                "scale_tier", "tranche_id", "username", "account_id"]
         return [dict(zip(cols, r)) for r in rows]
     except Exception:
-        conn.close()
+        try: conn.close()
+        except Exception: pass
         return []
 
 

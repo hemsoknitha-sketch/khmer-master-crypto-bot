@@ -6842,6 +6842,41 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.edit_text(f_text, parse_mode="Markdown", reply_markup=f_kb)
                 except Exception:
                     await update.effective_message.reply_text(f_text, parse_mode="Markdown", reply_markup=f_kb)
+            elif data.startswith("btn_cap_admin_trades_"):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                target_uid = int(data.replace("btn_cap_admin_trades_", "").strip())
+                try:
+                    await update.callback_query.answer("📜 កំពុងទាញយកកំណត់ត្រាជួញដូរបិទ...")
+                except Exception:
+                    pass
+                t_text, t_kb = await build_capital_trades_ledger_ui(target_uid)
+                try:
+                    await update.effective_message.edit_text(t_text, parse_mode="Markdown", reply_markup=t_kb)
+                except Exception:
+                    await update.effective_message.reply_text(t_text, parse_mode="Markdown", reply_markup=t_kb)
+            elif data == "btn_cap_admin_trades":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                try:
+                    await update.callback_query.answer("📜 កំពុងទាញយកកំណត់ត្រាជួញដូរបិទកងនាវាទាំងអស់...")
+                except Exception:
+                    pass
+                t_text, t_kb = await build_capital_trades_ledger_ui(None)
+                try:
+                    await update.effective_message.edit_text(t_text, parse_mode="Markdown", reply_markup=t_kb)
+                except Exception:
+                    await update.effective_message.reply_text(t_text, parse_mode="Markdown", reply_markup=t_kb)
             elif data.startswith("btn_cap_admin_closeall_"):
                 is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
                 if not is_sa:
@@ -25659,15 +25694,36 @@ class TelegramBotThread(BaseThread):
                         f"  SL: `${p['sl']:,.2f}` | TP: `${p['tp']:,.2f}`"
                     )
 
+            # Direct Broker Trades Audit
+            b_trades = [tx for tx in broker_txs if tx.get("transactionType") == "TRADE"]
+            b_cnt = len(b_trades)
+            b_wins = len([t for t in b_trades if float(t.get("size", 0.0) or 0.0) > 0])
+            b_losses = len([t for t in b_trades if float(t.get("size", 0.0) or 0.0) < 0])
+            b_tot_pnl = sum(float(t.get("size", 0.0) or 0.0) for t in b_trades)
+            b_wr = round((b_wins / b_cnt * 100.0), 1) if b_cnt > 0 else 0.0
+            b_pnl_prefix = "🟢 +" if b_tot_pnl >= 0 else "🔴 -"
+
             lines.append(f"{ui_standards.DIVIDER_LIGHT}")
-            lines.append(f"📈 **កំណត់ត្រាប្រវត្តិជួញដូរ & វាយតម្លៃវិន័យវិនិយោគ (Performance & Fidelity) ៖**")
-            lines.append(f"• ប្រតិបត្តិការបិទសរុប ៖ `{tot_trades} ជុំ` ({tot_wins} ឈ្នះ / {tot_losses} ចាញ់)")
-            lines.append(f"• អត្រាជោគជ័យជារួម (Win Rate) ៖ `{wr_pct}%` | PnL ៖ `{realized_prefix}${abs(tot_realized_pnl):,.2f} USD`")
-            lines.append(f"• ភាពស្មោះត្រង់នឹងប្រព័ន្ធ (System Fidelity) ៖ `🤖 {fidelity_pct}% AI` vs `👤 {manual_pct}% Manual`")
-            lines.append(f"• 🤖 **Pure AI System (ស្វ័យប្រវត្ត) ៖** `{ai_trades} ជុំ` (WR: `{ai_wr}%` | `{ai_pnl_prefix}${abs(ai_pnl):,.2f} USD`)")
-            if manual_trades > 0:
-                lines.append(f"• 👤 **Manual Decision (សម្រេចចិត្តដោយដៃ) ៖** `{manual_trades} ជុំ` (WR: `{manual_wr}%` | `{man_pnl_prefix}${abs(manual_pnl):,.2f} USD`)")
-            lines.append(f"• សន្ទស្សន៍ទំនុកចិត្តលើប្រព័ន្ធ (System Trust Index) ៖ `{trust_score}/100` | {trust_badge}")
+            lines.append(f"📈 **កំណត់ត្រាប្រវត្តិជួញដូរ & វាយតម្លៃវិន័យវិនិយោគជាក់ស្តែង (Performance & Fidelity) ៖**")
+
+            if tot_trades == 0 and b_cnt == 0:
+                lines.append("• _🛡️ គណនីថ្មីស្រឡាង មិនទាន់មានប្រតិបត្តិការបិទឡើយ (Zero Closed Trades - 100% Flat Cash Safe Floor)_")
+                lines.append("• ស្ថានភាពត្រៀមជួញដូរ ៖ `🤖 Bot កំពុងស្កេនរកឱកាស Confluence ខ្ពស់ (ADX ≥ 25, Breakeven Armor)`")
+                lines.append(f"• ភាពស្មោះត្រង់នឹងប្រព័ន្ធ ៖ `🤖 100.0% AI Safe Standby`")
+                lines.append(f"• សន្ទស្សន៍ទំនុកចិត្តលើប្រព័ន្ធ ៖ `100.0/100` | 💎 វិន័យកម្រិតស្ថាប័ន (រង់ចាំទិសដៅច្បាស់ មិន Chasing)")
+            else:
+                if tot_trades > 0:
+                    lines.append(f"• ប្រតិបត្តិការ Bot បិទសរុប (Database) ៖ `{tot_trades} ជុំ` ({tot_wins} ឈ្នះ / {tot_losses} ចាញ់)")
+                    lines.append(f"• អត្រាជោគជ័យ (Bot Win Rate) ៖ `{wr_pct}%` | PnL ៖ `{realized_prefix}${abs(tot_realized_pnl):,.2f} USD`")
+                    lines.append(f"• ភាពស្មោះត្រង់នឹងប្រព័ន្ធ (System Fidelity) ៖ `🤖 {fidelity_pct}% AI` vs `👤 {manual_pct}% Manual`")
+                    lines.append(f"• 🤖 **Pure AI System (ស្វ័យប្រវត្ត) ៖** `{ai_trades} ជុំ` (WR: `{ai_wr}%` | `{ai_pnl_prefix}${abs(ai_pnl):,.2f} USD`)")
+                    if manual_trades > 0:
+                        lines.append(f"• 👤 **Manual Decision (សម្រេចចិត្តដោយដៃ) ៖** `{manual_trades} ជុំ` (WR: `{manual_wr}%` | `{man_pnl_prefix}${abs(manual_pnl):,.2f} USD`)")
+                    lines.append(f"• សន្ទស្សន៍ទំនុកចិត្តលើប្រព័ន្ធ (System Trust Index) ៖ `{trust_score}/100` | {trust_badge}")
+                
+                if b_cnt > 0:
+                    lines.append(f"• ប្រតិបត្តិការលើ Broker (៧ ថ្ងៃចុងក្រោយ) ៖ `{b_cnt} ជុំ` ({b_wins} ឈ្នះ / {b_losses} ចាញ់)")
+                    lines.append(f"• អត្រាឈ្នះលើ Broker ៖ `{b_wr}%` | Realized PnL ៖ `{b_pnl_prefix}${abs(b_tot_pnl):,.2f} USD`")
 
             # Recent broker cash flow / transactions
             if broker_txs:
@@ -25697,7 +25753,7 @@ class TelegramBotThread(BaseThread):
             kb = [
                 [
                     InlineKeyboardButton("🔄 Refresh Report", callback_data=f"btn_cap_admin_inspect_{target_uid}"),
-                    InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu")
+                    InlineKeyboardButton("📜 User Trades Ledger", callback_data=f"btn_cap_admin_trades_{target_uid}")
                 ],
                 [
                     InlineKeyboardButton(f"{'🛑 បិទ Auto' if auto_on else '🟢 បើក Auto'}", callback_data=f"{'btn_cap_admin_off_' if auto_on else 'btn_cap_admin_on_'}{target_uid}"),
@@ -25705,7 +25761,7 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton("💵 Fleet Cash Flow", callback_data="btn_cap_admin_balances"),
-                    InlineKeyboardButton("🎛️ Asset Controls", callback_data="btn_cap_admin_assets")
+                    InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu")
                 ]
             ]
             return "\n".join(lines), InlineKeyboardMarkup(kb)
@@ -25791,19 +25847,121 @@ class TelegramBotThread(BaseThread):
             upl_sign = "+" if total_fleet_upl >= 0 else "-"
             lines.append(f"📈 **សរុបប្រាក់ចំណេញរត់ (Total Fleet UPL) ៖** `{upl_sign}${abs(total_fleet_upl):,.2f} USD`")
             lines.append(f"🚀 **សរុប Positions កំពុងរត់ ៖** `{total_fleet_pos} Positions`")
+
+            # Fleet Historical Closed Trades Performance
+            fleet_pnl = db.get_capital_auto_pnl_summary(None)
+            fl_tot_trades = fleet_pnl.get("total_trades", 0)
+            fl_wins = fleet_pnl.get("win_count", 0)
+            fl_losses = fleet_pnl.get("loss_count", 0)
+            fl_pnl = fleet_pnl.get("total_pnl", 0.0)
+            fl_wr = fleet_pnl.get("win_rate", 0.0)
+            fl_fidelity = fleet_pnl.get("system_fidelity_pct", 100.0)
+            fl_pnl_str = f"🟢 +${fl_pnl:,.2f}" if fl_pnl >= 0 else f"🔴 -${abs(fl_pnl):,.2f}"
+
+            lines.append(f"{ui_standards.DIVIDER_LIGHT}")
+            lines.append(f"🏆 **ប្រវត្តិជួញដូរបិទសរុបកងនាវា (Fleet Closed Trades Ledger) ៖**")
+            lines.append(f"• ប្រតិបត្តិការបិទសរុប ៖ `{fl_tot_trades} ជុំ` ({fl_wins} ឈ្នះ / {fl_losses} ចាញ់)")
+            lines.append(f"• អត្រាឈ្នះរួម (Fleet WR) ៖ `{fl_wr}%` | Realized PnL ៖ `{fl_pnl_str} USD`")
+            lines.append(f"• ភាពស្មោះត្រង់នឹងប្រព័ន្ធ ៖ `🤖 {fl_fidelity}% Pure AI Execution`")
             lines.append(f"{ui_standards.DIVIDER_HEAVY}")
             lines.append("💡 _ចុចប៊ូតុង '🔍 ពិនិត្យ' លើឈ្មោះនីមួយៗ ដើម្បីពិនិត្យលម្អិតដាច់ដោយឡែក!_")
 
             kb_rows.append([
                 InlineKeyboardButton("🔄 Refresh Fleet", callback_data="btn_cap_admin_balances"),
-                InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu")
+                InlineKeyboardButton("📜 Fleet Trades Ledger", callback_data="btn_cap_admin_trades")
             ])
             kb_rows.append([
-                InlineKeyboardButton("🎛️ Asset Controls", callback_data="btn_cap_admin_assets"),
-                InlineKeyboardButton("🔙 /capital Menu", callback_data="btn_cap_menu")
+                InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu"),
+                InlineKeyboardButton("🎛️ Asset Controls", callback_data="btn_cap_admin_assets")
             ])
 
             return "\n".join(lines), InlineKeyboardMarkup(kb_rows)
+
+        async def build_capital_trades_ledger_ui(target_uid: Optional[int] = None, limit: int = 15) -> tuple:
+            """
+            Builds an auditable live closed trade journal & ledger:
+            - If target_uid is None: Fleet-wide closed trades across ALL VIP users.
+            - If target_uid is provided: Closed trades specifically for that VIP user.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import ui_standards
+
+            pnl_summary = db.get_capital_auto_pnl_summary(target_uid)
+            tot_trades = pnl_summary.get("total_trades", 0)
+            tot_wins = pnl_summary.get("win_count", 0)
+            tot_losses = pnl_summary.get("loss_count", 0)
+            tot_pnl = pnl_summary.get("total_pnl", 0.0)
+            wr_pct = pnl_summary.get("win_rate", 0.0)
+            fidelity_pct = pnl_summary.get("system_fidelity_pct", 100.0)
+            pnl_prefix = "🟢 +" if tot_pnl >= 0 else "🔴 -"
+
+            recent_trades = db.get_capital_auto_trades(chat_id=target_uid, limit=limit, status="CLOSED")
+
+            if target_uid and target_uid > 0:
+                u_creds = db.get_user_capital_credentials(target_uid) or {}
+                uname = u_creds.get("username") or db.get_user_name(target_uid) or f"User_{target_uid}"
+                u_acc = u_creds.get("account_id") or "N/A"
+                title = f"📜 **[VIP USER CLOSED TRADES JOURNAL: {uname}]** 💎"
+                scope_desc = f"• **វិនិយោគិន ៖** `{uname}` (`{target_uid}`) | Acc: `{u_acc}`"
+            else:
+                title = "👑 **[CAPITAL.COM FLEET LIVE CLOSED TRADES LEDGER]** 💎"
+                scope_desc = "• **វិសាលភាព ៖** `កងនាវា VIP Traders ទាំងអស់ (Fleet-Wide)`"
+
+            lines = [
+                title,
+                f"{ui_standards.DIVIDER_HEAVY}",
+                scope_desc,
+                f"• ប្រតិបត្តិការបិទសរុប ៖ `{tot_trades} ជុំ` ({tot_wins} ឈ្នះ / {tot_losses} ចាញ់)",
+                f"• អត្រាជោគជ័យ (Win Rate) ៖ `{wr_pct}%` | Realized PnL ៖ `{pnl_prefix}${abs(tot_pnl):,.2f} USD`",
+                f"• ភាពស្មោះត្រង់នឹងប្រព័ន្ធ ៖ `🤖 {fidelity_pct}% Pure AI Execution`",
+                f"{ui_standards.DIVIDER_LIGHT}",
+                f"📜 **កំណត់ត្រាជួញដូរបិទថ្មីៗ (Recent Closed Trades: {len(recent_trades)}) ៖**\n"
+            ]
+
+            if not recent_trades:
+                lines.append("• _🛡️ មិនទាន់មានកំណត់ត្រាជួញដូរបិទ (Closed Trades) នៅក្នុង Database ឡើយ (100% Flat Cash Safe Floor)_")
+            else:
+                for idx, t in enumerate(recent_trades, 1):
+                    epic = t.get("epic", "CFD")
+                    direction = t.get("direction", "BUY")
+                    dir_icon = "🟢 BUY" if direction == "BUY" else "🔴 SELL"
+                    pnl_val = float(t.get("pnl", 0.0) or 0.0)
+                    pnl_lbl = f"+${pnl_val:,.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):,.2f}"
+                    pnl_tag = "🟢 WIN" if pnl_val > 0 else ("🔴 LOSS" if pnl_val < 0 else "⚪ EVEN")
+                    entry_p = float(t.get("entry_price", 0.0) or 0.0)
+                    exit_p = float(t.get("exit_price", 0.0) or 0.0)
+                    t_size = float(t.get("size", 0.0) or 0.0)
+                    t_date = str(t.get("closed_at") or t.get("created_at") or "")[:16]
+                    t_user = t.get("username") or str(t.get("chat_id") or "")
+                    t_acc = t.get("account_id") or ""
+                    acc_short = f" ({t_acc[-6:]})" if len(t_acc) >= 6 else ""
+
+                    user_tag = f"• User: `{t_user}`{acc_short} | " if not target_uid else ""
+                    lines.append(
+                        f"**{idx}. {pnl_tag} {epic}** ({dir_icon} `{t_size}`) ៖ `{pnl_lbl} USD`\n"
+                        f"  {user_tag}Entry: `${entry_p:,.2f}` ➜ Exit: `${exit_p:,.2f}`\n"
+                        f"  📅 `{t_date}` | Tranche: `{t.get('tranche_id', 'SINGLE')}`\n"
+                    )
+
+            lines.append(f"{ui_standards.DIVIDER_HEAVY}")
+            lines.append("💡 _រាល់កំណត់ត្រាទាំងអស់ឆ្លងកាត់ការការពារដោយ Breakeven Armor & Golden Ratchet!_")
+
+            kb = []
+            refresh_cb = f"btn_cap_admin_trades_{target_uid}" if target_uid else "btn_cap_admin_trades"
+            kb.append([
+                InlineKeyboardButton("🔄 Refresh Ledger", callback_data=refresh_cb),
+                InlineKeyboardButton("💵 Fleet Balances", callback_data="btn_cap_admin_balances")
+            ])
+            if target_uid:
+                kb.append([
+                    InlineKeyboardButton("🔍 User Dossier", callback_data=f"btn_cap_admin_inspect_{target_uid}"),
+                    InlineKeyboardButton("📜 Fleet Ledger", callback_data="btn_cap_admin_trades")
+                ])
+            kb.append([
+                InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu")
+            ])
+
+            return "\n".join(lines), InlineKeyboardMarkup(kb)
 
         async def admin_capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
@@ -25964,23 +26122,26 @@ class TelegramBotThread(BaseThread):
 
                 kb_rows.append([
                     InlineKeyboardButton("💵 Fleet Cash Flow & Balances", callback_data="btn_cap_admin_balances"),
-                    InlineKeyboardButton("🔄 Refresh Directory", callback_data="btn_cap_admin_menu")
+                    InlineKeyboardButton("📜 Fleet Trades Ledger", callback_data="btn_cap_admin_trades")
                 ])
                 kb_rows.append([
                     InlineKeyboardButton("🎛️ Asset Controls (Stocks/Crypto)", callback_data="btn_cap_admin_assets"),
-                    InlineKeyboardButton("👑 Total Spread Audit (Live)", callback_data="btn_cap_admin_total_spread")
+                    InlineKeyboardButton("🔄 Refresh Directory", callback_data="btn_cap_admin_menu")
+                ])
+                kb_rows.append([
+                    InlineKeyboardButton("👑 Total Spread Audit (Live)", callback_data="btn_cap_admin_total_spread"),
+                    InlineKeyboardButton("📄 Export JSON", callback_data="btn_cap_admin_spread_json")
                 ])
                 kb_rows.append([
                     InlineKeyboardButton("🌐 ALL USERS: ON", callback_data="btn_cap_all_users_on"),
                     InlineKeyboardButton("🛑 ALL USERS: OFF", callback_data="btn_cap_all_users_off")
                 ])
-                kb_rows.append([
-                    InlineKeyboardButton("📄 Export JSON", callback_data="btn_cap_admin_spread_json")
-                ])
 
                 lines.append(f"{ui_standards.DIVIDER_HEAVY}")
                 lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
                 lines.append("• `` `/admin_capital inspect <Account_ID_or_User_ID>` `` (ពិនិត្យរបាយការណ៍វិនិយោគ & ចរន្តសាច់ប្រាក់)")
+                lines.append("• `` `/admin_capital trades` `` (ពិនិត្យ Live កំណត់ត្រាប្រវត្តិជួញដូរបិទរួមរបស់ All Users)")
+                lines.append("• `` `/admin_capital trades <Account_ID_or_User_ID>` `` (ពិនិត្យកំណត់ត្រាប្រវត្តិជួញដូរ User ជាក់ស្តែង)")
                 lines.append("• `` `/admin_capital balances` `` (ពិនិត្យចរន្តសាច់ប្រាក់ & Equity កងនាវាទាំងអស់)")
                 lines.append("• `` `/admin_capital on <Account_ID> 400 live 10 24/7` `` (បើក Auto Trade ១០ កាក់ ស្មើដៃ Admin ២៤/៧)")
                 lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade កម្រិតទូទៅ)")
@@ -26207,6 +26368,15 @@ class TelegramBotThread(BaseThread):
                     f"💎 _គ្រប់មុខតំណែងត្រូវបានជម្រះជាសាច់ប្រាក់សុទ្ធ (Flat Cash) ១០០% ដោយសុវត្ថិភាព!_",
                     parse_mode="Markdown"
                 )
+                return
+
+            # Command: /admin_capital TRADES [chat_id_or_acc_id]
+            elif sub in ["TRADES", "TRADE", "HISTORY", "JOURNAL", "CLOSED", "DEALS", "LEDGER"]:
+                target_uid = None
+                if len(args) >= 2:
+                    target_uid, _ = _resolve_target(args[1])
+                t_text, t_kb = await build_capital_trades_ledger_ui(target_uid)
+                await update.effective_message.reply_text(t_text, parse_mode="Markdown", reply_markup=t_kb)
                 return
 
         async def admin_mt5_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
