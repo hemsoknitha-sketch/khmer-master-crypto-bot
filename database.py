@@ -9716,6 +9716,8 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
         ef = "capital"
     elif ef in ["reachsey", "matrix", "basket"]:
         ef = "reachsey"
+    elif ef in ["pamm", "mt5", "gtc", "gtc_pamm", "pool"]:
+        ef = "pamm"
     else:
         ef = None
 
@@ -9737,7 +9739,8 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
         "grid": {"name": "/compound_grid", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
         "flash_loan": {"name": "/flash_loan", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
         "capital": {"name": "/capital", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
-        "reachsey": {"name": "/reachsey", "pnl": 0.0, "trades": 0, "wins": 0, "active": False}
+        "reachsey": {"name": "/reachsey", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
+        "pamm": {"name": "/pamm", "pnl": 0.0, "trades": 0, "wins": 0, "active": False}
     }
 
     # Check active engines across all trading platforms
@@ -9793,6 +9796,18 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
     try:
         reach_on = (get_system_setting(f"reachsey_active_{chat_id}", "0") == "1")
         engines["reachsey"]["active"] = bool(reach_on)
+    except Exception:
+        pass
+
+    try:
+        pamm_rec = get_or_create_virtual_ledger(chat_id)
+        pamm_pnl = float(pamm_rec.get("realized_profit", 0.0) or 0.0)
+        pamm_alloc = float(pamm_rec.get("allocated_capital", 0.0) or 0.0)
+        pamm_act = bool(pamm_rec.get("is_active") and pamm_alloc > 0)
+        engines["pamm"]["pnl"] = pamm_pnl
+        engines["pamm"]["active"] = pamm_act
+        if ef == "pamm" and pamm_pnl != 0.0:
+            total_pnl += pamm_pnl
     except Exception:
         pass
 
@@ -9980,6 +9995,79 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
                         wins += ws_w
         except Exception:
             pass
+
+        # 5. Query capital_auto_trades for closed TradFi positions
+        if not ef or ef == "capital":
+            try:
+                cap_q = "SELECT id, epic, direction, entry_price, exit_price, size, created_at, closed_at, pnl FROM capital_auto_trades WHERE chat_id = ? AND status = 'CLOSED'"
+                cap_params = [chat_id]
+                if cutoff_str:
+                    cap_q += " AND (closed_at >= ? OR (closed_at IS NULL AND created_at >= ?))"
+                    cap_params.extend([cutoff_str, cutoff_str])
+                cap_q += " ORDER BY id DESC"
+                cursor.execute(cap_q, tuple(cap_params))
+                cap_rows = cursor.fetchall()
+                for cr in cap_rows:
+                    c_id, c_epic, c_dir, c_in, c_out, c_sz, c_crt, c_cls, c_pnl = cr
+                    cp_val = float(c_pnl or 0.0)
+                    total_pnl += cp_val
+                    total_trades += 1
+                    is_win = cp_val >= 0
+                    if is_win:
+                        wins += 1
+                    engines["capital"]["pnl"] += cp_val
+                    engines["capital"]["trades"] += 1
+                    if is_win:
+                        engines["capital"]["wins"] += 1
+
+                    if len(recent_trades) < 5:
+                        c_in_p = float(c_in or 0.0)
+                        c_out_p = float(c_out or 0.0)
+                        c_roi = round(((c_out_p - c_in_p) / c_in_p * 100.0) if c_in_p > 0 and c_dir == 'BUY' else ((c_in_p - c_out_p) / c_in_p * 100.0 if c_in_p > 0 else 0.0), 2)
+                        recent_trades.append({
+                            "id": f"#C{c_id}",
+                            "symbol": c_epic or "GOLD",
+                            "side": c_dir or "BUY",
+                            "type": "TRADFI_CFD",
+                            "qty": f"{float(c_sz or 0.0):.2f} Lots",
+                            "entry_price": c_in_p,
+                            "exit_price": c_out_p,
+                            "time": str(c_cls or c_crt or "")[:19],
+                            "pnl": cp_val,
+                            "roi": c_roi,
+                            "commission": 0.0,
+                            "funding": 0.0,
+                            "net_pnl": cp_val,
+                            "engine": "capital"
+                        })
+            except Exception as ce:
+                pass
+
+        # 6. Query capital_scalp_trades for closed scalp positions
+        if not ef or ef == "capital":
+            try:
+                scalp_q = "SELECT id, epic, direction, entry_price, sl, tp, budget, timestamp, pnl FROM capital_scalp_trades WHERE chat_id = ? AND status != 'OPEN'"
+                scalp_params = [chat_id]
+                if cutoff_str:
+                    scalp_q += " AND timestamp >= ?"
+                    scalp_params.append(cutoff_str)
+                scalp_q += " ORDER BY id DESC"
+                cursor.execute(scalp_q, tuple(scalp_params))
+                scalp_rows = cursor.fetchall()
+                for sr in scalp_rows:
+                    s_id, s_epic, s_dir, s_in, s_sl, s_tp, s_bdg, s_time, s_pnl = sr
+                    sp_val = float(s_pnl or 0.0)
+                    total_pnl += sp_val
+                    total_trades += 1
+                    is_win = sp_val >= 0
+                    if is_win:
+                        wins += 1
+                    engines["capital"]["pnl"] += sp_val
+                    engines["capital"]["trades"] += 1
+                    if is_win:
+                        engines["capital"]["wins"] += 1
+            except Exception:
+                pass
     except Exception:
         pass
     finally:

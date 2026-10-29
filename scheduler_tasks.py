@@ -6252,13 +6252,18 @@ async def trailing_guard_monitor(app: Application):
 
 async def build_executive_summary_report(chat_id: int, timeframe: str = "daily", engine_filter: str = None):
     """
-    Super Smart & Institutional Mobile-Responsive Executive Summary Report Builder.
-    Supports Multi-Timeframe (daily, monthly, yearly, lifetime) and Multi-Engine attribution.
-    Enforces 22-char separator lines for zero mobile line-wrapping.
+    Super Smart Institutional Tri-Platform Executive Summary Report Builder (Binance + Capital.com + GTC PAMM).
+    - Mathematically isolated per user BOT ID (chat_id) with Zero Cross-Tenant Contagion.
+    - Deep Tri-Venue attribution: Binance Crypto, Capital.com TradFi, GTC PAMM / MT5 Master Fund.
+    - Explicit Connection Status (CONNECTED vs NOT CONNECTED) with 1-tap actionable command guidance.
+    - Fiduciary Capital Protection: Zero division by near-zero dust balances (Eradicates +1075000000.00% bug).
+    - Enforces 22-char DIVIDER_HEAVY formatting for zero mobile line-wrapping.
     """
     import trading_engine
+    import capital_engine
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     from datetime import datetime
+    from ui_standards import DIVIDER_HEAVY, DIVIDER_LIGHT, DIVIDER_DASH, OFFICIAL_FOOTNOTE
 
     user_lang = db.get_user_language(chat_id) or 'km'
     if user_lang in ['km', 'khmer', '0', '1', 'auto'] or str(user_lang).isdigit():
@@ -6279,44 +6284,190 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     engines = data.get("engines", {})
     recent_trades = data.get("recent_trades", [])
 
-    # Balance Query
-    keys = db.get_user_api(chat_id)
-    has_api = bool(keys and keys[0] and keys[1])
-    free_usdt = 0.0
-    futures_margin = 0.0
-    avail_margin = 0.0
-
-    if has_api:
-        try:
-            free_usdt = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
-        except Exception as e:
-            print(f"Error fetching spot balance: {e}")
-        try:
-            fut_bal, _ = await asyncio.to_thread(trading_engine.get_futures_balance_detailed, keys[0], keys[1], "USDT")
-            futures_margin = float(fut_bal or 0.0)
-        except Exception as e:
-            print(f"Error fetching futures wallet balance: {e}")
-        try:
-            avail_margin = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
-        except Exception as e:
-            print(f"Error fetching futures available margin: {e}")
-
-    total_equity = free_usdt + futures_margin
-    base_cap = total_equity if total_equity > 0 else 100.0
-    growth_pct = round((net_profit / base_cap * 100.0), 2)
-
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    from ui_standards import DIVIDER_HEAVY, DIVIDER_LIGHT, DIVIDER_DASH, OFFICIAL_FOOTNOTE
     sep = DIVIDER_HEAVY
     dash_sep = DIVIDER_DASH
     line_sep = DIVIDER_LIGHT
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     cur_tf = (timeframe or "daily").lower().strip()
     cur_eng = (engine_filter or "").lower().strip() if engine_filter else "all"
     if cur_eng in ["none", ""]:
         cur_eng = "all"
 
-    # Dynamic Engine Allocations from DB
+    # =========================================================================
+    # 1. 🏢 BINANCE CRYPTO VENUE LIVE TELEMETRY
+    # =========================================================================
+    keys = db.get_user_api(chat_id)
+    has_binance = bool(keys and keys[0] and keys[1])
+    free_usdt = 0.0
+    futures_margin = 0.0
+    avail_margin = 0.0
+    binance_open_positions = []
+    binance_floating_pnl = 0.0
+
+    if has_binance:
+        try:
+            free_usdt = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
+        except Exception as e:
+            print(f"Error fetching spot balance for {chat_id}: {e}")
+        try:
+            fut_bal, _ = await asyncio.to_thread(trading_engine.get_futures_balance_detailed, keys[0], keys[1], "USDT")
+            futures_margin = float(fut_bal or 0.0)
+        except Exception as e:
+            print(f"Error fetching futures wallet balance for {chat_id}: {e}")
+        try:
+            avail_margin = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
+        except Exception as e:
+            print(f"Error fetching futures available margin for {chat_id}: {e}")
+        try:
+            fut_positions = await asyncio.to_thread(trading_engine.get_futures_positions, keys[0], keys[1]) or []
+            for p in fut_positions:
+                p_amt = float(p.get("positionAmt", 0.0) or 0.0)
+                if p_amt != 0.0:
+                    p_u = float(p.get("unRealizedProfit", 0.0) or 0.0)
+                    binance_floating_pnl += p_u
+                    binance_open_positions.append({
+                        "symbol": str(p.get("symbol", "")),
+                        "side": "LONG" if p_amt > 0 else "SHORT",
+                        "pnl": p_u,
+                        "leverage": int(p.get("leverage", 10) or 10),
+                        "venue": "Binance Futures"
+                    })
+        except Exception:
+            pass
+        try:
+            spot_active = await asyncio.to_thread(db.get_active_trades_by_user, chat_id) or []
+            for st in spot_active:
+                s_sym = st[1]
+                s_qty = float(st[2])
+                s_buy = float(st[3])
+                s_cur = await asyncio.to_thread(trading_engine.get_current_price, s_sym) or s_buy
+                s_pnl, _ = trading_engine.calculate_net_pnl(s_buy, s_cur, s_qty)
+                binance_floating_pnl += s_pnl
+                binance_open_positions.append({
+                    "symbol": s_sym,
+                    "side": "BUY (Spot)",
+                    "pnl": s_pnl,
+                    "leverage": 1,
+                    "venue": "Binance Spot"
+                })
+        except Exception:
+            pass
+
+    crypto_equity = free_usdt + futures_margin
+    binance_status = "🟢 CONNECTED" if has_binance else "🔴 NOT CONNECTED (វាយ /add_api)"
+
+    if binance_open_positions:
+        b_pos_lines = [f"├ 📊 Positions : `{len(binance_open_positions)} Active Positions`"]
+        for bp in binance_open_positions[:2]:
+            b_pnl = bp.get("pnl", 0.0)
+            b_em = "🟢" if b_pnl >= 0 else "🔴"
+            b_pos_lines.append(f"├ 🪙 {bp.get('symbol')} ({bp.get('side')} {bp.get('leverage')}x) : `{b_pnl:+,.2f} USDT` {b_em}")
+        b_pos_lines.append(f"└ 💸 Floating PnL : `{binance_floating_pnl:+,.2f} USDT`")
+        binance_pos_text = chr(10).join(b_pos_lines)
+    elif has_binance:
+        binance_pos_text = "└ 🟢 `100% Cash Harvested — គ្មាន Position ត្រាំឡើយ!`"
+    else:
+        binance_pos_text = "└ 🔴 `មិនទាន់ភ្ជាប់ API — សូមវាយ /add_api`"
+
+    # =========================================================================
+    # 2. 🏛️ CAPITAL.COM TRADFI VENUE LIVE TELEMETRY
+    # =========================================================================
+    has_cap = db.has_user_capital_credentials(chat_id) or (chat_id in [859271875, 537186806])
+    cap_balance = 0.0
+    cap_equity = 0.0
+    cap_avail = 0.0
+    cap_deposit = 0.0
+    cap_is_demo = False
+    cap_open_positions = []
+    cap_account_id = ""
+
+    if has_cap:
+        try:
+            cap_eng = capital_engine.get_user_capital_engine(chat_id)
+            cap_acc = await asyncio.to_thread(cap_eng.get_account_balance)
+            if cap_acc.get("success"):
+                cap_balance = float(cap_acc.get("balance", 0.0) or 0.0)
+                cap_equity = float(cap_acc.get("equity", 0.0) or 0.0)
+                cap_avail = float(cap_acc.get("available", 0.0) or 0.0)
+                cap_deposit = float(cap_acc.get("deposit", 0.0) or 0.0)
+                cap_is_demo = bool(cap_acc.get("is_demo", False))
+                cap_account_id = str(cap_acc.get("account_id", ""))
+        except Exception as e:
+            print(f"Error fetching capital account balance for {chat_id}: {e}")
+
+        try:
+            cap_open_positions = await asyncio.to_thread(db.get_capital_open_trades_by_chat_id, chat_id) or []
+        except Exception:
+            pass
+
+        cap_mode_badge = "DEMO" if cap_is_demo else "LIVE"
+        cap_status_badge = f"🟢 CONNECTED ({cap_mode_badge})"
+    else:
+        cap_status_badge = "⚪ NOT CONNECTED (វាយ /capital login)"
+
+    if cap_open_positions:
+        c_pos_lines = [f"├ 📊 Positions : `{len(cap_open_positions)} Active Positions`"]
+        for cp in cap_open_positions[:2]:
+            c_epic = cp.get("epic", "GOLD")
+            c_dir = cp.get("direction", "BUY")
+            c_sz = float(cp.get("size", 0.0) or 0.0)
+            c_entry = float(cp.get("entry_price", 0.0) or 0.0)
+            c_pos_lines.append(f"├ 📈 {c_epic} ({c_dir} {c_sz:.2f} lots @ ${c_entry:,.2f})")
+        c_pos_lines.append(f"└ 🎯 360° Citadel : `In-Flight Management Active`")
+        cap_pos_text = chr(10).join(c_pos_lines)
+    elif has_cap:
+        cap_pos_text = "└ 🟢 `100% Cash Harvested — គ្មាន Position ត្រាំឡើយ!`"
+    else:
+        cap_pos_text = "└ ⚪ `មិនទាន់ភ្ជាប់ API — សូមវាយ /capital login`"
+
+    cap_auto_summary = await asyncio.to_thread(db.get_capital_auto_pnl_summary, chat_id)
+    cap_trust_score = cap_auto_summary.get("trust_score", 100.0)
+    cap_trust_badge = cap_auto_summary.get("trust_badge", "💎 ពេជ្រ")
+
+    # =========================================================================
+    # 3. 🏦 GTC PAMM / MT5 MASTER FUND LIVE TELEMETRY
+    # =========================================================================
+    pamm_ledger = await asyncio.to_thread(db.get_or_create_virtual_ledger, chat_id)
+    pamm_alloc = float(pamm_ledger.get("allocated_capital", 0.0) or 0.0)
+    pamm_equity = float(pamm_ledger.get("virtual_equity", 0.0) or 0.0)
+    pamm_balance = float(pamm_ledger.get("current_balance", 0.0) or 0.0)
+    pamm_realized = float(pamm_ledger.get("realized_profit", 0.0) or 0.0)
+    pamm_share = float(pamm_ledger.get("pool_share_pct", 0.0) or 0.0)
+    pamm_split = float(pamm_ledger.get("profit_split_pct", 80.0) or 80.0)
+    pamm_risk_level = str(pamm_ledger.get("risk_level", "BALANCED"))
+    pamm_risk_pct = float(pamm_ledger.get("risk_per_trade_pct", 1.5))
+    pamm_reinvest = bool(pamm_ledger.get("auto_reinvest", True))
+    pamm_account_id = str(pamm_ledger.get("account_id", f"VIRTUAL-{chat_id}"))
+    pamm_is_active = bool(pamm_ledger.get("is_active") and pamm_alloc > 0)
+    pamm_status_badge = f"🟢 ALLOCATED (Share: {pamm_share:.2f}%)" if pamm_is_active else "⚪ STANDBY (វាយ /pamm)"
+
+    # =========================================================================
+    # 4. FIDUCIARY CAPITAL ALLOCATION & SAFE ROI (NO DUST DIVISION)
+    # =========================================================================
+    total_portfolio_cap = crypto_equity + cap_equity + (pamm_alloc if pamm_is_active else 0.0)
+
+    def _calc_safe_roi(pnl_val: float, cap_val: float) -> str:
+        if cap_val >= 10.0:
+            r = round((pnl_val / cap_val) * 100.0, 2)
+            s = "+" if r >= 0 else ""
+            return f"{s}{r:.2f}%"
+        elif cap_val > 0.0 and cap_val < 10.0:
+            s = "+" if pnl_val >= 0 else ""
+            return f"{s}${pnl_val:,.2f}"
+        else:
+            s = "+" if pnl_val >= 0 else ""
+            return f"{s}${pnl_val:,.2f}"
+
+    net_sign = "+" if net_profit >= 0 else ""
+    if total_portfolio_cap >= 10.0:
+        growth_pct = round((net_profit / total_portfolio_cap * 100.0), 2)
+        growth_sign = "+" if growth_pct >= 0 else ""
+        growth_str = f"{growth_sign}{growth_pct:.2f}% Net"
+    else:
+        growth_str = f"{net_sign}${net_profit:,.2f} Net (Base < $10)"
+
+    # Sub-Engine Allocations from DB
     turbo_bots = db.get_user_turbo_hedge_bots(chat_id)
     turbo_act = "ACTIVE" if turbo_bots else "STANDBY"
     turbo_amt = sum(float(b.get("amount", 0.0)) for b in turbo_bots) if turbo_bots else 0.0
@@ -6364,9 +6515,9 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     funding_act = "ACTIVE" if is_funding else "STANDBY"
 
     cap_alloc = float(db.get_system_setting(f"capital_alloc_{chat_id}", "0.0") or 0.0)
-    cap_act = "ACTIVE" if (db.get_system_setting(f"capital_active_{chat_id}", "0") == "1" or cap_alloc > 0) else "STANDBY"
+    cap_act = "ACTIVE" if (db.get_system_setting(f"capital_active_{chat_id}", "0") == "1" or cap_alloc > 0 or has_cap) else "STANDBY"
     cap_pnl = engines.get("capital", {}).get("pnl", 0.0)
-    cap_res_str = f"${cap_alloc:,.2f} USD" if cap_alloc > 0 else "$0.00 (Standby)"
+    cap_res_str = f"${cap_alloc:,.2f} USD" if cap_alloc > 0 else ("$0.00 (API Connected)" if has_cap else "$0.00 (Standby)")
 
     reach_setting = (db.get_system_setting(f"reachsey_active_{chat_id}", "0") == "1")
     reach_act = "ACTIVE" if reach_setting else "STANDBY"
@@ -6374,57 +6525,78 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     reach_alloc = float(db.get_system_setting(f"reachsey_alloc_{chat_id}", "0.0") or 0.0)
     reach_res_str = f"${reach_alloc:,.2f} USD" if reach_alloc > 0 else "$0.00 (Standby)"
 
-    # Query real live open positions & floating PnL across platforms
-    live_open_positions = []
-    live_floating_pnl = 0.0
-    if has_api:
-        try:
-            fut_positions = await asyncio.to_thread(trading_engine.get_futures_positions, keys[0], keys[1]) or []
-            for p in fut_positions:
-                p_amt = float(p.get("positionAmt", 0.0) or 0.0)
-                if p_amt != 0.0:
-                    p_u = float(p.get("unRealizedProfit", 0.0) or 0.0)
-                    live_floating_pnl += p_u
-                    live_open_positions.append({
-                        "symbol": str(p.get("symbol", "")),
-                        "side": "LONG" if p_amt > 0 else "SHORT",
-                        "pnl": p_u,
-                        "leverage": int(p.get("leverage", 10) or 10),
-                        "venue": "Binance Futures"
-                    })
-        except Exception:
-            pass
-
-    try:
-        spot_active = await asyncio.to_thread(db.get_active_trades_by_user, chat_id) or []
-        for st in spot_active:
-            s_sym = st[1]
-            s_qty = float(st[2])
-            s_buy = float(st[3])
-            s_cur = await asyncio.to_thread(trading_engine.get_current_price, s_sym) or s_buy
-            s_pnl, _ = trading_engine.calculate_net_pnl(s_buy, s_cur, s_qty)
-            live_floating_pnl += s_pnl
-            live_open_positions.append({
-                "symbol": s_sym,
-                "side": "BUY (Spot)",
-                "pnl": s_pnl,
-                "leverage": 1,
-                "venue": "Binance Spot"
-            })
-    except Exception:
-        pass
-
     msg_lines = []
 
-    if cur_eng == "wealth":
+    # =========================================================================
+    # 5. DEDICATED ENGINE AUDIT VIEWS
+    # =========================================================================
+    if cur_eng == "capital":
+        import portfolio_circuit_breaker
+        gov_status = portfolio_circuit_breaker.CapitalDailyAGIGovernor.get_user_status(chat_id, total_portfolio_cap) if hasattr(portfolio_circuit_breaker, 'CapitalDailyAGIGovernor') else {}
+        is_tgt_locked = gov_status.get("is_target_locked", False)
+        is_floor_hit = gov_status.get("is_loss_locked", False)
+        gov_str = "🏆 TARGET LOCKED (+5%)" if is_tgt_locked else ("🛡️ LOSS FLOOR (-2.5%)" if is_floor_hit else "🟢 NORMAL (+5% Cap / -2.5% Floor)")
+        cap_creds_alert = "" if has_cap else "⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/capital login`)"
+        msg_lines = [
+            f"👑 *APEX VIP AUDIT — 🏛️ CAPITAL.COM TRADFI*",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ *Mode ៖* `TradFi CFDs (Gold, US100, US500, Tech Equities)`",
+            sep,
+            f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
+            f"💵 Balance   : `${cap_balance:,.2f} USD`",
+            f"📈 Equity    : `${cap_equity:,.2f} USD`",
+            f"🏦 Avail Mgn : `${cap_avail:,.2f} USD`",
+            f"💎 Used Mgn  : `${cap_deposit:,.2f} USD`"
+        ]
+        if cap_creds_alert:
+            msg_lines.append(cap_creds_alert)
+        msg_lines.extend([
+            sep,
+            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន CAPITAL (SPECS)*",
+            f"├ 🏛️ ស្ថានភាព     : `[{cap_status_badge}]`",
+            f"├ 💵 ទុនបម្រុង     : `{cap_res_str}`",
+            f"├ 🛡️ Sky Net 360° : `7-Layer Pre-Flight Confluence`",
+            f"├ 🎯 AGI Governor : `{gov_str}`",
+            f"├ 🌾 Spread Guard : `Max 10x Hurdle (Spread <= 0.90$)`",
+            f"├ 📐 Kelly Sizer  : `Fractional Kelly Criterion (0.25x)`",
+            f"├ 💎 Trust Index  : `{cap_trust_score}% ({cap_trust_badge})`",
+            f"└ 🔒 Trailing Lock: `Breakeven Armor & 85% Cash Harvest`",
+            sep,
+            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
+        ])
+    elif cur_eng == "pamm":
+        pamm_creds_alert = "" if pamm_is_active else "⚠️ មិនទាន់បែងចែកទុន (សូមវាយ `/pamm` ដើម្បីបើកដំណើរការ)"
+        msg_lines = [
+            f"👑 *APEX VIP AUDIT — 🏦 GTC PAMM / MT5 MASTER FUND*",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ *Mode ៖* `Institutional Multi-Asset Pool (Gold, Indices, FX)`",
+            sep,
+            f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
+            f"💵 Allocated : `${pamm_alloc:,.2f} USD`",
+            f"📈 Equity    : `${pamm_equity:,.2f} USD`",
+            f"🏦 Balance   : `${pamm_balance:,.2f} USD`",
+            f"💎 Realized  : `${pamm_realized:+,.2f} USD`"
+        ]
+        if pamm_creds_alert:
+            msg_lines.append(pamm_creds_alert)
+        msg_lines.extend([
+            sep,
+            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន PAMM (SPECS)*",
+            f"├ 🏦 ស្ថានភាព     : `[{'ACTIVE' if pamm_is_active else 'STANDBY'}]`",
+            f"├ 🆔 Account ID  : `{pamm_account_id}`",
+            f"├ 📊 Pool Share  : `{pamm_share:.2f}% of Total Pool`",
+            f"├ 💎 Profit Split: `{pamm_split:.0f}% VIP Investor / {100-pamm_split:.0f}% Performance Fee`",
+            f"├ ⚖️ Risk Level  : `{pamm_risk_level} ({pamm_risk_pct}% per trade)`",
+            f"├ 🔄 Reinvest    : `{'ON (Snowball Compounding)' if pamm_reinvest else 'OFF (Cash Extraction)'}`",
+            f"└ 🛡️ Segregation : `Zero Cross-Tenant Contagion (Isolated Ledger)`",
+            sep,
+            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
+        ])
+    elif cur_eng == "wealth":
         wb_coins = wb.get("active_coins", []) if wb else []
         ws_coins = ws.get("active_coins", []) if ws else []
-        wb_pnl = float(wb.get("total_realized_pnl", 0.0) or 0.0) if wb else 0.0
-        ws_pnl = float(ws.get("total_realized_pnl", 0.0) or 0.0) if ws else 0.0
         w_lev = wb.get("leverage", 10) if wb else 10
         w_spot_tp = ws.get("target_tp", 6.0) if ws else 6.0
-        w_fut_tp = wb.get("target_tp", 10.0) if wb else 10.0
-
         msg_lines = [
             f"👑 *APEX VIP AUDIT — 💎 24/7 PERPETUAL WEALTH*",
             f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
@@ -6433,11 +6605,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"💵 Spot Bal  : `${free_usdt:,.2f}`",
             f"📈 Futures   : `${futures_margin:,.2f}`",
-            f"💎 Net Total : `${total_equity:,.2f}`"
+            f"💎 Net Total : `${crypto_equity:,.2f}`"
         ]
-        if not has_api:
+        if not has_binance:
             msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
-
         msg_lines.extend([
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន WEALTH (SPECS)*",
@@ -6469,11 +6640,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"📈 Futures   : `${futures_margin:,.2f}`",
             f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
-            f"💎 Net Total : `${total_equity:,.2f}`"
+            f"💎 Net Total : `${crypto_equity:,.2f}`"
         ]
-        if not has_api:
+        if not has_binance:
             msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
-
         msg_lines.extend([
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
@@ -6497,11 +6667,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"💵 Spot / Fut: `${free_usdt:,.2f}` / `${futures_margin:,.2f}`",
-            f"💎 Net Total : `${total_equity:,.2f}`"
+            f"💎 Net Total : `${crypto_equity:,.2f}`"
         ]
-        if not has_api:
+        if not has_binance:
             msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
-
         msg_lines.extend([
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
@@ -6522,11 +6691,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"💵 Spot Bal  : `${free_usdt:,.2f}`",
-            f"💎 Net Total : `${total_equity:,.2f}`"
+            f"💎 Net Total : `${crypto_equity:,.2f}`"
         ]
-        if not has_api:
+        if not has_binance:
             msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
-
         msg_lines.extend([
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
@@ -6546,7 +6714,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"🌐 Multi-Chain: `Solana / EVM Settlement`",
-            f"💎 Net Total : `${total_equity:,.2f}`",
+            f"💎 Net Total : `${crypto_equity:,.2f}`",
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
             f"├ ⚡ ស្ថានភាព     : `[{swap_act}]`",
@@ -6566,11 +6734,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"💵 Spot Bal  : `${free_usdt:,.2f}`",
-            f"💎 Net Total : `${total_equity:,.2f}`"
+            f"💎 Net Total : `${crypto_equity:,.2f}`"
         ]
-        if not has_api:
+        if not has_binance:
             msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
-
         msg_lines.extend([
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន GRID (SPECS)*",
@@ -6590,11 +6757,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"🌐 Multi-Venue: `Aave V3 Arbitrum / Tokyo Relayer`",
-            f"💎 Net Total : `${total_equity:,.2f}`"
+            f"💎 Net Total : `${crypto_equity:,.2f}`"
         ]
-        if not has_api:
+        if not has_binance:
             msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
-
         msg_lines.extend([
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
@@ -6606,33 +6772,6 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ])
-    elif cur_eng == "capital":
-        import portfolio_circuit_breaker
-        gov_status = portfolio_circuit_breaker.CapitalDailyAGIGovernor.get_user_status(chat_id, total_equity) if hasattr(portfolio_circuit_breaker, 'CapitalDailyAGIGovernor') else {}
-        is_tgt_locked = gov_status.get("is_target_locked", False)
-        is_floor_hit = gov_status.get("is_loss_locked", False)
-        gov_str = "🏆 TARGET LOCKED (+5%)" if is_tgt_locked else ("🛡️ LOSS FLOOR (-2.5%)" if is_floor_hit else "🟢 NORMAL (+5% Cap / -2.5% Floor)")
-        msg_lines = [
-            f"👑 *APEX VIP AUDIT — 🏛️ CAPITAL.COM TRADFI*",
-            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
-            f"🛡️ *Mode ៖* `TradFi CFDs (Gold, US500, US100, Crude Oil)`",
-            sep,
-            f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
-            f"💵 TradFi Bal : `${cap_alloc:,.2f}`",
-            f"📈 Futures / Spot: `${total_equity:,.2f}`",
-            f"💎 Net Total : `${total_equity + cap_alloc:,.2f}`",
-            sep,
-            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន CAPITAL (SPECS)*",
-            f"├ 🏛️ ស្ថានភាព     : `[{cap_act}]`",
-            f"├ 💵 ទុនបម្រុង     : `{cap_res_str}`",
-            f"├ 🛡️ Sky Net 360° : `7-Layer Pre-Flight Confluence`",
-            f"├ 🎯 AGI Governor : `{gov_str}`",
-            f"├ 🌾 Spread Guard : `Max 10x Hurdle (Spread <= 0.90$)`",
-            f"├ 📐 Kelly Sizer  : `Fractional Kelly Criterion (0.25x)`",
-            f"└ 🔒 Trailing Lock: `Breakeven Armor & 85% Cash Harvest`",
-            sep,
-            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
-        ]
     elif cur_eng == "reachsey":
         import reachsey_matrix_engine
         reach_info = reachsey_matrix_engine.get_reachsey_status(chat_id) if hasattr(reachsey_matrix_engine, 'get_reachsey_status') else {}
@@ -6644,7 +6783,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"💵 Reserve   : `${reach_alloc:,.2f}`",
-            f"💎 Net Total : `${total_equity:,.2f}`",
+            f"💎 Net Total : `${crypto_equity:,.2f}`",
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន REACHSEY (SPECS)*",
             f"├ 👑 ស្ថានភាព     : `[{reach_act}]`",
@@ -6657,27 +6796,32 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ]
     else:
-        # MASTER ALL LIVE TRADING PLATFORMS AUDIT
-        float_emoji = "🟢" if live_floating_pnl >= 0 else "🔴"
-        live_pos_text = (
-            f"├ 📊 សរុប Positions : `{len(live_open_positions)} Active Positions`\n"
-            f"└ 💸 Floating PnL   : `{live_floating_pnl:+,.2f} USDT` ({float_emoji} {'កំពុងចំណេញ' if live_floating_pnl >= 0 else 'ហានិភ័យត្រាំ'})"
-            if live_open_positions else
-            "└ 🟢 `100% Cash Harvested — គ្មាន Position ត្រាំឡើយ!`"
-        )
+        # =====================================================================
+        # MASTER ALL PLATFORMS AUDIT (BINANCE + CAPITAL + PAMM)
+        # =====================================================================
         msg_lines = [
             f"👑 *APEX VIP {tf_label.upper()} AUDIT* 👑",
             f"⏰ `{now_str} UTC+7`",
-            f"🛡️ *Platform Venues ៖* `Binance Spot + Futures + DeFi DEX`",
+            f"🛡️ *Venues ៖* `Binance Spot/Fut + Capital.com + GTC PAMM`",
             sep,
-            f"💰 *សមតុល្យទុនជាក់ស្តែង (EQUITY)*",
-            f"💵 Spot      : `${free_usdt:,.2f}`",
+            f"🏢 *BINANCE CRYPTO* `[{binance_status}]`",
+            f"💵 Spot Bal  : `${free_usdt:,.2f}`",
             f"📈 Futures   : `${futures_margin:,.2f}`",
             f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
-            f"💎 Net Total : `${total_equity:,.2f}`",
+            f"💎 Net Total : `${crypto_equity:,.2f}`",
+            binance_pos_text,
             sep,
-            f"⚡ *ស្ថានភាព POSITIONS ផ្ទាល់ (LIVE OPEN)*",
-            live_pos_text,
+            f"🏛️ *CAPITAL.COM TRADFI* `[{cap_status_badge}]`",
+            f"💵 Balance   : `${cap_balance:,.2f} USD`",
+            f"📈 Equity    : `${cap_equity:,.2f} USD`",
+            f"🏦 Avail Mgn : `${cap_avail:,.2f} USD`",
+            f"💎 Used Mgn  : `${cap_deposit:,.2f} USD`",
+            cap_pos_text,
+            sep,
+            f"🏦 *GTC PAMM / MT5* `[{pamm_status_badge}]`",
+            f"💵 Allocated : `${pamm_alloc:,.2f} USD`",
+            f"📈 Equity    : `${pamm_equity:,.2f} USD`",
+            f"💎 Realized  : `${pamm_realized:+,.2f} USD` (Split: `{pamm_split:.0f}% VIP`)",
             sep,
             f"⚙️ *ស្ថានភាពគ្រប់ PLATFORMS (24/7 FLEET)*",
             f"\n💎 *24/7 Perpetual Wealth* (`/wealth`) `[{wealth_act}]`",
@@ -6692,12 +6836,11 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"├ 💵 DEX      : `Solana / EVM Sub-5ms Arbitrage`" if swap_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smart_swap AUTO 50 1234` ``",
             f"\n🌾 *Flash Loan & Funding* (`/flash_loan`) `[{flash_act}]`",
             f"├ 💵 Yield    : `Delta-Neutral Yield + Tokyo HFT MEV`" if flash_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/flash_loan_keeper AUTO ON 1234` ``",
+            f"\n🏛️ *TradFi CFDs & Gold* (`/capital`) `[{cap_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{cap_res_str}` | Sky Net 360° & AGI Governor" if cap_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/capital login` ``",
+            f"\n🏦 *GTC PAMM Master Fund* (`/pamm`) `[{'ACTIVE' if pamm_is_active else 'STANDBY'}]`",
+            f"├ 💵 Allocated : `${pamm_alloc:,.2f} USD` | Virtual Equity: `${pamm_equity:,.2f}`" if pamm_is_active else f"└ 1-Tap Copy ៖ `` `/pamm` ``",
         ]
-        if cap_act == "ACTIVE" or cap_alloc > 0:
-            msg_lines.extend([
-                f"\n🏛️ *TradFi CFDs & Gold* (`/capital`) `[{cap_act}]`",
-                f"├ 💵 ទុនបម្រុង : `{cap_res_str}` | Sky Net 360° & AGI Governor"
-            ])
         if reach_act == "ACTIVE" or reach_alloc > 0 or reach_setting:
             msg_lines.extend([
                 f"\n👑 *Reachsey 5-Pos Matrix* (`/reachsey`) `[{reach_act}]`",
@@ -6708,6 +6851,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ])
 
+    # Recent Trades Section
     if not recent_trades:
         msg_lines.append("🟢 `ទុនរៀបរយ - គ្មាន Position ត្រាំ`")
     else:
@@ -6746,23 +6890,25 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             if idx < min(3, len(recent_trades)):
                 msg_lines.append(dash_sep)
 
-    wealth_roi = (wealth_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-    turbo_roi = (turbo_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-    smartx_roi = (smartx_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-    trade_roi = (trade_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-    swap_roi = (swap_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-    grid_roi = (grid_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-    cap_roi = (cap_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-    reach_roi = (reach_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
-
-    net_sign = "+" if net_profit >= 0 else ""
-    growth_sign = "+" if growth_pct >= 0 else ""
-
+    # Performance Attribution & Growth
     if cur_eng != "all":
-        eng_pnl = engines.get(cur_eng, {}).get("pnl", 0.0)
-        eng_net_roi = (net_profit / base_cap * 100.0) if base_cap > 0 else 0.0
-        eng_roi_sign = "+" if eng_net_roi >= 0 else ""
         eng_title = cur_eng.replace('_', ' ').upper()
+        if cur_eng == "capital":
+            eng_base = cap_equity if cap_equity >= 10.0 else cap_alloc
+        elif cur_eng == "pamm":
+            eng_base = pamm_alloc
+        elif cur_eng == "wealth":
+            eng_base = wealth_tot_cap if wealth_tot_cap >= 10.0 else crypto_equity
+        elif cur_eng == "turbo_hedge":
+            eng_base = turbo_amt if turbo_amt >= 10.0 else futures_margin
+        elif cur_eng == "smart_x":
+            eng_base = smartx_alloc if smartx_alloc >= 10.0 else crypto_equity
+        elif cur_eng == "smart_trade":
+            eng_base = trade_alloc if trade_alloc >= 10.0 else free_usdt
+        else:
+            eng_base = crypto_equity
+
+        eng_roi_str = _calc_safe_roi(net_profit, eng_base)
         msg_lines.extend([
             sep,
             f"🏆 *សរុបលទ្ធផល ({eng_title} - {tf_label.upper()})*",
@@ -6772,29 +6918,39 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"💸 Total Fee   : `-${tot_fees:,.2f}`",
             f"🌾 Net Funding : `{tot_funding:+,.2f}`",
             line_sep,
-            f"💎 *NET PROFIT : {net_sign}${net_profit:,.2f} USDT*",
-            f"📈 *{growth_label} : {eng_roi_sign}{eng_net_roi:.2f}% Net*",
+            f"💎 *NET PROFIT : {net_sign}${net_profit:,.2f} USD/USDT*",
+            f"📈 *{growth_label} : {eng_roi_str} Net*",
             sep,
             OFFICIAL_FOOTNOTE
         ])
     else:
+        w_roi_str = _calc_safe_roi(wealth_pnl, wealth_tot_cap if wealth_tot_cap >= 10.0 else crypto_equity)
+        t_roi_str = _calc_safe_roi(turbo_pnl, turbo_amt if turbo_amt >= 10.0 else futures_margin)
+        x_roi_str = _calc_safe_roi(smartx_pnl, smartx_alloc if smartx_alloc >= 10.0 else crypto_equity)
+        tr_roi_str = _calc_safe_roi(trade_pnl, trade_alloc if trade_alloc >= 10.0 else free_usdt)
+        sw_roi_str = _calc_safe_roi(swap_pnl, crypto_equity)
+        g_roi_str = _calc_safe_roi(grid_pnl, free_usdt)
+        c_roi_str = _calc_safe_roi(cap_pnl, cap_equity if cap_equity >= 10.0 else cap_alloc)
+        p_roi_str = _calc_safe_roi(pamm_realized, pamm_alloc)
+
         summary_rows = [
-            ("💎 `/wealth`", wealth_pnl, wealth_roi),
-            ("🚀 `/turbo_hedge`", turbo_pnl, turbo_roi),
-            ("🧠 `/smart_x`", smartx_pnl, smartx_roi),
-            ("📊 `/smart_trade`", trade_pnl, trade_roi),
-            ("⚡ `/smart_swap`", swap_pnl, swap_roi),
-            ("📊 `/compound_grid`", grid_pnl, grid_roi),
+            ("💎 `/wealth`", wealth_pnl, w_roi_str),
+            ("🚀 `/turbo_hedge`", turbo_pnl, t_roi_str),
+            ("🧠 `/smart_x`", smartx_pnl, x_roi_str),
+            ("📊 `/smart_trade`", trade_pnl, tr_roi_str),
+            ("⚡ `/smart_swap`", swap_pnl, sw_roi_str),
+            ("📊 `/compound_grid`", grid_pnl, g_roi_str),
+            ("🏛️ `/capital`", cap_pnl, c_roi_str),
+            ("🏦 `/pamm`", pamm_realized, p_roi_str)
         ]
-        if cap_act == "ACTIVE" or cap_pnl != 0 or cap_alloc > 0:
-            summary_rows.append(("🏛️ `/capital`", cap_pnl, cap_roi))
         if reach_act == "ACTIVE" or reach_pnl != 0 or reach_setting:
-            summary_rows.append(("👑 `/reachsey`", reach_pnl, reach_roi))
+            r_roi_str = _calc_safe_roi(reach_pnl, reach_alloc)
+            summary_rows.append(("👑 `/reachsey`", reach_pnl, r_roi_str))
 
         roi_lines = []
-        for i, (eng_tag, eng_val, eng_r) in enumerate(summary_rows):
+        for i, (eng_tag, eng_val, eng_r_str) in enumerate(summary_rows):
             pfx = "└" if i == len(summary_rows) - 1 else "├"
-            roi_lines.append(f"{pfx} {eng_tag:<18}: `{eng_val:+,.2f} ({eng_r:+.2f}%)`")
+            roi_lines.append(f"{pfx} {eng_tag:<18}: `{eng_val:+,.2f} ({eng_r_str})`")
 
         msg_lines.extend([
             sep,
@@ -6805,8 +6961,8 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"💸 Total Fee   : `-${tot_fees:,.2f}`",
             f"🌾 Net Funding : `{tot_funding:+,.2f}`",
             line_sep,
-            f"💎 *NET PROFIT : {net_sign}${net_profit:,.2f} USDT*",
-            f"📈 *{growth_label} : {growth_sign}{growth_pct:.2f}% Net*",
+            f"💎 *NET PROFIT : {net_sign}${net_profit:,.2f} USD/USDT*",
+            f"📈 *{growth_label} : {growth_str}*",
             *roi_lines,
             sep,
             OFFICIAL_FOOTNOTE
@@ -6814,6 +6970,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
 
     msg = "\n".join([line for line in msg_lines if line != ""])
 
+    # Navigation Keyboard
     b_daily = "✅ 24H Daily" if cur_tf == "daily" else "📅 24H Daily"
     b_monthly = "✅ Monthly" if cur_tf == "monthly" else "🗓️ Monthly"
     b_yearly = "✅ Yearly" if cur_tf == "yearly" else "📆 Yearly"
@@ -6826,6 +6983,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     b_grid = "✅ Spot Grids" if cur_eng == "grid" else "📊 Spot Grids"
     b_flash = "✅ Flash & Arb" if cur_eng == "flash_loan" else "🌾 Flash & Arb"
     b_cap = "✅ TradFi Capital" if cur_eng == "capital" else "🏛️ TradFi Capital"
+    b_pamm = "✅ GTC PAMM" if cur_eng == "pamm" else "🏦 GTC PAMM"
     b_reach = "✅ Reachsey Matrix" if cur_eng == "reachsey" else "👑 Reachsey Matrix"
     b_all = "✅ All Platforms" if cur_eng == "all" else "🌐 All Platforms"
 
@@ -6852,20 +7010,22 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
         ],
         [
             InlineKeyboardButton(b_cap, callback_data=f"btn_report_eng_capital_{cur_tf}"),
-            InlineKeyboardButton(b_reach, callback_data=f"btn_report_eng_reachsey_{cur_tf}")
+            InlineKeyboardButton(b_pamm, callback_data=f"btn_report_eng_pamm_{cur_tf}")
         ],
         [
-            InlineKeyboardButton(b_all, callback_data=f"btn_report_eng_all_{cur_tf}"),
-            InlineKeyboardButton("🔄 Refresh", callback_data=f"btn_report_refresh_{cur_tf}_{cur_eng}")
+            InlineKeyboardButton(b_reach, callback_data=f"btn_report_eng_reachsey_{cur_tf}"),
+            InlineKeyboardButton(b_all, callback_data=f"btn_report_eng_all_{cur_tf}")
         ],
         [
-            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+            InlineKeyboardButton("🔄 Refresh", callback_data=f"btn_report_refresh_{cur_tf}_{cur_eng}"),
+            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+        ],
+        [
             InlineKeyboardButton("💼 Portfolio", callback_data="btn_menu_portfolio")
         ]
     ])
 
     return msg, keyboard
-
 
 async def daily_executive_summary_report(app: Application):
     """

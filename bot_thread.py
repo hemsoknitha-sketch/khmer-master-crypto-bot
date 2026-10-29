@@ -3295,7 +3295,7 @@ class TelegramBotThread(BaseThread):
                     timeframe = "8h"
                 elif suffix in ["daily", "monthly", "yearly", "lifetime"]:
                     timeframe = suffix
-                elif suffix in ["macro_auto_trade", "turbo_hedge", "smart_x", "smart_swap", "smart_trade", "wealth", "grid", "flash_loan", "capital", "reachsey"]:
+                elif suffix in ["macro_auto_trade", "turbo_hedge", "smart_x", "smart_swap", "smart_trade", "wealth", "grid", "flash_loan", "capital", "reachsey", "pamm"]:
                     engine_filter = suffix
                 elif suffix in ["all", "all_engines", "all_platforms"]:
                     engine_filter = None
@@ -3331,6 +3331,8 @@ class TelegramBotThread(BaseThread):
                     engine_filter = "capital"
                 elif arg0 in ["reachsey", "reach_sey", "matrix", "5pos", "basket"]:
                     engine_filter = "reachsey"
+                elif arg0 in ["pamm", "mt5", "gtc", "gtc_pamm"]:
+                    engine_filter = "pamm"
 
                 if len(args) > 1:
                     arg1 = args[1]
@@ -3364,6 +3366,8 @@ class TelegramBotThread(BaseThread):
                         engine_filter = "capital"
                     elif arg1 in ["reachsey", "reach_sey", "matrix", "5pos", "basket"]:
                         engine_filter = "reachsey"
+                    elif arg1 in ["pamm", "mt5", "gtc", "gtc_pamm"]:
+                        engine_filter = "pamm"
 
             try:
                 import scheduler_tasks
@@ -8199,7 +8203,7 @@ class TelegramBotThread(BaseThread):
                 "btn_report_monthly", "btn_report_yearly", "btn_report_lifetime", 
                 "btn_report_turbo_hedge", "btn_report_smart_x", "btn_report_smart_swap", 
                 "btn_report_smart_trade", "btn_report_wealth", "btn_report_grid", "btn_report_flash_loan",
-                "btn_report_capital", "btn_report_reachsey", "btn_audit", "btn_daily_audit", "btn_apex_audit"
+                "btn_report_capital", "btn_report_reachsey", "btn_report_pamm", "btn_audit", "btn_daily_audit", "btn_apex_audit"
             ] or data.startswith("btn_report_") or data.startswith("btn_audit_"):
                 await report_command(update, context)
             elif data in ["btn_journal", "btn_journal_menu", "btn_trading_journal"]:
