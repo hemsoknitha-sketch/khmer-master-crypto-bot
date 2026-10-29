@@ -1003,46 +1003,51 @@ class CapitalComEngine:
             # Direct Broker Transactions Audit (AQ80 Invariant 35 & Pillar 3):
             # Fetches recent closed transactions directly from Capital.com to guarantee that any broker-side
             # stop-loss event immediately locks that asset under 45-Minute Post-SL Quarantine across all engines.
-            try:
-                if self.cst_token and self.security_token:
-                    headers = {
-                        "X-CAP-API-KEY": self.api_key,
-                        "CST": self.cst_token,
-                        "X-SECURITY-TOKEN": self.security_token
-                    }
-                    res_tx = self.session.get(f"{self.base_url}/history/transactions?lastPeriod=7200", headers=headers, timeout=5)
-                    if res_tx.status_code == 200:
-                        tx_list = res_tx.json().get("transactions", [])
-                        for tx in tx_list:
-                            if tx.get("transactionType") == "TRADE":
-                                pnl_size = float(tx.get("size", 0.0) or 0.0)
-                                if pnl_size < 0:
-                                    tx_inst = str(tx.get("instrumentName") or "").upper().strip()
-                                    date_str = tx.get("dateUtc") or tx.get("date")
-                                    if date_str and tx_inst:
-                                        try:
-                                            clean_dt = date_str.split(".")[0].replace("Z", "")
-                                            tx_dt = datetime.datetime.fromisoformat(clean_dt).replace(tzinfo=datetime.timezone.utc)
-                                            elapsed = (datetime.datetime.now(datetime.timezone.utc) - tx_dt).total_seconds()
-                                            if 0 <= elapsed < 2700.0:
-                                                rem_q = 2700.0 - elapsed
-                                                set_global_asset_quarantine(tx_inst, duration_seconds=rem_q, reason=f"Broker-Confirmed Loss (${pnl_size:.2f})")
-                                                if "GOLD" in tx_inst or "XAU" in tx_inst or "PAXG" in tx_inst:
-                                                    try:
-                                                        import gold_candlestick_pattern_memory as gcpm
-                                                        gcpm.register_gold_loss_for_adaptive_study(
-                                                            epic=tx_inst,
-                                                            direction="UNKNOWN",
-                                                            loss_price=0.0,
-                                                            loss_pnl=float(pnl_size),
-                                                            reason=f"Broker-Confirmed Loss (${pnl_size:.2f})"
-                                                        )
-                                                    except Exception:
-                                                        pass
-                                        except Exception:
-                                            pass
-            except Exception as e_tx_audit:
-                logger.debug(f"Direct broker transaction audit note: {e_tx_audit}")
+            # Throttled to once every 120 seconds with shorter period (3600s) to prevent API read timeouts and thread stalling.
+            now_ts = time.time()
+            if (now_ts - getattr(self, "_last_tx_audit_ts", 0.0)) >= 120.0:
+                self._last_tx_audit_ts = now_ts
+                try:
+                    if self.cst_token and self.security_token:
+                        headers = {
+                            "X-CAP-API-KEY": self.api_key,
+                            "CST": self.cst_token,
+                            "X-SECURITY-TOKEN": self.security_token
+                        }
+                        res_tx = self.session.get(f"{self.base_url}/history/transactions?lastPeriod=3600", headers=headers, timeout=5)
+                        if res_tx.status_code == 200:
+                            tx_list = res_tx.json().get("transactions", [])
+                            for tx in tx_list:
+                                if tx.get("transactionType") == "TRADE":
+                                    pnl_size = float(tx.get("size", 0.0) or 0.0)
+                                    if pnl_size < 0:
+                                        tx_inst = str(tx.get("instrumentName") or "").upper().strip()
+                                        date_str = tx.get("dateUtc") or tx.get("date")
+                                        if date_str and tx_inst:
+                                            try:
+                                                clean_dt = date_str.split(".")[0].replace("Z", "")
+                                                tx_dt = datetime.datetime.fromisoformat(clean_dt).replace(tzinfo=datetime.timezone.utc)
+                                                elapsed = (datetime.datetime.now(datetime.timezone.utc) - tx_dt).total_seconds()
+                                                if 0 <= elapsed < 2700.0:
+                                                    rem_q = 2700.0 - elapsed
+                                                    set_global_asset_quarantine(tx_inst, duration_seconds=rem_q, reason=f"Broker-Confirmed Loss (${pnl_size:.2f})")
+                                                    if "GOLD" in tx_inst or "XAU" in tx_inst or "PAXG" in tx_inst:
+                                                        try:
+                                                            import gold_candlestick_pattern_memory as gcpm
+                                                            gcpm.register_gold_loss_for_adaptive_study(
+                                                                epic=tx_inst,
+                                                                direction="UNKNOWN",
+                                                                loss_price=0.0,
+                                                                loss_pnl=float(pnl_size),
+                                                                reason=f"Broker-Confirmed Loss (${pnl_size:.2f})"
+                                                            )
+                                                        except Exception:
+                                                            pass
+                                            except Exception:
+                                                pass
+                except Exception as e_tx_audit:
+                    self._last_tx_audit_ts = now_ts + 60.0  # Backoff 60s on timeout/error
+                    logger.debug(f"Direct broker transaction audit note: {e_tx_audit}")
 
             if not all_open_trades:
                 return 0
