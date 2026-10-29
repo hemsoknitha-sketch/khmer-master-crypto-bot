@@ -6357,7 +6357,7 @@ MT5_TREASURY_REBATE_ACCOUNT = "52133938"
 MT5_TREASURY_WALLET_ID = "130237694"
 
 # Set of all Super Admin tier accounts (authorized for elevated access & zero lockouts)
-SUPER_ADMIN_MT5_ACCOUNTS = {"52171861", "52135153", "52133938"}
+SUPER_ADMIN_MT5_ACCOUNTS = {"52171861", "52133938"}
 
 def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     """
@@ -6368,7 +6368,7 @@ def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     1. chat_id == 859271875 (Master Super Admin) or is_admin(chat_id)
     2. User is marked is_verified == 1 in mt5_user_referrals
     3. User has 'Administrator' license
-    4. Account ID is Super Admin MT5 (52135153 or 52133938)
+    4. Account ID is Super Admin MT5 (52171861 or 52133938)
     """
     if chat_id in [859271875, 537186806] or str(account_id).strip() in SUPER_ADMIN_MT5_ACCOUNTS:
         return True
@@ -6804,12 +6804,17 @@ def get_or_create_virtual_ledger(chat_id: int, initial_capital: float = 100.0, a
     _ensure_virtual_ledger_schema(cursor)
     
     if not account_id and chat_id > 0:
-        cfg = get_user_mt5_config(chat_id)
-        account_id = str(cfg.get("login", "")).strip()
-        if not account_id:
-            ref_rec = get_mt5_referral_record(chat_id)
-            if ref_rec and ref_rec.get("account_id"):
-                account_id = str(ref_rec.get("account_id")).strip()
+        if chat_id in [859271875, 537186806]:
+            account_id = "52171861"
+        else:
+            cfg = get_user_mt5_config(chat_id)
+            account_id = str(cfg.get("login", "")).strip() if cfg else ""
+            if not account_id:
+                ref_rec = get_mt5_referral_record(chat_id)
+                if ref_rec and ref_rec.get("account_id"):
+                    account_id = str(ref_rec.get("account_id")).strip()
+                else:
+                    account_id = f"GTC-PAMM-{chat_id}"
 
     cursor.execute("SELECT * FROM mt5_virtual_ledgers WHERE chat_id = ?", (chat_id,))
     row = cursor.fetchone()

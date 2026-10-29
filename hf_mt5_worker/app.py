@@ -40,12 +40,12 @@ def log_event(msg: str):
 # Environment & Secret Configuration (From HF Space Secrets)
 BRIDGE_HOST = os.getenv("BRIDGE_HOST", "34.153.209.188").strip()
 BRIDGE_PORT = int(os.getenv("BRIDGE_PORT", "5555"))
-MT5_ACCOUNT = os.getenv("MT5_ACCOUNT", "55688250").strip()
+MT5_ACCOUNT = os.getenv("MT5_ACCOUNT", "52171861").strip()
 MT5_PASSWORD = os.getenv("MT5_PASSWORD", "").strip()
-MT5_SERVER = os.getenv("MT5_SERVER", "GTCGlobalTrade-Live").strip()
+MT5_SERVER = os.getenv("MT5_SERVER", "GTCGlobalSA-Server 2").strip()
 BROKER_NAME = os.getenv("BROKER_NAME", "GTCFX").strip()
 SECRET_KEY = os.getenv("SECRET_KEY", "KHMER_MASTER_CRYPTO_SECRET_KEY_2026").strip()
-CHAT_ID = int(os.getenv("CHAT_ID", "537186806"))
+CHAT_ID = int(os.getenv("CHAT_ID", "859271875"))
 IS_CENT = os.getenv("IS_CENT", "false").lower() == "true"
 
 # Global Runtime State

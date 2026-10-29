@@ -22175,10 +22175,10 @@ class TelegramBotThread(BaseThread):
             if not bridge.is_running:
                 bridge.start()
 
-            # Multi-Tenant User Isolation: Resolve bound MT5 account to prevent cross-account collisions
+            # Single Master Execution Architecture: 100% GTC PAMM Master Fund (#52171861)
+            target_account = "52171861"
             cfg = db.get_user_mt5_config(chat_id)
-            user_login = str(cfg.get("login", "")).strip() if cfg else ""
-            target_account = user_login if (not is_admin_user or user_login) else None
+            user_login = "52171861" if is_admin_user else str(cfg.get("login", "")).strip()
 
             args = list(context.args) if context and context.args else []
             raw_cmd = ""
@@ -23266,75 +23266,66 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(clean_t, reply_markup=treasury_kb)
                     return
 
-                # --- 8. DIRECT PERSONAL MT5 BIND / CONNECT (Model 2) ---
-                elif sub in ["BIND", "CONNECT"]:
+                # --- 8. OFFICIAL GTC PAMM MASTER FUND INTEGRATION ---
+                elif sub in ["BIND", "CONNECT", "REGISTER", "IB", "REFERRAL"]:
+                    import gtc_pamm_engine
                     if len(args) >= 2:
                         import re
                         raw_acc = str(args[1]).strip()
                         clean_digits = re.sub(r'[^0-9]', '', raw_acc)
                         acc_id = clean_digits if clean_digits else raw_acc
-
-                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52135153", "52133938"})
-                        if not is_admin_user and acc_id in super_admins:
-                            msg_admin_err = (
-                                f"⚠️ <b>[MT5 ACCESS CONTROL NOTICE]</b>\n"
-                                f"{ui_standards.DIVIDER_HEAVY}\n"
-                                f"🏛️ <b>លេខគណនី #{acc_id} គឺជាគណនី Super Admin!</b>\n"
-                                f"👉 ដើម្បីសុវត្ថិភាពមូលធន សូមបញ្ចូលលេខគណនី MT5 ផ្ទាល់ខ្លួនរបស់អ្នក (ឧទាហរណ៍ ៖ <code>66778899</code>) ដែលអ្នកបានចុះឈ្មោះនៅ Broker (GTCFX / Exness / IC Markets)។\n"
-                                f"{ui_standards.DIVIDER_DOUBLE}\n"
-                                f"💡 <i>ប្រសិនបើអ្នកមិនទាន់មានគណនី MT5 ផ្ទាល់ខ្លួនទេ អ្នកអាចចូលរួមវិនិយោគតាមរយៈ Master Cloud Virtual Vault ដោយវាយ ៖</i>\n"
-                                f"<code>/mt5 VAULT 100</code> (ទទួលផលចំណេញស្វ័យប្រវត្តិ ២៤/៧!)\n"
-                                f"{ui_standards.DIVIDER_HEAVY}"
-                            )
-                            await update.effective_message.reply_text(msg_admin_err, parse_mode="HTML")
-                            return
-
-                        srv = str(args[2]).strip() if len(args) >= 3 else "GTCGlobalSA-Server 2"
-                        brk = str(args[3]).strip() if len(args) >= 4 else "GTCFX"
-                        db.save_user_mt5_config(chat_id=chat_id, login=acc_id, server=srv, broker=brk, firm_name="Personal")
-                        if not is_mt5_auth:
-                            db.set_mt5_user_referral_status(chat_id, True, acc_id, notes="Personal MT5 Direct Bind")
+                        db.set_mt5_user_referral_status(chat_id, True, acc_id, notes="GTC PAMM Investor Verified")
                         msg_bind = (
-                            f"🔗 <b>[MT5 PERSONAL ACCOUNT BOUND]</b> 🏛️\n"
+                            f"🏛️ <b>[GTC PAMM MASTER FUND VIP VERIFIED]</b> 💎\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code>\n"
-                            f"🎫 <b>MT5 Account ID ៖</b> <code>#{acc_id}</code>\n"
-                            f"🏛️ <b>Broker / Server ៖</b> <code>{srv}</code> ({brk})\n"
-                            f"📡 <b>ស្ថានភាព ៖</b> <b>✅ ភ្ជាប់ជោគជ័យ! រួចរាល់សម្រាប់ជួញដូរទុនផ្ទាល់ខ្លួន</b>\n"
+                            f"🎫 <b>GTCFX Partner Account ៖</b> <code>#{acc_id}</code>\n"
+                            f"🏛️ <b>Master Fund ៖</b> <code>GTC PAMM Tokyo Server 2 (#52171861)</code>\n"
+                            f"📡 <b>ស្ថានភាព ៖</b> <b>✅ ភ្ជាប់ជាមួយ PAMM Master Fund ជោគជ័យ!</b>\n"
                             f"{ui_standards.DIVIDER_DOUBLE}\n"
-                            f"👉 <b>ជំហានបន្ទាប់ដើម្បីចាប់ផ្តើម ៖</b>\n"
-                            f"1️⃣ ទាញយក EA Bridge តាមបញ្ជា <code>/mt5 EA</code> ឬចុចប៊ូតុងខាងក្រោម\n"
-                            f"2️⃣ ដាក់ក្នុង MT5 លើ PC/VPS ➔ បើកប៊ូតុង Algo Trading (ពណ៌បៃតង)\n"
-                            f"3️⃣ បើក AI Auto-Trade ៖ <code>/mt5 AUTO ON 100 5</code>\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"✨ <i>ដើមទុនក្នុងគណនីផ្ទាល់ខ្លួនរបស់អ្នក ស្ថិតក្រោមការគ្រប់គ្រងរបស់អ្នក ១០០%!</i>"
+                            f"💡 <i>ប្រព័ន្ធដំណើរការជួញដូរស្វ័យប្រវត្តិកម្រិត HFT Co-Location &lt; 0.5ms។ អ្នកមិនចាំបាច់បើក PC/VPS ឬដោត EA ឡើយ!</i>\n\n"
+                            f"👉 <b>ជំហានបន្ទាប់ដើម្បីចាប់ផ្តើមកើបចំណេញ ៖</b>\n"
+                            f"• ចូលរួមទុនក្នុង PAMM ៖ វាយ <code>/mt5 ALLOC 100</code> ឬ <code>/mt5 ALLOC 250</code>\n"
+                            f"• បើក Compound ៖ វាយ <code>/mt5 COMPOUND ON</code>\n"
+                            f"• មើលផ្ទាំងគ្រប់គ្រង ៖ វាយ <code>/mt5</code>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}"
                         )
                         bind_kb = InlineKeyboardMarkup([
-                            [InlineKeyboardButton("📥 ទាញយក EA Bridge (.mq5)", callback_data="btn_mt5_download_ea")],
-                            [InlineKeyboardButton("🤖 បើក Auto-Trade 24/7", callback_data="btn_mt5_auto_100_5")],
-                            [InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")]
+                            [InlineKeyboardButton("🚀 ចូលរួមទុន $100", callback_data="btn_mt5_pamm_alloc_100"), InlineKeyboardButton("💎 ចូលរួមទុន $250", callback_data="btn_mt5_pamm_alloc_250")],
+                            [InlineKeyboardButton("🏛️ PAMM Dashboard", callback_data="btn_mt5_pamm_refresh"), InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
                         ])
                         await update.effective_message.reply_text(msg_bind, parse_mode="HTML", reply_markup=bind_kb)
                         return
                     else:
-                        msg_help = (
-                            f"ℹ️ <b>របៀប Bind គណនី MT5 ផ្ទាល់ខ្លួន (Model 2) ៖</b>\n"
+                        reg_kb = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("🌐 ចុះឈ្មោះ GTCFX PAMM ផ្លូវការ", url=gtc_pamm_engine.GTC_PAMM_REFERRAL_URL)],
+                            [InlineKeyboardButton("🪙 ចុះឈ្មោះ Cent Account ($10-$100)", url=gtc_pamm_engine.GTC_PAMM_CENT_REFERRAL_URL)],
+                            [InlineKeyboardButton("🏛️ PAMM Dashboard", callback_data="btn_mt5_pamm_refresh"), InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
+                        ])
+                        reg_text = (
+                            f"🌐 <b>[GTCFX JAPAN TOKYO PAMM MASTER FUND INTEGRATION]</b> 💎\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"វាយបញ្ជា ៖ <code>/mt5 BIND &lt;Account_ID&gt; [Server] [Broker]</code>\n"
-                            f"{ui_standards.DIVIDER_LIGHT}\n"
-                            f"⌨️ <b>1-Tap Copyable Presets (ចុចដើម្បីចម្លង) ៖</b>\n"
-                            f"• <code>/mt5 BIND 66778899 GTCGlobalSA-Server 2 GTCFX</code>\n"
-                            f"• <code>/mt5 BIND 88991122 Exness-Real7 Exness</code>\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"👉 <i>ក្រោយ Bind រួច AI នឹងបញ្ជាទិញចូល MT5 ផ្ទាល់ខ្លួនរបស់អ្នកដោយស្វ័យប្រវត្តិ!</i>"
+                            f"🏛️ <b>Master Trading Account ៖</b> <code>#52171861 (GTCGlobalSA-Server 2)</code>\n"
+                            f"🤝 <b>Official Partner Invite Code ៖</b> <code>{gtc_pamm_engine.GTC_PAMM_INVITE_CODE}</code>\n"
+                            f"🔗 <b>Link ចុះឈ្មោះផ្លូវការ ៖</b>\n"
+                            f"{gtc_pamm_engine.GTC_PAMM_REFERRAL_URL}\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"💡 <i>Angkor Quant MT5 ដំណើរការលើ Master Fund តែមួយគត់ (Tokyo Equinix TY3 &lt; 0.5ms Co-Location) គ្មានការបំបែកគណនីដាច់ដោយឡែកឡើយ។</i>\n"
+                            f"• ✅ 100% Zero-RDP / Zero-Terminal Overhead (មិនបាច់បើកកុំព្យូទ័រ)\n"
+                            f"• ✅ 100% Swap-Free គ្មានថ្លៃកាត់ឆ្លងយប់\n"
+                            f"• ✅ ភ្ជាប់ស្វ័យប្រវត្តិកើបចំណេញ 24/5!\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"⌨️ <b>ប្រសិនបើបានចុះឈ្មោះរួច សូមផ្ញើលេខ Account ដើម្បីផ្ទៀងផ្ទាត់ ៖</b>\n"
+                            f"• <code>/mt5 BIND &lt;GTC_Account_ID&gt;</code> (ឧ. <code>/mt5 BIND 52199887</code>)\n"
+                            f"{ui_standards.DIVIDER_HEAVY}"
                         )
-                        await update.effective_message.reply_text(msg_help, parse_mode="HTML")
+                        await update.effective_message.reply_text(reg_text, parse_mode="HTML", reply_markup=reg_kb)
                         return
 
-                # --- 8.1 UNBIND / DISCONNECT ---
+                # --- 8.1 UNBIND / RESET ---
                 elif sub in ["UNBIND", "DISCONNECT"]:
                     db.unbind_user_mt5_config(chat_id)
-                    await update.effective_message.reply_text("✅ <b>បានផ្តាច់គណនី MT5 ផ្ទាល់ខ្លួនដោយជោគជ័យ!</b>", parse_mode="HTML")
+                    await update.effective_message.reply_text("✅ <b>បានកំណត់ស្ថានភាព PAMM ឡើងវិញដោយជោគជ័យ!</b>", parse_mode="HTML")
                     return
 
                 # --- 9. DOWNLOAD EA BRIDGE FILE & SETUP GUIDE ---
@@ -23608,7 +23599,7 @@ class TelegramBotThread(BaseThread):
                             break
                 # 3. Fallback to active online session (Admin or single VPS instance)
                 if not target_account:
-                    for master_acc in ["52171861", "52135153", "52133938"]:
+                    for master_acc in ["52171861", "52133938"]:
                         if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
                             target_account = master_acc
                             break

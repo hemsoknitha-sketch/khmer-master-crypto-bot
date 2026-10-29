@@ -71,7 +71,7 @@ GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiG
 MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52171861"  # MT5's Super ADMIN / PAMM Master
 MT5_TREASURY_REBATE_ACCOUNT = "52133938"     # Real Super Treasury & Rebate Collector
 MT5_TREASURY_WALLET_ID = "130237694"          # Treasury Wallet ID
-SUPER_ADMIN_MT5_ACCOUNTS = {MT5_SUPER_ADMIN_TRADING_ACCOUNT, "52135153", MT5_TREASURY_REBATE_ACCOUNT}
+SUPER_ADMIN_MT5_ACCOUNTS = {MT5_SUPER_ADMIN_TRADING_ACCOUNT, MT5_TREASURY_REBATE_ACCOUNT}
 
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
@@ -841,7 +841,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                         if not sess.chat_id and chat_id:
                             sess.chat_id = chat_id
                         break
-                # If Super Admin or local portal, link directly to active Super Admin terminal (52135153 Trading Master or 52133938 Treasury)
+                # If Super Admin or local portal, link directly to active Super Admin terminal (52171861 Trading Master or 52133938 Treasury)
                 if not matched_session and (chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] or chat_id <= 0):
                     for admin_acc in [MT5_SUPER_ADMIN_TRADING_ACCOUNT, MT5_TREASURY_REBATE_ACCOUNT]:
                         if admin_acc in bridge.clients:
@@ -2897,7 +2897,7 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                     "message": f"🚨 គណនី #{target_account} កំពុងជាប់សោ Prop Shield! សូមវាយបញ្ជា /mt5 RESET ក្នុង Telegram ដើម្បីដោះសោ!"
                 }, status=400)
             else:
-                is_admin_acc = str(target_account) in ["52171861", "52135153", "52133938"]
+                is_admin_acc = str(target_account) in ["52171861", "52133938"]
                 if is_admin_acc:
                     solve_hint = "👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ឬ run លើ VPS ៖ `` `bash reset_and_launch_mt5.sh` ``!"
                 else:
