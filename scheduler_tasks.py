@@ -8333,63 +8333,12 @@ async def csx_daily_morning_brief_job(app: Application):
 
 async def tradfi_100_daily_training_job(app: Application):
     """
-    🧠 TradFi TOP 100+ Geospatial Sessions & 10-Year Trend/MA Daily Training Job (03:45 AM ICT / 20:45 UTC).
-    Executes in overnight flat cash lull prior to Tokyo Open:
-    1. Executes TradFi100SessionTrainer (trains 100+ assets, caches into RAM < 0.0003ms, saves to disk & HF).
-    2. Executes TradFiDailyLearner (evaluates 24h victories & errors, calibrates Brier score).
-    3. Dispatches comprehensive executive report directly to Super Admin Telegram.
+    [DECOMMISSIONED & UNIFIED INTO AQ89/AQ90 MASTER PIPELINE AT 03:30 AM ICT]
+    This legacy 111-asset job has been permanently unified into tri_regional_900_daily_training_job.
+    All 900 assets + 24H empirical audit + adaptive ratchet are executed in a single master pipeline.
     """
-    try:
-        import tradfi_100_session_trainer
-        import tradfi_daily_learner
-        import ui_standards
-
-        logger.info("🧠 [SCHEDULER] Starting Daily TOP 100+ TradFi Training & RAM Caching (03:45 AM ICT)...")
-        trainer = tradfi_100_session_trainer.TradFi100SessionTrainer()
-        session_results = await asyncio.to_thread(trainer.run_full_training_cycle)
-
-        learner = tradfi_daily_learner.TradFiDailyLearner()
-        learning_record = await asyncio.to_thread(learner.execute_daily_learning_cycle)
-
-        # Build executive report for Super Admin
-        total_assets = sum(len(s.get("assets", {})) for s in session_results.values())
-        m = learning_record.get("metrics", {})
-        p = learning_record.get("adaptive_parameters", {})
-
-        report_text = (
-            f"🧠 **របាយការណ៍ស្វ័យប្រវត្តិកំពូល៖ TRAIN TOP 100+ TRADFI & RAM CITADEL** 🧠\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"⏰ **កាលវិភាគប្រតិបត្តិការ ៖** `03:45 AM ICT (20:45 UTC) Daily`\n"
-            f"🌐 **ទ្រព្យសម្បត្តិដែលបាន Train ៖** `{total_assets} ទ្រព្យសម្បត្តិស្ថាប័ន`\n"
-            f"⚡ **ស្ថានភាព RAM Hot Cache ៖** `< 0.0003 ms Standard (Hot Active)`\n"
-            f"💾 **Local NVMe Disk & Hugging Face ៖** `100% SYNCHRONIZED`\n\n"
-            f"📊 **លទ្ធផលរៀនសូត្រពីកំហុស និងជ័យជំនះ (24H EMPIRICAL AUDIT)៖**\n"
-            f"• អត្រាជោគជ័យ (Win Rate) ៖ `{m.get('win_rate_pct', 0)}%` ({m.get('win_count', 0)} Wins / {m.get('loss_count', 0)} Losses)\n"
-            f"• Brier Calibration Score ៖ `{m.get('brier_score', 0)}` (គោលដៅ < 0.1800)\n"
-            f"• ការពារដើមទុនពីអន្ទាក់ ៖ `+${m.get('avoided_loss_usd', 0):.2f}` ({m.get('rejections_count', 0)} Traps Blocked)\n\n"
-            f"🛡️ **ការ AUTO កែសម្រួលប៉ារ៉ាម៉ែត្រក្នុង RAM (ADAPTIVE RATCHET)៖**\n"
-            f"• សភាពការណ៍ទីផ្សារ ៖ `{p.get('detected_regime', 'BALANCED')}`\n"
-            f"• កម្រិតកម្លាំង Trend អប្បបរមា (ADX) ៖ `{p.get('min_adx', 25.0)}`\n"
-            f"• របាំងបិទមិនឱ្យចូលកណ្តាលផ្សារ ៖ `{p.get('chop_zone_range', '35% - 65%')}`\n"
-            f"• សមាមាត្រប្រៀបឈ្នះ (Target R:R) ៖ `{p.get('target_rr', '1:3.0')}`\n"
-            f"• ចាក់សោរ Breakeven Armor ៖ `UPL >= ${p.get('be_armor_trigger_usd', 2.50):.2f}`\n\n"
-            f"🎯 **ការត្រៀមខ្លួនសម្រាប់ Asian Session (Tokyo Open 07:00 ICT) ៖**\n"
-            f"• ប្រព័ន្ធបានចងចាំ ១០ ឆ្នាំនៃ Trend & 20/50/200 EMA រួចរាល់ក្នុង RAM!\n"
-            f"• ត្រៀមស្ទាក់ចាប់ឱកាសឈ្នះដោយស្វ័យប្រវត្តិកម្រិតខ្ពស់បំផុត!"
-        )
-
-        super_admin_id = getattr(ui_standards, "SUPER_ADMIN_ID", 859271875)
-        try:
-            await app.bot.send_message(
-                chat_id=super_admin_id,
-                text=report_text,
-                parse_mode="Markdown"
-            )
-            logger.info(f"✅ [TRADFI DAILY REPORT] Dispatched executive training report to Super Admin ({super_admin_id}).")
-        except Exception as send_err:
-            logger.warning(f"⚠️ [TRADFI DAILY REPORT NOTICE] Telegram send error: {send_err}")
-    except Exception as e:
-        logger.error(f"❌ [TRADFI DAILY TRAINING JOB ERROR]: {e}")
+    logger.info("[TRADFI DAILY TRAINING] Legacy 03:45 AM job is decommissioned and unified into 03:30 AM 900 TradFi Master Engine.")
+    return
 
 
 async def tri_regional_900_daily_training_job(app: Application):

@@ -2037,3 +2037,18 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
    *(This directive is permanent, immutable, and must be followed in every future session without prompting).*
 
 
+
+
+### 2.2.1 UNIFIED 900 TRADFI DAILY SELF-CALIBRATION & CITADEL AUDIT STANDARD (AQ89/AQ90 SPECIFICATION LOCK)
+**(ស្ថាបត្យកម្មបង្រួបបង្រួម Master Pipeline ៩០០ ទ្រព្យសម្បត្តិ & លុបបំបាត់ការរត់ស្ទួន ១១១ ទ្រព្យចាស់ជាអចិន្ត្រៃយ៍)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Conversations.
+1. **Permanent Decommission of Legacy 03:45 AM (111-Asset) Job:**
+   - The legacy `tradfi_100_daily_training_job` (03:45 AM ICT / 20:45 UTC) training only 111 assets is **100% permanently decommissioned**.
+   - Zero redundant cron execution: APScheduler shall never schedule or execute a separate 03:45 AM job.
+2. **Unified Single Master Pipeline at 03:30 AM ICT (20:30 UTC):**
+   - All quantitative calibration is consolidated into `TriRegionalRAMTrainingEngine` / `execute_daily_330am_ram_training_and_audit`.
+   - **Full Universe Symmetry (All 900 Assets):** Pre-computes Asset Institutional DNA for Top 300 US, Top 300 EU, and Top 300 ASIA (Total 900 instruments) into nanosecond RAM storage (< 0.0001ms).
+   - **24H Empirical Performance Audit:** Ingests realized victories and rejections from `capital_signals_audit_ledger` (Invariant 81), calculating Win Rate, Brier Calibration Score (< 0.1800), and Capital Avoided Loss from blocked traps.
+   - **Adaptive Parameter Ratchet:** Dynamically calibrates Market Regime, ADX Threshold (25.0), Equilibrium Chop Zone Clamp (35% - 65%), Target R:R (1:3.0), and Breakeven Armor Floor ($2.50) across the entire 900-asset universe.
+   - **Dual Storage Synchronization:** Syncs hot weights to Local NVMe disk and Hugging Face Cloud Hub (`hemsinath/angkor-quant-data`).
+   - **Single Comprehensive Master Telegram Broadcast:** Emits exactly ONE unified institutional master report to Super Admin (859271875) at 03:30 AM ICT, completely eliminating split or confusing reports.
