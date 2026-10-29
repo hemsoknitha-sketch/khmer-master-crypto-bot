@@ -1193,6 +1193,8 @@ def init_db():
         )
     ''')
 
+
+
     # MT5 GTCFX Pro Referral & Gatekeeper Registry (Invariant 42)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS mt5_user_referrals (
@@ -6793,6 +6795,90 @@ def _ensure_virtual_ledger_schema(cursor):
             closed_at DATETIME
         )
     ''')
+
+    # Automatic GTC PAMM Cleanse Migration for VPS / Production Deployment (AQ101)
+    try:
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'gtc_pamm_v2_cleanse_done'")
+        c_row = cursor.fetchone()
+        if not c_row or c_row[0] != "1":
+            _execute_gtc_pamm_cleanse_migration(cursor)
+    except Exception:
+        pass
+
+def _execute_gtc_pamm_cleanse_migration(cursor):
+    """Executes atomic purge of legacy VIP accounts and resets GTC PAMM Master Fund to fresh state."""
+    try:
+        # 1. Purge all non-admin VIP user ledgers
+        cursor.execute("DELETE FROM mt5_virtual_ledgers WHERE chat_id != 859271875")
+        
+        # 2. Reset Super Admin (859271875) to fresh baseline
+        cursor.execute("SELECT id FROM mt5_virtual_ledgers WHERE chat_id = 859271875")
+        sa_row = cursor.fetchone()
+        if sa_row:
+            cursor.execute("""
+                UPDATE mt5_virtual_ledgers
+                SET account_id = '52171861', allocated_capital = 250.0, deposited_amount = 250.0,
+                    withdrawn_amount = 0.0, realized_profit = 0.0, current_balance = 250.0,
+                    virtual_equity = 250.0, risk_level = 'BALANCED', risk_per_trade_pct = 1.5,
+                    profit_split_pct = 80.0, auto_reinvest = 1, is_active = 1, updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = 859271875
+            """)
+        else:
+            cursor.execute("""
+                INSERT INTO mt5_virtual_ledgers
+                (chat_id, account_id, allocated_capital, deposited_amount, withdrawn_amount, realized_profit,
+                 current_balance, virtual_equity, risk_level, risk_per_trade_pct, profit_split_pct, auto_reinvest, is_active, created_at, updated_at)
+                VALUES (859271875, '52171861', 250.0, 250.0, 0.0, 0.0, 250.0, 250.0, 'BALANCED', 1.5, 80.0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """)
+        
+        # 3. Clear virtual transactions and seed single clean Super Admin allocation
+        cursor.execute("DELETE FROM mt5_virtual_transactions")
+        cursor.execute("""
+            INSERT INTO mt5_virtual_transactions
+            (chat_id, tx_type, amount, balance_before, balance_after, ticket, symbol, description, created_at)
+            VALUES (859271875, 'INITIAL_ALLOCATION', 250.0, 0.0, 250.0, 0, '', 'Super Admin GTC PAMM Master Fund Baseline Allocation', CURRENT_TIMESTAMP)
+        """)
+        
+        # 4. Reset Treasury Vault (#52133938) to 0.00
+        cursor.execute("""
+            UPDATE mt5_treasury_vault
+            SET total_maintenance_fee_usd = 0.0, total_rebate_usd = 0.0, total_balance_usd = 0.0,
+                withdrawn_usd = 0.0, updated_at = CURRENT_TIMESTAMP
+            WHERE account_id = '52133938'
+        """)
+        cursor.execute("DELETE FROM mt5_treasury_transactions")
+        
+        # 5. Purge bridge clients and bridge orders
+        cursor.execute("DELETE FROM mt5_bridge_clients WHERE account_id != '52171861'")
+        cursor.execute("""
+            UPDATE mt5_bridge_clients
+            SET chat_id = 859271875, broker = 'GTCFX', firm_name = 'GTC PAMM Master', balance = 0.0, equity = 0.0, status = 'CONFIGURED'
+            WHERE account_id = '52171861'
+        """)
+        cursor.execute("DELETE FROM mt5_bridge_orders")
+        
+        # 6. Purge non-PAMM referrals
+        cursor.execute("DELETE FROM mt5_user_referrals WHERE account_id != '52171861'")
+        
+        # 7. Purge non-admin mt5 system settings
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE 'mt5_user_config_%' AND key != 'mt5_user_config_859271875'")
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE 'mt5_ai_auto_trade_%' AND key != 'mt5_ai_auto_trade_859271875'")
+        
+        # 8. Mark migration complete
+        cursor.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('gtc_pamm_v2_cleanse_done', '1')")
+    except Exception as e:
+        logger.error(f"Error executing GTC PAMM cleanse migration: {e}")
+
+def reset_gtc_pamm_database_fresh_start() -> dict:
+    """Public wrapper to force reset GTC PAMM tables to fresh state."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    _execute_gtc_pamm_cleanse_migration(cursor)
+    conn.commit()
+    conn.close()
+    return {"status": "SUCCESS", "message": "GTC PAMM Master Fund Database cleansed and reset to fresh start"}
+
 
 def get_or_create_virtual_ledger(chat_id: int, initial_capital: float = 100.0, account_id: str = "") -> dict:
     """

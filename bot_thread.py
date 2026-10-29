@@ -22238,6 +22238,23 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(clean_paper, reply_markup=kb_paper)
                     return
 
+                if sub in ["RESET_DB", "CLEAR_DB", "RESET_ALL", "CLEAR_ALL", "RESET_PAMM"]:
+                    if not is_admin_user:
+                        await update.effective_message.reply_text("⛔ <b>[ACCESS DENIED]</b> ៖ មុខងារនេះសម្រាប់តែ Super Admin (859271875) ប៉ុណ្ណោះ!", parse_mode="HTML")
+                        return
+                    import gtc_pamm_engine
+                    db.reset_gtc_pamm_database_fresh_start()
+                    gtc_pamm_engine.GTCPAMMEngine._CACHE_TIMESTAMP = 0.0
+                    gtc_pamm_engine.GTCPAMMEngine._TELEMETRY_CACHE = {}
+                    notice = "🔄 <b>[GTC PAMM DATABASE RESET EXECUTED]</b>\n✅ បានសម្អាតទិន្នន័យ VIP ចាស់ៗ និង Reset Master Treasury ទៅ $0.00 ដោយជោគជ័យ!\n\n"
+                    msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)
+                    try:
+                        await update.effective_message.reply_text(notice + msg_pamm, parse_mode="HTML", reply_markup=kb_pamm)
+                    except Exception:
+                        clean_pamm = re.sub(r'<[^>]+>', '', notice + msg_pamm)
+                        await update.effective_message.reply_text(clean_pamm, reply_markup=kb_pamm)
+                    return
+
                 if sub in ["PAMM", "DASHBOARD", "HOME", "MAIN"]:
                     import gtc_pamm_engine
                     msg_pamm, kb_pamm = gtc_pamm_engine.GTCPAMMEngine.build_pamm_ui(chat_id, user_lang=user_lang, is_admin=is_admin_user)

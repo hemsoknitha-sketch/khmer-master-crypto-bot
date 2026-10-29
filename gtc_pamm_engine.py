@@ -76,9 +76,10 @@ class GTCPAMMEngine:
         cursor = conn.cursor()
         db._ensure_virtual_ledger_schema(cursor)
 
+        # Count strictly external VIP clients (exclude Super Admin 859271875)
         cursor.execute("""
             SELECT COUNT(*), SUM(allocated_capital), SUM(realized_profit), SUM(deposited_amount), SUM(withdrawn_amount)
-            FROM mt5_virtual_ledgers WHERE is_active = 1
+            FROM mt5_virtual_ledgers WHERE is_active = 1 AND chat_id != 859271875
         """)
         row = cursor.fetchone()
         active_investors = int(row[0] or 0)
@@ -110,7 +111,7 @@ class GTCPAMMEngine:
             real_master_bal = 0.0
 
         total_aum = round(real_master_bal + user_cap, 2)
-        cumulative_roi = round(((total_realized_profit + 14850.0) / max(total_aum, 1000.0)) * 100.0, 2)
+        cumulative_roi = round((total_realized_profit / max(total_aum, 100.0)) * 100.0, 2) if total_aum > 0 else 0.0
 
         data = {
             "master_account": GTC_PAMM_MASTER_TRADING_ACCOUNT,
@@ -130,7 +131,7 @@ class GTCPAMMEngine:
             "treasury_balance": t_bal,
             "total_performance_fees": t_maint,
             "total_ib_rebates": t_rebate,
-            "all_time_roi_pct": max(cumulative_roi, 48.6),
+            "all_time_roi_pct": cumulative_roi,
             "win_rate_pct": 95.2,
             "profit_factor": 4.21,
             "sharpe_ratio": 3.42,
