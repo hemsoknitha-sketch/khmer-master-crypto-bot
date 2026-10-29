@@ -4722,8 +4722,8 @@ def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
         dec_id = security.decrypt_data(raw_id) if raw_id else ""
         dec_pwd = security.decrypt_data(raw_pwd) if raw_pwd else ""
 
-        # Auto-upgrade unencrypted credentials in place to 256-bit AES
-        if dec_key and dec_id and dec_pwd:
+        # Auto-upgrade unencrypted credentials in place to 256-bit AES (exclude ENV_VAULT sentinel)
+        if dec_key and dec_id and dec_pwd and dec_key != "ENV_VAULT":
             if not raw_key.startswith("gAAAAA") or not raw_id.startswith("gAAAAA") or not raw_pwd.startswith("gAAAAA"):
                 try:
                     enc_k = security.encrypt_data(dec_key)
@@ -4740,6 +4740,18 @@ def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
                     up_conn.close()
                 except Exception:
                     pass
+
+        # Super Admin / ENV_VAULT sentinel handling: dynamically resolve from .env
+        if dec_key == "ENV_VAULT":
+            env_k = (os.getenv("CAPITAL_API_KEY") or "").strip()
+            env_i = (os.getenv("CAPITAL_IDENTIFIER") or "").strip()
+            env_p = (os.getenv("CAPITAL_PASSWORD") or "").strip()
+            if env_k and env_i and env_p:
+                dec_key, dec_id, dec_pwd = env_k, env_i, env_p
+            elif int(chat_id) in [859271875, 537186806]:
+                dec_key, dec_id, dec_pwd = "ENV_VAULT", "ENV_VAULT", "ENV_VAULT"
+            else:
+                return None
 
         if not dec_key or not dec_id or not dec_pwd:
             return None

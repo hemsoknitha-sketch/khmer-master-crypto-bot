@@ -513,25 +513,50 @@ class CapitalComEngine:
         is_demo: Optional[bool] = None,
         custom_chat_id: Optional[int] = None
     ):
-        if api_key == "UNAUTHENTICATED_GUEST":
+        if is_demo is not None:
+            self.is_demo = is_demo
+        else:
+            self.is_demo = os.getenv("CAPITAL_IS_DEMO", "True").strip().lower() in ("true", "1", "yes")
+
+        self.base_url = CAPITAL_DEMO_URL if self.is_demo else CAPITAL_LIVE_URL
+        self._custom_chat_id: Optional[int] = custom_chat_id
+        self.last_auth_error: str = ""
+
+        raw_key = (api_key or "").strip()
+        raw_id = (identifier or "").strip()
+        raw_pwd = (password or "").strip()
+
+        if raw_key == "UNAUTHENTICATED_GUEST":
             self.api_key = "UNAUTHENTICATED_GUEST"
             self.identifier = ""
             self.password = ""
             self.is_guest = True
         else:
             self.is_guest = False
-            self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip()
-            self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip()
-            self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip()
-        self.last_auth_error: str = ""
-        self._custom_chat_id: Optional[int] = custom_chat_id
-        
-        if is_demo is not None:
-            self.is_demo = is_demo
-        else:
-            self.is_demo = os.getenv("CAPITAL_IS_DEMO", "True").strip().lower() in ("true", "1", "yes")
-            
-        self.base_url = CAPITAL_DEMO_URL if self.is_demo else CAPITAL_LIVE_URL
+            # Resolve from environment if empty or 'ENV_VAULT' placeholder
+            if not raw_key or raw_key == "ENV_VAULT":
+                if self.is_demo:
+                    self.api_key = (os.getenv("CAPITAL_DEMO_API_KEY") or os.getenv("CAPITAL_API_KEY_DEMO") or os.getenv("CAPITAL_API_KEY", "")).strip()
+                else:
+                    self.api_key = (os.getenv("CAPITAL_LIVE_API_KEY") or os.getenv("CAPITAL_API_KEY_LIVE") or os.getenv("CAPITAL_API_KEY", "")).strip()
+            else:
+                self.api_key = raw_key
+
+            if not raw_id or raw_id == "ENV_VAULT":
+                if self.is_demo:
+                    self.identifier = (os.getenv("CAPITAL_DEMO_IDENTIFIER") or os.getenv("CAPITAL_IDENTIFIER_DEMO") or os.getenv("CAPITAL_IDENTIFIER", "")).strip()
+                else:
+                    self.identifier = (os.getenv("CAPITAL_LIVE_IDENTIFIER") or os.getenv("CAPITAL_IDENTIFIER_LIVE") or os.getenv("CAPITAL_IDENTIFIER", "")).strip()
+            else:
+                self.identifier = raw_id
+
+            if not raw_pwd or raw_pwd == "ENV_VAULT":
+                if self.is_demo:
+                    self.password = (os.getenv("CAPITAL_DEMO_PASSWORD") or os.getenv("CAPITAL_PASSWORD_DEMO") or os.getenv("CAPITAL_PASSWORD", "")).strip()
+                else:
+                    self.password = (os.getenv("CAPITAL_LIVE_PASSWORD") or os.getenv("CAPITAL_PASSWORD_LIVE") or os.getenv("CAPITAL_PASSWORD", "")).strip()
+            else:
+                self.password = raw_pwd
         
         # Session state
         self.cst_token: Optional[str] = None
@@ -612,6 +637,35 @@ class CapitalComEngine:
             else:
                 err_data = res.json() if res.content else {}
                 err_msg = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
+
+                # Demo Fallback Armor: If Demo was requested but API key was rejected as invalid
+                if "error.invalid.api.key" in err_msg and self.is_demo:
+                    fb_key = (os.getenv("CAPITAL_DEMO_API_KEY") or os.getenv("CAPITAL_API_KEY_DEMO") or os.getenv("CAPITAL_API_KEY", "")).strip()
+                    fb_id = (os.getenv("CAPITAL_DEMO_IDENTIFIER") or os.getenv("CAPITAL_IDENTIFIER_DEMO") or os.getenv("CAPITAL_IDENTIFIER", "")).strip()
+                    fb_pwd = (os.getenv("CAPITAL_DEMO_PASSWORD") or os.getenv("CAPITAL_PASSWORD_DEMO") or os.getenv("CAPITAL_PASSWORD", "")).strip()
+                    if fb_key and (fb_key != self.api_key or fb_id != self.identifier or fb_pwd != self.password):
+                        logger.info("🔄 [Capital.com] Demo custom credentials rejected. Testing system .env demo credentials auto-recovery...")
+                        try:
+                            fb_headers = {"X-CAP-API-KEY": fb_key, "Content-Type": "application/json"}
+                            fb_payload = {"identifier": fb_id, "password": fb_pwd, "encryptedPassword": False}
+                            res_fb = self.session.post(url, headers=fb_headers, json=fb_payload, timeout=8)
+                            if res_fb.status_code == 200:
+                                self.api_key = fb_key
+                                self.identifier = fb_id
+                                self.password = fb_pwd
+                                self.cst_token = res_fb.headers.get("CST")
+                                self.security_token = res_fb.headers.get("X-SECURITY-TOKEN")
+                                self.session_created_at = time.time()
+                                self.last_auth_error = ""
+                                self._auth_error_logged = False
+                                self._auth_backoff_until = 0.0
+                                body_fb = res_fb.json()
+                                self.active_account_id = body_fb.get("currentAccountId")
+                                msg = f"Session established successfully [DEMO ($10,000 Virtual) via System .env Recovery]! Account ID: {self.active_account_id}"
+                                logger.info(msg)
+                                return True, msg
+                        except Exception as e_fb:
+                            logger.debug(f"Demo system .env recovery note: {e_fb}")
 
                 # Auto-Detection Shield: If Demo was requested but account only has Live sub-accounts
                 if "error.null.accountId" in err_msg and self.is_demo:
@@ -3122,7 +3176,7 @@ def get_capital_engine(is_demo: Optional[bool] = None) -> CapitalComEngine:
 
 def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> CapitalComEngine:
     """
-    Per-User Dedicated Vault Engine Factory:
+    Per-User Dedicated Vault Engine Factory (Invariant 75 & Invariant 36):
     Instantiates or retrieves an isolated CapitalComEngine for the specified user chat_id
     and environment (Live or Demo), ensuring 100% separation between Prop Firm and Auto Trading.
     """
@@ -3137,25 +3191,54 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
             return _user_engine_pool[pool_key]
 
         creds = db.get_user_capital_credentials(chat_id)
-        if creds and (creds.get("api_key") or "").strip():
-            engine = CapitalComEngine(
-                api_key=creds.get("api_key"),
-                identifier=creds.get("identifier"),
-                password=creds.get("password"),
-                is_demo=is_demo,
-                custom_chat_id=chat_id
-            )
+        raw_key = (creds.get("api_key") or "").strip() if creds else ""
+
+        # Priority 1: Super Admin (859271875, 537186806) Dedicated Engine
+        if int(chat_id) in [SUPER_ADMIN_ID, 537186806]:
+            if raw_key and raw_key != "ENV_VAULT" and bool(creds.get("is_demo", False)) == is_demo:
+                engine = CapitalComEngine(
+                    api_key=raw_key,
+                    identifier=creds.get("identifier"),
+                    password=creds.get("password"),
+                    is_demo=is_demo,
+                    custom_chat_id=chat_id
+                )
+            else:
+                engine = CapitalComEngine(is_demo=is_demo, custom_chat_id=chat_id)
             _user_engine_pool[pool_key] = engine
             return engine
-        elif int(chat_id) in [SUPER_ADMIN_ID, 537186806]:
-            # Isolated dedicated engine for Super Admin utilizing .env credentials
-            engine = CapitalComEngine(is_demo=is_demo, custom_chat_id=chat_id)
-            _user_engine_pool[pool_key] = engine
-            return engine
+
+        # Priority 2: VIP User with valid custom credentials matching requested environment
+        if creds and raw_key and raw_key != "ENV_VAULT":
+            cred_is_demo = bool(creds.get("is_demo", False))
+            if cred_is_demo == is_demo:
+                engine = CapitalComEngine(
+                    api_key=raw_key,
+                    identifier=creds.get("identifier"),
+                    password=creds.get("password"),
+                    is_demo=is_demo,
+                    custom_chat_id=chat_id
+                )
+                _user_engine_pool[pool_key] = engine
+                return engine
+            elif is_demo:
+                # VIP user has live credentials but is trying demo -> safe demo sandbox
+                engine = CapitalComEngine(is_demo=True, custom_chat_id=chat_id)
+                _user_engine_pool[pool_key] = engine
+                return engine
+            else:
+                # VIP user only configured demo but live was requested -> unauthenticated guest
+                engine = CapitalComEngine(
+                    api_key="UNAUTHENTICATED_GUEST",
+                    identifier="",
+                    password="",
+                    is_demo=False,
+                    custom_chat_id=chat_id
+                )
+                _user_engine_pool[pool_key] = engine
+                return engine
         else:
-            # High-Security Multi-Tenant Isolation:
-            # VIP users who have not yet configured custom API keys receive a sandboxed guest engine.
-            # 100% strictly prevents leaking Super Admin's .env credentials, balances, and active positions!
+            # Priority 3: Sandboxed guest engine for users without custom keys
             engine = CapitalComEngine(
                 api_key="UNAUTHENTICATED_GUEST",
                 identifier="",
