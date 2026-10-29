@@ -1597,10 +1597,14 @@ class CapitalComEngine:
         if not bypass_citadel:
             try:
                 import super_smart_capital_citadel
+                setup_tp = kwargs.get("setup_type", "")
+                strat_reg = kwargs.get("strategy_regime", "AUTO")
                 is_citadel_ok, citadel_reason, citadel_diag = super_smart_capital_citadel.SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper(
                     epic=resolved_epic,
                     direction=dir_upper,
-                    engine=self
+                    engine=self,
+                    strategy_regime=strat_reg,
+                    setup_type=setup_tp
                 )
                 if not is_citadel_ok:
                     logger.warning(f"🛑 [SUPER SMART CAPITAL CITADEL] Order blocked for {resolved_epic} ({dir_upper}): {citadel_reason}")
@@ -2002,10 +2006,14 @@ class CapitalComEngine:
         if not bypass_citadel:
             try:
                 import super_smart_capital_citadel
+                setup_tp = kwargs.get("setup_type", "")
+                strat_reg = kwargs.get("strategy_regime", "AUTO")
                 is_citadel_ok, citadel_reason, citadel_diag = super_smart_capital_citadel.SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper(
                     epic=resolved_epic,
                     direction=dir_upper,
-                    engine=self
+                    engine=self,
+                    strategy_regime=strat_reg,
+                    setup_type=setup_tp
                 )
                 if not is_citadel_ok:
                     logger.warning(f"🛑 [SUPER SMART CAPITAL CITADEL] Working Order blocked for {resolved_epic} ({dir_upper}): {citadel_reason}")
@@ -2751,7 +2759,13 @@ class CapitalComEngine:
         epic: str,
         direction: str,
         size: Optional[float] = None,
-        risk_pct: float = 1.0
+        risk_pct: float = 1.0,
+        sl: Optional[float] = None,
+        tp: Optional[float] = None,
+        setup: Optional[Dict[str, Any]] = None,
+        bypass_quant_eval: bool = False,
+        bypass_citadel: bool = False,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Executes an institutional risk-managed trade with automated SL/TP based on ATR.
@@ -2874,15 +2888,20 @@ class CapitalComEngine:
             pass
         
         # 1. Run Quant Signal Evaluation
-        analysis = self.evaluate_tradfi_quant_signal(resolved_epic)
-        if not analysis.get("success"):
-            return {"success": False, "error": analysis.get("error", "Quant signal failure")}
+        if bypass_quant_eval or (setup and setup.get("success")):
+            analysis = setup or {}
+        elif sl is not None and tp is not None:
+            analysis = setup or {"success": True, "sl": sl, "tp": tp}
+        else:
+            analysis = self.evaluate_tradfi_quant_signal(resolved_epic)
+            if not analysis.get("success"):
+                return {"success": False, "error": analysis.get("error", "Quant signal failure")}
 
-        if analysis.get("market_status") != "TRADEABLE":
-            return {
-                "success": False,
-                "error": f"Market {resolved_epic} is {analysis.get('market_status')} (Closed for trading)."
-            }
+            if analysis.get("market_status") != "TRADEABLE":
+                return {
+                    "success": False,
+                    "error": f"Market {resolved_epic} is {analysis.get('market_status')} (Closed for trading)."
+                }
 
         # 2. Compute Size if not specified
         bal_info = self.get_account_balance()
@@ -2923,29 +2942,40 @@ class CapitalComEngine:
             size = max(size, min_size)
 
         # 3. Retrieve or calculate dynamic SL/TP
-        sl = analysis.get("sl")
-        tp = analysis.get("tp")
-        atr = analysis.get("atr", 1.0)
-        ask = analysis.get("ask", 0.0)
-        bid = analysis.get("bid", 0.0)
+        final_sl = sl if (sl is not None and sl > 0) else analysis.get("sl")
+        final_tp = tp if (tp is not None and tp > 0) else analysis.get("tp")
+        atr = float(analysis.get("atr", 1.0) or 1.0)
+        ask = float(analysis.get("ask", 0.0) or 0.0)
+        bid = float(analysis.get("bid", 0.0) or 0.0)
+        spread = float(analysis.get("spread", 0.0) or 0.0)
 
-        mid_px = (bid + ask) / 2.0 if (bid + ask) > 0 else 1.0
-        spread = analysis.get("spread", 0.0)
-        # Dynamic Volatility Breathing Stop: 2.5x ATR + 3.5x Spread for true market room (Noise-proof)
+        # Fallback to market details if ask/bid are unpopulated
+        if ask <= 0 or bid <= 0:
+            md = self.get_market_details(resolved_epic)
+            if md.get("success"):
+                ask = float(md.get("ask", ask) or ask)
+                bid = float(md.get("bid", bid) or bid)
+                if spread <= 0:
+                    spread = float(md.get("spread", spread) or spread)
+
+        mid_px = (bid + ask) / 2.0 if (bid + ask) > 0 else float(analysis.get("entry_price") or analysis.get("price") or 1.0)
+        spread = spread if spread > 0 else 0.0001
         prec = _get_tradfi_precision(resolved_epic, mid_px)
         min_sl_dist = max(2.5 * atr, spread * 3.5, 0.0035 * mid_px)
         min_tp_dist = max(3.5 * min_sl_dist, 6.0 * atr, 0.015 * mid_px)
 
         if dir_u == "BUY":
-            if not sl or sl <= 0 or sl >= bid:
-                sl = round(bid - min_sl_dist, prec)
-            if not tp or tp <= 0 or tp <= ask:
-                tp = round(ask + min_tp_dist, prec)
+            if not final_sl or final_sl <= 0 or (bid > 0 and final_sl >= bid):
+                final_sl = round((bid if bid > 0 else mid_px) - min_sl_dist, prec)
+            if not final_tp or final_tp <= 0 or (ask > 0 and final_tp <= ask):
+                final_tp = round((ask if ask > 0 else mid_px) + min_tp_dist, prec)
         elif dir_u == "SELL":
-            if not sl or sl <= 0 or sl <= ask:
-                sl = round(ask + min_sl_dist, prec)
-            if not tp or tp <= 0 or tp >= bid:
-                tp = round(bid - min_tp_dist, prec)
+            if not final_sl or final_sl <= 0 or (ask > 0 and final_sl <= ask):
+                final_sl = round((ask if ask > 0 else mid_px) + min_sl_dist, prec)
+            if not final_tp or final_tp <= 0 or (bid > 0 and final_tp >= bid):
+                final_tp = round((bid if bid > 0 else mid_px) - min_tp_dist, prec)
+        sl = final_sl
+        tp = final_tp
 
         # Pillar 4: Institutional 3-Stage Multi-Target Scale-Out Plan (TP1 50%, TP2 30%, Runner 20%)
         import super_smart_capital_citadel as sscc
@@ -2985,7 +3015,10 @@ class CapitalComEngine:
                     size=t_size,
                     stop_loss=sl,
                     take_profit=t_tp,
-                    max_allowed_spread=max_spread
+                    max_allowed_spread=max_spread,
+                    bypass_citadel=bypass_citadel,
+                    setup_type=(analysis.get("trigger_type") or kwargs.get("setup_type", "")),
+                    strategy_regime=(analysis.get("strategy_regime") or kwargs.get("strategy_regime", "AUTO"))
                 )
                 if t_res.get("success"):
                     t_res["tranche_id"] = t_id
@@ -3017,7 +3050,10 @@ class CapitalComEngine:
             size=size,
             stop_loss=sl,
             take_profit=eff_tp,
-            max_allowed_spread=max_spread
+            max_allowed_spread=max_spread,
+            bypass_citadel=bypass_citadel,
+            setup_type=(analysis.get("trigger_type") or kwargs.get("setup_type", "")),
+            strategy_regime=(analysis.get("strategy_regime") or kwargs.get("strategy_regime", "AUTO"))
         )
 
         if res.get("success"):
@@ -3350,14 +3386,30 @@ def execute_tradfi_trade(
     direction: str,
     size: Optional[float] = None,
     chat_id: Optional[int] = None,
-    is_demo: Optional[bool] = None
+    is_demo: Optional[bool] = None,
+    sl: Optional[float] = None,
+    tp: Optional[float] = None,
+    setup: Optional[Dict[str, Any]] = None,
+    bypass_quant_eval: bool = False,
+    bypass_citadel: bool = False,
+    **kwargs
 ) -> Dict[str, Any]:
     """Executes a protected institutional TradFi order on Capital.com."""
     if chat_id:
         engine = get_user_capital_engine(chat_id, is_demo=is_demo)
     else:
         engine = get_capital_engine(is_demo=is_demo)
-    return engine.execute_smart_tradfi_order(epic=epic, direction=direction, size=size)
+    return engine.execute_smart_tradfi_order(
+        epic=epic,
+        direction=direction,
+        size=size,
+        sl=sl,
+        tp=tp,
+        setup=setup,
+        bypass_quant_eval=bypass_quant_eval,
+        bypass_citadel=bypass_citadel,
+        **kwargs
+    )
 
 def close_all_tradfi(chat_id: Optional[int] = None, is_demo: Optional[bool] = None) -> Dict[str, Any]:
     """Closes all open TradFi positions in one click."""
@@ -5638,7 +5690,12 @@ class CapitalAutonomousEngine:
                 user_engine.execute_smart_tradfi_order,
                 epic=resolved_epic,
                 direction=final_action,
-                size=size
+                size=size,
+                sl=sl_p,
+                tp=tp_p,
+                setup=setup,
+                bypass_quant_eval=True,
+                setup_type=setup.get("trigger_type", "")
             )
 
             if trade_res.get("success"):
@@ -5971,7 +6028,12 @@ class CapitalAutonomousEngine:
                 user_engine.execute_smart_tradfi_order,
                 epic=cand_res_epic,
                 direction=c_action,
-                size=prop_size
+                size=prop_size,
+                sl=sl_px,
+                tp=cand_setup.get("tp", 0.0),
+                setup=cand_setup,
+                bypass_quant_eval=True,
+                setup_type=cand_setup.get("trigger_type", "")
             )
 
             deal_ref = "PROP"
@@ -11933,7 +11995,12 @@ class CapitalMasterLocomotiveEngine:
                 f_engine.execute_smart_tradfi_order,
                 epic=resolved_epic,
                 direction=direction,
-                size=f_size
+                size=f_size,
+                sl=sl_p,
+                tp=tp_p,
+                setup=setup,
+                bypass_quant_eval=True,
+                setup_type=setup.get("trigger_type", "")
             )
 
             if not trade_res.get("success"):

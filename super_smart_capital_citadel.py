@@ -1415,7 +1415,8 @@ class SuperSmartCapitalCitadel:
         epic: str,
         proposed_side: str,
         engine: Optional[Any] = None,
-        strategy_regime: str = "AUTO"
+        strategy_regime: str = "AUTO",
+        setup_type: str = ""
     ) -> Dict[str, Any]:
         """
         Comprehensive Institutional Trap & Confluence Evaluation for a Capital.com TradFi Asset.
@@ -1425,7 +1426,8 @@ class SuperSmartCapitalCitadel:
             epic=epic,
             proposed_side=proposed_side,
             engine=engine,
-            strategy_regime=strategy_regime
+            strategy_regime=strategy_regime,
+            setup_type=setup_type
         )
         if isinstance(res, dict) and "market_report" not in res:
             try:
@@ -1447,7 +1449,8 @@ class SuperSmartCapitalCitadel:
         epic: str,
         proposed_side: str,
         engine: Optional[Any] = None,
-        strategy_regime: str = "AUTO"
+        strategy_regime: str = "AUTO",
+        setup_type: str = ""
     ) -> Dict[str, Any]:
         """
         Comprehensive Institutional Trap & Confluence Evaluation for a Capital.com TradFi Asset.
@@ -1465,7 +1468,7 @@ class SuperSmartCapitalCitadel:
             norm_side = "UNKNOWN"
 
         now = time.time()
-        cache_key = f"{resolved_epic}_{norm_side}_{strategy_regime}"
+        cache_key = f"{resolved_epic}_{norm_side}_{strategy_regime}_{setup_type}"
         if cache_key in cls._CITADEL_CACHE:
             cached_ts, cached_res = cls._CITADEL_CACHE[cache_key]
             if now - cached_ts < cls._CACHE_TTL:
@@ -2024,55 +2027,82 @@ class SuperSmartCapitalCitadel:
 
         # Hard Veto on Deep Trapped Zones:
         # Longing in Extreme Premium (> 82.0%) without structural base is retail suicide
+        # BREAKOUT EXEMPTION: If this is an institutional Breakout Thrust (Path A of Invariant 76),
+        # price breaking above swing high (> 95.0% or > 100%) is the deliberate entry trigger!
+        is_breakout_mode = (
+            strategy_regime in ["BREAKOUT", "MOMENTUM"]
+            or any(b in str(setup_type or "").upper() for b in ["BREAKOUT", "RADAR", "SWEEP"])
+        )
+        has_armed_radar = False
+        try:
+            has_armed_radar = any(k.endswith(f"_{resolved_epic}") for k in CapitalInMemoryVirtualRadar.get_armed_traps())
+        except Exception:
+            pass
+
         if norm_side == "BUY" and price_range_pct > 82.0:
-            reason = (
-                f"DEEP_PREMIUM_TRAP: Price is at {price_range_pct:.1f}% of dealing range. "
-                f"Longing deep premium is blocked to avoid buying the top before discount pullback."
-            )
-            res = {
-                "epic": resolved_epic,
-                "proposed_side": norm_side,
-                "is_approved": False,
-                "rejection_reason": reason,
-                "strategy_regime": strategy_regime,
-                "regime_veto_code": "VETO_DEEP_PREMIUM_TRAP",
-                "price_range_pct": price_range_pct,
-                "confluence_score": 25.0,
-                "spread": spread,
-                "invalidation_sl": preliminary_sl,
-                "breathing_sl_dist": breathing_sl_dist
-            }
-            cls._CITADEL_CACHE[cache_key] = (now, res)
-            return res
+            if is_breakout_mode or has_armed_radar or (price_range_pct >= 98.0 and curr_price >= swing_high):
+                logger.info(
+                    f"⚡ [CITADEL BREAKOUT CLEARANCE] {resolved_epic} BUY at {price_range_pct:.1f}% dealing range "
+                    f"recognized as Invariant 76 Path A Boundary Breakout Thrust (Swing High: {swing_high:.2f}). "
+                    f"Bypassing Deep Premium Trap."
+                )
+            else:
+                reason = (
+                    f"DEEP_PREMIUM_TRAP: Price is at {price_range_pct:.1f}% of dealing range. "
+                    f"Longing deep premium inside range without confirmed boundary breakout is blocked to avoid buying the top before discount pullback."
+                )
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": reason,
+                    "strategy_regime": strategy_regime,
+                    "regime_veto_code": "VETO_DEEP_PREMIUM_TRAP",
+                    "price_range_pct": price_range_pct,
+                    "confluence_score": 25.0,
+                    "spread": spread,
+                    "invalidation_sl": preliminary_sl,
+                    "breathing_sl_dist": breathing_sl_dist
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
 
         # Shorting in Extreme Discount (< 18.0%) without structural breakdown is retail suicide
         if norm_side == "SELL" and price_range_pct < 18.0:
-            reason = (
-                f"DEEP_DISCOUNT_TRAP: Price is at {price_range_pct:.1f}% of dealing range. "
-                f"Shorting deep discount is blocked to prevent violent short squeeze."
-            )
-            res = {
-                "epic": resolved_epic,
-                "proposed_side": norm_side,
-                "is_approved": False,
-                "rejection_reason": reason,
-                "strategy_regime": strategy_regime,
-                "regime_veto_code": "VETO_DEEP_DISCOUNT_TRAP",
-                "price_range_pct": price_range_pct,
-                "confluence_score": 25.0,
-                "spread": spread,
-                "invalidation_sl": preliminary_sl,
-                "breathing_sl_dist": breathing_sl_dist
-            }
-            cls._CITADEL_CACHE[cache_key] = (now, res)
-            return res
+            if is_breakout_mode or has_armed_radar or (price_range_pct <= 2.0 and curr_price <= swing_low):
+                logger.info(
+                    f"⚡ [CITADEL BREAKDOWN CLEARANCE] {resolved_epic} SELL at {price_range_pct:.1f}% dealing range "
+                    f"recognized as Invariant 76 Path A Boundary Breakdown Thrust (Swing Low: {swing_low:.2f}). "
+                    f"Bypassing Deep Discount Trap."
+                )
+            else:
+                reason = (
+                    f"DEEP_DISCOUNT_TRAP: Price is at {price_range_pct:.1f}% of dealing range. "
+                    f"Shorting deep discount inside range without confirmed boundary breakdown is blocked to prevent violent short squeeze."
+                )
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": reason,
+                    "strategy_regime": strategy_regime,
+                    "regime_veto_code": "VETO_DEEP_DISCOUNT_TRAP",
+                    "price_range_pct": price_range_pct,
+                    "confluence_score": 25.0,
+                    "spread": spread,
+                    "invalidation_sl": preliminary_sl,
+                    "breathing_sl_dist": breathing_sl_dist
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
 
         # Anti-Chasing Momentum Overextension & Spread Drag Guard (Invariant 92 Pillar 1)
         # Chasing an extended impulse candle (> 1.85x ATR from EMA20) forces retail to buy the top wick
         # and pay inflated spread right before a mean-reverting pullback.
-        if norm_side == "BUY" and (curr_price - ema20_15m) > (1.85 * atr_15m):
+        max_chase_mult = 2.80 if (is_breakout_mode or has_armed_radar or curr_price >= swing_high) else 1.85
+        if norm_side == "BUY" and (curr_price - ema20_15m) > (max_chase_mult * atr_15m):
             reason = (
-                f"CHASING_MOMENTUM_OVEREXTENDED: Price {curr_price:.2f} is {((curr_price - ema20_15m)/atr_15m):.2f}x ATR above 15m EMA20. "
+                f"CHASING_MOMENTUM_OVEREXTENDED: Price {curr_price:.2f} is {((curr_price - ema20_15m)/atr_15m):.2f}x ATR above 15m EMA20 (max {max_chase_mult:.2f}x). "
                 f"Chasing extended impulse without pullback is blocked to eliminate spread drag and wick-top fills. "
                 f"Awaiting structural retest / FVG consolidation."
             )
@@ -2092,9 +2122,10 @@ class SuperSmartCapitalCitadel:
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
 
-        if norm_side == "SELL" and (ema20_15m - curr_price) > (1.85 * atr_15m):
+        max_short_chase_mult = 2.80 if (is_breakout_mode or has_armed_radar or curr_price <= swing_low) else 1.85
+        if norm_side == "SELL" and (ema20_15m - curr_price) > (max_short_chase_mult * atr_15m):
             reason = (
-                f"CHASING_MOMENTUM_OVEREXTENDED: Price {curr_price:.2f} is {((ema20_15m - curr_price)/atr_15m):.2f}x ATR below 15m EMA20. "
+                f"CHASING_MOMENTUM_OVEREXTENDED: Price {curr_price:.2f} is {((ema20_15m - curr_price)/atr_15m):.2f}x ATR below 15m EMA20 (max {max_short_chase_mult:.2f}x). "
                 f"Shorting extended breakdown without pullback is blocked to eliminate spread drag and bottom wicks. "
                 f"Awaiting structural retest / FVG consolidation."
             )
@@ -2386,10 +2417,13 @@ class SuperSmartCapitalCitadel:
             factors.append(f"STRATEGY_REGIME: TREND_FOLLOWING ({', '.join(regime_evidence)}) (+10)")
 
         if norm_side == "BUY":
-            # Discount advantage
+            # Discount advantage or Breakout thrust
             if is_discount:
                 score += 15.0
                 factors.append("DISCOUNT_ZONE_ADVANTAGE (+15)")
+            elif is_breakout_mode or has_armed_radar or (price_range_pct >= 98.0 and curr_price >= swing_high):
+                score += 20.0
+                factors.append("BOUNDARY_BREAKOUT_THRUST_CONFIRMED (+20)")
             else:
                 score -= 10.0
 
@@ -2503,10 +2537,13 @@ class SuperSmartCapitalCitadel:
                 score -= 15.0
 
         elif norm_side == "SELL":
-            # Premium advantage
+            # Premium advantage or Breakdown thrust
             if is_premium:
                 score += 15.0
                 factors.append("PREMIUM_ZONE_ADVANTAGE (+15)")
+            elif is_breakout_mode or has_armed_radar or (price_range_pct <= 2.0 and curr_price <= swing_low):
+                score += 20.0
+                factors.append("BOUNDARY_BREAKDOWN_THRUST_CONFIRMED (+20)")
             else:
                 score -= 10.0
 
@@ -3274,7 +3311,9 @@ class SuperSmartCapitalCitadel:
         epic: str,
         direction: str,
         engine: Optional[Any] = None,
-        bypass_citadel: bool = False
+        bypass_citadel: bool = False,
+        strategy_regime: str = "AUTO",
+        setup_type: str = ""
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Universal Pre-Flight Gatekeeper called by all Capital.com execution routines.
@@ -3525,7 +3564,7 @@ class SuperSmartCapitalCitadel:
         except Exception as e_chop_gate:
             logger.debug(f"Dealing range chop gatekeeper evaluation note: {e_chop_gate}")
 
-        diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
+        diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine, strategy_regime=strategy_regime, setup_type=setup_type)
         if not diag.get("is_approved"):
             reason = diag.get("rejection_reason", "SUPER_SMART_CAPITAL_CITADEL_REJECTED")
             print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
