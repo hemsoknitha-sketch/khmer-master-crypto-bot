@@ -9945,27 +9945,27 @@ class CapitalTrendScalpEngine:
                 raw_majors = []
         elif mode == "TRADFI":
             if 810 <= utc_min < 1230:
-                # NY Session
+                # NY Session: US Tech & Indices Majors
                 raw_majors = list(cls.TREND_MAJORS_TRADFI)
             elif 420 <= utc_min < 810:
-                # London Kill Zone: GOLD and DE40
-                raw_majors = ["GOLD", "GERMANY40"]
+                # London Kill Zone: Major European Indices, Commodities & Leaders
+                raw_majors = ["GOLD", "GERMANY40", "UK100", "FR40", "EU50", "OIL_CRUDE", "SILVER"]
             else:
-                # Asian Session: GOLD
-                raw_majors = ["GOLD"]
+                # Asian Session: Major Asian Indices & Commodities
+                raw_majors = ["GOLD", "SILVER", "OIL_CRUDE", "J225", "HK50", "CN50", "AU200", "SG25"]
         else:
             # Mode "ALL"
             if 810 <= utc_min < 1230:
                 # NY Session: All scalp majors (excluding crypto when disabled)
                 raw_majors = [m for m in cls.ALL_SCALP_MAJORS if (crypto_allowed or m not in cls.TREND_MAJORS_CRYPTO)]
             elif 420 <= utc_min < 810:
-                # London Kill Zone: GOLD, DE40
-                raw_majors = ["GOLD", "GERMANY40"]
+                # London Kill Zone: European Indices & Commodities
+                raw_majors = ["GOLD", "GERMANY40", "UK100", "FR40", "EU50", "OIL_CRUDE", "SILVER"]
                 if crypto_allowed:
                     raw_majors.extend(["BTCUSD", "ETHUSD", "SOLUSD"])
             else:
-                # Asian Session: GOLD
-                raw_majors = ["GOLD"]
+                # Asian Session: Asian Indices & Commodities
+                raw_majors = ["GOLD", "SILVER", "OIL_CRUDE", "J225", "HK50", "CN50", "AU200", "SG25"]
                 if crypto_allowed:
                     raw_majors.extend(["BTCUSD", "ETHUSD", "SOLUSD"])
 
@@ -11284,21 +11284,33 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SMART_SESSION_TIMED
                     return False, f"Forex trading for {epic} is 100% disabled by Angkor Quant Fiduciary Guard", info
 
             if current_session == "TOKYO_ASIAN":
-                # Tokyo/Asian Focus: USDJPY, AUDUSD, NZDUSD, GOLD, SILVER, US500
-                tokyo_allowed = ["USDJPY", "AUDUSD", "NZDUSD", "GOLD", "SILVER", "US500", "SP500"]
-                if any(k in epic_upper for k in tokyo_allowed):
+                # Tokyo/Asian Focus: GOLD, SILVER, OIL, Asian Indices & Full Top 300 Asian Equities (Invariant 89)
+                tokyo_core = ["USDJPY", "AUDUSD", "NZDUSD", "GOLD", "SILVER", "OIL_CRUDE", "OIL", "PLATINUM", "COPPER", "J225", "HK50", "CN50", "AU200", "SG25", "INDIA50", "US500", "SP500"]
+                if any(k in epic_upper for k in tokyo_core):
                     return True, f"Tokyo Kill Zone Active for {epic}", info
+                try:
+                    import capital_tri_regional_universe as ctru
+                    if epic_upper in getattr(ctru, "TOP_300_ASIA_SET", set()):
+                        return True, f"Tokyo Kill Zone Asian Equity Active for {epic}", info
+                except Exception:
+                    pass
                 return False, f"Asset {epic} outside Tokyo Kill Zone (Opens London 14:00 / NY 20:30 ICT)", info
                 
             elif current_session == "LONDON":
-                # London Focus: EURUSD, GBPUSD, GERMANY40, DAX, US500, GOLD, US100, OIL, SILVER
-                london_allowed = ["EURUSD", "GBPUSD", "GERMANY40", "DAX", "US500", "SP500", "GOLD", "US100", "OIL", "SILVER"]
-                if any(k in epic_upper for k in london_allowed):
+                # London Focus: GERMANY40, DAX, UK100, FR40, EU50, GOLD, OIL, SILVER & Full Top 300 European Equities (Invariant 89)
+                london_core = ["EURUSD", "GBPUSD", "GERMANY40", "DE40", "DAX", "UK100", "FR40", "EU50", "NETH25", "SPAIN35", "ITALY40", "SWISS20", "US500", "SP500", "GOLD", "US100", "OIL", "OIL_CRUDE", "BRENT", "SILVER"]
+                if any(k in epic_upper for k in london_core):
                     return True, f"London Kill Zone Active for {epic}", info
+                try:
+                    import capital_tri_regional_universe as ctru
+                    if epic_upper in getattr(ctru, "TOP_300_EU_SET", set()):
+                        return True, f"London Kill Zone European Equity Active for {epic}", info
+                except Exception:
+                    pass
                 return False, f"Asset {epic} outside London Kill Zone (Opens NY 20:30 ICT)", info
 
             elif current_session == "NEW_YORK":
-                # New York Peak Session: US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL, GERMANY40
+                # New York Peak Session: US100, US500, US30, GOLD, OIL, GERMANY40 & Full Top 300 US Equities (Invariant 89)
                 return True, f"New York Wall Street Active for {epic}", info
 
         # General engine check without epic: Always True in SMART_SESSION_TIMED
