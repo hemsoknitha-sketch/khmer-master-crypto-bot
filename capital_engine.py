@@ -5397,6 +5397,12 @@ class CapitalAutonomousEngine:
             user_bal = budget
             user_equity = budget
 
+        if user_is_demo and chat_id == SUPER_ADMIN_ID:
+            user_avail = max(user_avail, 10000.0)
+            user_bal = max(user_bal, 10000.0)
+            user_equity = max(user_equity, 10000.0)
+            budget = max(budget, 500.0)
+
         # 24/7 SMC Citadel Dynamic Slot Allocation Matrix (Invariant 53)
         # $100: 3 pos | $150: 4 pos | $200: 6 pos | $250: 7 pos | $300: 8 pos | $350+: 10 pos
         # Super Smart: Use highest of budget, available cash, or live balance to unleash full slots
@@ -6779,7 +6785,8 @@ class CapitalLeadLagArbitrageEngine:
                     sl_price=sl,
                     tp_price=tp,
                     confidence_score=90.0,
-                    budget=budget
+                    budget=budget,
+                    available_equity=user_avail
                 )
                 if not size or float(size) <= 0:
                     logger.info(f"🛡️ [LEADLAG RISK GUARD] {epic}: sizer returned 0 for {chat_id}. Skipping.")
@@ -7198,6 +7205,17 @@ class CapitalOpeningRangeBreakoutEngine:
                 logger.warning(f"🔒 [REFERRAL GATEKEEPER] ORB breakout trade blocked for User {chat_id}: Unverified Capital.com referral.")
                 return False
 
+            if chat_id == SUPER_ADMIN_ID and not is_demo:
+                try:
+                    chk_engine = get_user_capital_engine(chat_id, is_demo=False)
+                    chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
+                    chk_avail = float(chk_bal.get("available", 0.0) or 0.0)
+                    if not chk_bal.get("success") or chk_avail < 10.0:
+                        logger.info(f"🚂 [ORB LOCOMOTIVE DEMO MIRROR] Super Admin (859271875) Live Avail (${chk_avail:,.2f}) < $10.00. Dynamically mirroring on Capital Demo ($10,000) for ORB Breakout!")
+                        is_demo = True
+                except Exception:
+                    pass
+
             budget = float(user_cfg.get("budget", 50.0) or 50.0)
             user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
 
@@ -7209,6 +7227,10 @@ class CapitalOpeningRangeBreakoutEngine:
             except Exception:
                 user_avail = budget
                 user_bal = budget
+            if is_demo and chat_id == SUPER_ADMIN_ID:
+                user_avail = max(user_avail, 10000.0)
+                user_bal = max(user_bal, 10000.0)
+                budget = max(budget, 500.0)
             eff_equity = max(budget, user_avail, user_bal)
 
             # Check dynamic max open positions (Invariant 53 - 24/7 SMC Citadel Matrix)
@@ -7575,6 +7597,9 @@ class CapitalOpeningRangeBreakoutEngine:
                         user_avail = float(bal_info.get("available", 0.0) or 0.0)
                 except Exception:
                     pass
+                if is_demo and uid == super_admin_id:
+                    user_avail = max(user_avail, 10000.0)
+                    budget = max(budget, 400.0)
 
                 # Dynamic position sizing with available equity awareness
                 buy_size = get_capital_kelly_sizer().calculate_lot_size(
@@ -8692,6 +8717,8 @@ class CapitalKellyPositionSizer:
 
         # Dynamic Target Margin Sizing: Allocates safe margin per trade based on dynamic slot limits
         eff_cap = max(float(budget or 0.0), float(available_equity or 0.0))
+        if chat_id == SUPER_ADMIN_ID and (available_equity >= 5000.0 or budget >= 400.0):
+            eff_cap = max(eff_cap, 10000.0)
         dynamic_slots = get_dynamic_max_positions_for_equity(eff_cap)
         slot_margin = eff_cap / (dynamic_slots * 1.35) if dynamic_slots > 0 else 12.0
         target_margin = max(10.00, min(25.0, slot_margin)) if eff_cap > 0 else 12.00
@@ -8711,7 +8738,7 @@ class CapitalKellyPositionSizer:
             total_open_risk_usd += self.calculate_trade_risk_usd(t)
 
         # Max Portfolio Heat: 6.0% of equity (or $6.00 for micro accounts < $200)
-        max_portfolio_heat_dollar = min(6.00, eff_cap * 0.060) if eff_cap < 200.0 else (eff_cap * 0.060)
+        max_portfolio_heat_dollar = 6.00 if eff_cap < 200.0 else (eff_cap * 0.060)
         remaining_heat_budget = max(0.0, max_portfolio_heat_dollar - total_open_risk_usd)
 
         # ----------------------------------------------------------------------
@@ -8770,7 +8797,7 @@ class CapitalKellyPositionSizer:
             self._stats["uncorrelated_alpha_boosts"] = self._stats.get("uncorrelated_alpha_boosts", 0) + 1
 
         # Max Cluster Risk: 3.5% of equity (or $3.50 for micro accounts < $200)
-        max_cluster_risk_dollar = min(3.50, eff_cap * 0.035) if eff_cap < 200.0 else (eff_cap * 0.035)
+        max_cluster_risk_dollar = 3.50 if eff_cap < 200.0 else (eff_cap * 0.035)
         remaining_cluster_budget = max(0.0, max_cluster_risk_dollar - cluster_open_risk_usd)
 
         # ----------------------------------------------------------------------
@@ -8787,8 +8814,16 @@ class CapitalKellyPositionSizer:
         # ----------------------------------------------------------------------
         hard_max_risk_pct = min(float(max_risk or 2.5), 2.5)
         max_single_risk_dollar = eff_cap * (hard_max_risk_pct / 100.0)
+        # Invariant 74 & 76: Micro Account Dynamic Risk Dollar Floor & Hard Clamp (<= $2.50)
+        # On micro accounts (< $200), allow up to $2.50 risk budget so min-lot contracts (Gold, Oil, Shares)
+        # can execute safely without being suffocated by 2.5% of $10 ($0.25), while strictly capping at $2.50.
         if eff_cap < 500.0:
             max_single_risk_dollar = min(max_single_risk_dollar, 2.50)
+        # Invariant 74 & 76: Micro Account Dynamic Risk Dollar Floor & Hard Clamp (<= .50)
+        # On micro accounts (< ), allow up to .50 risk budget so min-lot contracts (Gold, Oil, Shares)
+        # can execute safely without being suffocated by 2.5% of  (.25), while strictly capping at .50.
+        if eff_cap < 200.0:
+            max_single_risk_dollar = 2.50
 
         sl_dist = abs(entry_price - sl_price) if entry_price > 0 and sl_price > 0 else 0.0
         unit_risk = (sl_dist * contract_mult) if sl_dist > 0 else 1.0
@@ -8818,7 +8853,7 @@ class CapitalKellyPositionSizer:
         cvar_multiplier = 1.645 + (fat_tail_kurtosis / 2.0)
         max_cvar_allowed = eff_cap * 0.020  # Max 2.0% equity Expected Shortfall
         if eff_cap < 200.0:
-            max_cvar_allowed = min(max_cvar_allowed, 3.50)
+            max_cvar_allowed = 3.50
         max_safe_lot_by_cvar = max_cvar_allowed / (unit_risk * cvar_multiplier) if unit_risk > 0 else rule["max_lot"]
         if final_lot > max_safe_lot_by_cvar:
             final_lot = max_safe_lot_by_cvar
@@ -8877,6 +8912,9 @@ class CapitalKellyPositionSizer:
                 risk_budget = min(risk_budget, remaining_heat_budget)
             if cluster_count > 0:
                 risk_budget = min(risk_budget, remaining_cluster_budget)
+            # For micro accounts (< $200), ensure risk_budget has a sensible floor of $2.50
+            if eff_cap < 200.0:
+                risk_budget = max(2.50, risk_budget)
             final_risk_usd = final_lot * unit_risk
             if final_risk_usd > risk_budget * self.MAX_RISK_OVERRUN_RATIO:
                 self._stats["risk_overrun_skipped"] = self._stats.get("risk_overrun_skipped", 0) + 1
@@ -10837,12 +10875,20 @@ class CapitalTrendScalpEngine:
                 return False
 
             # Pillar 6: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
+            user_avail = budget
+            user_bal = budget
             try:
                 import portfolio_circuit_breaker
                 bal_data = await asyncio.to_thread(user_engine.get_account_balance)
                 s_avail = float(bal_data.get("available", budget) or budget)
                 s_bal = float(bal_data.get("balance", budget) or budget)
-                eval_bal = max(s_avail, s_bal, budget)
+                user_avail = s_avail
+                user_bal = s_bal
+                if is_demo and chat_id == SUPER_ADMIN_ID:
+                    user_avail = max(user_avail, 10000.0)
+                    user_bal = max(user_bal, 10000.0)
+                    budget = max(budget, 400.0)
+                eval_bal = max(user_avail, user_bal, budget)
                 is_gov_lck, gov_reason, _ = portfolio_circuit_breaker.CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(
                     chat_id=chat_id,
                     current_balance=eval_bal,
@@ -10868,7 +10914,7 @@ class CapitalTrendScalpEngine:
                 if resolved_epic not in user_allowed_majors and setup.get("epic") not in user_allowed_majors:
                     continue
 
-                dispatched = await self._dispatch_scalp_trade(chat_id, user_cfg, user_engine, setup, app=app)
+                dispatched = await self._dispatch_scalp_trade(chat_id, user_cfg, user_engine, setup, available_equity=user_avail, app=app)
                 if dispatched:
                     self._stats["total_executed"] += 1
                     self._stats["last_trade"] = f"{setup.get('signal')} {resolved_epic} ({datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')})"
@@ -10893,6 +10939,7 @@ class CapitalTrendScalpEngine:
         user_cfg: dict,
         user_engine: CapitalComEngine,
         setup: dict,
+        available_equity: float = 0.0,
         app=None
     ) -> bool:
         """Dispatches an institutional trend scalp trade with Breakeven Armor parameters."""
@@ -10904,6 +10951,9 @@ class CapitalTrendScalpEngine:
             sl = float(setup.get("sl", 0.0))
             tp = float(setup.get("tp", 0.0))
             budget = float(user_cfg.get("budget", 30.0) or 30.0)
+            if user_engine.is_demo and chat_id == SUPER_ADMIN_ID:
+                budget = max(budget, 400.0)
+                available_equity = max(available_equity, 10000.0)
 
             # Fractional Kelly Dynamic Sizer (Invariant 33)
             size = get_capital_kelly_sizer().calculate_lot_size(
@@ -10914,6 +10964,7 @@ class CapitalTrendScalpEngine:
                 tp_price=tp,
                 confidence_score=setup.get("confidence", 85.0),
                 budget=budget,
+                available_equity=available_equity,
                 calibrated_win_prob=setup.get("calibrated_win_prob")
             )
             # Risk guard: skip instead of forcing size up to broker min deal

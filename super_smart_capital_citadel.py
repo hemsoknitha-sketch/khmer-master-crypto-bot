@@ -4308,14 +4308,14 @@ class TradFiMultiTargetScaleOutManager:
         sl_price: float,
         total_size: float,
         spread: float = 0.0,
-        min_deal_size: float = 0.01,
         tp1_r: float = 1.80,
         tp2_r: float = 3.50,
         runner_r: float = 8.00,
         tp1_price: Optional[float] = None,
         tp2_price: Optional[float] = None,
         tp3_price: Optional[float] = None,
-        atr_15m: Optional[float] = None
+        atr_15m: Optional[float] = None,
+        min_deal_size: float = 0.01
     ) -> Dict[str, Any]:
         """
         Calculates 3-stage scale-out target prices and tranche lot sizes.
