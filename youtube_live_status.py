@@ -58,21 +58,30 @@ def audit_stream_server(port: int = 8000):
     except Exception:
         pass
 
-    # 2. Comprehensive data probe
-    url = f"http://localhost:{port}/api/gold_m1_live"
+    # 2. Comprehensive data probe (M5 Preferred, M1 Fallback)
+    url = f"http://localhost:{port}/api/gold_m5_live"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "AQ-Status-Check"})
         with urllib.request.urlopen(req, timeout=2.0) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 return True, data
-    except Exception as e:
-        if health_ok:
-            return True, {
-                "current_price": health_data.get("price", 2745.50),
-                "signal": {"action": "WAIT", "confidence": 75.0, "entry": health_data.get("price", 2745.50), "sl": 2741.30, "tp1": 2753.90},
-                "math": {"hurst": 0.52, "verdict": "NEUTRAL_WAIT", "bayes_bull": 52.0}
-            }
+    except Exception:
+        url = f"http://localhost:{port}/api/gold_m1_live"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "AQ-Status-Check"})
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return True, data
+        except Exception as e:
+            if health_ok:
+                return True, {
+                    "current_price": health_data.get("price", 2745.50),
+                    "signal": {"action": "WAIT", "confidence": 75.0, "entry": health_data.get("price", 2745.50), "sl": 2741.30, "tp1": 2753.90},
+                    "math": {"hurst": 0.52, "verdict": "NEUTRAL_WAIT", "bayes_bull": 52.0}
+                }
+            return False, str(e)
         return False, str(e)
         
     return False, "Offline"
@@ -130,7 +139,7 @@ def print_status():
     else:
         status_badge = "🔴 OFFLINE"
 
-    print(f"📡 Gold M1 Web Server (Port 8000): {status_badge}")
+    print(f"📡 Gold M5 Web Server (Port 8000): {status_badge}")
 
     if srv_ok and isinstance(srv_data, dict):
         p = srv_data.get("current_price", 0.0)

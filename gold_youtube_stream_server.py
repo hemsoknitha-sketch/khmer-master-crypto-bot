@@ -58,31 +58,32 @@ except Exception:
 
 
 def _generate_fallback_data() -> Dict[str, Any]:
-    """Generates clean institutional fallback data during initial cold start."""
+    """Generates clean institutional fallback data during initial cold start (M5 Timeframe)."""
     now = time.time()
     current_price = 2745.50
     return {
         "timestamp": now,
         "current_price": current_price,
         "spread": 0.18,
+        "timeframe": "M5",
         "candles": [
             {
-                "time": int(now - 60),
-                "open": current_price - 0.20,
-                "high": current_price + 0.30,
-                "low": current_price - 0.40,
+                "time": int(now - 300),
+                "open": current_price - 0.40,
+                "high": current_price + 0.60,
+                "low": current_price - 0.80,
                 "close": current_price,
-                "volume": 120.0
+                "volume": 250.0
             }
         ],
         "signal": {
             "action": "WAIT",
             "confidence": 75.0,
             "entry": current_price,
-            "sl": round(current_price - 4.20, 2),
-            "tp1": round(current_price + 8.40, 2),
-            "tp2": round(current_price + 16.80, 2),
-            "runner": round(current_price + 25.20, 2),
+            "sl": round(current_price - 4.50, 2),
+            "tp1": round(current_price + 9.00, 2),
+            "tp2": round(current_price + 18.00, 2),
+            "runner": round(current_price + 27.00, 2),
             "rr_ratio": "1 : 3.5"
         },
         "math": {
@@ -93,11 +94,11 @@ def _generate_fallback_data() -> Dict[str, Any]:
             "ou_z": "+0.15",
             "ou_bias": "EQUILIBRIUM",
             "bayes_bull": 52.0,
-            "risk_buffer": 4.20
+            "risk_buffer": 4.50
         },
         "smc": {
             "confluence_score": 75,
-            "order_blocks_summary": "Scanning RAM Structure",
+            "order_blocks_summary": "1 Bullish M5 OB",
             "fvg_summary": "1 Imbalance Zone",
             "sweep_summary": "Boundary Dealing Range"
         }
@@ -115,7 +116,7 @@ _WS_CLIENTS = set()
 
 def _fetch_gold_m1_data() -> Dict[str, Any]:
     """
-    Synthesizes Live Gold M1 Candlesticks, SMC Structures, and Math Radar.
+    Synthesizes Live Gold M5 Candlesticks, SMC Structures, and Math Radar.
     Runs in background thread to avoid blocking the event loop.
     """
     try:
@@ -125,17 +126,17 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         print(f"⚠️ [YOUTUBE STREAM] Engine import note: {e}", flush=True)
         return _generate_fallback_data()
 
-    # 1. Fetch M1 Candlesticks
+    # 1. Fetch M5 Candlesticks (Optimal Institutional Sniper Timeframe)
     df = None
     try:
-        df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("XAUUSD", "1m", limit=120)
+        df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("XAUUSD", "5m", limit=120)
     except Exception:
         df = None
 
     if df is None or len(df) < 15:
         # Fallback to PAXGUSDT if XAUUSD feed is offline
         try:
-            df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("PAXGUSDT", "1m", limit=120)
+            df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("PAXGUSDT", "5m", limit=120)
         except Exception:
             df = None
 
@@ -156,9 +157,9 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     else:
         return _generate_fallback_data()
 
-    # 2. Institutional 9 SMC Citadel Analysis
+    # 2. Institutional 9 SMC Citadel Analysis on M5
     smc_score = 75
-    ob_summary = "1 Bullish M1 OB"
+    ob_summary = "1 Bullish M5 OB"
     fvg_summary = "1 Imbalance Retest"
     sweep_summary = "Dealing Range Boundaries"
     smc_action = "WAIT"
@@ -174,7 +175,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
             bear_obs = [o for o in obs if o.get('type') == 'BEARISH_OB' and not o.get('mitigated', False)]
             active_fvgs = [f for f in fvgs if not f.get('filled', False)]
 
-            ob_summary = f"{len(bull_obs)} Bullish OB, {len(bear_obs)} Bearish OB"
+            ob_summary = f"{len(bull_obs)} Bullish M5 OB, {len(bear_obs)} Bearish M5 OB"
             fvg_summary = f"{len(active_fvgs)} Imbalance Zones"
 
             if slh.get('bullish_sweep'):
@@ -481,6 +482,8 @@ def create_app() -> web.Application:
     app.router.add_get("/", handle_live_view)
     app.router.add_get("/gold_live_view", handle_live_view)
     app.router.add_get("/api/health", handle_health)
+    app.router.add_get("/api/gold_m5_live", handle_api_snapshot)
+    app.router.add_get("/api/gold_m5_ws", handle_api_ws)
     app.router.add_get("/api/gold_m1_live", handle_api_snapshot)
     app.router.add_get("/api/gold_m1_ws", handle_api_ws)
     app.router.add_get("/api/mc_speech", handle_mc_speech)

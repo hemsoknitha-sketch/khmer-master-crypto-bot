@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>ANGKOR QUANT | INSTITUTIONAL GOLD XAUUSD M1 LIVE 24/7</title>
+  <title>ANGKOR QUANT | INSTITUTIONAL GOLD XAUUSD M5 LIVE 24/7</title>
   <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -721,8 +721,8 @@
       <div class="brand">
         <div class="brand-logo">AQ</div>
         <div class="brand-title">
-          <h1>ANGKOR QUANT • INSTITUTIONAL GOLD XAUUSD M1</h1>
-          <p>M1 HFT Confluence • 9 SMC Citadel • Math Radar • AI Regimes</p>
+          <h1>ANGKOR QUANT • INSTITUTIONAL GOLD XAUUSD M5</h1>
+          <p>M5 Sniper Scalping • 9 SMC Citadel • Math Radar • AI Regimes</p>
         </div>
       </div>
 
@@ -765,7 +765,7 @@
           <div class="dot-purple"></div> EMA 200
         </div>
         <div class="indicator-pill" id="chart-watermark" style="color:#cbd5e1; font-weight:700;">
-          GOLD XAUUSD (M1) • TOKYO VPS DIRECT FEED
+          GOLD XAUUSD (M5) • TOKYO VPS DIRECT FEED
         </div>
       </div>
       <div id="chart-container"></div>
@@ -978,7 +978,7 @@
         </div>
         <div class="metric-row">
           <span class="metric-name">Active Order Blocks</span>
-          <span class="metric-val mono" id="smc-obs" style="color:#34d399;">1 Bullish M1 OB</span>
+          <span class="metric-val mono" id="smc-obs" style="color:#34d399;">1 Bullish M5 OB</span>
         </div>
         <div class="metric-row">
           <span class="metric-name">Fair Value Gaps (FVG)</span>
@@ -1205,7 +1205,7 @@
 
     async function fetchFullSnapshot() {
       try {
-        const res = await fetch('/api/gold_m1_live');
+        const res = await fetch('/api/gold_m5_live');
         if (!res.ok) return;
         const data = await res.json();
 
@@ -1348,12 +1348,12 @@
     function initWebSocket() {
       const loc = window.location;
       const wsProto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProto}//${loc.host}/api/gold_m1_ws`;
+      const wsUrl = `${wsProto}//${loc.host}/api/gold_m5_ws`;
       let ws = null;
 
       try {
         ws = new WebSocket(wsUrl);
-        ws.onopen = () => console.log("🟢 WebSocket Connected to Gold M1 Stream");
+        ws.onopen = () => console.log("🟢 WebSocket Connected to Gold M5 Stream");
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -1504,7 +1504,7 @@
       if (eq) eq.className = 'mc-equalizer';
       if (statusText) statusText.innerText = "ON AIR";
       if (captionMood) captionMood.innerText = "• ORDER FLOW RADAR";
-      if (captionText) captionText.innerText = '"Monitoring Gold M1 order flow & institutional liquidity pools..."';
+      if (captionText) captionText.innerText = '"Monitoring Gold M5 order flow & institutional liquidity pools..."';
     }
 
     // Trigger initial welcome greeting after 3.5 seconds on live load

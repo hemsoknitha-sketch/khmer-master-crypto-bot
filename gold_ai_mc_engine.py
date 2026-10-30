@@ -62,9 +62,9 @@ class GoldAIMCEngine:
 
         def _worker():
             templates = {
-                "welcome.mp3": "Welcome to Angkor Quant Institutional Live. I am Elena, your 24/7 AI Market Anchor. Monitoring Gold M1 order flow.",
+                "welcome.mp3": "Welcome to Angkor Quant Institutional Live. I am Elena, your 24/7 AI Market Anchor. Monitoring Gold M5 sniper order flow.",
                 "be_armor.mp3": "Notice. Breakeven Armor is now engaged. Stop loss has moved to entry plus spread. Trade is officially risk free.",
-                "tp1_reached.mp3": "Target One reached on Gold M1! Fifty percent scaled out for solid profit. Trailing the remaining position.",
+                "tp1_reached.mp3": "Target One reached on Gold M5! Fifty percent scaled out for solid profit. Trailing the remaining position.",
                 "tp2_reached.mp3": "Target Two captured! Banking cash profit into the vault. Moonshot runner is now trailing behind fifteen-minute EMA confluence.",
             }
             for filename, text in templates.items():
@@ -125,14 +125,14 @@ class GoldAIMCEngine:
 
             if action == "BUY":
                 speech_text = (
-                    f"Institutional alert! Strong Buy confluence confirmed on Gold at {p:.2f} dollars. "
+                    f"Institutional alert! Strong Buy confluence confirmed on Gold M5 at {p:.2f} dollars. "
                     f"Stop loss is anchored at {sl:.2f}, targeting TP1 at {tp1:.2f} for a 2.0R return. "
                     f"Order flow indicates solid institutional absorption."
                 )
                 mood = "buy"
             else:
                 speech_text = (
-                    f"Institutional alert! Strong Sell confluence confirmed on Gold at {p:.2f} dollars. "
+                    f"Institutional alert! Strong Sell confluence confirmed on Gold M5 at {p:.2f} dollars. "
                     f"Stop loss is anchored at {sl:.2f}, targeting TP1 at {tp1:.2f}. "
                     f"Bearish order block rejection active."
                 )
@@ -280,3 +280,4 @@ class GoldAIMCEngine:
 
 # Module singleton
 mc_engine = GoldAIMCEngine.get_instance()
+

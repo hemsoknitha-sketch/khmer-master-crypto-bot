@@ -102,9 +102,9 @@ else
 fi
 export DISPLAY=:99
 
-# 4. Start Gold M1 Stream Web Server (Unbuffered output)
+# 4. Start Gold M5 Stream Web Server (Unbuffered output)
 if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
-    echo "📡 Starting Gold M1 Stream Server (Port $PORT)..."
+    echo "📡 Starting Gold M5 Stream Server (Port $PORT)..."
     # Ensure port is released from any zombie process
     fuser -k ${PORT}/tcp 2>/dev/null || true
     pkill -f "gold_youtube_stream_server.py" 2>/dev/null || true
@@ -113,7 +113,7 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     # Wait up to 5s for server health endpoint to come up
     for i in {1..5}; do
         if curl -s "http://localhost:${PORT}/api/health" | grep -q "ok"; then
-            echo "✅ Gold M1 Stream Server active and verified on Port $PORT."
+            echo "✅ Gold M5 Stream Server active and verified on Port $PORT."
             break
         fi
         sleep 0.5
