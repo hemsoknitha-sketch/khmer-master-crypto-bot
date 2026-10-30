@@ -125,3 +125,4 @@ gold trading, xauusd, gold live, xauusd live, gold trading live, forex live, liv
 | **Auto-Stop** | **Disabled** (Crucial for 24/7/365 uninterrupted streaming) |
 | **Audience** | No, it's not made for kids |
 | **Age Restriction** | None |
+
