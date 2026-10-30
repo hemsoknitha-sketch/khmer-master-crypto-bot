@@ -59,9 +59,9 @@ else
 fi
 echo "🐍 Detected Python Interpreter: $PYTHON_BIN"
 
-# 4.1 Ensure gTTS is installed for AI Girl MC Neural Voice Engine
-echo "🎙️ Verifying gTTS Neural Voice Engine..."
-$PYTHON_BIN -m pip install gtts --quiet || true
+# 4.1 Ensure edge-tts and gTTS are installed for AI Girl MC Confident Neural Voice
+echo "🎙️ Verifying Edge-TTS and gTTS Neural Voice Engines..."
+$PYTHON_BIN -m pip install edge-tts gtts --quiet || true
 
 # 5. Configure PulseAudio Virtual Null Sink (Zero-Hardware Audio Bus)
 echo "🎵 Configuring PulseAudio virtual null sink..."
@@ -92,7 +92,7 @@ SERVICE_FILE="/etc/systemd/system/angkor-gold-youtube-live.service"
 echo "⚙️ Configuring Systemd 24/7 service at $SERVICE_FILE..."
 sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
-Description=Angkor Quant - Auto YouTube Live Stream 24/7 (Gold M1 HFT Signal)
+Description=Angkor Quant - Auto YouTube Live Stream 24/7 (Gold M5 Sniper Scalping & AI Elena)
 After=network.target sound.target
 
 [Service]

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-ANGKOR QUANT - GOLD M1 YOUTUBE LIVE STREAMING SERVER
+ANGKOR QUANT - GOLD M5 YOUTUBE LIVE STREAMING SERVER
 ======================================================
 Asynchronous HTTP & WebSocket server powering the 24/7/365 YouTube Live Stream.
 Delivers:
-  1. Live Gold M1 Candlesticks with sub-millisecond RAM caching
+  1. Live Gold M5 Sniper Candlesticks with sub-millisecond RAM caching
   2. Institutional 9 SMC Citadel Overlays (Order Blocks, FVG, Liquidity Sweeps)
   3. Wall Street Mathematical Radar (Hurst, Kalman, Bayes, OU, GARCH)
   4. Audio Chime Alerts for BUY/SELL/TP/SL Signals
@@ -378,10 +378,10 @@ async def handle_mc_test(request: web.Request) -> web.Response:
                 text = "Institutional alert! Strong Sell confluence confirmed on Gold at 2,745.50 dollars. Order block rejection confirmed. Stop loss anchored above high."
                 mood = "sell"
             elif test_type == "tp":
-                text = "Target One reached on Gold M1! Realizing 50% lot cash profit into the vault. Breakeven Armor is now locked at risk zero."
+                text = "Target One reached on Gold M5! Realizing 50% lot cash profit into the vault. Breakeven Armor is now locked at risk zero."
                 mood = "tp"
             else:
-                text = "Welcome to Angkor Quant Institutional Live. I am Elena, your 24/7 AI Market Anchor. Monitoring Gold M1 order flow and institutional liquidity pools."
+                text = "Welcome to Angkor Quant Institutional Live. I am Elena, your eighteen-year-old market anchor. Monitoring Gold M5 sniper order flow and institutional liquidity pools."
                 mood = "brief"
 
             speech_id = f"test_{int(now)}"
@@ -389,7 +389,7 @@ async def handle_mc_test(request: web.Request) -> web.Response:
             payload = {
                 "id": speech_id,
                 "text": text,
-                "speaker": "Elena (Senior Quant Analyst)",
+                "speaker": "Elena (Senior Quant Host, 18)",
                 "mood": mood,
                 "priority": "HIGH",
                 "audio_url": audio_url,

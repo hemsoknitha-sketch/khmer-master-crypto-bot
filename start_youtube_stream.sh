@@ -120,38 +120,39 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     done
 
     if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
-        echo "⚠️ Gold M1 Stream Server failed to stay alive! Inspecting logs/stream_server.log:"
+        echo "⚠️ Gold M5 Stream Server failed to stay alive! Inspecting logs/stream_server.log:"
         tail -n 15 "$SCRIPT_DIR/logs/stream_server.log" 2>/dev/null || true
     fi
 else
-    echo "📡 Gold M1 Stream Server already running."
+    echo "📡 Gold M5 Stream Server already running."
 fi
 
-# 5. Start Chromium in Kiosk Mode on :99
-if ! pgrep -f "$CHROMIUM_BIN.*gold_live_view" > /dev/null && ! pgrep -f "chromium.*gold_live_view" > /dev/null; then
-    echo "🌐 Starting Headless Chromium Kiosk on DISPLAY :99..."
-    # Purge stale chromium singleton locks
-    rm -rf /tmp/chromium-stream-profile/Singleton* 2>/dev/null || true
-    taskset -c 2,3 $CHROMIUM_BIN \
-        --user-data-dir=/tmp/chromium-stream-profile \
-        --display=:99 \
-        --ozone-platform=x11 \
-        --kiosk \
-        --window-position=0,0 \
-        --window-size=1920,1080 \
-        --no-sandbox \
-        --disable-infobars \
-        --disable-notifications \
-        --disable-session-crashed-bubble \
-        --autoplay-policy=no-user-gesture-required \
-        --disable-dev-shm-usage \
-        --disable-gpu-sandbox \
-        --hide-scrollbars \
-        http://localhost:${PORT}/gold_live_view > "$SCRIPT_DIR/logs/chromium.log" 2>&1 &
-    sleep 2
-else
-    echo "🌐 Chromium Kiosk already running."
-fi
+# 5. Start Fresh Chromium in Kiosk Mode on :99 (Zero Stale Cache)
+echo "🌐 Starting Fresh Headless Chromium Kiosk on DISPLAY :99..."
+pkill -9 -f "chromium.*gold_live_view" 2>/dev/null || true
+pkill -9 -f "chrome.*gold_live_view" 2>/dev/null || true
+rm -rf /tmp/chromium-stream-profile/Singleton* /tmp/chromium-stream-profile/Default/Cache* /tmp/chromium-stream-profile/Default/Code\ Cache* 2>/dev/null || true
+sleep 1
+
+taskset -c 2,3 $CHROMIUM_BIN \
+    --user-data-dir=/tmp/chromium-stream-profile \
+    --display=:99 \
+    --ozone-platform=x11 \
+    --kiosk \
+    --window-position=0,0 \
+    --window-size=1920,1080 \
+    --no-sandbox \
+    --disable-infobars \
+    --disable-notifications \
+    --disable-session-crashed-bubble \
+    --autoplay-policy=no-user-gesture-required \
+    --disable-dev-shm-usage \
+    --disable-gpu-sandbox \
+    --disk-cache-size=1 \
+    --media-cache-size=1 \
+    --hide-scrollbars \
+    http://localhost:${PORT}/gold_live_view > "$SCRIPT_DIR/logs/chromium.log" 2>&1 &
+sleep 2
 
 # 6. Audio Routing: Combine PulseAudio Alerts & Ambient Sound
 PULSE_AVAILABLE=false

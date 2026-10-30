@@ -8,10 +8,10 @@ echo "🛑 [ANGKOR QUANT] Stopping YouTube Live Stream..."
 pkill -9 -f "ffmpeg.*x11grab" 2>/dev/null || true
 pkill -f "ffmpeg.*rtmp" 2>/dev/null || true
 
-# Kill Chromium Kiosk
+# Kill Chromium Kiosk & Purge Cache
 pkill -9 -f "chromium.*gold_live_view" 2>/dev/null || true
 pkill -9 -f "chrome.*gold_live_view" 2>/dev/null || true
-rm -rf /tmp/chromium-stream-profile/Singleton* 2>/dev/null || true
+rm -rf /tmp/chromium-stream-profile/Singleton* /tmp/chromium-stream-profile/Default/Cache* /tmp/chromium-stream-profile/Default/Code\ Cache* 2>/dev/null || true
 
 # Kill Stream Web Server
 pkill -9 -f "gold_youtube_stream_server.py" 2>/dev/null || true

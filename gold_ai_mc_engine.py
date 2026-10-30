@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-ANGKOR QUANT - GOLD M1 AI GIRL MC & QUANT HOST ENGINE
-=====================================================
+ANGKOR QUANT - GOLD M5 AI GIRL MC & QUANT HOST ENGINE (ELENA 18)
+================================================================
 Powers the 24/7 Virtual Institutional Quant Anchor ("Elena") for YouTube Live.
 Delivers:
   1. Real-time institutional Wall Street English commentaries (Buy/Sell, TP/SL, Breakeven).
-  2. Interbank Kill Zone briefings (London Open, New York Wall Street Cash Open).
-  3. Physical Shanghai Gold (SGE) & Macro TIPS real yield commentary.
-  4. Audio speech generation with pre-cached high-fidelity neural voice assets.
+  2. Confident, strong, human-grade neural voice synthesis (en-US-JennyNeural / gTTS).
+  3. Interbank Kill Zone briefings (London Open, New York Wall Street Cash Open).
+  4. Physical Shanghai Gold (SGE) & Macro TIPS real yield commentary.
   5. Intelligent cooldown & priority queue (Zero chatter collision, instant priority on signals).
-=====================================================
+================================================================
 """
 
 import os
@@ -17,6 +17,7 @@ import sys
 import time
 import json
 import threading
+import subprocess
 from typing import Dict, Any, Optional
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,7 +35,7 @@ except Exception:
 class GoldAIMCEngine:
     """
     Virtual Quant Host Engine managing AI Anchor Elena's thoughts, speeches,
-    emotive states, and neural voice synthesis.
+    emotive states, and confident human-grade neural voice synthesis.
     """
     _instance = None
     _lock = threading.Lock()
@@ -55,46 +56,63 @@ class GoldAIMCEngine:
                 cls._instance = cls()
             return cls._instance
 
+    def _synthesize_file(self, text: str, filepath: str) -> bool:
+        """
+        Synthesizes text to MP3 using confident human-grade neural voice (en-US-JennyNeural)
+        with seamless gTTS fallback.
+        """
+        # Tier 1: Microsoft Edge Neural TTS (Natural, Confident, Human TV Broadcaster Voice)
+        try:
+            res = subprocess.run([
+                sys.executable, "-m", "edge_tts",
+                "--voice", "en-US-JennyNeural",
+                "--rate", "+2%",
+                "--text", text,
+                "--write-media", filepath
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=6)
+            if res.returncode == 0 and os.path.exists(filepath) and os.path.getsize(filepath) > 1000:
+                return True
+        except Exception:
+            pass
+
+        # Tier 2: Google Neural TTS Fallback
+        if GTTS_AVAILABLE:
+            try:
+                tts = gTTS(text=text, lang="en", tld="us")
+                tts.save(filepath)
+                return True
+            except Exception as e:
+                print(f"[AI MC] TTS fallback note for {os.path.basename(filepath)}: {e}", flush=True)
+
+        return False
+
     def _precache_standard_alerts(self):
         """Generates standard alert audio files in background thread if not present."""
-        if not GTTS_AVAILABLE:
-            return
-
         def _worker():
             templates = {
-                "welcome.mp3": "Welcome to Angkor Quant Institutional Live. I am Elena, your 24/7 AI Market Anchor. Monitoring Gold M5 sniper order flow.",
+                "welcome.mp3": "Welcome to Angkor Quant Institutional Live. I am Elena, your eighteen-year-old market anchor. Monitoring Gold M5 sniper order flow.",
                 "be_armor.mp3": "Notice. Breakeven Armor is now engaged. Stop loss has moved to entry plus spread. Trade is officially risk free.",
                 "tp1_reached.mp3": "Target One reached on Gold M5! Fifty percent scaled out for solid profit. Trailing the remaining position.",
                 "tp2_reached.mp3": "Target Two captured! Banking cash profit into the vault. Moonshot runner is now trailing behind fifteen-minute EMA confluence.",
             }
             for filename, text in templates.items():
                 filepath = os.path.join(AUDIO_MC_DIR, filename)
-                if not os.path.exists(filepath):
-                    try:
-                        tts = gTTS(text=text, lang="en", tld="us")
-                        tts.save(filepath)
-                    except Exception as e:
-                        print(f"⚠️ [AI MC] Pre-cache note for {filename}: {e}", flush=True)
+                if not os.path.exists(filepath) or os.path.getsize(filepath) < 1000:
+                    self._synthesize_file(text, filepath)
 
         threading.Thread(target=_worker, daemon=True).start()
 
     def synthesize_speech(self, text: str, speech_id: str) -> Optional[str]:
         """Synthesizes text to MP3 file and returns relative URL."""
-        if not GTTS_AVAILABLE:
-            return None
-
         filename = f"{speech_id}.mp3"
         filepath = os.path.join(AUDIO_MC_DIR, filename)
-        if os.path.exists(filepath):
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 1000:
             return f"/audio/mc/{filename}"
 
-        try:
-            tts = gTTS(text=text, lang="en", tld="us")
-            tts.save(filepath)
+        ok = self._synthesize_file(text, filepath)
+        if ok and os.path.exists(filepath):
             return f"/audio/mc/{filename}"
-        except Exception as e:
-            print(f"⚠️ [AI MC] TTS synthesis note: {e}", flush=True)
-            return None
+        return None
 
     def evaluate_market_events(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -144,7 +162,7 @@ class GoldAIMCEngine:
             payload = {
                 "id": speech_id,
                 "text": speech_text,
-                "speaker": "Elena (Senior Quant Analyst)",
+                "speaker": "Elena (Senior Quant Host, 18)",
                 "mood": mood,
                 "priority": "HIGH",
                 "audio_url": audio_url,
@@ -178,7 +196,7 @@ class GoldAIMCEngine:
             payload = {
                 "id": speech_id,
                 "text": speech_text,
-                "speaker": "Elena (Senior Quant Analyst)",
+                "speaker": "Elena (Senior Quant Host, 18)",
                 "mood": "analysis",
                 "priority": "MEDIUM",
                 "audio_url": audio_url,
@@ -221,7 +239,7 @@ class GoldAIMCEngine:
             payload = {
                 "id": speech_id,
                 "text": speech_text,
-                "speaker": "Elena (Senior Quant Analyst)",
+                "speaker": "Elena (Senior Quant Host, 18)",
                 "mood": "session",
                 "priority": "MEDIUM",
                 "audio_url": audio_url,
@@ -252,7 +270,7 @@ class GoldAIMCEngine:
             payload = {
                 "id": speech_id,
                 "text": speech_text,
-                "speaker": "Elena (Senior Quant Analyst)",
+                "speaker": "Elena (Senior Quant Host, 18)",
                 "mood": "brief",
                 "priority": "LOW",
                 "audio_url": audio_url,
