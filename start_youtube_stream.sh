@@ -14,6 +14,11 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Ensure UTF-8 across all subshells & background python processes
+export PYTHONIOENCODING=utf-8
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+
 # 1. Load Stream Key from .env
 if [ -f .env ]; then
     export $(grep -v '^#' .env | grep -E '^YOUTUBE_STREAM_KEY=' | xargs)
@@ -79,13 +84,23 @@ export DISPLAY=:99
 # 4. Start Gold M1 Stream Web Server
 if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     echo "📡 Starting Gold M1 Stream Server (Port $PORT)..."
+    # Ensure port is released from any zombie process
+    fuser -k ${PORT}/tcp 2>/dev/null || true
+    sleep 1
     taskset -c 2,3 $PYTHON_BIN gold_youtube_stream_server.py > logs/stream_server.log 2>&1 &
-    sleep 3
+    
+    # Wait up to 5s for server health endpoint to come up
+    for i in {1..5}; do
+        if curl -s "http://localhost:${PORT}/api/health" | grep -q "ok"; then
+            echo "✅ Gold M1 Stream Server active and verified on Port $PORT."
+            break
+        fi
+        sleep 1
+    done
+
     if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
         echo "⚠️ Gold M1 Stream Server failed to stay alive! Inspecting logs/stream_server.log:"
         tail -n 15 logs/stream_server.log 2>/dev/null || true
-    else
-        echo "✅ Gold M1 Stream Server running on Port $PORT."
     fi
 else
     echo "📡 Gold M1 Stream Server already running."

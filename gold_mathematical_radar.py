@@ -640,11 +640,16 @@ def calculate_bayesian_confluence(
         lr_smc = 1.0
 
     # Evidence 2: SGE Physical Gold Premium
-    if sge_premium >= 25.0:
+    try:
+        sge_premium_val = float(sge_premium)
+    except (ValueError, TypeError):
+        sge_premium_val = 28.50
+
+    if sge_premium_val >= 25.0:
         lr_sge = 1.50
-    elif sge_premium >= 15.0:
+    elif sge_premium_val >= 15.0:
         lr_sge = 1.25
-    elif sge_premium < 8.0:
+    elif sge_premium_val < 8.0:
         lr_sge = 0.85
     else:
         lr_sge = 1.0

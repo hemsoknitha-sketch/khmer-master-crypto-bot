@@ -10,6 +10,7 @@ pkill -f "ffmpeg.*x11grab.*rtmp" || true
 pkill -f "chromium.*gold_live_view" || true
 # Kill Stream Web Server
 pkill -f "gold_youtube_stream_server.py" || true
+fuser -k 8000/tcp 2>/dev/null || true
 # Kill Xvfb :99
 pkill -f "Xvfb :99" || true
 

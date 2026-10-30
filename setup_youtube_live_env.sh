@@ -96,6 +96,9 @@ Type=simple
 User=$CURRENT_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=-$APP_DIR/.env
+Environment=PYTHONIOENCODING=utf-8
+Environment=LC_ALL=C.UTF-8
+Environment=LANG=C.UTF-8
 ExecStart=/bin/bash $APP_DIR/start_youtube_stream.sh
 ExecStop=/bin/bash $APP_DIR/stop_youtube_stream.sh
 Restart=always

@@ -21,6 +21,7 @@ import subprocess
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
@@ -40,10 +41,21 @@ def check_process(name_pattern: str):
 
 
 def audit_stream_server(port: int = 8000):
+    # 1. Fast probe /api/health
+    health_url = f"http://localhost:{port}/api/health"
+    try:
+        req = urllib.request.Request(health_url, headers={"User-Agent": "AQ-Status-Check"})
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            if resp.status == 200:
+                pass
+    except Exception:
+        pass
+
+    # 2. Comprehensive data probe
     url = f"http://localhost:{port}/api/gold_m1_live"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "AQ-Status-Check"})
-        with urllib.request.urlopen(req, timeout=2.5) as resp:
+        with urllib.request.urlopen(req, timeout=8.0) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 return True, data
@@ -72,8 +84,17 @@ def print_status():
     print(f"🎵 PulseAudio Audio Engine:        {'🟢 ACTIVE' if pulse_ok else '🔴 OFFLINE'}")
 
     # 4. Stream Server
+    srv_proc_ok, srv_pids = check_process("gold_youtube_stream_server")
     srv_ok, srv_data = audit_stream_server(8000)
-    print(f"📡 Gold M1 Web Server (Port 8000): {'🟢 ACTIVE' if srv_ok else '🔴 OFFLINE'}")
+
+    if srv_ok:
+        status_badge = "🟢 ACTIVE"
+    elif srv_proc_ok:
+        status_badge = "🟡 WARMING UP (Process active, pre-warming RAM cache...)"
+    else:
+        status_badge = "🔴 OFFLINE"
+
+    print(f"📡 Gold M1 Web Server (Port 8000): {status_badge}")
 
     if srv_ok and isinstance(srv_data, dict):
         p = srv_data.get("current_price", 0.0)
@@ -85,7 +106,7 @@ def print_status():
         print(f"   ├─ Hurst Exponent:             {math.get('hurst')} ({math.get('verdict')})")
         print(f"   └─ Bayesian Bullish Prob:      {math.get('bayes_bull')}%")
     else:
-        # Check logs if offline
+        # Check logs if offline or warming up
         log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "stream_server.log")
         if os.path.exists(log_path):
             try:
@@ -93,7 +114,7 @@ def print_status():
                     lines = [l.strip() for l in f.readlines() if l.strip()]
                     if lines:
                         last_err = lines[-1]
-                        print(f"   └─ Last Server Log: {last_err[:60]}")
+                        print(f"   └─ Recent Server Log: {last_err[:70]}")
             except Exception:
                 pass
 
