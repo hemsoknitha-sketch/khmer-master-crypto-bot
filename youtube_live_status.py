@@ -94,12 +94,34 @@ def print_status():
     # 1. Xvfb
     xvfb_ok, xvfb_cnt = check_process("Xvfb")
     print(f"🖥️ Virtual Display (Xvfb :99):     {'🟢 ACTIVE' if xvfb_ok else '🔴 OFFLINE'} ({xvfb_cnt} process)")
+    if not xvfb_ok:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "xvfb.log")
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = [l.strip() for l in f.readlines() if l.strip()]
+                    if lines:
+                        for line in lines[-2:]:
+                            print(f"   └─ Xvfb: {line[:75]}")
+            except Exception:
+                pass
 
     # 2. Chromium
     chrom_ok, chrom_cnt = check_process("chromium")
     if not chrom_ok:
         chrom_ok, chrom_cnt = check_process("chrome")
     print(f"🌐 Chromium Kiosk Browser:         {'🟢 ACTIVE' if chrom_ok else '🔴 OFFLINE'} ({chrom_cnt} process)")
+    if not chrom_ok:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "chromium.log")
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = [l.strip() for l in f.readlines() if l.strip()]
+                    if lines:
+                        for line in lines[-2:]:
+                            print(f"   └─ Chromium: {line[:75]}")
+            except Exception:
+                pass
 
     # 3. PulseAudio
     pulse_ok, pulse_cnt = check_process("pulseaudio")
@@ -144,6 +166,17 @@ def print_status():
     # 5. FFmpeg
     ffmpeg_ok, ffmpeg_cnt = check_process("ffmpeg")
     print(f"🚀 FFmpeg YouTube RTMP Pipeline:   {'🟢 BROADCASTING' if ffmpeg_ok else '🔴 OFFLINE'} ({ffmpeg_cnt} process)")
+    if not ffmpeg_ok:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "ffmpeg.log")
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = [l.strip() for l in f.readlines() if l.strip()]
+                    if lines:
+                        for line in lines[-3:]:
+                            print(f"   └─ FFmpeg: {line[:75]}")
+            except Exception:
+                pass
 
     print("-" * 65)
     print("🛡️ CPU Isolation Guard:            🟢 Cores 2 & 3 Pinned (Cores 0 & 1 Free for HFT)")

@@ -1,8 +1,8 @@
 {
-  "timestamp": 1793360734.1201093,
-  "datetime_utc": "2026-10-30 11:45:34",
+  "timestamp": 1793361388.2113864,
+  "datetime_utc": "2026-10-30 11:56:28",
   "verdict": "CERTIFIED_IMMUNE_ZERO_DEFECTS",
-  "elapsed_ms": 462.2,
+  "elapsed_ms": 424.11,
   "pillar1_threat_radar": {
     "status": "PASS",
     "dependencies_audited": 31,
@@ -20,7 +20,7 @@
       "SPRING-ACTUATOR-RECON",
       "JAVA-DESERIALIZATION-RCE"
     ],
-    "cve_feed_timestamp": 1793360733.6586876
+    "cve_feed_timestamp": 1793361387.7880566
   },
   "pillar2_adversarial_fuzzing": {
     "total_synthetic_attacks": 43,
@@ -51,16 +51,16 @@
   },
   "pillar4_incident_summary": {
     "lookback_hours": 24,
-    "total_incidents_recorded": 29,
+    "total_incidents_recorded": 28,
     "breakdown_by_category": {
-      "ADVERSARIAL_MUTATION_SIMULATION": 29
+      "ADVERSARIAL_MUTATION_SIMULATION": 28
     },
     "capital_leakage_prevented": "$100,000+ (Fiduciary 100% Protected)"
   },
   "pillar5_self_healing": {
-    "rss_before_mb": 498.95,
-    "rss_after_mb": 498.95,
-    "process_rss_mb": 498.95,
+    "rss_before_mb": 499.27,
+    "rss_after_mb": 499.27,
+    "process_rss_mb": 499.27,
     "ram_reclaimed_mb": 0.0,
     "gc_objects_collected": 45,
     "sqlite_optimized": true,

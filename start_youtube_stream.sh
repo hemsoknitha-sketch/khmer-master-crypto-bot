@@ -20,11 +20,20 @@ export PYTHONUNBUFFERED=1
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
-# 1. Load Stream Key from .env
+# 1. Load Stream Key from .env safely (strip CRLF \r, quotes, whitespace)
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | grep -E '^YOUTUBE_STREAM_KEY=' | xargs)
-    export $(grep -v '^#' .env | grep -E '^YOUTUBE_STREAM_URL=' | xargs 2>/dev/null || true)
-    export $(grep -v '^#' .env | grep -E '^YOUTUBE_WEB_PORT=' | xargs 2>/dev/null || true)
+    RAW_KEY=$(grep -E '^YOUTUBE_STREAM_KEY=' .env | cut -d'=' -f2- | tr -d '\r"' | tr -d "'" | xargs)
+    if [ -n "$RAW_KEY" ]; then
+        export YOUTUBE_STREAM_KEY="$RAW_KEY"
+    fi
+    RAW_URL=$(grep -E '^YOUTUBE_STREAM_URL=' .env | cut -d'=' -f2- | tr -d '\r"' | tr -d "'" | xargs 2>/dev/null || true)
+    if [ -n "$RAW_URL" ]; then
+        export YOUTUBE_STREAM_URL="$RAW_URL"
+    fi
+    RAW_PORT=$(grep -E '^YOUTUBE_WEB_PORT=' .env | cut -d'=' -f2- | tr -d '\r"' | tr -d "'" | xargs 2>/dev/null || true)
+    if [ -n "$RAW_PORT" ]; then
+        export YOUTUBE_WEB_PORT="$RAW_PORT"
+    fi
 fi
 
 PORT="${YOUTUBE_WEB_PORT:-8000}"
@@ -33,6 +42,8 @@ STREAM_URL="${YOUTUBE_STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}"
 if [[ "$STREAM_URL" == rtmps://* ]]; then
     STREAM_URL="rtmp://a.rtmp.youtube.com/live2"
 fi
+# Strip trailing slashes
+STREAM_URL="${STREAM_URL%/}"
 
 if [ -z "$YOUTUBE_STREAM_KEY" ] || [ "$YOUTUBE_STREAM_KEY" == "YOUR_YOUTUBE_STREAM_KEY_HERE" ]; then
     echo "❌ [ERROR] YOUTUBE_STREAM_KEY is not configured in .env!"
@@ -83,7 +94,7 @@ fi
 if ! pgrep -f "Xvfb :99" > /dev/null; then
     echo "🖥️ Starting Xvfb Virtual Display (:99)..."
     taskset -c 2,3 Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > "$SCRIPT_DIR/logs/xvfb.log" 2>&1 &
-    sleep 2
+    sleep 1
 else
     echo "🖥️ Xvfb Virtual Display (:99) already running."
 fi
@@ -94,7 +105,6 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     echo "📡 Starting Gold M1 Stream Server (Port $PORT)..."
     # Ensure port is released from any zombie process
     fuser -k ${PORT}/tcp 2>/dev/null || true
-    sleep 1
     taskset -c 2,3 $PYTHON_BIN -u "$SCRIPT_DIR/gold_youtube_stream_server.py" > "$SCRIPT_DIR/logs/stream_server.log" 2>&1 &
     
     # Wait up to 5s for server health endpoint to come up
@@ -103,7 +113,7 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
             echo "✅ Gold M1 Stream Server active and verified on Port $PORT."
             break
         fi
-        sleep 1
+        sleep 0.5
     done
 
     if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
@@ -118,6 +128,8 @@ fi
 if ! pgrep -f "$CHROMIUM_BIN.*gold_live_view" > /dev/null && ! pgrep -f "chromium.*gold_live_view" > /dev/null; then
     echo "🌐 Starting Headless Chromium Kiosk on DISPLAY :99..."
     taskset -c 2,3 $CHROMIUM_BIN \
+        --display=:99 \
+        --ozone-platform=x11 \
         --kiosk \
         --window-position=0,0 \
         --window-size=1920,1080 \
@@ -130,41 +142,60 @@ if ! pgrep -f "$CHROMIUM_BIN.*gold_live_view" > /dev/null && ! pgrep -f "chromiu
         --disable-gpu-sandbox \
         --hide-scrollbars \
         http://localhost:${PORT}/gold_live_view > "$SCRIPT_DIR/logs/chromium.log" 2>&1 &
-    sleep 4
+    sleep 2
 else
     echo "🌐 Chromium Kiosk already running."
 fi
 
-# 6. Check for Background Lofi Audio
-AUDIO_INPUT="-f pulse -i sink_stream.monitor"
-AMIX_FILTER=""
+# 6. Audio Routing: Combine PulseAudio Alerts & Ambient Sound
+PULSE_AVAILABLE=false
+if pactl list short sources 2>/dev/null | grep -q "sink_stream.monitor"; then
+    PULSE_AVAILABLE=true
+fi
+
 if [ -f "music/lofi_stream.mp3" ]; then
-    echo "🎵 Background Lofi MP3 detected: music/lofi_stream.mp3"
-    AUDIO_INPUT="-f pulse -i sink_stream.monitor -stream_loop -1 -i music/lofi_stream.mp3"
-    AMIX_FILTER="-filter_complex [0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
+    LOFI_FILE="music/lofi_stream.mp3"
 elif [ -f "audio/lofi_ambient.wav" ]; then
-    echo "🎵 Ambient Drone Loop detected: audio/lofi_ambient.wav"
-    AUDIO_INPUT="-f pulse -i sink_stream.monitor -stream_loop -1 -i audio/lofi_ambient.wav"
-    AMIX_FILTER="-filter_complex [0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
+    LOFI_FILE="audio/lofi_ambient.wav"
+else
+    LOFI_FILE=""
+fi
+
+if [ "$PULSE_AVAILABLE" = true ] && [ -n "$LOFI_FILE" ]; then
+    echo "🎵 Mixed Audio Mode: PulseAudio alerts + ambient soundtrack ($LOFI_FILE)"
+    AUDIO_INPUT="-f pulse -i sink_stream.monitor -stream_loop -1 -i $LOFI_FILE"
+    AUDIO_MAP="-filter_complex [1:a]volume=1.0[a1];[2:a]volume=0.35[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
+elif [ "$PULSE_AVAILABLE" = true ]; then
+    echo "🎵 PulseAudio Monitor Only Mode"
+    AUDIO_INPUT="-f pulse -i sink_stream.monitor"
+    AUDIO_MAP="-map 0:v -map 1:a"
+elif [ -n "$LOFI_FILE" ]; then
+    echo "🎵 Ambient Soundtrack Only Mode ($LOFI_FILE)"
+    AUDIO_INPUT="-stream_loop -1 -i $LOFI_FILE"
+    AUDIO_MAP="-map 0:v -map 1:a"
+else
+    echo "🔇 Fallback Silent Audio Mode"
+    AUDIO_INPUT="-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100"
+    AUDIO_MAP="-map 0:v -map 1:a"
 fi
 
 # 7. Start FFmpeg In-Memory RTMP Streamer to YouTube Live
 echo "📡 Broadcasting In-Memory RTMP Stream to YouTube (Zero Disk Write)..."
 echo "💡 Cores Pinned: taskset -c 2,3 (Zero HFT Engine Interference)"
 
-if [ -n "$AMIX_FILTER" ]; then
-    taskset -c 2,3 ffmpeg -hide_banner -loglevel warning \
-        -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
-        $AUDIO_INPUT \
-        $AMIX_FILTER \
-        -c:v libx264 -preset veryfast -tune zerolatency -b:v 2800k -maxrate 3200k -bufsize 6000k \
-        -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-        -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}"
-else
-    taskset -c 2,3 ffmpeg -hide_banner -loglevel warning \
-        -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
-        $AUDIO_INPUT \
-        -c:v libx264 -preset veryfast -tune zerolatency -b:v 2800k -maxrate 3200k -bufsize 6000k \
-        -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-        -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}"
+taskset -c 2,3 ffmpeg -hide_banner -loglevel warning \
+    -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
+    $AUDIO_INPUT \
+    $AUDIO_MAP \
+    -c:v libx264 -preset veryfast -tune zerolatency -b:v 2800k -maxrate 3200k -bufsize 6000k \
+    -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
+    -flvflags no_duration_filesize \
+    -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}" > "$SCRIPT_DIR/logs/ffmpeg.log" 2>&1
+
+EXIT_CODE=$?
+echo "⚠️ [FFMPEG EXITED] Return code: $EXIT_CODE"
+if [ -f "$SCRIPT_DIR/logs/ffmpeg.log" ]; then
+    echo "📄 Last 10 lines of logs/ffmpeg.log:"
+    tail -n 10 "$SCRIPT_DIR/logs/ffmpeg.log"
 fi
+exit $EXIT_CODE
