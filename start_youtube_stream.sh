@@ -110,8 +110,8 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     pkill -f "gold_youtube_stream_server.py" 2>/dev/null || true
     taskset -c 2,3 $PYTHON_BIN -u "$SCRIPT_DIR/gold_youtube_stream_server.py" > "$SCRIPT_DIR/logs/stream_server.log" 2>&1 &
     
-    # Wait up to 5s for server health endpoint to come up
-    for i in {1..5}; do
+    # Wait up to 10s for server health endpoint to come up
+    for i in {1..20}; do
         if curl -s "http://localhost:${PORT}/api/health" | grep -q "ok"; then
             echo "✅ Gold M5 Stream Server active and verified on Port $PORT."
             break

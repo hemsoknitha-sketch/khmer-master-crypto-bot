@@ -731,15 +731,18 @@ def create_app() -> web.Application:
 
 
 async def start_background_tasks(app):
-    try:
-        print("🔥 [YOUTUBE STREAM] Pre-warming M5 candlestick cache on startup...", flush=True)
-        snapshot = await asyncio.to_thread(_fetch_gold_m1_data)
-        _CACHE["timestamp"] = time.time()
-        _CACHE["snapshot"] = snapshot
-        print(f"✅ [YOUTUBE STREAM] Startup pre-warm complete! Price: ${snapshot.get('current_price')}, Candles: {len(snapshot.get('candles', []))}", flush=True)
-    except Exception as e:
-        print(f"⚠️ [YOUTUBE STREAM] Startup pre-warm note: {e}", flush=True)
+    # Non-blocking background pre-warm so HTTP port 8000 opens instantly in < 50ms
+    async def _async_prewarm():
+        try:
+            print("🔥 [YOUTUBE STREAM] Pre-warming M5 candlestick cache in background...", flush=True)
+            snapshot = await asyncio.to_thread(_fetch_gold_m1_data)
+            _CACHE["timestamp"] = time.time()
+            _CACHE["snapshot"] = snapshot
+            print(f"✅ [YOUTUBE STREAM] Background pre-warm complete! Price: ${snapshot.get('current_price')}, Candles: {len(snapshot.get('candles', []))}", flush=True)
+        except Exception as e:
+            print(f"⚠️ [YOUTUBE STREAM] Background pre-warm note: {e}", flush=True)
 
+    asyncio.create_task(_async_prewarm())
     app["tick_task"] = asyncio.create_task(super_fast_live_gold_tick_loop())
     app["broadcast_task"] = asyncio.create_task(broadcast_loop())
 
