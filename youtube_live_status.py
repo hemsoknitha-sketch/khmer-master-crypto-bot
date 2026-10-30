@@ -20,8 +20,8 @@ import subprocess
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
     except Exception:
         pass
 
@@ -33,20 +33,12 @@ def check_process(name_pattern: str):
             running = name_pattern.lower() in out.lower()
             return running, 1 if running else 0
         else:
-            my_pid = os.getpid()
-            out = subprocess.check_output(f'pgrep -f "{name_pattern}" || true', shell=True).decode("utf-8", errors="ignore").strip()
-            raw_pids = [int(p) for p in out.split() if p.strip().isdigit() and int(p) != my_pid]
-            # Exclude pgrep, sh, and status script itself
-            valid_pids = []
-            for pid in raw_pids:
-                try:
-                    with open(f"/proc/{pid}/cmdline", "r", errors="ignore") as f:
-                        cmd = f.read()
-                        if "pgrep" not in cmd and "youtube_live_status" not in cmd and name_pattern in cmd:
-                            valid_pids.append(pid)
-                except Exception:
-                    pass
-            return len(valid_pids) > 0, len(valid_pids)
+            # Direct binary call without shell=True avoids matching /bin/sh wrappers
+            res = subprocess.run(["pgrep", "-f", name_pattern], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+            if res.returncode == 0:
+                pids = [p.strip() for p in res.stdout.split() if p.strip().isdigit()]
+                return len(pids) > 0, len(pids)
+            return False, 0
     except Exception:
         return False, 0
 
@@ -59,7 +51,7 @@ def audit_stream_server(port: int = 8000):
     health_url = f"http://localhost:{port}/api/health"
     try:
         req = urllib.request.Request(health_url, headers={"User-Agent": "AQ-Status-Check"})
-        with urllib.request.urlopen(req, timeout=3.0) as resp:
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
             if resp.status == 200:
                 health_ok = True
                 health_data = json.loads(resp.read().decode("utf-8"))
@@ -70,7 +62,7 @@ def audit_stream_server(port: int = 8000):
     url = f"http://localhost:{port}/api/gold_m1_live"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "AQ-Status-Check"})
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 return True, data
