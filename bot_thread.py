@@ -25663,7 +25663,7 @@ class TelegramBotThread(BaseThread):
                                 conn_status = f"⚠️ Notice ({err_txt})"
                             bal_val = float(b_data.get("balance", 0.0) or 0.0)
                             avail_val = float(b_data.get("available", 0.0) or 0.0)
-                            margin_val = float(b_data.get("deposit", 0.0) or 0.0)
+                            margin_val = float(b_data.get("margin", 0.0) or 0.0)
                             pnl_val = float(b_data.get("pnl", 0.0) or 0.0)
                             equity_val = float(b_data.get("equity", 0.0) or (bal_val + pnl_val))
                             curr = str(b_data.get("currency", "USD"))
@@ -25716,6 +25716,10 @@ class TelegramBotThread(BaseThread):
             is_limit_dis = portfolio_circuit_breaker.CapitalDailyAGIGovernor.is_daily_limits_disabled(target_uid)
             limit_lbl = "🔓 DISABLED (ជួញដូរបន្តគ្មានដែនកំណត់)" if is_limit_dis else "🔒 ENABLED (+5% Profit Lock / -2.5% Loss Floor)"
 
+            if not open_pos or len(open_pos) == 0:
+                margin_val = 0.0
+            elif margin_val <= 0.0 and equity_val > avail_val:
+                margin_val = max(0.0, equity_val - avail_val)
             margin_pct = round(margin_val / max(0.01, equity_val) * 100, 1) if equity_val > 0 else 0.0
             upl_prefix = "🟢 +" if pnl_val >= 0 else "🔴 -"
             realized_prefix = "🟢 +" if tot_realized_pnl >= 0 else "🔴 -"
@@ -25892,10 +25896,13 @@ class TelegramBotThread(BaseThread):
                         avail_val = float(b_data.get("available", 0.0) or 0.0)
                         upl_val = float(b_data.get("pnl", 0.0) or 0.0)
                         eq_val = float(b_data.get("equity", 0.0) or (bal_val + upl_val))
-                        margin_val = float(b_data.get("deposit", 0.0) or 0.0)
-
                         pos_data = await asyncio.to_thread(u_eng.get_open_positions)
-                        pos_count = len(pos_data)
+                        pos_count = len(pos_data) if pos_data else 0
+                        margin_val = float(b_data.get("margin", 0.0) or 0.0)
+                        if pos_count == 0:
+                            margin_val = 0.0
+                        elif margin_val <= 0.0 and eq_val > avail_val:
+                            margin_val = max(0.0, eq_val - avail_val)
 
                         total_fleet_bal += bal_val
                         total_fleet_avail += avail_val

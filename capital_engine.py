@@ -892,9 +892,12 @@ class CapitalComEngine:
                 or balance_info.get("balance")
                 or 0.0
             )
-            deposit_val = float(balance_info.get("deposit") or balance_info.get("margin") or 0.0)
+            deposit_val = float(balance_info.get("deposit") or balance_val)
+            margin_used = float(balance_info.get("margin") or 0.0)
             pnl_val = float(balance_info.get("profitLoss") or balance_info.get("pnl") or 0.0)
             equity_val = float(balance_info.get("equity") or (balance_val + pnl_val))
+            if margin_used <= 0.0 and equity_val > avail_val:
+                margin_used = max(0.0, equity_val - avail_val)
         
         return {
             "success": True,
@@ -902,7 +905,8 @@ class CapitalComEngine:
             "account_name": primary.get("accountName", "Capital.com Main"),
             "balance": balance_val,
             "available": avail_val,
-            "deposit": deposit_val,  # Margin used
+            "deposit": deposit_val,  # Total funds deposited
+            "margin": margin_used,   # Actual margin used by open positions
             "equity": equity_val,
             "pnl": pnl_val,
             "currency": primary.get("currency", "USD"),
