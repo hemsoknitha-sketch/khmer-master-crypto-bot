@@ -29,6 +29,10 @@ fi
 
 PORT="${YOUTUBE_WEB_PORT:-8000}"
 STREAM_URL="${YOUTUBE_STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}"
+# Convert rtmps:// to rtmp:// to avoid OpenSSL handshake drops with FLV muxer
+if [[ "$STREAM_URL" == rtmps://* ]]; then
+    STREAM_URL="rtmp://a.rtmp.youtube.com/live2"
+fi
 
 if [ -z "$YOUTUBE_STREAM_KEY" ] || [ "$YOUTUBE_STREAM_KEY" == "YOUR_YOUTUBE_STREAM_KEY_HERE" ]; then
     echo "❌ [ERROR] YOUTUBE_STREAM_KEY is not configured in .env!"
