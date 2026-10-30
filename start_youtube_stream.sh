@@ -93,6 +93,8 @@ fi
 # 3. Start Xvfb Virtual Framebuffer (1920x1080 24-bit TrueColor) on Core 2,3
 if ! pgrep -f "Xvfb :99" > /dev/null; then
     echo "🖥️ Starting Xvfb Virtual Display (:99)..."
+    # Clean up any stale X11 lock files from killed sessions
+    rm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true
     taskset -c 2,3 Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > "$SCRIPT_DIR/logs/xvfb.log" 2>&1 &
     sleep 1
 else
@@ -105,6 +107,7 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     echo "📡 Starting Gold M1 Stream Server (Port $PORT)..."
     # Ensure port is released from any zombie process
     fuser -k ${PORT}/tcp 2>/dev/null || true
+    pkill -f "gold_youtube_stream_server.py" 2>/dev/null || true
     taskset -c 2,3 $PYTHON_BIN -u "$SCRIPT_DIR/gold_youtube_stream_server.py" > "$SCRIPT_DIR/logs/stream_server.log" 2>&1 &
     
     # Wait up to 5s for server health endpoint to come up
@@ -127,7 +130,10 @@ fi
 # 5. Start Chromium in Kiosk Mode on :99
 if ! pgrep -f "$CHROMIUM_BIN.*gold_live_view" > /dev/null && ! pgrep -f "chromium.*gold_live_view" > /dev/null; then
     echo "🌐 Starting Headless Chromium Kiosk on DISPLAY :99..."
+    # Purge stale chromium singleton locks
+    rm -rf /tmp/chromium-stream-profile/Singleton* 2>/dev/null || true
     taskset -c 2,3 $CHROMIUM_BIN \
+        --user-data-dir=/tmp/chromium-stream-profile \
         --display=:99 \
         --ozone-platform=x11 \
         --kiosk \
