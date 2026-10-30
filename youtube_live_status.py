@@ -164,9 +164,13 @@ def print_status():
             with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
                 lines = [l.strip() for l in f.readlines() if l.strip()]
                 if lines:
-                    last_line = lines[-1]
-                    if ffmpeg_ok and "fps=" in last_line:
-                        print(f"   ├─ Stream Telemetry:           {last_line[:65]}")
+                    telemetry = None
+                    for l in reversed(lines[-25:]):
+                        if "fps=" in l or "bitrate=" in l:
+                            telemetry = l
+                            break
+                    if ffmpeg_ok and telemetry:
+                        print(f"   ├─ Stream Telemetry:           {telemetry[:65]}")
                     elif not ffmpeg_ok:
                         for line in lines[-3:]:
                             print(f"   └─ FFmpeg: {line[:75]}")

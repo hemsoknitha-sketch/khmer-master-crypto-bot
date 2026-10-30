@@ -193,7 +193,8 @@ taskset -c 2,3 ffmpeg -hide_banner -loglevel info -stats \
     -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
     $AUDIO_INPUT \
     $AUDIO_MAP \
-    -c:v libx264 -preset veryfast -tune zerolatency -b:v 2800k -maxrate 3200k -bufsize 6000k \
+    -c:v libx264 -preset veryfast -b:v 4500k -minrate 4000k -maxrate 5500k -bufsize 9000k \
+    -x264-params "nal-hrd=cbr:force-cfr=1" \
     -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
     -flvflags no_duration_filesize \
     -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}" > "$SCRIPT_DIR/logs/ffmpeg.log" 2>&1
