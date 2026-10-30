@@ -1,0 +1,26 @@
+[Unit]
+Description=Angkor Quant - Auto YouTube Live Stream 24/7 (Gold M1 HFT Signal)
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/ANGKOR_QUANT
+EnvironmentFile=-/root/ANGKOR_QUANT/.env
+ExecStart=/bin/bash /root/ANGKOR_QUANT/start_youtube_stream.sh
+ExecStop=/bin/bash /root/ANGKOR_QUANT/stop_youtube_stream.sh
+Restart=always
+RestartSec=10
+
+# CPU Affinity: Strictly Pin to Core 2 and 3 (Leaves Core 0 & 1 for HFT Bot)
+CPUAffinity=2 3
+
+# Scheduling Priority: Low priority (Nice=10) so Trading Bot always takes precedence
+Nice=10
+
+# OOM Protection: Sacrifice Streamer first before touching Trading Bot
+OOMScoreAdjust=500
+
+[Install]
+WantedBy=multi-user.target
+

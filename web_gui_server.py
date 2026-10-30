@@ -3487,6 +3487,18 @@ async def handle_style(request: web.Request) -> web.FileResponse:
     resp.headers["Expires"] = "0"
     return resp
 
+
+async def handle_gold_live_view(request: web.Request) -> web.FileResponse:
+    html_p = os.path.join(STATIC_DIR, "gold_live_view.html")
+    resp = web.FileResponse(html_p)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    return resp
+
+async def handle_api_gold_m1_live(request: web.Request) -> web.Response:
+    import gold_youtube_stream_server as gys
+    data = await gys.get_live_data_cached()
+    return web.json_response(data, dumps=fast_dumps)
+
 async def handle_script(request: web.Request) -> web.FileResponse:
     resp = web.FileResponse(os.path.join(STATIC_DIR, "app.js"))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -3606,6 +3618,8 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/index.html", handle_index)
     app.router.add_get("/style.css", handle_style)
     app.router.add_get("/app.js", handle_script)
+    app.router.add_get("/gold_live_view", handle_gold_live_view)
+    app.router.add_get("/api/gold_m1_live", handle_api_gold_m1_live)
     app.router.add_get("/gtc_QRCode.png", handle_gtc_qr)
 
     # High-Performance WebSocket Route (0.01ms streaming)

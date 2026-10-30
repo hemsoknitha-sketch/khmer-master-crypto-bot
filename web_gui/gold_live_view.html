@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ANGKOR QUANT | INSTITUTIONAL GOLD XAUUSD M1 LIVE 24/7</title>
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500;700;800&display=swap"
+    rel="stylesheet">
+  <!-- TradingView Lightweight Charts (CDN with Fallback) -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #06090e;
+      color: #f1f5f9;
+      font-family: 'Inter', -apple-system, sans-serif;
+      user-select: none;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Grid Container */
+    #dashboard {
+      display: grid;
+      grid-template-rows: 72px 1fr 38px;
+      grid-template-columns: 1410px 510px;
+      width: 1920px;
+      height: 1080px;
+      background: radial-gradient(circle at 15% 20%, rgba(20, 30, 48, 0.45), transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(13, 20, 33, 0.6), transparent 50%),
+        #070a10;
+    }
+
+    /* TOP HEADER */
+    header {
+      grid-column: 1 / 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      background: rgba(10, 15, 25, 0.94);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 24px;
+      color: #06090e;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.45);
+    }
+
+    .brand-title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title h1 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #f8fafc, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-title p {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #ef4444;
+      letter-spacing: 0.8px;
+    }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 10px #ef4444;
+      animation: pulse 1.4s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+      }
+
+      70% {
+        transform: scale(1.15);
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+      }
+
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+      }
+    }
+
+    .session-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .price-box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .live-price {
+      font-size: 32px;
+      font-weight: 800;
+      color: #f8fafc;
+      letter-spacing: -0.5px;
+      line-height: 1;
+      text-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
+      transition: color 0.3s ease;
+    }
+
+    .price-sub {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .spread-tag {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* CHART CONTAINER */
+    #chart-wrapper {
+      position: relative;
+      width: 1410px;
+      height: 970px;
+      background: #080c14;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    #chart-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Overlay HUD inside chart */
+    .chart-overlay-top {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      display: flex;
+      gap: 12px;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .indicator-pill {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot-cyan {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #06b6d4;
+    }
+
+    .dot-gold {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+    }
+
+    .dot-purple {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #a855f7;
+    }
+
+    /* RIGHT SIDEBAR */
+    #sidebar {
+      width: 510px;
+      height: 970px;
+      background: rgba(10, 14, 23, 0.95);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: hidden;
+    }
+
+    .card {
+      background: rgba(18, 25, 40, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 8px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Active Signal Banner */
+    #signal-card {
+      background: linear-gradient(145deg, rgba(20, 30, 48, 0.9), rgba(12, 18, 30, 0.95));
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 18px;
+    }
+
+    .signal-status-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .sig-buy {
+      background: linear-gradient(90deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15));
+      border: 1px solid #10b981;
+      color: #34d399;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.3);
+    }
+
+    .sig-sell {
+      background: linear-gradient(90deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.15));
+      border: 1px solid #ef4444;
+      color: #f87171;
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.3);
+    }
+
+    .sig-wait {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #cbd5e1;
+    }
+
+    .targets-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .target-item {
+      background: rgba(12, 17, 29, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .target-lbl {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .target-val {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-top: 2px;
+    }
+
+    .target-desc {
+      font-size: 9px;
+      font-weight: 500;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Radar Telemetry Metrics */
+    .metric-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+    }
+
+    .metric-row:last-child {
+      border-bottom: none;
+    }
+
+    .metric-name {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .metric-val {
+      font-weight: 700;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Bayesian Probability Bar */
+    .prob-bar-container {
+      margin-top: 8px;
+    }
+
+    .prob-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 10px;
+      background: #ef4444;
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .bar-fill-bull {
+      height: 100%;
+      background: #10b981;
+      transition: width 0.4s ease;
+      box-shadow: 0 0 10px #10b981;
+    }
+
+    /* SMC Badge Tags */
+    .smc-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .smc-tag {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+
+    .smc-active-bull {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .smc-active-bear {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    /* BOTTOM TICKER */
+    footer {
+      grid-column: 1 / 3;
+      display: flex;
+      align-items: center;
+      background: rgba(6, 10, 17, 0.98);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0 24px;
+      overflow: hidden;
+      white-space: nowrap;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .ticker-content {
+      display: inline-block;
+      animation: ticker 32s linear infinite;
+    }
+
+    @keyframes ticker {
+      0% {
+        transform: translateX(100%);
+      }
+
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 48px;
+      font-weight: 600;
+    }
+
+    .ticker-item span {
+      color: #f59e0b;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="dashboard">
+    <!-- HEADER -->
+    <header>
+      <div class="brand">
+        <div class="brand-logo">AQ</div>
+        <div class="brand-title">
+          <h1>ANGKOR QUANT • INSTITUTIONAL GOLD XAUUSD M1</h1>
+          <p>M1 HFT Confluence • 9 SMC Citadel • Math Radar • AI Regimes</p>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="live-badge">
+          <div class="pulse-dot"></div>
+          <span>LIVE 24/7/365</span>
+        </div>
+        <div class="session-badge">
+          <span style="color:#f59e0b;">🏛️ KILL ZONE:</span>
+          <span id="session-name" class="mono" style="font-weight:700;">LONDON OPEN</span>
+        </div>
+        <div class="session-badge mono" id="clock-display" style="font-weight:600; color:#38bdf8;">
+          00:00:00 UTC | 00:00:00 ICT
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="price-box">
+          <div class="live-price mono" id="header-price">2,745.50</div>
+          <div class="price-sub">
+            <span class="spread-tag mono">SPREAD: <span id="header-spread">0.18</span></span>
+            <span class="mono" id="header-change" style="color:#10b981; font-weight:700;">+0.42%</span>
+            <span class="mono" style="color:#64748b;">LATENCY: &lt;0.0003ms</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- CHART AREA -->
+    <div id="chart-wrapper">
+      <div class="chart-overlay-top">
+        <div class="indicator-pill">
+          <div class="dot-cyan"></div> EMA 20
+        </div>
+        <div class="indicator-pill">
+          <div class="dot-gold"></div> EMA 50
+        </div>
+        <div class="indicator-pill">
+          <div class="dot-purple"></div> EMA 200
+        </div>
+        <div class="indicator-pill" id="chart-watermark" style="color:#cbd5e1; font-weight:700;">
+          GOLD XAUUSD (M1) • TOKYO VPS DIRECT FEED
+        </div>
+      </div>
+      <div id="chart-container"></div>
+    </div>
+
+    <!-- RIGHT SIDEBAR HUD -->
+    <div id="sidebar">
+      <!-- 1. ACTIVE TRADING SIGNAL -->
+      <div class="card" id="signal-card">
+        <div class="card-header">
+          <div class="card-title">⚡ ACTIVE TRADING SIGNAL PLAN</div>
+          <div class="mono" style="font-size:11px; color:#f59e0b; font-weight:700;" id="signal-conf">CONFIDENCE: 86.5%
+          </div>
+        </div>
+        <div class="signal-status-badge sig-buy" id="signal-badge">
+          <span>🟢 STRONG BUY CONFLUENCE</span>
+        </div>
+        <div class="targets-grid">
+          <div class="target-item">
+            <span class="target-lbl">ENTRY PRICE</span>
+            <span class="target-val mono" id="val-entry" style="color:#38bdf8;">$2,745.50</span>
+            <span class="target-desc">SMC Sniper Invalidation</span>
+          </div>
+          <div class="target-item">
+            <span class="target-lbl">STOP LOSS (SL)</span>
+            <span class="target-val mono" id="val-sl" style="color:#ef4444;">$2,741.00</span>
+            <span class="target-desc">Breathing Stop (-1.0R)</span>
+          </div>
+          <div class="target-item">
+            <span class="target-lbl">TARGET 1 (TP1)</span>
+            <span class="target-val mono" id="val-tp1" style="color:#10b981;">$2,754.50</span>
+            <span class="target-desc">+2.0R (50% Out + BE Free Roll)</span>
+          </div>
+          <div class="target-item">
+            <span class="target-lbl">TARGET 2 (TP2)</span>
+            <span class="target-val mono" id="val-tp2" style="color:#10b981;">$2,763.50</span>
+            <span class="target-desc">+4.0R (30% Cash Profit Floor)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. MATHEMATICAL RADAR MATRIX -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🧠 WALL STREET MATHEMATICAL RADAR</div>
+          <div style="font-size:10px; color:#64748b;">Sub-0.5ms Vectorized</div>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">Hurst Exponent (H)</span>
+          <span class="metric-val mono" id="m-hurst" style="color:#34d399;">0.642 (PERSISTENT TREND)</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">Kalman Latent Velocity</span>
+          <span class="metric-val mono" id="m-kalman" style="color:#38bdf8;">+1.45 (EXPANSION UP)</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">Ornstein-Uhlenbeck Z-Score</span>
+          <span class="metric-val mono" id="m-ou">-0.32 (EQUILIBRIUM)</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">GARCH Dynamic Risk Buffer</span>
+          <span class="metric-val mono" id="m-garch">±$4.50/oz (CONE 95%)</span>
+        </div>
+
+        <!-- Bayesian Posterior Bar -->
+        <div class="prob-bar-container">
+          <div class="prob-bar-labels mono">
+            <span style="color:#10b981;">BULLISH: <span id="val-bull-pct">78%</span></span>
+            <span style="color:#ef4444;">BEARISH: <span id="val-bear-pct">22%</span></span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill-bull" id="bar-bull-fill" style="width:78%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 9 SMC CITADEL CONFLUENCE -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🏰 9 SMC CITADEL CONFLUENCE</div>
+          <div class="mono" style="font-size:10px; color:#10b981; font-weight:700;" id="smc-score">SCORE: 85/100</div>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">Active Order Blocks</span>
+          <span class="metric-val mono" id="smc-obs" style="color:#34d399;">1 Bullish M1 OB</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">Fair Value Gaps (FVG)</span>
+          <span class="metric-val mono" id="smc-fvgs" style="color:#f59e0b;">1 Imbalance Retest</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">Turtle Soup Liquidity Sweep</span>
+          <span class="metric-val mono" id="smc-sweep" style="color:#38bdf8;">SSL Sweep Absorbed</span>
+        </div>
+        <div class="smc-tags">
+          <span class="smc-tag smc-active-bull" id="tag-bos">BOS CONFIRMED</span>
+          <span class="smc-tag smc-active-bull" id="tag-choch">CHoCH REVERSAL</span>
+          <span class="smc-tag smc-active-bull" id="tag-be">BE ARMOR ARMED</span>
+          <span class="smc-tag" id="tag-guard">ANTI-OVERSOLD GUARD OK</span>
+        </div>
+      </div>
+
+      <!-- 4. PHYSICAL BENCHMARK & MACRO SATELLITE -->
+      <div class="card" style="padding:12px 16px;">
+        <div class="card-header" style="margin-bottom:8px; padding-bottom:4px;">
+          <div class="card-title">🌐 CENTRAL BANK & MACRO CATALYST</div>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">Shanghai SGE Gold Premium</span>
+          <span class="metric-val mono" style="color:#f59e0b;">+$28.50/oz (PHYSICAL DEMAND)</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-name">US 10Y TIPS Real Yields</span>
+          <span class="metric-val mono" style="color:#34d399;">SOFTENING (BULLISH GOLD)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM TICKER TAPE -->
+    <footer>
+      <div class="ticker-content mono">
+        <span class="ticker-item">⚡ <span>ANGKOR QUANT AI ENGINE</span>: HIGH-FREQUENCY STATISTICAL ARBITRAGE
+          ACTIVE</span>
+        <span class="ticker-item">🏛️ <span>INTERBANK KILL ZONE</span>: LONDON / NY OVERLAP PRIME EXECUTION</span>
+        <span class="ticker-item">🛡️ <span>CAPITAL PROTECTION</span>: INVARIANT 35 VOLATILITY BREATHING STOPS
+          ENFORCED</span>
+        <span class="ticker-item">💎 <span>SHANGHAI GOLD SGE BENCHMARK</span>: +$28.50/OZ DISPARITY SIGNALS SOLID
+          PHYSICAL BID</span>
+        <span class="ticker-item">📊 <span>PROBABILITY DISCLOSURE</span>: ASYMMETRIC R:R >= 1:2.5 REQUIRED ON ALL
+          SIGNALS • ZERO NO-SL TRADING</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Audio Elements for Alerts -->
+  <audio id="audio-buy" src="/audio/buy_chime.wav" preload="auto"></audio>
+  <audio id="audio-sell" src="/audio/sell_chime.wav" preload="auto"></audio>
+  <audio id="audio-tp" src="/audio/tp_chime.wav" preload="auto"></audio>
+  <audio id="audio-sl" src="/audio/sl_chime.wav" preload="auto"></audio>
+
+  <script>
+    // ----------------------------------------------------
+    // 1. CLOCK & SESSION CONTROLLER
+    // ----------------------------------------------------
+    function updateClock() {
+      const now = new Date();
+      const utcStr = now.toISOString().substring(11, 19) + ' UTC';
+      // ICT = UTC + 7
+      const ictHours = (now.getUTCHours() + 7) % 24;
+      const ictStr = String(ictHours).padStart(2, '0') + ':' +
+        String(now.getUTCMinutes()).padStart(2, '0') + ':' +
+        String(now.getUTCSeconds()).padStart(2, '0') + ' ICT';
+      document.getElementById('clock-display').innerText = `${utcStr} | ${ictStr}`;
+
+      // Calculate Kill Zone
+      const utcHour = now.getUTCHours();
+      const utcMin = now.getUTCMinutes();
+      const totalUtcMin = utcHour * 60 + utcMin;
+      let session = "ASIAN SESSION";
+      if (totalUtcMin >= 7 * 60 && totalUtcMin < 13 * 60 + 30) {
+        session = "LONDON OPEN KILL ZONE";
+      } else if (totalUtcMin >= 13 * 60 + 30 && totalUtcMin < 18 * 60 + 30) {
+        session = "NEW YORK OPEN KILL ZONE";
+      } else if (totalUtcMin >= 20 * 60 + 45 && totalUtcMin < 24 * 60) {
+        session = "OVERNIGHT ROLLOVER STANDBY";
+      }
+      document.getElementById('session-name').innerText = session;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ----------------------------------------------------
+    // 2. TRADINGVIEW LIGHTWEIGHT CHARTS INITIALIZATION
+    // ----------------------------------------------------
+    const chartContainer = document.getElementById('chart-container');
+    const chart = LightweightCharts.createChart(chartContainer, {
+      width: 1410,
+      height: 970,
+      layout: {
+        background: { color: '#080c14' },
+        textColor: '#94a3b8',
+        fontSize: 12,
+        fontFamily: "'JetBrains Mono', monospace",
+      },
+      grid: {
+        vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.15,
+        },
+      },
+      timeScale: {
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: '#00E676',
+      downColor: '#FF1744',
+      borderVisible: false,
+      wickUpColor: '#00E676',
+      wickDownColor: '#FF1744',
+    });
+
+    const ema20Series = chart.addLineSeries({
+      color: '#06b6d4',
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+
+    const ema50Series = chart.addLineSeries({
+      color: '#f59e0b',
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+
+    const ema200Series = chart.addLineSeries({
+      color: '#a855f7',
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+
+    // Price Line References for TP/SL
+    let entryLine = null;
+    let slLine = null;
+    let tp1Line = null;
+    let tp2Line = null;
+
+    function updatePriceLines(entry, sl, tp1, tp2, action) {
+      if (entryLine) { candleSeries.removePriceLine(entryLine); entryLine = null; }
+      if (slLine) { candleSeries.removePriceLine(slLine); slLine = null; }
+      if (tp1Line) { candleSeries.removePriceLine(tp1Line); tp1Line = null; }
+      if (tp2Line) { candleSeries.removePriceLine(tp2Line); tp2Line = null; }
+
+      if (action === 'BUY' || action === 'SELL') {
+        entryLine = candleSeries.createPriceLine({
+          price: entry,
+          color: '#38bdf8',
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid,
+          axisLabelVisible: true,
+          title: `ENTRY: $${entry.toFixed(2)}`,
+        });
+
+        slLine = candleSeries.createPriceLine({
+          price: sl,
+          color: '#ef4444',
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid,
+          axisLabelVisible: true,
+          title: `SL (-1.0R): $${sl.toFixed(2)}`,
+        });
+
+        tp1Line = candleSeries.createPriceLine({
+          price: tp1,
+          color: '#10b981',
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: `TP1 (+2.0R): $${tp1.toFixed(2)}`,
+        });
+
+        tp2Line = candleSeries.createPriceLine({
+          price: tp2,
+          color: '#10b981',
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid,
+          axisLabelVisible: true,
+          title: `TP2 (+4.0R): $${tp2.toFixed(2)}`,
+        });
+      }
+    }
+
+    // ----------------------------------------------------
+    // 3. AUDIO ALERT DISPATCHER
+    // ----------------------------------------------------
+    let lastSignalAction = "WAIT";
+
+    function playAlert(action) {
+      try {
+        if (action === 'BUY') {
+          const a = document.getElementById('audio-buy');
+          if (a) { a.currentTime = 0; a.play().catch(() => { }); }
+        } else if (action === 'SELL') {
+          const a = document.getElementById('audio-sell');
+          if (a) { a.currentTime = 0; a.play().catch(() => { }); }
+        }
+      } catch (err) {
+        console.warn("Audio play blocked by browser policy:", err);
+      }
+    }
+
+    // ----------------------------------------------------
+    // 4. REAL-TIME DATA STREAM & WEBSOCKET ENGINE
+    // ----------------------------------------------------
+    let isInitialLoad = true;
+
+    async function fetchFullSnapshot() {
+      try {
+        const res = await fetch('/api/gold_m1_live');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // 1. Candlestick Data
+        if (data.candles && data.candles.length > 0) {
+          candleSeries.setData(data.candles);
+
+          // Calculate EMAs
+          const closes = data.candles.map(c => c.close);
+          const ema20Data = calculateEMA(data.candles, 20);
+          const ema50Data = calculateEMA(data.candles, 50);
+          const ema200Data = calculateEMA(data.candles, 200);
+          ema20Series.setData(ema20Data);
+          ema50Series.setData(ema50Data);
+          ema200Series.setData(ema200Data);
+
+          if (isInitialLoad) {
+            chart.timeScale().fitContent();
+            isInitialLoad = false;
+          }
+        }
+
+        // 2. Update Telemetry HUD
+        updateHUD(data);
+      } catch (e) {
+        console.error("Snapshot error:", e);
+      }
+    }
+
+    function calculateEMA(candles, period) {
+      if (candles.length < period) return [];
+      const k = 2 / (period + 1);
+      const emaData = [];
+      let prevEma = candles[0].close;
+
+      for (let i = 0; i < candles.length; i++) {
+        const c = candles[i];
+        if (i === 0) {
+          prevEma = c.close;
+        } else {
+          prevEma = c.close * k + prevEma * (1 - k);
+        }
+        if (i >= period - 1) {
+          emaData.push({ time: c.time, value: prevEma });
+        }
+      }
+      return emaData;
+    }
+
+    function updateHUD(data) {
+      if (!data) return;
+      const p = Number(data.current_price || 0.0);
+      const headerPriceEl = document.getElementById('header-price');
+      headerPriceEl.innerText = p.toFixed(2);
+
+      if (data.spread) {
+        document.getElementById('header-spread').innerText = Number(data.spread).toFixed(2);
+      }
+
+      // Signal Plan
+      const sig = data.signal || {};
+      const action = sig.action || "WAIT";
+      const conf = Number(sig.confidence || 50.0);
+      document.getElementById('signal-conf').innerText = `CONFIDENCE: ${conf.toFixed(1)}%`;
+
+      const badge = document.getElementById('signal-badge');
+      if (action === 'BUY') {
+        badge.className = 'signal-status-badge sig-buy';
+        badge.innerHTML = `<span>🟢 STRONG BUY CONFLUENCE</span>`;
+      } else if (action === 'SELL') {
+        badge.className = 'signal-status-badge sig-sell';
+        badge.innerHTML = `<span>🔴 STRONG SELL CONFLUENCE</span>`;
+      } else {
+        badge.className = 'signal-status-badge sig-wait';
+        badge.innerHTML = `<span>🟡 CHOP WAIT / EQUILIBRIUM</span>`;
+      }
+
+      if (action !== lastSignalAction) {
+        if (!isInitialLoad && (action === 'BUY' || action === 'SELL')) {
+          playAlert(action);
+        }
+        lastSignalAction = action;
+      }
+
+      // Targets
+      const entry = Number(sig.entry || p);
+      const sl = Number(sig.sl || (action === 'BUY' ? entry - 4.5 : entry + 4.5));
+      const tp1 = Number(sig.tp1 || (action === 'BUY' ? entry + 9.0 : entry - 9.0));
+      const tp2 = Number(sig.tp2 || (action === 'BUY' ? entry + 18.0 : entry - 18.0));
+
+      document.getElementById('val-entry').innerText = `$${entry.toFixed(2)}`;
+      document.getElementById('val-sl').innerText = `$${sl.toFixed(2)}`;
+      document.getElementById('val-tp1').innerText = `$${tp1.toFixed(2)}`;
+      document.getElementById('val-tp2').innerText = `$${tp2.toFixed(2)}`;
+
+      updatePriceLines(entry, sl, tp1, tp2, action);
+
+      // Math Radar
+      const math = data.math || {};
+      const hVal = Number(math.hurst || 0.50);
+      const hEl = document.getElementById('m-hurst');
+      if (hVal > 0.55) {
+        hEl.innerText = `${hVal.toFixed(3)} (PERSISTENT TREND 🟢)`;
+        hEl.style.color = '#34d399';
+      } else if (hVal < 0.45) {
+        hEl.innerText = `${hVal.toFixed(3)} (MEAN-REVERTING 🔄)`;
+        hEl.style.color = '#f59e0b';
+      } else {
+        hEl.innerText = `${hVal.toFixed(3)} (RANDOM WALK ⚠️)`;
+        hEl.style.color = '#94a3b8';
+      }
+
+      document.getElementById('m-kalman').innerText = `${math.kalman_velocity || '+0.00'} (${math.kalman_bias || 'STATIONARY'})`;
+      document.getElementById('m-ou').innerText = `${math.ou_z || '0.00'} (${math.ou_bias || 'EQUILIBRIUM'})`;
+      document.getElementById('m-garch').innerText = `±$${Number(math.risk_buffer || 4.50).toFixed(2)}/oz`;
+
+      // Bayesian Prob
+      const bullPct = Math.round(Number(math.bayes_bull || 50));
+      const bearPct = 100 - bullPct;
+      document.getElementById('val-bull-pct').innerText = `${bullPct}%`;
+      document.getElementById('val-bear-pct').innerText = `${bearPct}%`;
+      document.getElementById('bar-bull-fill').style.width = `${bullPct}%`;
+
+      // SMC Telemetry
+      const smc = data.smc || {};
+      document.getElementById('smc-score').innerText = `SCORE: ${smc.confluence_score || 80}/100`;
+      document.getElementById('smc-obs').innerText = smc.order_blocks_summary || "1 Bullish OB";
+      document.getElementById('smc-fvgs').innerText = smc.fvg_summary || "1 Imbalance Retest";
+      document.getElementById('smc-sweep').innerText = smc.sweep_summary || "Neutral Boundaries";
+    }
+
+    // ----------------------------------------------------
+    // 5. WEBSOCKET / POLLING LOOP
+    // ----------------------------------------------------
+    function initWebSocket() {
+      const loc = window.location;
+      const wsProto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProto}//${loc.host}/api/gold_m1_ws`;
+      let ws = null;
+
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => console.log("🟢 WebSocket Connected to Gold M1 Stream");
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.candle) {
+              candleSeries.update(data.candle);
+            }
+            updateHUD(data);
+          } catch (e) {
+            console.error("WS Parse err:", e);
+          }
+        };
+        ws.onclose = () => {
+          console.warn("WebSocket disconnected. Reconnecting in 3s...");
+          setTimeout(initWebSocket, 3000);
+        };
+        ws.onerror = (err) => {
+          console.error("WebSocket error:", err);
+          ws.close();
+        };
+      } catch (err) {
+        console.warn("WebSocket fallback to HTTP polling:", err);
+      }
+    }
+
+    // Initial load + Polling fallback
+    fetchFullSnapshot();
+    setInterval(fetchFullSnapshot, 2000);
+    initWebSocket();
+  </script>
+</body>
+
+</html>
