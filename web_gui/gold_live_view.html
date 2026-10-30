@@ -183,7 +183,20 @@
       letter-spacing: -0.5px;
       line-height: 1;
       text-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
-      transition: color 0.3s ease;
+      transition: color 0.12s ease, transform 0.12s ease, text-shadow 0.12s ease;
+      display: inline-block;
+    }
+
+    .live-price.tick-up {
+      color: #10b981 !important;
+      text-shadow: 0 0 28px rgba(16, 185, 129, 0.95), 0 0 10px #10b981 !important;
+      transform: scale(1.04);
+    }
+
+    .live-price.tick-down {
+      color: #ef4444 !important;
+      text-shadow: 0 0 28px rgba(239, 68, 68, 0.95), 0 0 10px #ef4444 !important;
+      transform: scale(1.04);
     }
 
     .price-sub {
@@ -769,6 +782,13 @@
         </div>
         <div class="indicator-pill" id="chart-watermark" style="color:#cbd5e1; font-weight:700;">
           GOLD XAUUSD (M5) • TOKYO VPS DIRECT FEED
+        </div>
+        <div class="indicator-pill" style="border-color: rgba(245, 158, 11, 0.5); background: rgba(15, 23, 42, 0.95);">
+          <span style="color:#f59e0b;">⏳ M5 BAR:</span> <span id="candle-timer" class="mono" style="color:#38bdf8; font-weight:700; margin-left:4px;">04:59</span>
+        </div>
+        <div class="indicator-pill" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(15, 23, 42, 0.95);">
+          <div class="dot-green" style="width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></div>
+          <span style="color:#34d399; font-weight:700; margin-left:4px;">SUB-SECOND TICK</span>
         </div>
       </div>
       <div id="chart-container"></div>
@@ -1420,6 +1440,45 @@
     }
 
     // ----------------------------------------------------
+    // 4.1 SUB-SECOND REAL LIVE TICK & COUNTDOWN HANDLERS
+    // ----------------------------------------------------
+    let tickResetTimer = null;
+    function updateLivePriceTick(price, prevPrice, spread) {
+      const headerPriceEl = document.getElementById('header-price');
+      if (!headerPriceEl || isNaN(price) || price <= 0) return;
+      headerPriceEl.innerText = price.toFixed(2);
+
+      if (spread && !isNaN(spread)) {
+        const spreadEl = document.getElementById('header-spread');
+        if (spreadEl) spreadEl.innerText = Number(spread).toFixed(2);
+      }
+
+      headerPriceEl.classList.remove('tick-up', 'tick-down');
+      if (price > prevPrice) {
+        headerPriceEl.classList.add('tick-up');
+      } else if (price < prevPrice) {
+        headerPriceEl.classList.add('tick-down');
+      }
+
+      clearTimeout(tickResetTimer);
+      tickResetTimer = setTimeout(() => {
+        headerPriceEl.classList.remove('tick-up', 'tick-down');
+      }, 220);
+    }
+
+    // 5m Candle Countdown Timer (Runs every second in client browser)
+    setInterval(() => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const remaining = 300 - (nowSec % 300);
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      const el = document.getElementById('candle-timer');
+      if (el) {
+        el.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+    }, 1000);
+
+    // ----------------------------------------------------
     // 5. WEBSOCKET / POLLING LOOP
     // ----------------------------------------------------
     function initWebSocket() {
@@ -1434,7 +1493,18 @@
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.candle) {
+
+            // 1. Super Fast Sub-Second Real Live Tick Handling (<0.05ms)
+            if (data.type === "tick") {
+              if (data.candle && candleSeries) {
+                candleSeries.update(data.candle);
+              }
+              updateLivePriceTick(Number(data.current_price), Number(data.prev_price), Number(data.spread));
+              return;
+            }
+
+            // 2. Full Snapshot Data Stream
+            if (data.candle && candleSeries) {
               candleSeries.update(data.candle);
             }
             updateHUD(data);

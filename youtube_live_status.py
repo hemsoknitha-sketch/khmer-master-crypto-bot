@@ -6,7 +6,7 @@ Performs instant sub-second diagnostic audit of the YouTube Live Stream:
   - Xvfb Virtual Framebuffer (:99)
   - PulseAudio Virtual Sink (sink_stream)
   - Headless Chromium Kiosk
-  - Gold M1 Stream Server (Port 8000)
+  - Gold M5 Stream Server (Port 8000)
   - FFmpeg RTMP Broadcaster
   - CPU Core Affinity & Memory Clamping
 ================================================================

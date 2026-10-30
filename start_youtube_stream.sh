@@ -191,14 +191,20 @@ echo "📡 Broadcasting In-Memory RTMP Stream to YouTube (Zero Disk Write)..."
 echo "💡 Cores Pinned: taskset -c 2,3 (Zero HFT Engine Interference)"
 echo "🚀 Bitrate Mode: Constant Bitrate (CBR) 6800 Kbps (YouTube Recommended Flatline)"
 
+# Kill any stale FFmpeg instances to avoid RTMP session collisions
+pkill -9 -f "ffmpeg.*x11grab" 2>/dev/null || true
+pkill -9 -f "ffmpeg.*rtmp" 2>/dev/null || true
+sleep 1
+
 taskset -c 2,3 ffmpeg -hide_banner -loglevel info -stats \
     -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
     $AUDIO_INPUT \
     $AUDIO_MAP \
     -c:v libx264 -preset veryfast \
-    -b:v 6800k -minrate 6800k -maxrate 6800k -bufsize 6800k \
+    -b:v 6800k -minrate 6800k -maxrate 6800k -bufsize 13600k \
     -x264-params "nal-hrd=cbr:force-cfr=1" \
     -g 60 -keyint_min 60 \
+    -r 30 \
     -pix_fmt yuv420p -profile:v high -level 4.1 \
     -c:a aac -b:a 160k -ar 48000 \
     -flvflags no_duration_filesize \

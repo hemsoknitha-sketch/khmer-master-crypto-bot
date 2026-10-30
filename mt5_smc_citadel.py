@@ -205,10 +205,11 @@ class MT5SMCCitadelEngine:
         clean_sym = cls.clean_symbol(symbol)
         cache_key = f"{clean_sym}_{timeframe}"
         now_ts = time.time()
+        ttl = 5.0 if timeframe in ["1m", "5m"] else cls._CACHE_TTL_SECONDS
 
         if cache_key in cls._CANDLE_CACHE:
             ts, df_cached = cls._CANDLE_CACHE[cache_key]
-            if (now_ts - ts) < cls._CACHE_TTL_SECONDS and df_cached is not None and len(df_cached) >= 20:
+            if (now_ts - ts) < ttl and df_cached is not None and len(df_cached) >= 20:
                 return df_cached
 
         df = None
