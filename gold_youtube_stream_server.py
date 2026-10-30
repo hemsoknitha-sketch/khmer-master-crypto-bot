@@ -50,14 +50,6 @@ except Exception:
     def fast_dumps(obj):
         return json.dumps(obj)
 
-# Cache state & synchronization
-_CACHE = {
-    "timestamp": 0.0,
-    "snapshot": {}
-}
-_IS_REFRESHING = False
-_WS_CLIENTS = set()
-
 
 def _generate_fallback_data() -> Dict[str, Any]:
     """Generates clean institutional fallback data during initial cold start."""
@@ -106,6 +98,15 @@ def _generate_fallback_data() -> Dict[str, Any]:
     }
 
 
+# Cache state & synchronization: pre-initialized so cache is NEVER empty
+_CACHE = {
+    "timestamp": _START_TIME,
+    "snapshot": _generate_fallback_data()
+}
+_IS_REFRESHING = False
+_WS_CLIENTS = set()
+
+
 def _fetch_gold_m1_data() -> Dict[str, Any]:
     """
     Synthesizes Live Gold M1 Candlesticks, SMC Structures, and Math Radar.
@@ -115,7 +116,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         import mt5_smc_citadel
         import gold_mathematical_radar
     except Exception as e:
-        print(f"⚠️ [YOUTUBE STREAM] Engine import note: {e}")
+        print(f"⚠️ [YOUTUBE STREAM] Engine import note: {e}", flush=True)
         return _generate_fallback_data()
 
     # 1. Fetch M1 Candlesticks
@@ -210,7 +211,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         bayes = math_res.get("bayesian_probability", {})
         garch = math_res.get("garch_volatility", {})
         risk_buffer = float(garch.get("dynamic_risk_buffer_usd", 4.50))
-    except Exception as e:
+    except Exception:
         math_res = {}
 
     # 4. Synthesize Final Trading Action & Target Plan
@@ -287,7 +288,7 @@ async def _refresh_cache_in_background():
         _CACHE["timestamp"] = time.time()
         _CACHE["snapshot"] = snapshot
     except Exception as e:
-        print(f"⚠️ [YOUTUBE STREAM] Background refresh error: {e}")
+        print(f"⚠️ [YOUTUBE STREAM] Background refresh error: {e}", flush=True)
     finally:
         _IS_REFRESHING = False
 
@@ -299,28 +300,14 @@ async def get_live_data_cached() -> Dict[str, Any]:
     """
     global _IS_REFRESHING
     now = time.time()
-    if _CACHE["snapshot"]:
-        # If cache is fresh (< 2.5s), return instantly
-        if (now - _CACHE["timestamp"]) < 2.5:
-            return _CACHE["snapshot"]
 
-        # If cache is slightly aged, trigger non-blocking background refresh and return cached
-        if not _IS_REFRESHING:
-            _IS_REFRESHING = True
-            asyncio.create_task(_refresh_cache_in_background())
-        return _CACHE["snapshot"]
+    # Cache is always pre-initialized, so return immediately
+    # If cache is older than 2.0s and not already refreshing, trigger async background refresh
+    if (now - _CACHE["timestamp"]) >= 2.0 and not _IS_REFRESHING:
+        _IS_REFRESHING = True
+        asyncio.create_task(_refresh_cache_in_background())
 
-    # Cold start: try fast fetch or return fallback
-    try:
-        snapshot = await asyncio.to_thread(_fetch_gold_m1_data)
-        _CACHE["timestamp"] = time.time()
-        _CACHE["snapshot"] = snapshot
-        return snapshot
-    except Exception:
-        fallback = _generate_fallback_data()
-        _CACHE["snapshot"] = fallback
-        _CACHE["timestamp"] = now
-        return fallback
+    return _CACHE["snapshot"]
 
 
 # -------------------------------------------------------------------------
@@ -356,7 +343,7 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
     ws = web.WebSocketResponse(heartbeat=15.0)
     await ws.prepare(request)
     _WS_CLIENTS.add(ws)
-    print(f"📡 [YOUTUBE STREAM] New WebSocket client connected (Total: {len(_WS_CLIENTS)})")
+    print(f"📡 [YOUTUBE STREAM] New WebSocket client connected (Total: {len(_WS_CLIENTS)})", flush=True)
 
     # Send initial snapshot immediately
     snapshot = await get_live_data_cached()
@@ -403,14 +390,14 @@ async def warm_up_cache(app):
     async def _do_warmup():
         global _IS_REFRESHING
         try:
-            print("🔥 [YOUTUBE STREAM] Pre-warming Gold M1 cache and loading RAM memory models...")
+            print("🔥 [YOUTUBE STREAM] Pre-warming Gold M1 cache and loading RAM memory models...", flush=True)
             t0 = time.time()
             snapshot = await asyncio.to_thread(_fetch_gold_m1_data)
             _CACHE["timestamp"] = time.time()
             _CACHE["snapshot"] = snapshot
-            print(f"✅ [YOUTUBE STREAM] Pre-warming complete in {time.time()-t0:.2f}s! Price: ${snapshot.get('current_price')}")
+            print(f"✅ [YOUTUBE STREAM] Pre-warming complete in {time.time()-t0:.2f}s! Price: ${snapshot.get('current_price')}", flush=True)
         except Exception as e:
-            print(f"⚠️ [YOUTUBE STREAM] Pre-warming note: {e}")
+            print(f"⚠️ [YOUTUBE STREAM] Pre-warming note: {e}", flush=True)
         finally:
             _IS_REFRESHING = False
 
@@ -451,7 +438,7 @@ def main():
     app.on_startup.append(warm_up_cache)
     app.on_cleanup.append(cleanup_background_tasks)
 
-    print(f"🚀 [ANGKOR QUANT] Gold M1 YouTube Live Stream Server starting on http://0.0.0.0:{port}")
+    print(f"🚀 [ANGKOR QUANT] Gold M1 YouTube Live Stream Server starting on http://0.0.0.0:{port}", flush=True)
     web.run_app(app, host="0.0.0.0", port=port)
 
 

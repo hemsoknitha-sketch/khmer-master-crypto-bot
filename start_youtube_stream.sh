@@ -16,16 +16,19 @@ cd "$SCRIPT_DIR"
 
 # Ensure UTF-8 across all subshells & background python processes
 export PYTHONIOENCODING=utf-8
+export PYTHONUNBUFFERED=1
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
 # 1. Load Stream Key from .env
 if [ -f .env ]; then
     export $(grep -v '^#' .env | grep -E '^YOUTUBE_STREAM_KEY=' | xargs)
+    export $(grep -v '^#' .env | grep -E '^YOUTUBE_STREAM_URL=' | xargs 2>/dev/null || true)
     export $(grep -v '^#' .env | grep -E '^YOUTUBE_WEB_PORT=' | xargs 2>/dev/null || true)
 fi
 
 PORT="${YOUTUBE_WEB_PORT:-8000}"
+STREAM_URL="${YOUTUBE_STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}"
 
 if [ -z "$YOUTUBE_STREAM_KEY" ] || [ "$YOUTUBE_STREAM_KEY" == "YOUR_YOUTUBE_STREAM_KEY_HERE" ]; then
     echo "❌ [ERROR] YOUTUBE_STREAM_KEY is not configured in .env!"
@@ -62,6 +65,7 @@ fi
 echo "🚀 [ANGKOR QUANT] Launching YouTube Live 24/7 Engine..."
 echo "🐍 Python Interpreter: $PYTHON_BIN"
 echo "🌐 Chromium Executable: $CHROMIUM_BIN"
+echo "📡 Target Stream URL: $STREAM_URL"
 mkdir -p logs
 
 # 2. Start PulseAudio Virtual Audio Bus
@@ -81,13 +85,13 @@ else
 fi
 export DISPLAY=:99
 
-# 4. Start Gold M1 Stream Web Server
+# 4. Start Gold M1 Stream Web Server (Unbuffered output)
 if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     echo "📡 Starting Gold M1 Stream Server (Port $PORT)..."
     # Ensure port is released from any zombie process
     fuser -k ${PORT}/tcp 2>/dev/null || true
     sleep 1
-    taskset -c 2,3 $PYTHON_BIN gold_youtube_stream_server.py > logs/stream_server.log 2>&1 &
+    taskset -c 2,3 $PYTHON_BIN -u gold_youtube_stream_server.py > logs/stream_server.log 2>&1 &
     
     # Wait up to 5s for server health endpoint to come up
     for i in {1..5}; do
@@ -151,12 +155,12 @@ if [ -n "$AMIX_FILTER" ]; then
         $AMIX_FILTER \
         -c:v libx264 -preset veryfast -tune zerolatency -b:v 2800k -maxrate 3200k -bufsize 6000k \
         -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-        -f flv "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}"
+        -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}"
 else
     taskset -c 2,3 ffmpeg -hide_banner -loglevel warning \
         -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
         $AUDIO_INPUT \
         -c:v libx264 -preset veryfast -tune zerolatency -b:v 2800k -maxrate 3200k -bufsize 6000k \
         -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-        -f flv "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}"
+        -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}"
 fi
