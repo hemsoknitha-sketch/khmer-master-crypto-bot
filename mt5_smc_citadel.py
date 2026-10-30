@@ -217,27 +217,39 @@ class MT5SMCCitadelEngine:
         # Strategy 1: High-Frequency Direct Exchange API (Binance Futures for Gold / Crypto, Binance Spot for Others)
         if any(c in clean_sym for c in ["BTC", "ETH", "SOL", "BNB", "XAU", "GOLD", "PAXG"]):
             b_interval = timeframe if timeframe != "4h" else "4h"
+            target_urls = []
             if any(k in clean_sym for k in ["XAU", "GOLD"]):
-                url = f"https://fapi.binance.com/fapi/v1/klines?symbol=XAUUSDT&interval={b_interval}&limit={limit}"
+                target_urls = [
+                    f"https://fapi.binance.com/fapi/v1/klines?symbol=XAUUSDT&interval={b_interval}&limit={limit}",
+                    f"https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}"
+                ]
             elif "PAXG" in clean_sym:
-                url = f"https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}"
+                target_urls = [
+                    f"https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}"
+                ]
             else:
                 b_sym = clean_sym + "USDT" if not clean_sym.endswith("USDT") else clean_sym
-                url = f"https://fapi.binance.com/fapi/v1/klines?symbol={b_sym}&interval={b_interval}&limit={limit}"
-            try:
-                r = requests.get(url, timeout=4)
-                if r.status_code == 200:
-                    raw_data = r.json()
-                    if isinstance(raw_data, list) and len(raw_data) > 0:
-                        df = pd.DataFrame(raw_data, columns=[
-                            'timestamp', 'open', 'high', 'low', 'close', 'volume',
-                            'close_time', 'q_vol', 'num_trades', 'tb_base', 'tb_quote', 'ignore'
-                        ])
-                        for col in ['open', 'high', 'low', 'close', 'volume']:
-                            df[col] = df[col].astype(float)
-                        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            except Exception as e_bin:
-                logger.debug(f"Exchange candle fetch notice for {clean_sym}: {e_bin}")
+                target_urls = [
+                    f"https://fapi.binance.com/fapi/v1/klines?symbol={b_sym}&interval={b_interval}&limit={limit}"
+                ]
+
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            for url in target_urls:
+                try:
+                    r = requests.get(url, headers=headers, timeout=4)
+                    if r.status_code == 200:
+                        raw_data = r.json()
+                        if isinstance(raw_data, list) and len(raw_data) > 0:
+                            df = pd.DataFrame(raw_data, columns=[
+                                'timestamp', 'open', 'high', 'low', 'close', 'volume',
+                                'close_time', 'q_vol', 'num_trades', 'tb_base', 'tb_quote', 'ignore'
+                            ])
+                            for col in ['open', 'high', 'low', 'close', 'volume']:
+                                df[col] = df[col].astype(float)
+                            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                            break
+                except Exception as e_bin:
+                    logger.debug(f"Exchange candle fetch notice for {clean_sym} ({url}): {e_bin}")
 
         # Strategy 2: yfinance for Forex, Indices, Stocks & Global Metals
         if df is None or len(df) < 20:

@@ -60,22 +60,38 @@ except Exception:
 def _generate_fallback_data() -> Dict[str, Any]:
     """Generates clean institutional fallback data during initial cold start (M5 Timeframe)."""
     now = time.time()
-    current_price = 2745.50
+    current_price = _LIVE_TICK.get("price", 3900.00) if "_LIVE_TICK" in globals() else 3900.00
+    candle_ts = (int(now) // 300) * 300
+    
+    # Generate 60 realistic M5 historical candles around current price
+    candles = []
+    for i in range(60, 0, -1):
+        t = candle_ts - (i * 300)
+        drift = np.sin(i / 6.0) * 2.80 + np.cos(i / 3.0) * 1.50
+        p = round(current_price + drift, 2)
+        candles.append({
+            "time": t,
+            "open": round(p - 0.40, 2),
+            "high": round(p + 1.20, 2),
+            "low": round(p - 1.10, 2),
+            "close": p,
+            "volume": 180.0
+        })
+    candles.append({
+        "time": candle_ts,
+        "open": round(current_price - 0.20, 2),
+        "high": round(current_price + 0.60, 2),
+        "low": round(current_price - 0.50, 2),
+        "close": current_price,
+        "volume": 25.0
+    })
+
     return {
         "timestamp": now,
         "current_price": current_price,
         "spread": 0.18,
         "timeframe": "M5",
-        "candles": [
-            {
-                "time": int(now - 300),
-                "open": current_price - 0.40,
-                "high": current_price + 0.60,
-                "low": current_price - 0.80,
-                "close": current_price,
-                "volume": 250.0
-            }
-        ],
+        "candles": candles,
         "signal": {
             "action": "WAIT",
             "confidence": 75.0,
@@ -117,20 +133,20 @@ _WS_CLIENTS = set()
 # SUPER FAST REAL LIVE CANDLES STATE & SUB-SECOND AGGREGATOR
 # -------------------------------------------------------------------------
 _LIVE_TICK = {
-    "price": 2745.50,
-    "prev_price": 2745.50,
+    "price": 3900.00,
+    "prev_price": 3900.00,
     "spread": 0.18,
-    "bid": 2745.41,
-    "ask": 2745.59,
+    "bid": 3899.91,
+    "ask": 3900.09,
     "timestamp": time.time()
 }
 
 _ACTIVE_CANDLE = {
     "time": (int(time.time()) // 300) * 300,
-    "open": 2745.50,
-    "high": 2745.50,
-    "low": 2745.50,
-    "close": 2745.50,
+    "open": 3900.00,
+    "high": 3900.00,
+    "low": 3900.00,
+    "close": 3900.00,
     "volume": 10.0
 }
 
@@ -146,10 +162,19 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
     
     price = round(float(price), 2)
     spread = round(float(spread), 2) if spread else 0.18
-    prev_p = _LIVE_TICK["price"]
+    prev_p = _LIVE_TICK.get("price", price)
     
-    # 1. Update Active Candle OHLCV
-    if _ACTIVE_CANDLE["time"] != candle_ts:
+    # Sanity check against legacy price contamination
+    if _ACTIVE_CANDLE.get("open", 0.0) < 3200.0 and price > 3500.0:
+        _ACTIVE_CANDLE = {
+            "time": candle_ts,
+            "open": price,
+            "high": price,
+            "low": price,
+            "close": price,
+            "volume": 1.0
+        }
+    elif _ACTIVE_CANDLE["time"] != candle_ts:
         # 5-minute candle roll-over
         _ACTIVE_CANDLE = {
             "time": candle_ts,
@@ -206,6 +231,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     Synthesizes Live Gold M5 Candlesticks, SMC Structures, and Math Radar.
     Runs in background thread to avoid blocking the event loop.
     """
+    global _ACTIVE_CANDLE, _LIVE_TICK
     try:
         import mt5_smc_citadel
         import gold_mathematical_radar
@@ -227,11 +253,11 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         except Exception:
             df = None
 
-    current_price = 2745.50
+    current_price = _LIVE_TICK.get("price", 3900.00)
     candles_list = []
     if df is not None and not df.empty:
         current_price = round(float(df['close'].iloc[-1]), 2)
-        if _LIVE_TICK["price"] > 1000.0:
+        if _LIVE_TICK.get("price", 0) > 1000.0:
             current_price = _LIVE_TICK["price"]
         for idx, row in df.iterrows():
             ts = int(row['timestamp'].timestamp()) if hasattr(row['timestamp'], 'timestamp') else int(time.time())
@@ -250,16 +276,22 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
             candle_ts = (now_ts // 300) * 300
             last_c = candles_list[-1]
             if last_c["time"] == candle_ts:
-                last_c["high"] = max(last_c["high"], _ACTIVE_CANDLE.get("high", last_c["high"]))
-                last_c["low"] = min(last_c["low"], _ACTIVE_CANDLE.get("low", last_c["low"]))
+                # Sanity check: only merge if prices are within $80 of each other
+                active_c = _ACTIVE_CANDLE.copy() if isinstance(_ACTIVE_CANDLE, dict) else {}
+                if abs(last_c["close"] - active_c.get("close", last_c["close"])) < 80.0:
+                    last_c["high"] = max(last_c["high"], active_c.get("high", last_c["high"]))
+                    last_c["low"] = min(last_c["low"], active_c.get("low", last_c["low"]))
                 last_c["close"] = current_price
                 _ACTIVE_CANDLE = last_c.copy()
             elif candle_ts > last_c["time"]:
-                _ACTIVE_CANDLE["time"] = candle_ts
-                _ACTIVE_CANDLE["open"] = current_price
-                _ACTIVE_CANDLE["high"] = current_price
-                _ACTIVE_CANDLE["low"] = current_price
-                _ACTIVE_CANDLE["close"] = current_price
+                _ACTIVE_CANDLE = {
+                    "time": candle_ts,
+                    "open": current_price,
+                    "high": current_price,
+                    "low": current_price,
+                    "close": current_price,
+                    "volume": 1.0
+                }
                 candles_list.append(_ACTIVE_CANDLE.copy())
     else:
         return _generate_fallback_data()
@@ -478,11 +510,12 @@ async def handle_mc_test(request: web.Request) -> web.Response:
         if "gold_ai_mc_engine" in sys.modules:
             test_type = request.query.get("type", "welcome")
             now = time.time()
+            cur_p = _LIVE_TICK.get("price", 3900.00)
             if test_type == "buy":
-                text = "Institutional alert! Strong Buy confluence confirmed on Gold at 2,745.50 dollars. Stop loss is anchored at 2,741.00, targeting TP1 for a 2.0R gain."
+                text = f"Institutional alert! Strong Buy confluence confirmed on Gold at {cur_p:.2f} dollars. Stop loss is anchored at {cur_p - 4.50:.2f}, targeting TP1 for a 2.0R gain."
                 mood = "buy"
             elif test_type == "sell":
-                text = "Institutional alert! Strong Sell confluence confirmed on Gold at 2,745.50 dollars. Order block rejection confirmed. Stop loss anchored above high."
+                text = f"Institutional alert! Strong Sell confluence confirmed on Gold at {cur_p:.2f} dollars. Order block rejection confirmed. Stop loss anchored above high."
                 mood = "sell"
             elif test_type == "tp":
                 text = "Target One reached on Gold M5! Realizing 50% lot cash profit into the vault. Breakeven Armor is now locked at risk zero."
@@ -698,6 +731,15 @@ def create_app() -> web.Application:
 
 
 async def start_background_tasks(app):
+    try:
+        print("🔥 [YOUTUBE STREAM] Pre-warming M5 candlestick cache on startup...", flush=True)
+        snapshot = await asyncio.to_thread(_fetch_gold_m1_data)
+        _CACHE["timestamp"] = time.time()
+        _CACHE["snapshot"] = snapshot
+        print(f"✅ [YOUTUBE STREAM] Startup pre-warm complete! Price: ${snapshot.get('current_price')}, Candles: {len(snapshot.get('candles', []))}", flush=True)
+    except Exception as e:
+        print(f"⚠️ [YOUTUBE STREAM] Startup pre-warm note: {e}", flush=True)
+
     app["tick_task"] = asyncio.create_task(super_fast_live_gold_tick_loop())
     app["broadcast_task"] = asyncio.create_task(broadcast_loop())
 
