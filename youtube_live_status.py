@@ -77,8 +77,8 @@ def audit_stream_server(port: int = 8000):
         except Exception as e:
             if health_ok:
                 return True, {
-                    "current_price": health_data.get("price", 2745.50),
-                    "signal": {"action": "WAIT", "confidence": 75.0, "entry": health_data.get("price", 2745.50), "sl": 2741.30, "tp1": 2753.90},
+                    "current_price": health_data.get("price", 3900.00),
+                    "signal": {"action": "WAIT", "confidence": 75.0, "entry": health_data.get("price", 3900.00), "sl": 3887.50, "tp1": 3925.00},
                     "math": {"hurst": 0.52, "verdict": "NEUTRAL_WAIT", "bayes_bull": 52.0}
                 }
             return False, str(e)
