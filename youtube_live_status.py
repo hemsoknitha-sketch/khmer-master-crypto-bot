@@ -30,7 +30,7 @@ def check_process(name_pattern: str):
         if os.name == "nt":
             out = subprocess.check_output(f'tasklist /fi "imagename eq {name_pattern}"', shell=True).decode("utf-8", errors="ignore")
             running = name_pattern.lower() in out.lower()
-            return running, 0
+            return running, 1 if running else 0
         else:
             out = subprocess.check_output(f'pgrep -f "{name_pattern}"', shell=True).decode("utf-8", errors="ignore").strip()
             pids = out.split()
@@ -43,7 +43,7 @@ def audit_stream_server(port: int = 8000):
     url = f"http://localhost:{port}/api/gold_m1_live"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "AQ-Status-Check"})
-        with urllib.request.urlopen(req, timeout=2.0) as resp:
+        with urllib.request.urlopen(req, timeout=2.5) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 return True, data
@@ -63,6 +63,8 @@ def print_status():
 
     # 2. Chromium
     chrom_ok, chrom_cnt = check_process("chromium")
+    if not chrom_ok:
+        chrom_ok, chrom_cnt = check_process("chrome")
     print(f"🌐 Chromium Kiosk Browser:         {'🟢 ACTIVE' if chrom_ok else '🔴 OFFLINE'} ({chrom_cnt} process)")
 
     # 3. PulseAudio
@@ -82,6 +84,18 @@ def print_status():
         print(f"   ├─ Entry / SL / TP1:           ${sig.get('entry')} | SL: ${sig.get('sl')} | TP1: ${sig.get('tp1')}")
         print(f"   ├─ Hurst Exponent:             {math.get('hurst')} ({math.get('verdict')})")
         print(f"   └─ Bayesian Bullish Prob:      {math.get('bayes_bull')}%")
+    else:
+        # Check logs if offline
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "stream_server.log")
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = [l.strip() for l in f.readlines() if l.strip()]
+                    if lines:
+                        last_err = lines[-1]
+                        print(f"   └─ Last Server Log: {last_err[:60]}")
+            except Exception:
+                pass
 
     # 5. FFmpeg
     ffmpeg_ok, ffmpeg_cnt = check_process("ffmpeg")
@@ -95,4 +109,3 @@ def print_status():
 
 if __name__ == "__main__":
     print_status()
-

@@ -17,7 +17,10 @@ cd "$SCRIPT_DIR"
 # 1. Load Stream Key from .env
 if [ -f .env ]; then
     export $(grep -v '^#' .env | grep -E '^YOUTUBE_STREAM_KEY=' | xargs)
+    export $(grep -v '^#' .env | grep -E '^YOUTUBE_WEB_PORT=' | xargs 2>/dev/null || true)
 fi
+
+PORT="${YOUTUBE_WEB_PORT:-8000}"
 
 if [ -z "$YOUTUBE_STREAM_KEY" ] || [ "$YOUTUBE_STREAM_KEY" == "YOUR_YOUTUBE_STREAM_KEY_HERE" ]; then
     echo "❌ [ERROR] YOUTUBE_STREAM_KEY is not configured in .env!"
@@ -25,12 +28,40 @@ if [ -z "$YOUTUBE_STREAM_KEY" ] || [ "$YOUTUBE_STREAM_KEY" == "YOUR_YOUTUBE_STRE
     exit 1
 fi
 
+# Detect Python interpreter (prefer virtualenv)
+if [ -f "$SCRIPT_DIR/venv/bin/python3" ]; then
+    PYTHON_BIN="$SCRIPT_DIR/venv/bin/python3"
+elif [ -f "$SCRIPT_DIR/venv/bin/python" ]; then
+    PYTHON_BIN="$SCRIPT_DIR/venv/bin/python"
+elif [ -f "/opt/khmer-master-crypto-bot/venv/bin/python3" ]; then
+    PYTHON_BIN="/opt/khmer-master-crypto-bot/venv/bin/python3"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+else
+    PYTHON_BIN="python3"
+fi
+
+# Detect Chromium executable
+if command -v chromium >/dev/null 2>&1; then
+    CHROMIUM_BIN="$(command -v chromium)"
+elif command -v chromium-browser >/dev/null 2>&1; then
+    CHROMIUM_BIN="$(command -v chromium-browser)"
+elif command -v google-chrome-stable >/dev/null 2>&1; then
+    CHROMIUM_BIN="$(command -v google-chrome-stable)"
+elif command -v google-chrome >/dev/null 2>&1; then
+    CHROMIUM_BIN="$(command -v google-chrome)"
+else
+    CHROMIUM_BIN="chromium"
+fi
+
 echo "🚀 [ANGKOR QUANT] Launching YouTube Live 24/7 Engine..."
+echo "🐍 Python Interpreter: $PYTHON_BIN"
+echo "🌐 Chromium Executable: $CHROMIUM_BIN"
 mkdir -p logs
 
 # 2. Start PulseAudio Virtual Audio Bus
 pulseaudio --start --exit-idle-time=-1 || true
-if ! pactl list short sinks | grep -q "sink_stream"; then
+if ! pactl list short sinks 2>/dev/null | grep -q "sink_stream"; then
     pactl load-module module-null-sink sink_name=sink_stream sink_properties=device.description=Virtual_Stream_Sink || true
     pactl set-default-sink sink_stream || true
 fi
@@ -45,19 +76,25 @@ else
 fi
 export DISPLAY=:99
 
-# 4. Start Gold M1 Stream Web Server (Port 8000)
+# 4. Start Gold M1 Stream Web Server
 if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
-    echo "📡 Starting Gold M1 Stream Server (Port 8000)..."
-    taskset -c 2,3 python3 gold_youtube_stream_server.py > logs/stream_server.log 2>&1 &
+    echo "📡 Starting Gold M1 Stream Server (Port $PORT)..."
+    taskset -c 2,3 $PYTHON_BIN gold_youtube_stream_server.py > logs/stream_server.log 2>&1 &
     sleep 3
+    if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
+        echo "⚠️ Gold M1 Stream Server failed to stay alive! Inspecting logs/stream_server.log:"
+        tail -n 15 logs/stream_server.log 2>/dev/null || true
+    else
+        echo "✅ Gold M1 Stream Server running on Port $PORT."
+    fi
 else
     echo "📡 Gold M1 Stream Server already running."
 fi
 
 # 5. Start Chromium in Kiosk Mode on :99
-if ! pgrep -f "chromium.*gold_live_view" > /dev/null; then
+if ! pgrep -f "$CHROMIUM_BIN.*gold_live_view" > /dev/null && ! pgrep -f "chromium.*gold_live_view" > /dev/null; then
     echo "🌐 Starting Headless Chromium Kiosk on DISPLAY :99..."
-    taskset -c 2,3 chromium-browser \
+    taskset -c 2,3 $CHROMIUM_BIN \
         --kiosk \
         --window-position=0,0 \
         --window-size=1920,1080 \
@@ -69,7 +106,7 @@ if ! pgrep -f "chromium.*gold_live_view" > /dev/null; then
         --disable-dev-shm-usage \
         --disable-gpu-sandbox \
         --hide-scrollbars \
-        http://localhost:8000/gold_live_view > logs/chromium.log 2>&1 &
+        http://localhost:${PORT}/gold_live_view > logs/chromium.log 2>&1 &
     sleep 4
 else
     echo "🌐 Chromium Kiosk already running."
@@ -108,4 +145,3 @@ else
         -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
         -f flv "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}"
 fi
-
