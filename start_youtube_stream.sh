@@ -170,7 +170,7 @@ fi
 if [ "$PULSE_AVAILABLE" = true ] && [ -n "$LOFI_FILE" ]; then
     echo "🎵 Mixed Audio Mode: PulseAudio alerts + ambient soundtrack ($LOFI_FILE)"
     AUDIO_INPUT="-f pulse -i sink_stream.monitor -stream_loop -1 -i $LOFI_FILE"
-    AUDIO_MAP="-filter_complex [1:a]volume=1.0[a1];[2:a]volume=0.35[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
+    AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=44100,volume=1.0[a1];[2:a]aformat=channel_layouts=stereo:sample_rates=44100,volume=0.35[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
 elif [ "$PULSE_AVAILABLE" = true ]; then
     echo "🎵 PulseAudio Monitor Only Mode"
     AUDIO_INPUT="-f pulse -i sink_stream.monitor"
@@ -189,7 +189,7 @@ fi
 echo "📡 Broadcasting In-Memory RTMP Stream to YouTube (Zero Disk Write)..."
 echo "💡 Cores Pinned: taskset -c 2,3 (Zero HFT Engine Interference)"
 
-taskset -c 2,3 ffmpeg -hide_banner -loglevel warning \
+taskset -c 2,3 ffmpeg -hide_banner -loglevel info -stats \
     -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
     $AUDIO_INPUT \
     $AUDIO_MAP \

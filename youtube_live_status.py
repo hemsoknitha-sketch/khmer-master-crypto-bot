@@ -158,17 +158,20 @@ def print_status():
     # 5. FFmpeg
     ffmpeg_ok, ffmpeg_cnt = check_process("ffmpeg")
     print(f"🚀 FFmpeg YouTube RTMP Pipeline:   {'🟢 BROADCASTING' if ffmpeg_ok else '🔴 OFFLINE'} ({ffmpeg_cnt} process)")
-    if not ffmpeg_ok:
-        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "ffmpeg.log")
-        if os.path.exists(log_path):
-            try:
-                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                    lines = [l.strip() for l in f.readlines() if l.strip()]
-                    if lines:
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "ffmpeg.log")
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = [l.strip() for l in f.readlines() if l.strip()]
+                if lines:
+                    last_line = lines[-1]
+                    if ffmpeg_ok and "fps=" in last_line:
+                        print(f"   ├─ Stream Telemetry:           {last_line[:65]}")
+                    elif not ffmpeg_ok:
                         for line in lines[-3:]:
                             print(f"   └─ FFmpeg: {line[:75]}")
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     print("-" * 65)
     print("🛡️ CPU Isolation Guard:            🟢 Cores 2 & 3 Pinned (Cores 0 & 1 Free for HFT)")
