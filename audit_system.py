@@ -4360,6 +4360,11 @@ def run_audit():
 
         # Test CapitalExecutionBridge smart routing under large spread
         bridge = CapitalExecutionBridge(testnet=True)
+        bridge.cst_token = "MOCK_CST_TOKEN"
+        bridge.x_security_token = "MOCK_SEC_TOKEN"
+        bridge.session_expiry = time.time() + 3600.0
+        bridge.session.post = lambda *args, **kwargs: type("Resp", (), {"status_code": 200, "text": "", "json": lambda s: {"dealReference": "DEAL_TEST_INV97"}})()
+        bridge.session.delete = lambda *args, **kwargs: type("Resp", (), {"status_code": 200, "text": ""})()
         resp_large_spread = bridge.place_smart_order_latency_aware(
             epic="GOLD",
             direction="BUY",

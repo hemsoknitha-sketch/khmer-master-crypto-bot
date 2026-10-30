@@ -170,7 +170,7 @@ fi
 if [ "$PULSE_AVAILABLE" = true ] && [ -n "$LOFI_FILE" ]; then
     echo "🎵 Mixed Audio Mode: PulseAudio alerts + ambient soundtrack ($LOFI_FILE)"
     AUDIO_INPUT="-f pulse -i sink_stream.monitor -stream_loop -1 -i $LOFI_FILE"
-    AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=44100,volume=1.0[a1];[2:a]aformat=channel_layouts=stereo:sample_rates=44100,volume=0.35[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
+    AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=1.0[a1];[2:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=0.35[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
 elif [ "$PULSE_AVAILABLE" = true ]; then
     echo "🎵 PulseAudio Monitor Only Mode"
     AUDIO_INPUT="-f pulse -i sink_stream.monitor"
@@ -181,21 +181,25 @@ elif [ -n "$LOFI_FILE" ]; then
     AUDIO_MAP="-map 0:v -map 1:a"
 else
     echo "🔇 Fallback Silent Audio Mode"
-    AUDIO_INPUT="-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100"
+    AUDIO_INPUT="-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000"
     AUDIO_MAP="-map 0:v -map 1:a"
 fi
 
-# 7. Start FFmpeg In-Memory RTMP Streamer to YouTube Live
+# 7. Start FFmpeg In-Memory RTMP Streamer to YouTube Live (True CBR 6800k with NAL-HRD Filler)
 echo "📡 Broadcasting In-Memory RTMP Stream to YouTube (Zero Disk Write)..."
 echo "💡 Cores Pinned: taskset -c 2,3 (Zero HFT Engine Interference)"
+echo "🚀 Bitrate Mode: Constant Bitrate (CBR) 6800 Kbps (YouTube Recommended Flatline)"
 
 taskset -c 2,3 ffmpeg -hide_banner -loglevel info -stats \
     -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
     $AUDIO_INPUT \
     $AUDIO_MAP \
-    -c:v libx264 -preset veryfast -b:v 4500k -minrate 4000k -maxrate 5500k -bufsize 9000k \
+    -c:v libx264 -preset veryfast \
+    -b:v 6800k -minrate 6800k -maxrate 6800k -bufsize 6800k \
     -x264-params "nal-hrd=cbr:force-cfr=1" \
-    -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
+    -g 60 -keyint_min 60 \
+    -pix_fmt yuv420p -profile:v high -level 4.1 \
+    -c:a aac -b:a 160k -ar 48000 \
     -flvflags no_duration_filesize \
     -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}" > "$SCRIPT_DIR/logs/ffmpeg.log" 2>&1
 
