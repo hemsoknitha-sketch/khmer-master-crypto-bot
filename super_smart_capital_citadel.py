@@ -3731,9 +3731,9 @@ class SuperSmartCapitalCitadel:
 
             # 4. Real-Time Deep Regime Transition Detector (Invariant 100 Pillar 8)
             deep_regime = caqm.RealTimeDeepRegimeDetector.evaluate_realtime_regime(
-                current_price=current_price,
-                current_atr=atr_15m,
-                current_spread=spread,
+                current_price=c_price,
+                current_atr=atr_val,
+                current_spread=sp_val,
                 candles_1m_or_5m=diag.get("candles_15m"),
                 direction=direction
             )
