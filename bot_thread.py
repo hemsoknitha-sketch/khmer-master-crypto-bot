@@ -6814,6 +6814,28 @@ class TelegramBotThread(BaseThread):
                     await context.bot.send_message(chat_id=target_uid, text=user_notif, parse_mode="Markdown")
                 except Exception:
                     pass
+            elif data.startswith("btn_cap_admin_mode_"):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                target_uid = int(data.replace("btn_cap_admin_mode_", "").strip())
+                curr_sm = db.get_capital_user_sync_mode(target_uid)
+                new_sm = "AUTONOMOUS" if curr_sm == "MASTER_FOLLOW" else "MASTER_FOLLOW"
+                db.set_capital_user_sync_mode(target_uid, new_sm)
+                lbl_toast = "🎯 ប្តូរទៅ Autonomous (ជួញដូរឯករាជ្យ ២៤/៧)!" if new_sm == "AUTONOMOUS" else "🚂 ប្តូរទៅ Follow Master (តាម Super Admin)!"
+                try:
+                    await update.callback_query.answer(lbl_toast, show_alert=True)
+                except Exception:
+                    pass
+                i_text, i_kb = await build_capital_user_inspection_ui(target_uid)
+                try:
+                    await update.effective_message.edit_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
+                except Exception:
+                    await update.effective_message.reply_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
             elif data.startswith("btn_cap_admin_off_"):
                 target_uid = int(data.replace("btn_cap_admin_off_", "").strip())
                 db.set_capital_auto_config(target_uid, enabled=False)
@@ -25826,9 +25848,14 @@ class TelegramBotThread(BaseThread):
             lines.append(f"• ស្ថានភាព Auto ៖ `{a_status}`")
             lines.append(f"• កាលវិភាគ (Schedule) ៖ `{sched_lbl}`")
             lines.append(f"• Daily Governor ៖ `{limit_lbl}`")
+            sync_mode = db.get_capital_user_sync_mode(target_uid)
+            sync_lbl = "🚂 Follow Master (ធ្វើសមកាលកម្មតាម Super Admin)" if sync_mode == "MASTER_FOLLOW" else "🎯 Autonomous (ជួញដូរដោយឯករាជ្យ ២៤/៧)"
+            lines.append(f"• របៀបជួញដូរ (Sync Mode) ៖ `{sync_lbl}`")
             lines.append(f"{ui_standards.DIVIDER_HEAVY}")
             lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
             lines.append(f"• `` `/admin_capital on {target_uid} 400 live 10 24/7` ``")
+            lines.append(f"• `` `/admin_capital mode {target_uid} autonomous` ``")
+            lines.append(f"• `` `/admin_capital mode {target_uid} master` ``")
             lines.append(f"• `` `/admin_capital off {target_uid}` ``")
             lines.append(f"• `` `/admin_capital closeall {target_uid}` ``")
             lines.append(f"• `` `/admin_capital limit {target_uid} off` ``")
@@ -25840,10 +25867,13 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton(f"{'🛑 បិទ Auto' if auto_on else '🟢 បើក Auto'}", callback_data=f"{'btn_cap_admin_off_' if auto_on else 'btn_cap_admin_on_'}{target_uid}"),
-                    InlineKeyboardButton("🚨 Close All Pos", callback_data=f"btn_cap_admin_closeall_{target_uid}")
+                    InlineKeyboardButton(f"{'🎯 ទៅ Autonomous' if sync_mode == 'MASTER_FOLLOW' else '🚂 ទៅ Follow Master'}", callback_data=f"btn_cap_admin_mode_{target_uid}")
                 ],
                 [
-                    InlineKeyboardButton("💵 Fleet Cash Flow", callback_data="btn_cap_admin_balances"),
+                    InlineKeyboardButton("🚨 Close All Pos", callback_data=f"btn_cap_admin_closeall_{target_uid}"),
+                    InlineKeyboardButton("💵 Fleet Cash Flow", callback_data="btn_cap_admin_balances")
+                ],
+                [
                     InlineKeyboardButton("👥 VIP Directory", callback_data="btn_cap_admin_menu")
                 ]
             ]
@@ -26280,6 +26310,13 @@ class TelegramBotThread(BaseThread):
                     elif raw_s in ["TIMED", "SMART", "SMART_SESSION_TIMED"]:
                         sched_mode = "SMART_SESSION_TIMED"
 
+                # Optional Sync Mode override (e.g. autonomous or master)
+                rem_args = [str(a).upper().strip() for a in args[2:]]
+                if any(a in ["AUTONOMOUS", "AUTO_PORTFOLIO", "INDEPENDENT", "SELF", "AUTO"] for a in rem_args):
+                    db.set_capital_user_sync_mode(target_uid, "AUTONOMOUS")
+                elif any(a in ["MASTER", "MASTER_FOLLOW", "FOLLOW", "SYNC"] for a in rem_args):
+                    db.set_capital_user_sync_mode(target_uid, "MASTER_FOLLOW")
+
                 db.set_capital_auto_config(target_uid, enabled=True, budget=budget, max_positions=max_pos, is_demo=is_demo, schedule_mode=sched_mode)
 
                 # Fetch real balance for feedback
@@ -26295,6 +26332,8 @@ class TelegramBotThread(BaseThread):
                     bal_str = f"Connected ({e_b})"
 
                 mode_lbl = "🟡 DEMO ($10,000)" if is_demo else "🟢 LIVE MAINNET (Real Funds)"
+                cur_sync = db.get_capital_user_sync_mode(target_uid)
+                sync_kh = "🚂 Follow Master (តាម Super Admin)" if cur_sync == "MASTER_FOLLOW" else "🎯 Autonomous (ជួញដូរឯករាជ្យ ២៤/៧)"
                 success_msg = (
                     f"🎉 **[CAPITAL.COM VIP AUTO-TRADE ACTIVATED!]** 🟢\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -26303,6 +26342,7 @@ class TelegramBotThread(BaseThread):
                     f"⚙️ **បរិយាកាស ៖** `{mode_lbl}`\n"
                     f"💰 **ទុនវិនិយោគ ៖** `${budget:,.2f} USD / Trade` (Max: `{max_pos}` កាក់)\n"
                     f"💵 **សមតុល្យជាក់ស្តែង ៖** `{bal_str}`\n"
+                    f"🔄 **របៀបជួញដូរ (Sync Mode) ៖** `{sync_kh}`\n"
                     f"🛡️ **Referral Status ៖** `100% VERIFIED (az48cxia)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🚀 _ប្រព័ន្ធ AI ស្វ័យប្រវត្តិកំពុងដំណើរការកើបផលចំណេញ ២៤/៧!_"
@@ -26324,6 +26364,29 @@ class TelegramBotThread(BaseThread):
                     await context.bot.send_message(chat_id=target_uid, text=user_notif, parse_mode="Markdown")
                 except Exception as e_nu:
                     print(f"Failed to notify user {target_uid}: {e_nu}")
+                return
+
+            # Command: /admin_capital MODE <chat_id_or_acc_id> [AUTONOMOUS|MASTER]
+            elif sub in ["MODE", "SYNC", "SYNC_MODE"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ ៖ `` `/admin_capital mode 643724109 autonomous` `` ឬ `` `/admin_capital mode 643724109 master` ``", parse_mode="Markdown")
+                    return
+                target_uid, _ = _resolve_target(args[1])
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈ `{args[1]}` ឡើយ!", parse_mode="Markdown")
+                    return
+                new_m = "AUTONOMOUS" if len(args) > 2 and str(args[2]).upper().strip() in ["AUTONOMOUS", "AUTO", "SELF", "INDEPENDENT"] else "MASTER_FOLLOW"
+                db.set_capital_user_sync_mode(target_uid, new_m)
+                lbl = "🎯 Autonomous (ជួញដូរដោយឯករាជ្យ ២៤/៧ តាម Citadel)" if new_m == "AUTONOMOUS" else "🚂 Follow Master (ធ្វើសមកាលកម្មតាម Super Admin)"
+                await update.effective_message.reply_text(
+                    f"✅ **[SYNC MODE UPDATED]** ⚙️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👤 **User ID ៖** `{target_uid}`\n"
+                    f"⚙️ **របៀបជួញដូរថ្មី ៖** `{lbl}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🚀 _ប្រព័ន្ធនឹងដំណើរការតាមរបៀបនេះភ្លាមៗ!_",
+                    parse_mode="Markdown"
+                )
                 return
 
             # Command: /admin_capital OFF <chat_id_or_acc_id>
