@@ -31,6 +31,12 @@ from aiohttp import web, WSMsgType
 import pandas as pd
 import numpy as np
 
+# Import AI Girl MC & Quant Host Engine
+try:
+    import gold_ai_mc_engine
+except Exception as e:
+    print(f"⚠️ [YOUTUBE STREAM] gold_ai_mc_engine import note: {e}", flush=True)
+
 # Adjust path for Angkor Quant root imports
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 if ROOT_DIR not in sys.path:
@@ -336,7 +342,64 @@ async def handle_health(request: web.Request) -> web.Response:
 
 async def handle_api_snapshot(request: web.Request) -> web.Response:
     data = await get_live_data_cached()
+    # Check for AI MC events
+    try:
+        if "gold_ai_mc_engine" in sys.modules:
+            mc_event = gold_ai_mc_engine.mc_engine.evaluate_market_events(data)
+            if mc_event:
+                data["mc_speech"] = mc_event
+    except Exception:
+        pass
     return web.json_response(data, dumps=fast_dumps)
+
+
+async def handle_mc_speech(request: web.Request) -> web.Response:
+    """Returns the current or most recent speech payload from AI Anchor Elena."""
+    try:
+        if "gold_ai_mc_engine" in sys.modules:
+            speech = gold_ai_mc_engine.mc_engine.current_speech
+            return web.json_response(speech or {}, dumps=fast_dumps)
+    except Exception:
+        pass
+    return web.json_response({}, dumps=fast_dumps)
+
+
+async def handle_mc_test(request: web.Request) -> web.Response:
+    """Trigger an on-demand test speech from Elena (e.g. ?type=buy or ?type=welcome)."""
+    try:
+        if "gold_ai_mc_engine" in sys.modules:
+            test_type = request.query.get("type", "welcome")
+            now = time.time()
+            if test_type == "buy":
+                text = "Institutional alert! Strong Buy confluence confirmed on Gold at 2,745.50 dollars. Stop loss is anchored at 2,741.00, targeting TP1 for a 2.0R gain."
+                mood = "buy"
+            elif test_type == "sell":
+                text = "Institutional alert! Strong Sell confluence confirmed on Gold at 2,745.50 dollars. Order block rejection confirmed. Stop loss anchored above high."
+                mood = "sell"
+            elif test_type == "tp":
+                text = "Target One reached on Gold M1! Realizing 50% lot cash profit into the vault. Breakeven Armor is now locked at risk zero."
+                mood = "tp"
+            else:
+                text = "Welcome to Angkor Quant Institutional Live. I am Elena, your 24/7 AI Market Anchor. Monitoring Gold M1 order flow and institutional liquidity pools."
+                mood = "brief"
+
+            speech_id = f"test_{int(now)}"
+            audio_url = gold_ai_mc_engine.mc_engine.synthesize_speech(text, speech_id)
+            payload = {
+                "id": speech_id,
+                "text": text,
+                "speaker": "Elena (Senior Quant Analyst)",
+                "mood": mood,
+                "priority": "HIGH",
+                "audio_url": audio_url,
+                "duration_est": max(4.0, len(text) * 0.065),
+                "timestamp": now
+            }
+            gold_ai_mc_engine.mc_engine.current_speech = payload
+            return web.json_response(payload, dumps=fast_dumps)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+    return web.json_response({"status": "no_engine"}, dumps=fast_dumps)
 
 
 async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
@@ -367,6 +430,15 @@ async def broadcast_loop():
             await asyncio.sleep(1.0)
             if _WS_CLIENTS:
                 data = await get_live_data_cached()
+                # Check for AI MC speech events
+                try:
+                    if "gold_ai_mc_engine" in sys.modules:
+                        mc_event = gold_ai_mc_engine.mc_engine.evaluate_market_events(data)
+                        if mc_event:
+                            data["mc_speech"] = mc_event
+                except Exception:
+                    pass
+
                 msg = fast_dumps(data)
                 dead = set()
                 for ws in _WS_CLIENTS:
@@ -411,8 +483,10 @@ def create_app() -> web.Application:
     app.router.add_get("/api/health", handle_health)
     app.router.add_get("/api/gold_m1_live", handle_api_snapshot)
     app.router.add_get("/api/gold_m1_ws", handle_api_ws)
+    app.router.add_get("/api/mc_speech", handle_mc_speech)
+    app.router.add_get("/api/mc_test", handle_mc_test)
 
-    # Audio static files
+    # Audio static files (including audio/mc)
     if os.path.exists(AUDIO_DIR):
         app.router.add_static("/audio", AUDIO_DIR)
     

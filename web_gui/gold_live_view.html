@@ -506,6 +506,211 @@
     .ticker-item span {
       color: #f59e0b;
     }
+
+    /* ========================================================
+       AI GIRL MC (QUANT ANCHOR ELENA) PICTURE-IN-PICTURE (PIP)
+       ======================================================== */
+    #ai-mc-pip {
+      position: absolute;
+      bottom: 40px;
+      right: 75px;
+      width: 340px;
+      height: 280px;
+      background: rgba(10, 15, 26, 0.94);
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      border-radius: 14px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 25;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    #ai-mc-pip.aura-buy {
+      border-color: #10b981 !important;
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.5), inset 0 0 15px rgba(16, 185, 129, 0.2) !important;
+    }
+
+    #ai-mc-pip.aura-sell {
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 35px rgba(239, 68, 68, 0.5), inset 0 0 15px rgba(239, 68, 68, 0.2) !important;
+    }
+
+    #ai-mc-pip.aura-tp {
+      border-color: #f59e0b !important;
+      box-shadow: 0 0 40px rgba(245, 158, 11, 0.6), inset 0 0 20px rgba(245, 158, 11, 0.25) !important;
+    }
+
+    #ai-mc-pip.aura-analysis {
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.4) !important;
+    }
+
+    /* PIP Header */
+    .mc-pip-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: rgba(15, 23, 42, 0.9);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+    }
+
+    .mc-onair-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      color: #ef4444;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .mc-pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+      animation: pulse 1.2s infinite;
+    }
+
+    /* Equalizer Sound Waves */
+    .mc-equalizer {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+      margin-left: 4px;
+    }
+
+    .mc-equalizer span {
+      width: 3px;
+      height: 3px;
+      background: #38bdf8;
+      border-radius: 1px;
+      transition: height 0.1s ease;
+    }
+
+    .mc-equalizer.active span:nth-child(1) { animation: eq-wave 0.4s infinite ease-in-out alternate; }
+    .mc-equalizer.active span:nth-child(2) { animation: eq-wave 0.6s infinite ease-in-out alternate 0.1s; }
+    .mc-equalizer.active span:nth-child(3) { animation: eq-wave 0.5s infinite ease-in-out alternate 0.2s; }
+    .mc-equalizer.active span:nth-child(4) { animation: eq-wave 0.7s infinite ease-in-out alternate 0.05s; }
+
+    @keyframes eq-wave {
+      0% { height: 3px; background: #38bdf8; }
+      100% { height: 12px; background: #10b981; }
+    }
+
+    .mc-anchor-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: #f59e0b;
+      letter-spacing: 0.6px;
+    }
+
+    /* Avatar Studio Stage */
+    .mc-avatar-stage {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #152238 0%, #070c18 85%);
+      overflow: hidden;
+    }
+
+    .mc-studio-ambient {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 140px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.15), transparent 70%);
+      pointer-events: none;
+    }
+
+    /* SVG Character Animation */
+    .mc-character-svg {
+      width: 175px;
+      height: 175px;
+      animation: anchor-breathe 3.5s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+
+    @keyframes anchor-breathe {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
+    /* Blinking eyes */
+    .mc-eye-lid {
+      animation: natural-blink 4.2s infinite;
+      transform-origin: 50% 50%;
+    }
+
+    @keyframes natural-blink {
+      0%, 93%, 100% { transform: scaleY(1); }
+      96% { transform: scaleY(0.08); }
+    }
+
+    /* Lip-Sync Mouth */
+    .mc-mouth {
+      transform-origin: 50% 50%;
+      transition: transform 0.08s ease;
+    }
+
+    .talking .mc-mouth {
+      animation: lip-talk 0.28s infinite alternate ease-in-out;
+    }
+
+    @keyframes lip-talk {
+      0% { transform: scaleY(0.2) scaleX(1); }
+      30% { transform: scaleY(0.8) scaleX(0.95); }
+      60% { transform: scaleY(1.3) scaleX(0.88); }
+      100% { transform: scaleY(0.4) scaleX(1.05); }
+    }
+
+    /* Closed Caption Subtitle Bar */
+    .mc-caption-bar {
+      min-height: 56px;
+      max-height: 56px;
+      background: rgba(5, 8, 15, 0.96);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 6px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .mc-caption-tag {
+      font-size: 9px;
+      font-weight: 700;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 2px;
+      letter-spacing: 0.5px;
+    }
+
+    .mc-caption-text {
+      font-size: 11px;
+      font-weight: 500;
+      color: #f1f5f9;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
   </style>
 </head>
 
@@ -564,6 +769,134 @@
         </div>
       </div>
       <div id="chart-container"></div>
+
+      <!-- AI GIRL MC PICTURE-IN-PICTURE (PIP) CARD -->
+      <div id="ai-mc-pip" class="aura-normal">
+        <div class="mc-pip-header">
+          <div class="mc-onair-badge">
+            <div class="mc-pulse-dot"></div>
+            <span id="mc-status-text">ON AIR</span>
+            <div class="mc-equalizer" id="mc-equalizer">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="mc-anchor-title mono">ELENA • QUANT HOST</div>
+        </div>
+
+        <div class="mc-avatar-stage" id="mc-stage">
+          <div class="mc-studio-ambient"></div>
+          
+          <!-- Realistic 3D Wall Street News Anchor SVG -->
+          <svg class="mc-character-svg" id="mc-avatar-svg" viewBox="0 0 200 200">
+            <defs>
+              <linearGradient id="skin" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#fed7aa"/>
+                <stop offset="60%" stop-color="#fbd38d"/>
+                <stop offset="100%" stop-color="#f6ad55"/>
+              </linearGradient>
+              <linearGradient id="blazer" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b"/>
+                <stop offset="70%" stop-color="#0f172a"/>
+                <stop offset="100%" stop-color="#090d16"/>
+              </linearGradient>
+              <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#fbbf24"/>
+                <stop offset="50%" stop-color="#f59e0b"/>
+                <stop offset="100%" stop-color="#d97706"/>
+              </linearGradient>
+              <linearGradient id="hair" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#262626"/>
+                <stop offset="40%" stop-color="#404040"/>
+                <stop offset="100%" stop-color="#171717"/>
+              </linearGradient>
+              <filter id="mic-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2" result="blur"/>
+                <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+              </filter>
+            </defs>
+
+            <!-- Back Hair Layer -->
+            <path d="M 50 100 C 45 45, 155 45, 150 100 C 150 140, 155 160, 160 180 L 40 180 C 45 160, 50 140, 50 100 Z" fill="url(#hair)"/>
+
+            <!-- Corporate Blazer & Shoulders -->
+            <path d="M 20 200 L 45 140 L 75 145 L 85 170 L 100 178 L 115 170 L 125 145 L 155 140 L 180 200 Z" fill="url(#blazer)"/>
+            <!-- Gold Satin Lapels -->
+            <path d="M 45 140 L 85 170 L 78 145 Z" fill="url(#gold)"/>
+            <path d="M 155 140 L 115 170 L 122 145 Z" fill="url(#gold)"/>
+            <!-- Inner Silk Blouse V-Neck -->
+            <path d="M 85 145 L 100 168 L 115 145 Z" fill="#f8fafc"/>
+            <!-- Gold AQ Pin -->
+            <circle cx="58" cy="155" r="4.5" fill="url(#gold)"/>
+            <text x="58" y="157" font-size="4" font-weight="900" fill="#090d16" text-anchor="middle" font-family="'JetBrains Mono'">AQ</text>
+
+            <!-- Neck -->
+            <path d="M 86 115 L 86 148 L 114 148 L 114 115 Z" fill="url(#skin)"/>
+            <path d="M 86 130 C 95 138, 105 138, 114 130 L 114 145 L 86 145 Z" fill="rgba(0,0,0,0.12)"/>
+
+            <!-- Head / Face -->
+            <path d="M 68 85 C 68 50, 132 50, 132 85 C 132 115, 118 135, 100 135 C 82 135, 68 115, 68 85 Z" fill="url(#skin)"/>
+
+            <!-- Refined Hair Front / Bangs -->
+            <path d="M 65 78 C 72 45, 128 45, 135 78 C 125 60, 108 58, 100 68 C 92 58, 75 60, 65 78 Z" fill="url(#hair)"/>
+            <path d="M 65 78 C 62 100, 68 125, 74 135 C 70 120, 68 95, 72 82 Z" fill="#262626"/>
+            <path d="M 135 78 C 138 100, 132 125, 126 135 C 130 120, 132 95, 128 82 Z" fill="#262626"/>
+
+            <!-- Eyebrows -->
+            <path d="M 76 78 C 82 76, 88 77, 92 80" stroke="#3d2c1d" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M 124 78 C 118 76, 112 77, 108 80" stroke="#3d2c1d" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+            <!-- Left Eye (with blink animation) -->
+            <g class="mc-eye-lid" style="transform-origin: 84px 86px;">
+              <ellipse cx="84" cy="86" rx="5.5" ry="3.5" fill="#f8fafc"/>
+              <circle cx="84" cy="86" r="2.8" fill="#3b2b1d"/>
+              <circle cx="84" cy="86" r="1.3" fill="#0f172a"/>
+              <circle cx="85.2" cy="84.8" r="0.9" fill="#ffffff"/>
+            </g>
+
+            <!-- Right Eye (with blink animation) -->
+            <g class="mc-eye-lid" style="transform-origin: 116px 86px;">
+              <ellipse cx="116" cy="86" rx="5.5" ry="3.5" fill="#f8fafc"/>
+              <circle cx="116" cy="86" r="2.8" fill="#3b2b1d"/>
+              <circle cx="116" cy="86" r="1.3" fill="#0f172a"/>
+              <circle cx="117.2" cy="84.8" r="0.9" fill="#ffffff"/>
+            </g>
+
+            <!-- Nose -->
+            <path d="M 100 84 L 98 101 L 102 101" stroke="#e29b63" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+
+            <!-- Reactive Lip-Sync Mouth -->
+            <g id="mc-mouth-group" class="mc-mouth" style="transform-origin: 100px 114px;">
+              <!-- Lips resting state -->
+              <path id="mc-lip-base" d="M 91 113 C 95 111, 105 111, 109 113 C 105 117, 95 117, 91 113 Z" fill="#e11d48"/>
+              <!-- Inner mouth cavity (opens when talking) -->
+              <ellipse id="mc-mouth-cavity" cx="100" cy="114" rx="4.5" ry="2" fill="#4c0519"/>
+            </g>
+
+            <!-- Studio Broadcast Headset -->
+            <!-- Headband -->
+            <path d="M 66 82 C 64 42, 136 42, 134 82" stroke="#0f172a" stroke-width="4" stroke-linecap="round" fill="none"/>
+            <!-- Gold Earpieces -->
+            <rect x="61" y="76" width="6" height="15" rx="3" fill="url(#gold)"/>
+            <rect x="133" y="76" width="6" height="15" rx="3" fill="url(#gold)"/>
+            <!-- Boom Mic -->
+            <path d="M 64 88 C 66 112, 85 118, 93 117" stroke="#334155" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <circle cx="94" cy="117" r="2.5" fill="#0f172a"/>
+            <!-- Glowing Cyan Mic Indicator LED -->
+            <circle cx="94.5" cy="116.5" r="1.2" fill="#38bdf8" filter="url(#mic-glow)"/>
+          </svg>
+        </div>
+
+        <!-- Subtitles / Closed Caption -->
+        <div class="mc-caption-bar">
+          <div class="mc-caption-tag">
+            <span style="color:#f59e0b;">🎙️ ELENA</span>
+            <span id="mc-caption-mood" style="color:#64748b; font-size:10px;">• ORDER FLOW RADAR</span>
+          </div>
+          <div class="mc-caption-text mono" id="mc-caption-text">
+            "Monitoring Gold M1 order flow & institutional liquidity pools..."
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- RIGHT SIDEBAR HUD -->
@@ -1002,6 +1335,11 @@
       document.getElementById('smc-obs').innerText = smc.order_blocks_summary || "1 Bullish OB";
       document.getElementById('smc-fvgs').innerText = smc.fvg_summary || "1 Imbalance Retest";
       document.getElementById('smc-sweep').innerText = smc.sweep_summary || "Neutral Boundaries";
+
+      // Check for AI MC speech
+      if (data.mc_speech) {
+        enqueueMCSpeech(data.mc_speech);
+      }
     }
 
     // ----------------------------------------------------
@@ -1039,6 +1377,145 @@
         console.warn("WebSocket fallback to HTTP polling:", err);
       }
     }
+
+    // ----------------------------------------------------
+    // 6. AI GIRL MC (QUANT ANCHOR ELENA) CONTROLLER
+    // ----------------------------------------------------
+    const mcSpeechQueue = [];
+    let isMCSpeaking = false;
+    const playedSpeechIds = new Set();
+    let speechTimeout = null;
+
+    function enqueueMCSpeech(speech) {
+      if (!speech || !speech.id || playedSpeechIds.has(speech.id)) return;
+      playedSpeechIds.add(speech.id);
+      // High priority signal speeches go straight to the front
+      if (speech.priority === 'HIGH') {
+        mcSpeechQueue.unshift(speech);
+      } else {
+        mcSpeechQueue.push(speech);
+      }
+      if (!isMCSpeaking) {
+        processNextMCSpeech();
+      }
+    }
+
+    function processNextMCSpeech() {
+      if (mcSpeechQueue.length === 0) {
+        isMCSpeaking = false;
+        resetMCIdle();
+        return;
+      }
+
+      isMCSpeaking = true;
+      const speech = mcSpeechQueue.shift();
+      executeMCSpeech(speech);
+    }
+
+    function executeMCSpeech(speech) {
+      const pip = document.getElementById('ai-mc-pip');
+      const stage = document.getElementById('mc-stage');
+      const captionText = document.getElementById('mc-caption-text');
+      const captionMood = document.getElementById('mc-caption-mood');
+      const eq = document.getElementById('mc-equalizer');
+      const statusText = document.getElementById('mc-status-text');
+
+      // 1. Update Aura & Ticker UI
+      if (pip) pip.className = `aura-${speech.mood || 'normal'}`;
+      if (statusText) statusText.innerText = "LIVE BROADCAST";
+      if (captionMood) captionMood.innerText = `• ${String(speech.mood || 'COMMENTARY').toUpperCase()}`;
+      if (captionText) captionText.innerText = `"${speech.text}"`;
+      if (eq) eq.className = 'mc-equalizer active';
+      if (stage) stage.classList.add('talking');
+
+      let audioFinished = false;
+      const endSpeech = () => {
+        if (audioFinished) return;
+        audioFinished = true;
+        if (stage) stage.classList.remove('talking');
+        if (eq) eq.className = 'mc-equalizer';
+        if (statusText) statusText.innerText = "ON AIR";
+        if (pip) pip.className = 'aura-normal';
+
+        // 1.5s pause before processing next speech in queue
+        setTimeout(() => {
+          processNextMCSpeech();
+        }, 1500);
+      };
+
+      // 2. Play Audio via backend MP3 URL or Web Speech API fallback
+      if (speech.audio_url) {
+        const audio = new Audio(speech.audio_url);
+        audio.volume = 1.0;
+        audio.onended = endSpeech;
+        audio.onerror = () => {
+          console.warn("Audio MP3 load error, fallback to Web Speech:", speech.audio_url);
+          fallbackWebSpeech(speech.text, endSpeech);
+        };
+        audio.play().catch(err => {
+          console.warn("Audio autoplay blocked, fallback to Web Speech:", err);
+          fallbackWebSpeech(speech.text, endSpeech);
+        });
+      } else {
+        fallbackWebSpeech(speech.text, endSpeech);
+      }
+
+      // 3. Safety Watchdog Timeout
+      const safeDuration = (speech.duration_est || 6.0) * 1000 + 2000;
+      clearTimeout(speechTimeout);
+      speechTimeout = setTimeout(endSpeech, safeDuration);
+    }
+
+    function fallbackWebSpeech(text, callback) {
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'en-US';
+          u.rate = 1.05;
+          u.pitch = 1.0;
+
+          const voices = window.speechSynthesis.getVoices();
+          const female = voices.find(v => v.lang.startsWith('en') && 
+            (v.name.includes('Female') || v.name.includes('Aria') || v.name.includes('Jenny') || v.name.includes('Zira') || v.name.includes('Google US English')));
+          if (female) u.voice = female;
+
+          u.onend = callback;
+          u.onerror = callback;
+          window.speechSynthesis.speak(u);
+          return;
+        } catch (e) {
+          console.warn("speechSynthesis error:", e);
+        }
+      }
+      setTimeout(callback, 5000);
+    }
+
+    function resetMCIdle() {
+      const pip = document.getElementById('ai-mc-pip');
+      const stage = document.getElementById('mc-stage');
+      const captionText = document.getElementById('mc-caption-text');
+      const captionMood = document.getElementById('mc-caption-mood');
+      const eq = document.getElementById('mc-equalizer');
+      const statusText = document.getElementById('mc-status-text');
+
+      if (pip) pip.className = 'aura-normal';
+      if (stage) stage.classList.remove('talking');
+      if (eq) eq.className = 'mc-equalizer';
+      if (statusText) statusText.innerText = "ON AIR";
+      if (captionMood) captionMood.innerText = "• ORDER FLOW RADAR";
+      if (captionText) captionText.innerText = '"Monitoring Gold M1 order flow & institutional liquidity pools..."';
+    }
+
+    // Trigger initial welcome greeting after 3.5 seconds on live load
+    setTimeout(() => {
+      fetch('/api/mc_test?type=welcome')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.id) enqueueMCSpeech(data);
+        })
+        .catch(() => {});
+    }, 3500);
 
     // Initial load + Polling fallback
     fetchFullSnapshot();
