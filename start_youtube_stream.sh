@@ -66,7 +66,7 @@ echo "🚀 [ANGKOR QUANT] Launching YouTube Live 24/7 Engine..."
 echo "🐍 Python Interpreter: $PYTHON_BIN"
 echo "🌐 Chromium Executable: $CHROMIUM_BIN"
 echo "📡 Target Stream URL: $STREAM_URL"
-mkdir -p logs
+mkdir -p "$SCRIPT_DIR/logs"
 
 # 2. Start PulseAudio Virtual Audio Bus
 pulseaudio --start --exit-idle-time=-1 || true
@@ -78,7 +78,7 @@ fi
 # 3. Start Xvfb Virtual Framebuffer (1920x1080 24-bit TrueColor) on Core 2,3
 if ! pgrep -f "Xvfb :99" > /dev/null; then
     echo "🖥️ Starting Xvfb Virtual Display (:99)..."
-    taskset -c 2,3 Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > logs/xvfb.log 2>&1 &
+    taskset -c 2,3 Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > "$SCRIPT_DIR/logs/xvfb.log" 2>&1 &
     sleep 2
 else
     echo "🖥️ Xvfb Virtual Display (:99) already running."
@@ -91,7 +91,7 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     # Ensure port is released from any zombie process
     fuser -k ${PORT}/tcp 2>/dev/null || true
     sleep 1
-    taskset -c 2,3 $PYTHON_BIN -u gold_youtube_stream_server.py > logs/stream_server.log 2>&1 &
+    taskset -c 2,3 $PYTHON_BIN -u "$SCRIPT_DIR/gold_youtube_stream_server.py" > "$SCRIPT_DIR/logs/stream_server.log" 2>&1 &
     
     # Wait up to 5s for server health endpoint to come up
     for i in {1..5}; do
@@ -104,7 +104,7 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
 
     if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
         echo "⚠️ Gold M1 Stream Server failed to stay alive! Inspecting logs/stream_server.log:"
-        tail -n 15 logs/stream_server.log 2>/dev/null || true
+        tail -n 15 "$SCRIPT_DIR/logs/stream_server.log" 2>/dev/null || true
     fi
 else
     echo "📡 Gold M1 Stream Server already running."
@@ -125,7 +125,7 @@ if ! pgrep -f "$CHROMIUM_BIN.*gold_live_view" > /dev/null && ! pgrep -f "chromiu
         --disable-dev-shm-usage \
         --disable-gpu-sandbox \
         --hide-scrollbars \
-        http://localhost:${PORT}/gold_live_view > logs/chromium.log 2>&1 &
+        http://localhost:${PORT}/gold_live_view > "$SCRIPT_DIR/logs/chromium.log" 2>&1 &
     sleep 4
 else
     echo "🌐 Chromium Kiosk already running."

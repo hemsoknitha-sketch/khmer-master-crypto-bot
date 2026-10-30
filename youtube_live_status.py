@@ -33,9 +33,20 @@ def check_process(name_pattern: str):
             running = name_pattern.lower() in out.lower()
             return running, 1 if running else 0
         else:
-            out = subprocess.check_output(f'pgrep -f "{name_pattern}"', shell=True).decode("utf-8", errors="ignore").strip()
-            pids = [p for p in out.split() if p.strip()]
-            return len(pids) > 0, len(pids)
+            my_pid = os.getpid()
+            out = subprocess.check_output(f'pgrep -f "{name_pattern}" || true', shell=True).decode("utf-8", errors="ignore").strip()
+            raw_pids = [int(p) for p in out.split() if p.strip().isdigit() and int(p) != my_pid]
+            # Exclude pgrep, sh, and status script itself
+            valid_pids = []
+            for pid in raw_pids:
+                try:
+                    with open(f"/proc/{pid}/cmdline", "r", errors="ignore") as f:
+                        cmd = f.read()
+                        if "pgrep" not in cmd and "youtube_live_status" not in cmd and name_pattern in cmd:
+                            valid_pids.append(pid)
+                except Exception:
+                    pass
+            return len(valid_pids) > 0, len(valid_pids)
     except Exception:
         return False, 0
 
