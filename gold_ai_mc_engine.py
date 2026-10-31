@@ -18,6 +18,7 @@ import time
 import json
 import threading
 import subprocess
+import shutil
 from typing import Dict, Any, Optional
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -56,30 +57,102 @@ class GoldAIMCEngine:
                 cls._instance = cls()
             return cls._instance
 
-    def _synthesize_file(self, text: str, filepath: str) -> bool:
+    def _apply_studio_mastering(self, input_path: str, output_path: str) -> bool:
         """
-        Synthesizes text to MP3 using confident human-grade neural voice (en-US-JennyNeural)
-        with seamless gTTS fallback.
+        Applies Institutional TV Broadcast mastering to synthesized voice:
+          - High-pass 80Hz (cuts mic rumble & low-end mud)
+          - Warm low-end 140Hz (+2.2dB for FM radio anchor body)
+          - De-box 450Hz (-1.8dB for crystal clarity)
+          - Broadcast presence 3400Hz (+3.6dB for sharp TV anchor diction)
+          - Air & sheen 10000Hz (+1.8dB for high-frequency studio polish)
+          - Broadcast compressor (levels whisper vs loud words)
+          - Loudnorm targeting EBU R128 (-16 LUFS, YouTube optimal loudness)
         """
-        # Tier 1: Microsoft Edge Neural TTS (Natural, Confident, Human TV Broadcaster Voice)
         try:
-            res = subprocess.run([
-                sys.executable, "-m", "edge_tts",
-                "--voice", "en-US-JennyNeural",
-                "--rate", "+2%",
-                "--text", text,
-                "--write-media", filepath
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=6)
-            if res.returncode == 0 and os.path.exists(filepath) and os.path.getsize(filepath) > 1000:
+            ffmpeg_bin = shutil.which("ffmpeg") or "ffmpeg"
+            filter_chain = (
+                "highpass=f=80,"
+                "equalizer=f=140:width_type=h:width=60:g=2.2,"
+                "equalizer=f=450:width_type=h:width=120:g=-1.8,"
+                "equalizer=f=3400:width_type=h:width=1200:g=3.6,"
+                "equalizer=f=10000:width_type=h:width=3000:g=1.8,"
+                "acompressor=threshold=-15dB:ratio=3:attack=10:release=120:makeup=2,"
+                "loudnorm=I=-16:TP=-1.5:LRA=7"
+            )
+            cmd = [
+                ffmpeg_bin, "-y",
+                "-i", input_path,
+                "-af", filter_chain,
+                "-ar", "48000",
+                "-b:a", "192k",
+                output_path
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=8)
+            if res.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                 return True
         except Exception:
             pass
+        return False
+
+    def _synthesize_file(self, text: str, filepath: str) -> bool:
+        """
+        Synthesizes text to MP3 using confident human-grade neural voice (en-US-AvaNeural / en-US-AriaNeural)
+        with Studio Vocal Presence Mastering and seamless gTTS fallback.
+        """
+        # Primary: en-US-AvaNeural (youthful, radiant, confident 18-20y TV host)
+        # Alternate: en-US-AriaNeural (formal Wall Street financial reporter)
+        primary_voice = os.environ.get("ELENA_VOICE", "en-US-AvaNeural")
+        candidate_voices = [primary_voice, "en-US-AvaNeural", "en-US-AriaNeural", "en-US-JennyNeural"]
+        candidate_voices = list(dict.fromkeys(candidate_voices))
+
+        raw_filepath = filepath + ".raw.mp3"
+
+        # Tier 1: Microsoft Edge Neural TTS with candidate fallback
+        for voice in candidate_voices:
+            try:
+                res = subprocess.run([
+                    sys.executable, "-m", "edge_tts",
+                    "--voice", voice,
+                    "--rate", "+1%",
+                    "--pitch", "+0Hz",
+                    "--text", text,
+                    "--write-media", raw_filepath
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=8)
+                if res.returncode == 0 and os.path.exists(raw_filepath) and os.path.getsize(raw_filepath) > 1000:
+                    # Apply Studio Broadcast Mastering
+                    if self._apply_studio_mastering(raw_filepath, filepath):
+                        try:
+                            os.remove(raw_filepath)
+                        except Exception:
+                            pass
+                        return True
+                    else:
+                        # Fallback: keep raw output directly if ffmpeg is unavailable
+                        if os.path.exists(filepath):
+                            try:
+                                os.remove(filepath)
+                            except Exception:
+                                pass
+                        os.replace(raw_filepath, filepath)
+                        return True
+            except Exception:
+                pass
+            finally:
+                if os.path.exists(raw_filepath):
+                    try:
+                        os.remove(raw_filepath)
+                    except Exception:
+                        pass
 
         # Tier 2: Google Neural TTS Fallback
         if GTTS_AVAILABLE:
             try:
                 tts = gTTS(text=text, lang="en", tld="us")
                 tts.save(filepath)
+                # Try mastering even on fallback
+                mastered_fb = filepath + ".mastered.mp3"
+                if self._apply_studio_mastering(filepath, mastered_fb):
+                    os.replace(mastered_fb, filepath)
                 return True
             except Exception as e:
                 print(f"[AI MC] TTS fallback note for {os.path.basename(filepath)}: {e}", flush=True)
@@ -87,8 +160,17 @@ class GoldAIMCEngine:
         return False
 
     def _precache_standard_alerts(self):
-        """Generates standard alert audio files in background thread if not present."""
+        """Generates standard alert audio files in background thread with AvaNeural & Studio Mastering."""
         def _worker():
+            version_file = os.path.join(AUDIO_MC_DIR, ".voice_version")
+            current_ver = "v2_ava_studio_mastered"
+            force_regen = False
+            try:
+                if not os.path.exists(version_file) or open(version_file).read().strip() != current_ver:
+                    force_regen = True
+            except Exception:
+                force_regen = True
+
             templates = {
                 "welcome.mp3": "Welcome to Angkor Quant Institutional Live. I am Elena, your eighteen-year-old market anchor. Monitoring Gold M5 sniper order flow.",
                 "be_armor.mp3": "Notice. Breakeven Armor is now engaged. Stop loss has moved to entry plus spread. Trade is officially risk free.",
@@ -97,8 +179,14 @@ class GoldAIMCEngine:
             }
             for filename, text in templates.items():
                 filepath = os.path.join(AUDIO_MC_DIR, filename)
-                if not os.path.exists(filepath) or os.path.getsize(filepath) < 1000:
+                if force_regen or not os.path.exists(filepath) or os.path.getsize(filepath) < 1000:
                     self._synthesize_file(text, filepath)
+
+            try:
+                with open(version_file, "w") as f:
+                    f.write(current_ver)
+            except Exception:
+                pass
 
         threading.Thread(target=_worker, daemon=True).start()
 

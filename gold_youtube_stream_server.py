@@ -466,6 +466,17 @@ async def handle_lightweight_charts(request: web.Request) -> web.FileResponse:
     resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp
 
+
+async def handle_elena_avatar(request: web.Request) -> web.Response:
+    avatar_path = os.path.join(STATIC_DIR, "elena_avatar.jpg")
+    if not os.path.exists(avatar_path):
+        avatar_path = os.path.join(ROOT_DIR, "Guant.JPG")
+    if os.path.exists(avatar_path):
+        resp = web.FileResponse(avatar_path)
+        resp.headers["Cache-Control"] = "public, max-age=86400"
+        return resp
+    return web.Response(status=404, text="Avatar not found")
+
 async def handle_live_view(request: web.Request) -> web.FileResponse:
     html_path = os.path.join(STATIC_DIR, "gold_live_view.html")
     resp = web.FileResponse(html_path)
@@ -727,6 +738,7 @@ def create_app() -> web.Application:
     app.router.add_get("/", handle_live_view)
     app.router.add_get("/gold_live_view", handle_live_view)
     app.router.add_get("/lightweight-charts.standalone.production.js", handle_lightweight_charts)
+    app.router.add_get("/elena_avatar.jpg", handle_elena_avatar)
     app.router.add_get("/api/health", handle_health)
     app.router.add_get("/api/gold_m5_live", handle_api_snapshot)
     app.router.add_get("/api/gold_m5_ws", handle_api_ws)
