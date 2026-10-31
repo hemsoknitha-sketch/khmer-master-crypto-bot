@@ -1402,22 +1402,23 @@
         if (data.candles && data.candles.length > 0) {
           if (isInitialLoad) {
             candleSeries.setData(data.candles);
-
-            // Calculate initial EMAs
-            const ema20Data = calculateEMA(data.candles, 20);
-            const ema50Data = calculateEMA(data.candles, 50);
-            const ema200Data = calculateEMA(data.candles, 200);
-            ema20Series.setData(ema20Data);
-            ema50Series.setData(ema50Data);
-            ema200Series.setData(ema200Data);
-
+            updateEMAs(data.candles);
             chart.timeScale().fitContent();
+            chart.timeScale().scrollToRealTime();
             isInitialLoad = false;
           } else {
-            // Smoothly update the active forming candle without clearing chart history
-            const lastCandle = data.candles[data.candles.length - 1];
+            // Synchronize last closed bar and current forming bar
+            const len = data.candles.length;
+            if (len >= 2) {
+              const prevBar = data.candles[len - 2];
+              prevBar.time = Math.floor(Number(prevBar.time));
+              candleSeries.update(prevBar);
+            }
+            const lastCandle = data.candles[len - 1];
             lastCandle.time = Math.floor(Number(lastCandle.time));
             candleSeries.update(lastCandle);
+            updateEMAs(data.candles);
+            chart.timeScale().scrollToRealTime();
           }
         }
 
@@ -1429,7 +1430,7 @@
     }
 
     function calculateEMA(candles, period) {
-      if (candles.length < period) return [];
+      if (!candles || candles.length < period) return [];
       const k = 2 / (period + 1);
       const emaData = [];
       let prevEma = candles[0].close;
@@ -1442,10 +1443,24 @@
           prevEma = c.close * k + prevEma * (1 - k);
         }
         if (i >= period - 1) {
-          emaData.push({ time: c.time, value: prevEma });
+          emaData.push({ time: Math.floor(Number(c.time)), value: prevEma });
         }
       }
       return emaData;
+    }
+
+    function updateEMAs(candles) {
+      if (!candles || candles.length < 20) return;
+      try {
+        const ema20Data = calculateEMA(candles, 20);
+        const ema50Data = calculateEMA(candles, 50);
+        const ema200Data = calculateEMA(candles, 200);
+        if (ema20Series && ema20Data.length > 0) ema20Series.setData(ema20Data);
+        if (ema50Series && ema50Data.length > 0) ema50Series.setData(ema50Data);
+        if (ema200Series && ema200Data.length > 0) ema200Series.setData(ema200Data);
+      } catch (err) {
+        console.warn("EMA update note:", err);
+      }
     }
 
     function updateHUD(data) {
@@ -1601,6 +1616,7 @@
               if (data.candle && candleSeries) {
                 data.candle.time = Math.floor(Number(data.candle.time));
                 candleSeries.update(data.candle);
+                chart.timeScale().scrollToRealTime();
               }
               updateLivePriceTick(Number(data.current_price), Number(data.prev_price), Number(data.spread));
               return;
@@ -1610,22 +1626,28 @@
             if (data.candles && data.candles.length > 0 && candleSeries) {
               if (isInitialLoad) {
                 candleSeries.setData(data.candles);
-                const ema20Data = calculateEMA(data.candles, 20);
-                const ema50Data = calculateEMA(data.candles, 50);
-                const ema200Data = calculateEMA(data.candles, 200);
-                ema20Series.setData(ema20Data);
-                ema50Series.setData(ema50Data);
-                ema200Series.setData(ema200Data);
+                updateEMAs(data.candles);
                 chart.timeScale().fitContent();
+                chart.timeScale().scrollToRealTime();
                 isInitialLoad = false;
               } else {
-                const lastBar = data.candles[data.candles.length - 1];
+                // Synchronize last closed bar and current forming bar
+                const len = data.candles.length;
+                if (len >= 2) {
+                  const prevBar = data.candles[len - 2];
+                  prevBar.time = Math.floor(Number(prevBar.time));
+                  candleSeries.update(prevBar);
+                }
+                const lastBar = data.candles[len - 1];
                 lastBar.time = Math.floor(Number(lastBar.time));
                 candleSeries.update(lastBar);
+                updateEMAs(data.candles);
+                chart.timeScale().scrollToRealTime();
               }
             } else if (data.candle && candleSeries) {
               data.candle.time = Math.floor(Number(data.candle.time));
               candleSeries.update(data.candle);
+              chart.timeScale().scrollToRealTime();
             }
             updateHUD(data);
           } catch (e) {
