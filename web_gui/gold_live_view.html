@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>ANGKOR QUANT | INSTITUTIONAL GOLD XAUUSD M5 LIVE 24/7</title>
-  <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -25,13 +25,41 @@
     }
 
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
+      width: 100vw;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
       background: #06090e;
       color: #f1f5f9;
       font-family: 'Inter', -apple-system, sans-serif;
       user-select: none;
+    }
+
+    body.is-embedded {
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body.is-embedded header {
+      height: 48px;
+      padding: 0 16px;
+    }
+
+    body.is-embedded footer,
+    body.is-embedded #sidebar,
+    body.is-embedded #ai-mc-pip {
+      display: none !important;
+    }
+
+    body.is-embedded #dashboard {
+      grid-template-columns: 1fr !important;
+      grid-template-rows: 48px 1fr !important;
+      width: 100% !important;
+      height: 100% !important;
     }
 
     .mono {
@@ -42,12 +70,35 @@
     #dashboard {
       display: grid;
       grid-template-rows: 72px 1fr 38px;
-      grid-template-columns: 1410px 510px;
-      width: 1920px;
-      height: 1080px;
+      grid-template-columns: minmax(0, 1fr) 480px;
+      width: 100vw;
+      height: 100vh;
       background: radial-gradient(circle at 15% 20%, rgba(20, 30, 48, 0.45), transparent 45%),
         radial-gradient(circle at 85% 80%, rgba(13, 20, 33, 0.6), transparent 50%),
         #070a10;
+    }
+
+    @media (max-width: 1200px) {
+      #dashboard {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        height: auto;
+        min-height: 100vh;
+      }
+      #chart-wrapper {
+        height: 60vh !important;
+        min-height: 400px !important;
+      }
+      #sidebar {
+        max-width: 100% !important;
+        height: auto !important;
+      }
+      header {
+        grid-column: 1 / 2 !important;
+      }
+      footer {
+        grid-column: 1 / 2 !important;
+      }
     }
 
     /* TOP HEADER */
@@ -218,8 +269,10 @@
     /* CHART CONTAINER */
     #chart-wrapper {
       position: relative;
-      width: 1410px;
-      height: 970px;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
       background: #080c14;
       border-right: 1px solid rgba(255, 255, 255, 0.08);
       overflow: hidden;
@@ -278,14 +331,15 @@
 
     /* RIGHT SIDEBAR */
     #sidebar {
-      width: 510px;
-      height: 970px;
+      width: 100%;
+      max-width: 480px;
+      height: 100%;
       background: rgba(10, 14, 23, 0.95);
-      padding: 20px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      overflow-y: hidden;
+      gap: 14px;
+      overflow-y: auto;
     }
 
     .card {
@@ -1165,10 +1219,18 @@
     // ----------------------------------------------------
     // 2. TRADINGVIEW LIGHTWEIGHT CHARTS INITIALIZATION
     // ----------------------------------------------------
+    // Auto detect embedded mode
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('embedded') === 'true' || window.self !== window.top) {
+      document.body.classList.add('is-embedded');
+    }
+
     const chartContainer = document.getElementById('chart-container');
+    const chartW = chartContainer.clientWidth || 1410;
+    const chartH = chartContainer.clientHeight || 970;
     const chart = LightweightCharts.createChart(chartContainer, {
-      width: 1410,
-      height: 970,
+      width: chartW,
+      height: chartH,
       layout: {
         background: { color: '#080c14' },
         textColor: '#94a3b8',
@@ -1194,6 +1256,15 @@
         timeVisible: true,
         secondsVisible: false,
       },
+    });
+
+    window.addEventListener('resize', () => {
+      if (chartContainer && chart) {
+        chart.applyOptions({
+          width: chartContainer.clientWidth,
+          height: chartContainer.clientHeight
+        });
+      }
     });
 
     const candleSeries = chart.addCandlestickSeries({

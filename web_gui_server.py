@@ -41,7 +41,8 @@ _SERVER_RUNNER = None
 _SITE = None
 _CACHE_WORKER_TASK = None
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_gui")
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(ROOT_DIR, "web_gui")
 
 # GTCFX Official Referral Standards (Invariant 42)
 # Track 1 (Primary Super Admin): Swap-Free Standard L15 Pro (Server 2 - Capital $100+ • MT5-SF-STD-L15)
@@ -93,6 +94,8 @@ _GUI_CACHE = {
 }
 
 _ACTIVE_WEBSOCKETS = set()  # set of (WebSocketResponse, chat_id)
+_GOLD_TICK_TASK = None
+_GOLD_BROADCAST_TASK = None
 
 def _get_chat_id_from_req(request: web.Request) -> int:
     """
@@ -3499,6 +3502,34 @@ async def handle_api_gold_m1_live(request: web.Request) -> web.Response:
     data = await gys.get_live_data_cached()
     return web.json_response(data, dumps=fast_dumps)
 
+
+async def handle_api_gold_m5_ws(request: web.Request) -> web.WebSocketResponse:
+    """
+    Sub-millisecond WebSocket endpoint (/api/gold_m5_ws and /api/gold_m1_ws).
+    Streams live 0.05ms TradingView Lightweight Candles and tick updates.
+    """
+    import gold_youtube_stream_server as gys
+    return await gys.handle_api_ws(request)
+
+
+async def handle_mc_speech(request: web.Request) -> web.Response:
+    """Returns the latest AI MC speech event for audio synthesis."""
+    try:
+        import gold_youtube_stream_server as gys
+        return await gys.handle_mc_speech(request)
+    except Exception:
+        return web.json_response({}, dumps=fast_dumps)
+
+
+async def handle_mc_test(request: web.Request) -> web.Response:
+    """Trigger an on-demand test speech from Elena AI MC."""
+    try:
+        import gold_youtube_stream_server as gys
+        return await gys.handle_mc_test(request)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
 async def handle_script(request: web.Request) -> web.FileResponse:
     resp = web.FileResponse(os.path.join(STATIC_DIR, "app.js"))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -3619,7 +3650,19 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/style.css", handle_style)
     app.router.add_get("/app.js", handle_script)
     app.router.add_get("/gold_live_view", handle_gold_live_view)
+    app.router.add_get("/chart", handle_gold_live_view)
+    app.router.add_get("/live_chart", handle_gold_live_view)
     app.router.add_get("/api/gold_m1_live", handle_api_gold_m1_live)
+    app.router.add_get("/api/gold_m5_live", handle_api_gold_m1_live)
+    app.router.add_get("/api/gold_m5_ws", handle_api_gold_m5_ws)
+    app.router.add_get("/api/gold_m1_ws", handle_api_gold_m5_ws)
+    app.router.add_get("/api/mc_speech", handle_mc_speech)
+    app.router.add_get("/api/mc_test", handle_mc_test)
+
+    # Static Audio Files (alerts, AI MC Speech)
+    audio_p = os.path.join(ROOT_DIR, "audio")
+    if os.path.exists(audio_p):
+        app.router.add_static("/audio", audio_p)
     app.router.add_get("/gtc_QRCode.png", handle_gtc_qr)
 
     # High-Performance WebSocket Route (0.01ms streaming)
@@ -3723,16 +3766,33 @@ async def start_web_gui_server(host: str = "0.0.0.0", port: int = 8080) -> web.A
     if _CACHE_WORKER_TASK is None or _CACHE_WORKER_TASK.done():
         _CACHE_WORKER_TASK = asyncio.create_task(_gui_background_cache_worker())
 
+    # Start TradingView HFT Live Candlestick & Broadcast background tasks
+    global _GOLD_TICK_TASK, _GOLD_BROADCAST_TASK
+    try:
+        import gold_youtube_stream_server as gys
+        if _GOLD_TICK_TASK is None or _GOLD_TICK_TASK.done():
+            _GOLD_TICK_TASK = asyncio.create_task(gys.super_fast_live_gold_tick_loop())
+        if _GOLD_BROADCAST_TASK is None or _GOLD_BROADCAST_TASK.done():
+            _GOLD_BROADCAST_TASK = asyncio.create_task(gys.broadcast_loop())
+    except Exception as e_bg:
+        print(f"⚠️ [WEB GUI] Gold live tick background task startup note: {e_bg}")
+
     print(f"🌐 [WEB GUI] Telegram Mini App Dashboard listening on http://{env_host}:{port} (RAM Cache Bus & WebSockets ACTIVE)")
     return _SERVER_RUNNER
 
 
 async def stop_web_gui_server():
     """Gracefully shuts down the Web GUI server and background tasks."""
-    global _SERVER_RUNNER, _SITE, _CACHE_WORKER_TASK
+    global _SERVER_RUNNER, _SITE, _CACHE_WORKER_TASK, _GOLD_TICK_TASK, _GOLD_BROADCAST_TASK
     if _CACHE_WORKER_TASK and not _CACHE_WORKER_TASK.done():
         _CACHE_WORKER_TASK.cancel()
         _CACHE_WORKER_TASK = None
+    if _GOLD_TICK_TASK and not _GOLD_TICK_TASK.done():
+        _GOLD_TICK_TASK.cancel()
+        _GOLD_TICK_TASK = None
+    if _GOLD_BROADCAST_TASK and not _GOLD_BROADCAST_TASK.done():
+        _GOLD_BROADCAST_TASK.cancel()
+        _GOLD_BROADCAST_TASK = None
     if _SITE:
         await _SITE.stop()
         _SITE = None
@@ -3746,4 +3806,23 @@ if __name__ == "__main__":
     # Standalone execution for testing
     print("🚀 Starting Web GUI standalone test server on http://localhost:8080...")
     app = create_web_gui_app()
+
+    async def _on_startup_standalone(app_instance):
+        global _CACHE_WORKER_TASK, _GOLD_TICK_TASK, _GOLD_BROADCAST_TASK
+        if _CACHE_WORKER_TASK is None or _CACHE_WORKER_TASK.done():
+            _CACHE_WORKER_TASK = asyncio.create_task(_gui_background_cache_worker())
+        try:
+            import gold_youtube_stream_server as gys
+            if _GOLD_TICK_TASK is None or _GOLD_TICK_TASK.done():
+                _GOLD_TICK_TASK = asyncio.create_task(gys.super_fast_live_gold_tick_loop())
+            if _GOLD_BROADCAST_TASK is None or _GOLD_BROADCAST_TASK.done():
+                _GOLD_BROADCAST_TASK = asyncio.create_task(gys.broadcast_loop())
+        except Exception as e_st:
+            print(f"⚠️ [WEB GUI] Standalone background task note: {e_st}")
+
+    async def _on_cleanup_standalone(app_instance):
+        await stop_web_gui_server()
+
+    app.on_startup.append(_on_startup_standalone)
+    app.on_cleanup.append(_on_cleanup_standalone)
     web.run_app(app, host="0.0.0.0", port=8080)

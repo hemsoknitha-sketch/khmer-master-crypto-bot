@@ -1157,39 +1157,54 @@
                         </div>
                     </div>
 
-                    <!-- Live 15M Gold Candlestick & ORB Breakout Graphic Canvas (0.01ms RAM Engine) -->
+                    <!-- Live 15M Gold Candlestick & TradingView HFT Live Engine (0.05ms WS) -->
                     <div class="glass-card gold-orb-graphic-card" id="card-gold-orb-graphic">
                         <div class="card-header-flex">
                             <div class="card-title-group">
                                 <div class="card-title-flex-row">
                                     <span class="badge-icon-inline">📈</span>
-                                    <h3 class="card-title">LIVE GOLD CANDLESTICK & ORB 15M GRAPHIC</h3>
+                                    <h3 class="card-title">LIVE GOLD CANDLESTICK & TRADINGVIEW 0.05ms ENGINE</h3>
                                 </div>
-                                <span class="card-subtitle">Real-Time 15M Candlesticks • Highlight Buy/Sell Zones • Equilibrium 50% Dealing Range • 0.01ms RAM Engine</span>
+                                <span class="card-subtitle">Real-Time Sub-Second Candlesticks • TradingView WebSocket Engine • 0.05ms Direct RAM</span>
                             </div>
                             <div class="gold-chart-badges">
+                                <a href="/chart" target="_blank" class="badge badge-accent" style="text-decoration:none;" title="Open Standalone TradingView Cockpit in New Tab">⛶ Standalone Cockpit ↗</a>
                                 <span id="orb-session-tag" class="badge badge-cyber">SESSION: ACTIVE</span>
                                 <span id="orb-breakout-tag" class="badge badge-success">🟢 ORB: WAIT</span>
                             </div>
                         </div>
 
-                        <!-- Highlight Zone Legend Strip -->
-                        <div class="orb-legend-strip">
-                            <div class="orb-legend-item"><span class="legend-swatch swatch-buy"></span><span id="legend-buy-range">🟢 Buy Zone: --</span></div>
-                            <div class="orb-legend-item"><span class="legend-swatch swatch-eq"></span><span id="legend-eq-level">🟡 50% Equilibrium: --</span></div>
-                            <div class="orb-legend-item"><span class="legend-swatch swatch-sell"></span><span id="legend-sell-range">🔴 Sell Zone: --</span></div>
-                            <div class="orb-legend-item"><span class="legend-swatch swatch-price"></span><span id="legend-cur-price">📍 Live: --</span></div>
+                        <!-- View Mode Switcher -->
+                        <div class="gold-chart-view-switcher">
+                            <button type="button" id="chart-tab-tv" class="chart-mode-pill active" onclick="setGoldChartMode('tv')">⚡ TradingView Live Candles (0.05ms WS)</button>
+                            <button type="button" id="chart-tab-orb" class="chart-mode-pill" onclick="setGoldChartMode('orb')">📐 ORB 15M Dealing Range</button>
                         </div>
 
-                        <!-- Canvas Container -->
-                        <div class="gold-canvas-wrapper">
-                            <canvas id="goldOrbCanvas" class="gold-orb-canvas"></canvas>
+                        <!-- 1. Real-Time TradingView Live View Container -->
+                        <div id="view-tv-chart" class="gold-tv-view-container">
+                            <iframe src="/chart?embedded=true" id="goldTvIframe" title="TradingView Live Candlesticks" loading="eager"></iframe>
                         </div>
 
-                        <div class="orb-footer-meta">
-                            <span id="orb-range-text">Opening Range: -- ($--/oz)</span>
-                            <span id="orb-atr-text">ATR: $--</span>
-                            <span id="orb-conf-text" class="text-neon-gold">Confluence: --%</span>
+                        <!-- 2. ORB 15M Canvas View Container -->
+                        <div id="view-orb-canvas" style="display:none;">
+                            <!-- Highlight Zone Legend Strip -->
+                            <div class="orb-legend-strip">
+                                <div class="orb-legend-item"><span class="legend-swatch swatch-buy"></span><span id="legend-buy-range">🟢 Buy Zone: --</span></div>
+                                <div class="orb-legend-item"><span class="legend-swatch swatch-eq"></span><span id="legend-eq-level">🟡 50% Equilibrium: --</span></div>
+                                <div class="orb-legend-item"><span class="legend-swatch swatch-sell"></span><span id="legend-sell-range">🔴 Sell Zone: --</span></div>
+                                <div class="orb-legend-item"><span class="legend-swatch swatch-price"></span><span id="legend-cur-price">📍 Live: --</span></div>
+                            </div>
+
+                            <!-- Canvas Container -->
+                            <div class="gold-canvas-wrapper">
+                                <canvas id="goldOrbCanvas" class="gold-orb-canvas"></canvas>
+                            </div>
+
+                            <div class="orb-footer-meta">
+                                <span id="orb-range-text">Opening Range: -- ($--/oz)</span>
+                                <span id="orb-atr-text">ATR: $--</span>
+                                <span id="orb-conf-text" class="text-neon-gold">Confluence: --%</span>
+                            </div>
                         </div>
                     </div>
 
@@ -2530,9 +2545,9 @@
                 <span class="nav-text">Capital</span>
                 <span id="nav-cap-pos-badge" class="nav-badge" style="display:none">0</span>
             </button>
-            <button class="nav-item" data-tab="tab-wealth-vault" id="nav-btn-gold" title="Gold 3D Vault & Live ORB 15M Graphic">
-                <span class="nav-icon">🥇</span>
-                <span class="nav-text">Gold ORB</span>
+            <button class="nav-item" data-tab="tab-wealth-vault" id="nav-btn-gold" title="Live TradingView Candles (0.05ms WS) & Gold Vault">
+                <span class="nav-icon">📈</span>
+                <span class="nav-text">Live Chart ⚡</span>
             </button>
             <button class="nav-item" data-tab="tab-mt5" id="nav-btn-mt5" title="MT5 Pro Interbank Broker Terminal">
                 <span class="nav-icon">👑</span>

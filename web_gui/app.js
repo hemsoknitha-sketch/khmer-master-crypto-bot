@@ -1340,6 +1340,40 @@ async function fetchGoldOrbChart() {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Real-Time TradingView Live Candles / ORB Mode Controller
+// -----------------------------------------------------------------------------
+window.setGoldChartMode = function(mode) {
+    const tvView = document.getElementById('view-tv-chart');
+    const orbView = document.getElementById('view-orb-canvas');
+    const tabTv = document.getElementById('chart-tab-tv');
+    const tabOrb = document.getElementById('chart-tab-orb');
+
+    if (mode === 'tv') {
+        if (tvView) tvView.style.display = 'block';
+        if (orbView) orbView.style.display = 'none';
+        if (tabTv) tabTv.classList.add('active');
+        if (tabOrb) tabOrb.classList.remove('active');
+    } else {
+        if (tvView) tvView.style.display = 'none';
+        if (orbView) orbView.style.display = 'block';
+        if (tabTv) tabTv.classList.remove('active');
+        if (tabOrb) tabOrb.classList.add('active');
+        if (state.goldOrbData) {
+            renderGoldOrbGraphic(state.goldOrbData);
+        }
+    }
+};
+
+window.toggleTradingViewLiveChart = function() {
+    const tvView = document.getElementById('view-tv-chart');
+    if (tvView && tvView.style.display === 'none') {
+        window.setGoldChartMode('tv');
+    } else {
+        window.setGoldChartMode('orb');
+    }
+};
+
 function renderGoldOrbGraphic(data) {
     if (!data) return;
     const canvas = document.getElementById('goldOrbCanvas');
