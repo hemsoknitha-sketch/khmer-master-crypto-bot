@@ -23353,35 +23353,57 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text("✅ <b>បានកំណត់ស្ថានភាព PAMM ឡើងវិញដោយជោគជ័យ!</b>", parse_mode="HTML")
                     return
 
-                # --- 9. DOWNLOAD EA BRIDGE FILE & SETUP GUIDE ---
+                # --- 9. DOWNLOAD EA & GTC PAMM DISK PRESERVATION NOTICE (INVARIANT 105) ---
                 elif sub in ["EA", "DOWNLOAD", "DOWNLOAD_EA"]:
                     ea_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "KhmerMasterCrypto_Bridge.mq5")
                     if not os.path.exists(ea_path):
                         ea_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "KhmerMasterCrypto_Bridge.mq5")
 
+                    if not is_admin_user:
+                        pamm_notice_text = (
+                            f"🛡️ <b>[GTC PAMM MASTER FUND ARCHITECTURE (INVARIANT 105)]</b> 🚀\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"ℹ️ <b>ការប្រើប្រាស់ EA ដាច់ដោយឡែកសម្រាប់គណនីផ្សេងទៀត ត្រូវបានលុបចោលជាស្ថាពរ!</b>\n\n"
+                            f"• <b>មូលហេតុការពារទំហំ Disk ៖</b> ការបង្កើត MT5 Terminal និង EA ដាច់ដោយឡែកសម្រាប់រាល់គណនី ស៊ីទំហំ Disk ច្រើនហួសប្រមាណ (~1.5 GB ក្នុងមួយគណនី) និងបង្កឱ្យមាន Memory Leaks លើ VPS។\n"
+                            f"• <b>ដំណើរការរួមគ្នា ៖</b> យើងដំណើរការតាមរយៈ <b>GTC PAMM Master Account (#52171861)</b> តែមួយគត់លើ Equinix TY3 Tokyo។\n"
+                            f"• <b>Zero Disk & Zero VPS Cost ៖</b> អ្នកវិនិយោគទាំងអស់មិនបាច់ដំឡើង EA, មិនបាច់បើកកុំព្យូទ័រចោល, និងមិនចាំបាច់ជួល VPS ឡើយ — ប្រព័ន្ធគ្រប់គ្រងតាម <b>RAM Virtual Ledger (&lt; 0.0001ms)</b> ស្វ័យប្រវត្ត ១០០%!\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"👉 <b>ចូលរួមបែងចែកដើមទុនជាមួយ Master PAMM ៖</b>\n"
+                            f"• <code>/mt5 ALLOC 100</code> ➔ បែងចែក $100 USD ចូល PAMM\n"
+                            f"• <code>/mt5 DEPOSIT 100</code> ➔ ដាក់ប្រាក់ចូល PAMM Vault\n"
+                            f"• <code>/mt5 PAMM</code> ➔ មើលផ្ទាំងគ្រប់គ្រង Master PAMM\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✨ <i>Angkor Quant — Institutional Quantitative Intelligence</i>"
+                        )
+                        pamm_ea_kb = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("📊 ផ្ទាំងគ្រប់គ្រង PAMM", callback_data="btn_mt5_pamm_refresh")],
+                            [InlineKeyboardButton("🌐 ចុះឈ្មោះ GTC PAMM", url=getattr(gtc_pamm_engine, "GTC_PAMM_REFERRAL_URL", "https://web.mygtc.app/login/register?ref=LnZZcHxY"))],
+                            [InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")]
+                        ])
+                        try:
+                            await update.effective_message.reply_text(pamm_notice_text, parse_mode="HTML", reply_markup=pamm_ea_kb)
+                        except Exception:
+                            clean_text = re.sub(r'<[^>]+>', '', pamm_notice_text)
+                            await update.effective_message.reply_text(clean_text, reply_markup=pamm_ea_kb)
+                        return
+
+                    # Super Admin exclusive Master EA bridge
                     vps_ip = os.getenv("MT5_PUBLIC_IP", "34.153.209.188")
                     guide_text = (
-                        f"📥 <b>[ANGKOR QUANT - MT5 BRIDGE EA V13.0]</b> 🚀\n"
+                        f"🛡️ <b>[SUPER ADMIN MASTER PAMM EA — #52171861 ONLY]</b> 🚀\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🏛️ <b>សម្រាប់ដោតលើ MT5 ផ្ទាល់ខ្លួន (PC / Laptop / VPS)</b>\n"
+                        f"🏛️ <b>Master PAMM Terminal Gateway (Server: GTCGlobalSA-Server 2)</b>\n"
                         f"⚡ <b>Zero DLL Direct Socket (&lt; 0.5ms HFT Bridge)</b>\n"
+                        f"🔒 <i>All client/secondary account EAs have been pruned to prevent VPS disk bloat.</i>\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
-                        f"⚙️ <b>ការកំណត់ក្នុង EA Settings (Inputs) ៖</b>\n"
+                        f"⚙️ <b>Master EA Inputs ៖</b>\n"
                         f"• <code>InpHost</code> ៖ <code>{vps_ip}</code> (Cloud Swarm IP)\n"
                         f"• <code>InpPort</code> ៖ <code>5555</code> (TCP Bridge Port)\n"
                         f"• <code>InpSecretKey</code> ៖ <code>KhmerMasterCrypto_PropBridge_Fortress_2026</code>\n"
-                        f"{ui_standards.DIVIDER_DOUBLE}\n"
-                        f"📖 <b>ការណែនាំដំឡើងជា ៤ ជំហានងាយៗ ៖</b>\n"
-                        f"1️⃣ ចម្លងឯកសារ <code>.mq5</code> នេះ ទៅដាក់ក្នុង Folder ៖\n"
-                        f"   <code>File</code> ➔ <code>Open Data Folder</code> ➔ <code>MQL5</code> ➔ <code>Experts</code>\n"
-                        f"2️⃣ ក្នុង MT5 Navigator ចុចកណ្ដុរស្ដាំលើ Experts ជ្រើសរើស <b>Refresh</b>\n"
-                        f"3️⃣ ទាញ EA ដាក់លើក្រាហ្វិកមាស (<code>XAUUSD</code>) ឬរូបិយប័ណ្ណណាមួយ\n"
-                        f"4️⃣ ចុចបើកប៊ូតុង <b>Algo Trading</b> (ពណ៌បៃតង) លើរបារខាងលើ MT5!\n"
-                        f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"✨ <i>ពេលភ្ជាប់ជោគជ័យ HUD Dashboard ពណ៌ខៀវ Neon នឹងលោតលើក្រាហ្វិក MT5 ភ្លាម!</i>"
+                        f"{ui_standards.DIVIDER_HEAVY}"
                     )
                     ea_kb = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔗 ភ្ជាប់គណនីផ្ទាល់ខ្លួន (Bind)", callback_data="btn_mt5_bind_guide")],
+                        [InlineKeyboardButton("📊 Master PAMM UI", callback_data="btn_mt5_pamm_refresh")],
                         [InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")]
                     ])
                     if os.path.exists(ea_path):

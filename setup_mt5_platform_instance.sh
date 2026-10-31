@@ -1,12 +1,11 @@
 #!/bin/bash
 # ==============================================================================
-# 🏛️ KHMER MASTER CRYPTO / APEX SUPER BRAIN AI
-# DUAL-INSTANCE MT5 SETUP SCRIPT FOR GOOGLE CLOUD LINUX VPS (EQUINIX TOKYO TY3)
+# ANGKOR QUANT / APEX SUPER BRAIN AI
+# SINGLE MASTER GTC PAMM MT5 SETUP SCRIPT FOR LINUX VPS (INVARIANT 105)
 # ==============================================================================
-# Instance 1: #52171861 (Super Admin Master PAMM MT5 Terminal 24/7)
-# Instance 2: #52133938 (Legacy Admin / Treasury Terminal)
-# Mode: Native Portable Isolation (/portable) via Wine on Ubuntu/Debian
-# Memory Impact: ~120 MB RAM (Well within 16 GB RAM VPS limit)
+# Master Account: #52171861 (GTC PAMM Master Gateway on GTCGlobalSA-Server 2)
+# Architecture: Single Consolidated Terminal | Zero-Disk / Zero-Resource Client Ledgers
+# Memory & Disk Impact: Clamped to single instance (~1.2 GB disk, ~120 MB RAM)
 # ==============================================================================
 
 set -e
@@ -19,50 +18,76 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${CYAN}==============================================================================${NC}"
-echo -e "${BOLD}${GREEN}   🏛️ KHMER MASTER CRYPTO — SUPER ADMIN MT5 CONFIGURATOR 🏛️${NC}"
-echo -e "${YELLOW}   Super Admin PAMM MT5: #52171861 | Server: GTCGlobalSA-Server 2${NC}"
+echo -e "${BOLD}${GREEN}   🛡️ ANGKOR QUANT — GTC PAMM SINGLE MASTER MT5 SETUP 🛡️${NC}"
+echo -e "${YELLOW}   Configuring Master PAMM Terminal #52171861 (Zero Disk Bloat)${NC}"
 echo -e "${CYAN}==============================================================================${NC}"
 
 TARGET_USER="${SUDO_USER:-$USER}"
 TARGET_HOME=$(eval echo "~$TARGET_USER")
 WORKSPACE_DIR="/opt/khmer-master-crypto-bot"
-MT5_ORIGINAL="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5"
-MT5_PLATFORM="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"
+WINE_PROGRAMS="$TARGET_HOME/.wine/drive_c/Program Files"
+MT5_ORIGINAL="$WINE_PROGRAMS/MetaTrader 5"
+MT5_PLATFORM="$WINE_PROGRAMS/MetaTrader 5_Platform"
 DESKTOP_DIR="$TARGET_HOME/Desktop"
 
-if [ ! -d "$MT5_ORIGINAL" ]; then
-    echo -e "${RED}❌ MetaTrader 5 base installation not found at: $MT5_ORIGINAL${NC}"
-    echo -e "${YELLOW}👉 Please make sure MetaTrader 5 is installed first via install_mt5_linux_vps.sh${NC}"
+# 1. Consolidate to single master directory without duplicating 1.5 GB
+if [ -d "$MT5_PLATFORM" ] && [ -d "$MT5_ORIGINAL" ]; then
+    echo -e "${YELLOW}ℹ️ Both MetaTrader 5 and MetaTrader 5_Platform found.${NC}"
+    echo -e "${YELLOW}🧹 Removing redundant base folder to reclaim ~1.5 GB disk space...${NC}"
+    rm -rf "$MT5_ORIGINAL"
+    echo -e "${GREEN}✅ Reclaimed ~1.5 GB! Using MetaTrader 5_Platform as single master.${NC}"
+elif [ ! -d "$MT5_PLATFORM" ] && [ -d "$MT5_ORIGINAL" ]; then
+    echo -e "${CYAN}Renaming MetaTrader 5 to MetaTrader 5_Platform for canonical consistency...${NC}"
+    mv "$MT5_ORIGINAL" "$MT5_PLATFORM"
+elif [ ! -d "$MT5_PLATFORM" ]; then
+    echo -e "${RED}❌ MetaTrader 5 base installation not found at: $MT5_PLATFORM${NC}"
+    echo -e "${YELLOW}Please install MetaTrader 5 first via install_mt5_linux_vps.sh${NC}"
     exit 1
 fi
 
-echo -e "👤 Target User: ${BOLD}${CYAN}$TARGET_USER${NC}"
-echo -e "📁 MT5 Instance 1 (Admin):    ${CYAN}$MT5_ORIGINAL${NC}"
-echo -e "📁 MT5 Instance 2 (Platform): ${CYAN}$MT5_PLATFORM${NC}"
-echo ""
+# 2. Prune all other cloned account directories to save disk space
+echo -e "${YELLOW}🧹 Pruning all non-PAMM account instances...${NC}"
+for DIR in "$WINE_PROGRAMS/MetaTrader 5_"*; do
+    if [ -d "$DIR" ] && [ "$DIR" != "$MT5_PLATFORM" ]; then
+        echo -e "   ${RED}🗑️ Purging non-PAMM directory: $(basename "$DIR")...${NC}"
+        pkill -9 -f "$DIR.*terminal64.exe" 2>/dev/null || true
+        rm -rf "$DIR"
+    fi
+done
 
-# 1. Duplicate MT5 base folder for Instance 2 (Platform Account 52171861)
-if [ ! -d "$MT5_PLATFORM" ]; then
-    echo -e "${YELLOW}📦 Creating isolated directory for Platform MT5 Instance...${NC}"
-    cp -r "$MT5_ORIGINAL" "$MT5_PLATFORM"
-    chown -R "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM"
-    echo -e "${GREEN}✅ Cloned MetaTrader 5 into MetaTrader 5_Platform successfully!${NC}"
-else
-    echo -e "${GREEN}✅ Platform MT5 directory already exists at: $MT5_PLATFORM${NC}"
-fi
-
-# 2. Reset saved account data for Instance 2 so it does not auto-login to Admin account 52133938
+# 3. Configure startup.ini for Master PAMM Account #52171861
 rm -f "$MT5_PLATFORM/config/accounts.dat"
 cat << EOF > "$MT5_PLATFORM/startup.ini"
 [Common]
 Login=52171861
 Server=GTCGlobalSA-Server 2
+
+[StartUp]
+Expert=KhmerMasterCrypto_Bridge
+Symbol=XAUUSD
+Period=M15
+
+[Experts]
+AllowDllImport=1
+Enabled=1
+Account=1
+Profile=Default
+WebRequest=1
+WebRequestUrl=http://127.0.0.1;http://127.0.0.1:5555;http://localhost;127.0.0.1;127.0.0.1:5555
+
+[Chart]
+Symbol=XAUUSD
+Period=M15
+Expert=KhmerMasterCrypto_Bridge
 EOF
+
+mkdir -p "$MT5_PLATFORM/config"
+cp -f "$MT5_PLATFORM/startup.ini" "$MT5_PLATFORM/config/startup.ini"
 chown -R "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM"
 chmod -R 775 "$MT5_PLATFORM"
-echo -e "${GREEN}✅ Configured startup.ini & fixed permissions for Platform Account #52171861!${NC}"
+echo -e "${GREEN}✅ Configured startup.ini & fixed permissions for Master PAMM #52171861!${NC}"
 
-# 3. Stage KhmerMasterCrypto_Bridge.mq5 into Instance 2 Experts folder
+# 4. Stage KhmerMasterCrypto_Bridge.mq5 into Experts folder
 BRIDGE_SRC="$WORKSPACE_DIR/KhmerMasterCrypto_Bridge.mq5"
 if [ ! -f "$BRIDGE_SRC" ]; then
     BRIDGE_SRC="$(dirname "$0")/KhmerMasterCrypto_Bridge.mq5"
@@ -73,92 +98,63 @@ mkdir -p "$PLATFORM_EXPERTS"
 if [ -f "$BRIDGE_SRC" ]; then
     cp -f "$BRIDGE_SRC" "$PLATFORM_EXPERTS/KhmerMasterCrypto_Bridge.mq5"
     chown "$TARGET_USER:$TARGET_USER" "$PLATFORM_EXPERTS/KhmerMasterCrypto_Bridge.mq5"
-    echo -e "${GREEN}✅ Staged KhmerMasterCrypto_Bridge.mq5 to Platform Experts directory!${NC}"
+    echo -e "${GREEN}✅ Staged KhmerMasterCrypto_Bridge.mq5 to Master Experts directory!${NC}"
 fi
 
-# 4. Create Desktop Shortcuts for both instances (with strict working directory isolation)
+# Stage pre-compiled .ex5 if present
+BRIDGE_EX5="$WORKSPACE_DIR/KhmerMasterCrypto_Bridge.ex5"
+if [ ! -f "$BRIDGE_EX5" ]; then
+    BRIDGE_EX5="$(dirname "$0")/KhmerMasterCrypto_Bridge.ex5"
+fi
+if [ -f "$BRIDGE_EX5" ]; then
+    cp -f "$BRIDGE_EX5" "$PLATFORM_EXPERTS/KhmerMasterCrypto_Bridge.ex5"
+    chown "$TARGET_USER:$TARGET_USER" "$PLATFORM_EXPERTS/KhmerMasterCrypto_Bridge.ex5"
+fi
+
+# 5. Create Desktop Shortcut for Master PAMM MT5
 if [ -d "$DESKTOP_DIR" ]; then
-    # Shortcut 1: Super Admin PAMM MT5 (52171861)
-    cat << EOF > "$DESKTOP_DIR/1_Launch_Super_Admin_MT5.desktop"
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=1. Launch Super Admin PAMM MT5 (52171861)
-Comment=Open Super Admin PAMM MetaTrader 5 Terminal 24/7
-Path=$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform
-Exec=bash -c 'cd "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform" && wine terminal64.exe /portable /config:startup.ini'
-Icon=wine
-Terminal=false
-StartupNotify=true
-Categories=Application;Finance;
-EOF
-    chmod +x "$DESKTOP_DIR/1_Launch_Super_Admin_MT5.desktop"
-    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/1_Launch_Super_Admin_MT5.desktop"
+    rm -f "$DESKTOP_DIR"/Launch_MT5_*.desktop 2>/dev/null || true
+    rm -f "$DESKTOP_DIR"/1_Launch_Super_Admin_MT5.desktop 2>/dev/null || true
+    rm -f "$DESKTOP_DIR"/2_Launch_MT5_Platform.desktop 2>/dev/null || true
 
-    # Shortcut 2: Platform MT5 (52171861)
-    cat << EOF > "$DESKTOP_DIR/2_Launch_MT5_Platform.desktop"
+    cat << EOF > "$DESKTOP_DIR/0_START_GTC_PAMM_MT5.desktop"
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=2. Launch MT5 Platform (52171861)
-Comment=Open Platform Auto-Trade MetaTrader 5 Terminal
-Path=$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform
-Exec=bash -c 'cd "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform" && wine terminal64.exe /portable /config:startup.ini'
+Name=🛡️ START GTC PAMM MT5 (#52171861)
+Comment=Launch Super Admin PAMM MetaTrader 5 Terminal 24/7
+Path=$MT5_PLATFORM
+Exec=bash -c 'cd "$MT5_PLATFORM" && wine terminal64.exe /portable /config:startup.ini'
 Icon=wine
 Terminal=false
 StartupNotify=true
 Categories=Application;Finance;
 EOF
-    chmod +x "$DESKTOP_DIR/2_Launch_MT5_Platform.desktop"
-    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/2_Launch_MT5_Platform.desktop"
-    echo -e "${GREEN}✅ Created isolated Desktop Shortcuts for Super Admin PAMM MT5 (#52171861)!${NC}"
+    chmod +x "$DESKTOP_DIR/0_START_GTC_PAMM_MT5.desktop"
+    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/0_START_GTC_PAMM_MT5.desktop"
+    echo -e "${GREEN}✅ Created single canonical Desktop Shortcut for Master PAMM MT5 (#52171861)!${NC}"
 fi
 
-# 5. Install Global CLI Commands
-cat << EOF > /usr/local/bin/mt5-dual-start
+# 6. Install Global CLI Commands
+cat << EOF > /usr/local/bin/mt5-pamm-start
 #!/bin/bash
 TARGET_USER="$TARGET_USER"
 TARGET_HOME="$TARGET_HOME"
-echo "🚀 Starting Dual MT5 Terminals in Portable Mode under user \$TARGET_USER..."
-# Launch Instance 1: Admin
-sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5' && nohup wine terminal64.exe /portable >/dev/null 2>&1 &"
-sleep 2
-# Launch Instance 2: Platform
+echo "🚀 Starting GTC PAMM Master MT5 Terminal (52171861)..."
 sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
-echo "✅ Both MT5 Terminals (Admin 52133938 + PAMM Platform 52171861) launched in background!"
+echo "✅ GTC PAMM Master MT5 Terminal (52171861) launched in background."
 EOF
-chmod +x /usr/local/bin/mt5-dual-start
+chmod +x /usr/local/bin/mt5-pamm-start
 
-cat << EOF > /usr/local/bin/mt5-admin-start
-#!/bin/bash
-TARGET_USER="$TARGET_USER"
-TARGET_HOME="$TARGET_HOME"
-echo "🚀 Starting Super Admin PAMM MT5 Terminal (52171861)..."
-sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
-echo "✅ Super Admin PAMM MT5 Terminal (52171861) launched in background."
-EOF
-chmod +x /usr/local/bin/mt5-admin-start
-
-cat << EOF > /usr/local/bin/mt5-platform-start
-#!/bin/bash
-TARGET_USER="$TARGET_USER"
-TARGET_HOME="$TARGET_HOME"
-echo "🚀 Restarting Platform MT5 Terminal (52171861)..."
-pkill -9 -f "MetaTrader 5_Platform.*terminal64.exe" 2>/dev/null || true
-sleep 2
-sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
-echo "✅ Platform MT5 Terminal launched in background."
-EOF
-chmod +x /usr/local/bin/mt5-platform-start
+# Symlink legacy commands to mt5-pamm-start
+ln -sf /usr/local/bin/mt5-pamm-start /usr/local/bin/mt5-admin-start
+ln -sf /usr/local/bin/mt5-pamm-start /usr/local/bin/mt5-platform-start
+ln -sf /usr/local/bin/mt5-pamm-start /usr/local/bin/mt5-dual-start
 
 echo ""
 echo -e "${CYAN}==============================================================================${NC}"
-echo -e "${BOLD}${GREEN}🎉 DUAL MT5 SETUP COMPLETED SUCCESSFULLY!${NC}"
-echo -e "${CYAN}==============================================================================${NC}"
-echo -e "👉 ${BOLD}Next Simple Steps:${NC}"
-echo -e "1. Open XRDP Remote Desktop (mstsc)."
-echo -e "2. Double click ${BOLD}'1. Launch Super Admin PAMM MT5 (52171861)'${NC} on Desktop."
-echo -e "3. Login with account: ${BOLD}52171861${NC}, Server: ${BOLD}GTCGlobalSA-Server 2${NC}."
-echo -e "4. Attach ${BOLD}KhmerMasterCrypto_Bridge.mq5${NC} to any chart with Port 5555."
-echo -e "5. Both terminals will now run 24/7 side by side with zero interference!"
+echo -e "${BOLD}${GREEN}✅ GTC PAMM SINGLE MASTER MT5 SETUP COMPLETE!${NC}"
+echo -e "${CYAN}• Master Account: #52171861 on GTCGlobalSA-Server 2.${NC}"
+echo -e "${CYAN}• Disk Preservation: All duplicate/client folders purged; zero disk bloat.${NC}"
+echo -e "${CYAN}• Launch shortcut: Desktop '0_START_GTC_PAMM_MT5.desktop' or 'mt5-pamm-start'.${NC}"
 echo -e "${CYAN}==============================================================================${NC}"

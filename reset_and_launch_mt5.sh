@@ -1,11 +1,12 @@
 #!/bin/bash
 # ==============================================================================
-# 🏛️ KHMER MASTER CRYPTO / APEX SUPER BRAIN AI
-# MT5 DUAL INSTANCE MASTER RESTORER & PERSISTENCE ENGINE
+# ANGKOR QUANT / APEX SUPER BRAIN AI
+# GTC PAMM SINGLE MASTER RESTORER & DISK HYGIENE ENGINE (INVARIANT 105)
 # ==============================================================================
 # Restores & Launches:
-# 1. Super Admin Master PAMM MT5 (#52171861)
-# 2. Platform / Secondary MT5 (#52171861)
+#   Super Admin Master PAMM MT5 (#52171861 on GTCGlobalSA-Server 2)
+# Fiduciary Principle:
+#   Eliminates all other account EAs and duplicate folders to maximize free VPS disk space.
 # ==============================================================================
 
 set -e
@@ -18,18 +19,19 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${CYAN}==============================================================================${NC}"
-echo -e "${BOLD}${GREEN}   🏛️ KHMER MASTER CRYPTO — SUPER ADMIN MT5 MASTER RESTORER 🏛️${NC}"
+echo -e "${BOLD}${GREEN}   🛡️ ANGKOR QUANT — GTC PAMM MASTER RESTORER & DISK HYGIENE 🛡️${NC}"
 echo -e "${YELLOW}   Unlocks & Restores: Super Admin PAMM MT5 (#52171861)${NC}"
 echo -e "${CYAN}==============================================================================${NC}"
 
 TARGET_USER="${SUDO_USER:-$USER}"
 TARGET_HOME=$(eval echo "~$TARGET_USER")
-MT5_ADMIN="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5"
-MT5_PLATFORM="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"
+WINE_PROGRAMS="$TARGET_HOME/.wine/drive_c/Program Files"
+MT5_PLATFORM="$WINE_PROGRAMS/MetaTrader 5_Platform"
+MT5_ORIGINAL="$WINE_PROGRAMS/MetaTrader 5"
 DESKTOP_DIR="$TARGET_HOME/Desktop"
 
 # 1. Force kill all stuck / zombie wine and MT5 processes & clean memory locks
-echo -e "${YELLOW}[1/5] 🧹 Purging all zombie Wine and MT5 processes...${NC}"
+echo -e "${YELLOW}[1/5] 🛑 Purging all zombie Wine and MT5 processes...${NC}"
 pkill -9 -f "terminal64.exe" 2>/dev/null || true
 pkill -9 -f "metaeditor" 2>/dev/null || true
 pkill -9 -f "wine" 2>/dev/null || true
@@ -40,203 +42,153 @@ rm -rf /tmp/.wine-* 2>/dev/null || true
 rm -f /tmp/.X*-lock 2>/dev/null || true
 echo -e "   ${GREEN}✅ Cleaned all locks, mutexes, and dead sockets!${NC}"
 
-# 2. Fix 100% of permissions across .wine and Desktop
-echo -e "${YELLOW}[2/5] 🔑 Restoring full ownership to user $TARGET_USER...${NC}"
-chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.wine" 2>/dev/null || true
-chmod -R 775 "$TARGET_HOME/.wine" 2>/dev/null || true
-if [ -d "$DESKTOP_DIR" ]; then
-    chown -R "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR" 2>/dev/null || true
-    chmod +x "$DESKTOP_DIR"/*.desktop 2>/dev/null || true
-    chmod +x "$DESKTOP_DIR"/*.sh 2>/dev/null || true
+# 2. Prune non-PAMM MT5 account instances & consolidate base folders to save disk space
+echo -e "${YELLOW}[2/5] 🧹 Purging non-PAMM account instances & consolidating folders...${NC}"
+if [ -d "$MT5_PLATFORM" ] && [ -d "$MT5_ORIGINAL" ]; then
+    rm -rf "$MT5_ORIGINAL"
+elif [ ! -d "$MT5_PLATFORM" ] && [ -d "$MT5_ORIGINAL" ]; then
+    mv "$MT5_ORIGINAL" "$MT5_PLATFORM"
 fi
-echo -e "   ${GREEN}✅ Permissions fully restored (Zero EACCES errors)!${NC}"
 
-# 2.1 Sync latest KhmerMasterCrypto_Bridge.mq5 and .ex5 into Experts directories
+PRIMARY_MT5="$MT5_PLATFORM"
+if [ ! -d "$PRIMARY_MT5" ]; then
+    echo -e "${RED}❌ MetaTrader 5 base installation not found at: $PRIMARY_MT5${NC}"
+    exit 1
+fi
+
+for DIR in "$WINE_PROGRAMS/MetaTrader 5_"*; do
+    if [ -d "$DIR" ] && [ "$DIR" != "$PRIMARY_MT5" ]; then
+        echo -e "   ${RED}🗑️ Removed non-PAMM clone: $(basename "$DIR")${NC}"
+        rm -rf "$DIR"
+    fi
+done
+
+# Deep-clean crash dumps, logs, and temp files to maximize free disk
+find "$PRIMARY_MT5" -name "*.dmp" -type f -delete 2>/dev/null || true
+find "$PRIMARY_MT5" -name "compile.log" -type f -delete 2>/dev/null || true
+find "$PRIMARY_MT5" -path "*/Logs/*" -name "*.log" -type f -delete 2>/dev/null || true
+find "$PRIMARY_MT5" -path "*/logs/*" -name "*.log" -type f -delete 2>/dev/null || true
+rm -rf "$TARGET_HOME/.wine/drive_c/users"/*/AppData/Local/Temp/* 2>/dev/null || true
+echo -e "   ${GREEN}✅ VPS disk cleaned & sanitized!${NC}"
+
+# Fix ownership and permissions
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.wine" 2>/dev/null || true
+chmod -R 775 "$PRIMARY_MT5" 2>/dev/null || true
+
+# 3. Sync latest KhmerMasterCrypto_Bridge.mq5 and .ex5 into Master Experts directory
+echo -e "${YELLOW}[3/5] 🔄 Syncing latest KhmerMasterCrypto_Bridge.mq5 into Master PAMM Experts...${NC}"
 WORKSPACE_BRIDGE="/opt/khmer-master-crypto-bot/KhmerMasterCrypto_Bridge.mq5"
 WORKSPACE_BRIDGE_EX5="/opt/khmer-master-crypto-bot/KhmerMasterCrypto_Bridge.ex5"
 if [ ! -f "$WORKSPACE_BRIDGE" ]; then
     WORKSPACE_BRIDGE="$(dirname "$0")/KhmerMasterCrypto_Bridge.mq5"
     WORKSPACE_BRIDGE_EX5="$(dirname "$0")/KhmerMasterCrypto_Bridge.ex5"
 fi
+
+mkdir -p "$PRIMARY_MT5/MQL5/Experts"
 if [ -f "$WORKSPACE_BRIDGE" ]; then
-    mkdir -p "$MT5_ADMIN/MQL5/Experts/Advisors" "$MT5_PLATFORM/MQL5/Experts/Advisors"
-    cp -f "$WORKSPACE_BRIDGE" "$MT5_ADMIN/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
-    cp -f "$WORKSPACE_BRIDGE" "$MT5_PLATFORM/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
-    cp -f "$WORKSPACE_BRIDGE" "$MT5_ADMIN/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
-    cp -f "$WORKSPACE_BRIDGE" "$MT5_PLATFORM/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
-    if [ -f "$WORKSPACE_BRIDGE_EX5" ]; then
-        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_ADMIN/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_PLATFORM/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_ADMIN/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-        cp -f "$WORKSPACE_BRIDGE_EX5" "$MT5_PLATFORM/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-    fi
-    if [ -d "$DESKTOP_DIR" ]; then
-        cp -f "$WORKSPACE_BRIDGE" "$DESKTOP_DIR/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
-        [ -f "$WORKSPACE_BRIDGE_EX5" ] && cp -f "$WORKSPACE_BRIDGE_EX5" "$DESKTOP_DIR/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-    fi
-    echo -e "   ${GREEN}✅ Synced latest KhmerMasterCrypto_Bridge.mq5 & .ex5 to all MT5 Experts & Advisors directories!${NC}"
+    cp -f "$WORKSPACE_BRIDGE" "$PRIMARY_MT5/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+fi
+if [ -f "$WORKSPACE_BRIDGE_EX5" ]; then
+    cp -f "$WORKSPACE_BRIDGE_EX5" "$PRIMARY_MT5/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
 fi
 
-# 3. Detect the EXACT display the user is currently viewing
-echo -e "${YELLOW}[3/5] 📺 Detecting active Desktop Display...${NC}"
-ACTIVE_DISPLAY=""
+# 4. Configure startup.ini for Master PAMM Account #52171861
+echo -e "${YELLOW}[4/5] ⚙️ Configuring Master PAMM startup.ini...${NC}"
+cat << 'EOF' > "$PRIMARY_MT5/startup.ini"
+[Common]
+Login=52171861
+Server=GTCGlobalSA-Server 2
 
-# Check xfce4-session environment for user
+[StartUp]
+Expert=KhmerMasterCrypto_Bridge
+Symbol=XAUUSD
+Period=M15
+
+[Experts]
+AllowDllImport=1
+Enabled=1
+Account=1
+Profile=Default
+WebRequest=1
+WebRequestUrl=http://127.0.0.1;http://127.0.0.1:5555;http://localhost;127.0.0.1;127.0.0.1:5555
+
+[Chart]
+Symbol=XAUUSD
+Period=M15
+Expert=KhmerMasterCrypto_Bridge
+EOF
+
+mkdir -p "$PRIMARY_MT5/config"
+cp -f "$PRIMARY_MT5/startup.ini" "$PRIMARY_MT5/config/startup.ini"
+chown -R "$TARGET_USER:$TARGET_USER" "$PRIMARY_MT5"
+
+# Auto-detect active Desktop Display
+ACTIVE_DISPLAY=""
 XFCE_PID=$(pgrep -u "$TARGET_USER" xfce4-session | head -n 1 || true)
 if [ -n "$XFCE_PID" ] && [ -f "/proc/$XFCE_PID/environ" ]; then
     ACTIVE_DISPLAY=$(grep -z '^DISPLAY=' "/proc/$XFCE_PID/environ" 2>/dev/null | tr -d '\0' | cut -d= -f2 || true)
 fi
-
-# Fallback: check current DISPLAY environment variable
-if [ -z "$ACTIVE_DISPLAY" ] && [ -n "$DISPLAY" ]; then
-    ACTIVE_DISPLAY="$DISPLAY"
-fi
-
-# Fallback: check active X11 socket
 if [ -z "$ACTIVE_DISPLAY" ]; then
-    for sock in $(ls -1t /tmp/.X11-unix/ 2>/dev/null | grep -E '^X[0-9]+'); do
-        disp_num=$(echo "$sock" | sed 's/^X//')
-        ACTIVE_DISPLAY=":${disp_num}.0"
-        break
-    done
+    ACTIVE_DISPLAY="${DISPLAY:-:10.0}"
+    if [ -e /tmp/.X11-unix/X10 ]; then
+        ACTIVE_DISPLAY=":10.0"
+    elif [ -e /tmp/.X11-unix/X11 ]; then
+        ACTIVE_DISPLAY=":11.0"
+    elif [ -e /tmp/.X11-unix/X0 ]; then
+        ACTIVE_DISPLAY=":0.0"
+    fi
 fi
 
-ACTIVE_DISPLAY="${ACTIVE_DISPLAY:-:10.0}"
-echo -e "   ${CYAN}🎯 Targeted Display Screen: ${BOLD}${GREEN}$ACTIVE_DISPLAY${NC}"
-
-# 3.1 Verify and ensure KhmerMasterCrypto_Bridge.ex5 is present in Advisors
-echo -e "${YELLOW}[3.1/5] ⚙️ Verifying KhmerMasterCrypto_Bridge.ex5 in Advisors...${NC}"
-for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
-    if [ -d "$MT5_DIR" ]; then
-        mkdir -p "$MT5_DIR/MQL5/Experts/Advisors" 2>/dev/null || true
-        # Ensure .ex5 is copied into Advisors
-        if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
-            cp -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$MT5_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-            echo -e "   ${GREEN}🎯 SUCCESS: Verified KhmerMasterCrypto_Bridge.ex5 in $(basename "$MT5_DIR")/MQL5/Experts/Advisors!${NC}"
-        else
-            # Only compile if .ex5 is missing, and strictly use timeout 10s to prevent hang
-            EDITOR_BIN=$(find "$MT5_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
-            MQ5_FILE="$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5"
-            if [ -n "$EDITOR_BIN" ] && [ -f "$MQ5_FILE" ]; then
-                echo -e "   ${CYAN}⚙️ Attempting wine compile with 10s timeout in $(basename "$MT5_DIR")...${NC}"
-                (cd "$MT5_DIR" && timeout 10s wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true)
-                if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
-                    cp -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$MT5_DIR/MQL5/Experts/Advisors/KhmerMasterCrypto_Bridge.ex5" 2>/dev/null || true
-                    echo -e "   ${GREEN}🎯 SUCCESS: KhmerMasterCrypto_Bridge.ex5 compiled and linked to Advisors!${NC}"
-                fi
-            fi
-        fi
-    fi
-done
-echo -e "   ${GREEN}✅ Compilation and sync check completed!${NC}"
-
-# 4. Configure startup.ini for Super Admin PAMM MT5 (52171861) (Auto-Attach Bridge EA Shield)
-cat << 'EOF' > "$MT5_PLATFORM/startup.ini"
-[Common]
-Login=52171861
-Server=GTCGlobalSA-Server 2
-
-[StartUp]
-Expert=KhmerMasterCrypto_Bridge
-Symbol=XAUUSD
-Period=M15
-
-[Experts]
-AllowDllImport=1
-Enabled=1
-Account=1
-Profile=Default
-WebRequest=1
-WebRequestUrl=http://127.0.0.1;http://127.0.0.1:5555;http://localhost;127.0.0.1;127.0.0.1:5555
-
-[Chart]
-Symbol=XAUUSD
-Period=M15
-Expert=KhmerMasterCrypto_Bridge
-EOF
-chown "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM/startup.ini"
-
-cat << 'EOF' > "$MT5_ADMIN/startup.ini"
-[Common]
-Login=52171861
-Server=GTCGlobalSA-Server 2
-
-[StartUp]
-Expert=KhmerMasterCrypto_Bridge
-Symbol=XAUUSD
-Period=M15
-
-[Experts]
-AllowDllImport=1
-Enabled=1
-Account=1
-Profile=Default
-WebRequest=1
-WebRequestUrl=http://127.0.0.1;http://127.0.0.1:5555;http://localhost;127.0.0.1;127.0.0.1:5555
-
-[Chart]
-Symbol=XAUUSD
-Period=M15
-Expert=KhmerMasterCrypto_Bridge
-EOF
-chown "$TARGET_USER:$TARGET_USER" "$MT5_ADMIN/startup.ini"
-
-# Launch Super Admin PAMM MT5 (#52171861)
-echo -e "${YELLOW}[4/5] 🚀 Launching Primary Super Admin PAMM MT5 (#52171861)...${NC}"
+# 5. Launch Super Admin PAMM MT5 (#52171861)
+echo -e "${YELLOW}[5/5] 🚀 Launching GTC PAMM Master MT5 (#52171861) on Display $ACTIVE_DISPLAY...${NC}"
 PLATFORM_LOG="$TARGET_HOME/mt5_platform_launch.log"
-sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini > '$PLATFORM_LOG' 2>&1 &"
+sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$PRIMARY_MT5' && nohup wine terminal64.exe /portable /config:startup.ini > '$PLATFORM_LOG' 2>&1 &"
 sleep 3
 
-# 6. Create 1-Click Desktop Launcher script directly on user's Desktop
+# Setup 1-Click Desktop Launcher
 if [ -d "$DESKTOP_DIR" ]; then
-    cat << 'EOF' > "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
+    rm -f "$DESKTOP_DIR"/Launch_MT5_*.desktop 2>/dev/null || true
+    rm -f "$DESKTOP_DIR"/START_ALL_MT5.sh 2>/dev/null || true
+    rm -f "$DESKTOP_DIR"/0_START_ALL_MT5.desktop 2>/dev/null || true
+
+    cat << 'EOF' > "$DESKTOP_DIR/START_GTC_PAMM_MT5.sh"
 #!/bin/bash
 pkill -9 -f "terminal64.exe" 2>/dev/null || true
 pkill -9 -f "wineserver" 2>/dev/null || true
 sleep 1
 TARGET_HOME="$HOME"
-MT5_PLATFORM="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"
+PRIMARY_MT5="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"
 CURRENT_DISP="${DISPLAY:-:10.0}"
-
-# Start Super Admin PAMM MT5 (52171861)
-cd "$MT5_PLATFORM" && nohup wine terminal64.exe /portable /config:startup.ini > "$TARGET_HOME/mt5_platform_launch.log" 2>&1 &
-
-notify-send "Khmer Master Crypto" "Super Admin PAMM MT5 (52171861) launched successfully!" 2>/dev/null || true
+cd "$PRIMARY_MT5" && nohup wine terminal64.exe /portable /config:startup.ini > "$TARGET_HOME/mt5_platform_launch.log" 2>&1 &
+notify-send "Angkor Quant" "GTC PAMM Master MT5 (#52171861) launched successfully!" 2>/dev/null || true
 EOF
-    chmod +x "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
-    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
+    chmod +x "$DESKTOP_DIR/START_GTC_PAMM_MT5.sh"
+    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/START_GTC_PAMM_MT5.sh"
 
-    # Create .desktop file for 1-click execution
-    cat << EOF > "$DESKTOP_DIR/0_START_SUPER_ADMIN_MT5.desktop"
+    cat << EOF > "$DESKTOP_DIR/0_START_GTC_PAMM_MT5.desktop"
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=▶️ START SUPER ADMIN PAMM MT5 (52171861)
+Name=🛡️ START GTC PAMM MT5 (#52171861)
 Comment=Launch Super Admin PAMM MetaTrader 5 Terminal 24/7
-Exec=bash "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
+Exec=bash "$DESKTOP_DIR/START_GTC_PAMM_MT5.sh"
 Icon=wine
 Terminal=false
 StartupNotify=true
 Categories=Application;Finance;
 EOF
-    chmod +x "$DESKTOP_DIR/0_START_SUPER_ADMIN_MT5.desktop"
-    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/0_START_SUPER_ADMIN_MT5.desktop"
+    chmod +x "$DESKTOP_DIR/0_START_GTC_PAMM_MT5.desktop"
+    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/0_START_GTC_PAMM_MT5.desktop"
 fi
 
-echo ""
-echo -e "${CYAN}==============================================================================${NC}"
-echo -e "${BOLD}${GREEN}📋 CURRENT RUNNING MT5 PROCESSES:${NC}"
-echo -e "${CYAN}==============================================================================${NC}"
-ps aux | grep -i "terminal64.exe" | grep -v grep || echo "⚠️ Checking status in 2s..."
-
-echo ""
-echo -e "${BOLD}${GREEN}🎉 BOTH MT5 TERMINALS RESTORED & ACTIVE ON DISPLAY $ACTIVE_DISPLAY!${NC}"
-echo -e "👉 Look at your Remote Desktop screen right now — both MT5 windows are OPEN!"
-echo -e "👉 A 1-Click shortcut '${BOLD}0_START_ALL_MT5.desktop${NC}' has been placed on your Desktop."
-echo -e "👉 Verify in Telegram with: /mt5"
-
-# Auto-restart python bot service so Linux Brain & MT5 are 100% in sync
-echo -e "${YELLOW}[6/6] 🔄 Synchronizing & Restarting khmer-master-crypto-bot service...${NC}"
+# Auto-restart python bot service so Linux Brain & MT5 are in sync
 sudo systemctl restart khmer-master-crypto-bot 2>/dev/null || true
-echo -e "   ${GREEN}✅ khmer-master-crypto-bot service synchronized & active!${NC}"
+
+echo ""
+echo -e "${CYAN}==============================================================================${NC}"
+echo -e "${BOLD}${GREEN}✅ GTC PAMM MASTER MT5 RESTORED & ACTIVE ON DISPLAY $ACTIVE_DISPLAY!${NC}"
+echo -e "${CYAN}• Single PAMM Terminal #52171861 active with KhmerMasterCrypto_Bridge.${NC}"
+echo -e "${CYAN}• All non-PAMM EAs, duplicate folders, and bloated logs permanently purged.${NC}"
+echo -e "${CYAN}• 1-Click Desktop Launcher: '0_START_GTC_PAMM_MT5.desktop'.${NC}"
+echo -e "${CYAN}• Verify live telemetry in Telegram: /mt5${NC}"
 echo -e "${CYAN}==============================================================================${NC}"

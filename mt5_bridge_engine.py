@@ -1221,6 +1221,22 @@ class MT5BridgeEngine:
             is_broker_connected = False
 
         with self._clients_lock:
+            # Invariant 105: GTC PAMM Institutional Master Fund Authority Lock
+            # Prohibits trade execution on non-PAMM accounts to eliminate VPS disk & memory bloat
+            pamm_authorized = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52171861", "52133938"})
+            if account_id not in pamm_authorized:
+                logger.warning(
+                    f"🛡️ [PAMM FIDUCIARY GUARD] Account #{account_id} is not an authorized GTC PAMM Master Account. "
+                    f"Order execution disabled; client EAs decommissioned under Invariant 105 to preserve VPS disk space."
+                )
+                session = MT5ClientSession(account_id, socket_conn=sock)
+                session.broker = broker
+                session.firm_name = firm_name
+                session.status = "UNAUTHORIZED_NON_PAMM"
+                session.is_prop_compliant = False
+                self.clients[account_id] = session
+                return
+
             session = self.clients.get(account_id)
             if not session:
                 session = MT5ClientSession(account_id, socket_conn=sock)

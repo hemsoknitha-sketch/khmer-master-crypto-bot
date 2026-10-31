@@ -5658,6 +5658,23 @@ def get_active_prop_firm_users() -> list:
         conn.close()
         return []
 
+def prune_non_pamm_mt5_clients(pamm_master_account: str = "52171861") -> int:
+    """
+    Purges any non-PAMM MT5 client records from mt5_bridge_clients,
+    ensuring strictly that only the GTC PAMM Master Account is maintained (Invariant 105).
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM mt5_bridge_clients WHERE account_id != ? AND account_id != '52133938'", (str(pamm_master_account),))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception:
+        conn.close()
+        return 0
+
 def upsert_mt5_bridge_client(
     account_id: str,
     chat_id: int = 0,
