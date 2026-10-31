@@ -1370,6 +1370,7 @@
     // 4. REAL-TIME DATA STREAM & WEBSOCKET ENGINE
     // ----------------------------------------------------
     let isInitialLoad = true;
+    let isWebSocketConnected = false;
 
     async function fetchFullSnapshot() {
       try {
@@ -1377,22 +1378,26 @@
         if (!res.ok) return;
         const data = await res.json();
 
-        // 1. Candlestick Data
+        // 1. Candlestick Data (Smooth initial render & non-destructive live updates)
         if (data.candles && data.candles.length > 0) {
-          candleSeries.setData(data.candles);
-
-          // Calculate EMAs
-          const closes = data.candles.map(c => c.close);
-          const ema20Data = calculateEMA(data.candles, 20);
-          const ema50Data = calculateEMA(data.candles, 50);
-          const ema200Data = calculateEMA(data.candles, 200);
-          ema20Series.setData(ema20Data);
-          ema50Series.setData(ema50Data);
-          ema200Series.setData(ema200Data);
-
           if (isInitialLoad) {
+            candleSeries.setData(data.candles);
+
+            // Calculate initial EMAs
+            const ema20Data = calculateEMA(data.candles, 20);
+            const ema50Data = calculateEMA(data.candles, 50);
+            const ema200Data = calculateEMA(data.candles, 200);
+            ema20Series.setData(ema20Data);
+            ema50Series.setData(ema50Data);
+            ema200Series.setData(ema200Data);
+
             chart.timeScale().fitContent();
             isInitialLoad = false;
+          } else {
+            // Smoothly update the active forming candle without clearing chart history
+            const lastCandle = data.candles[data.candles.length - 1];
+            lastCandle.time = Math.floor(Number(lastCandle.time));
+            candleSeries.update(lastCandle);
           }
         }
 
@@ -1525,6 +1530,7 @@
       }
 
       headerPriceEl.classList.remove('tick-up', 'tick-down');
+      void headerPriceEl.offsetWidth; // Force CSS reflow to guarantee glowing pulse animation
       if (price > prevPrice) {
         headerPriceEl.classList.add('tick-up');
       } else if (price < prevPrice) {
@@ -1534,7 +1540,7 @@
       clearTimeout(tickResetTimer);
       tickResetTimer = setTimeout(() => {
         headerPriceEl.classList.remove('tick-up', 'tick-down');
-      }, 220);
+      }, 250);
     }
 
     // 5m Candle Countdown Timer (Runs every second in client browser)
@@ -1560,7 +1566,12 @@
 
       try {
         ws = new WebSocket(wsUrl);
-        ws.onopen = () => console.log("🟢 WebSocket Connected to Gold M5 Stream");
+        ws.onopen = () => {
+          isWebSocketConnected = true;
+          console.log("🟢 WebSocket Connected to Gold M5 Stream");
+          const dot = document.querySelector('.legend-dot');
+          if (dot) dot.style.background = '#00E676';
+        };
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -1568,6 +1579,7 @@
             // 1. Super Fast Sub-Second Real Live Tick Handling (<0.05ms)
             if (data.type === "tick") {
               if (data.candle && candleSeries) {
+                data.candle.time = Math.floor(Number(data.candle.time));
                 candleSeries.update(data.candle);
               }
               updateLivePriceTick(Number(data.current_price), Number(data.prev_price), Number(data.spread));
@@ -1575,7 +1587,24 @@
             }
 
             // 2. Full Snapshot Data Stream
-            if (data.candle && candleSeries) {
+            if (data.candles && data.candles.length > 0 && candleSeries) {
+              if (isInitialLoad) {
+                candleSeries.setData(data.candles);
+                const ema20Data = calculateEMA(data.candles, 20);
+                const ema50Data = calculateEMA(data.candles, 50);
+                const ema200Data = calculateEMA(data.candles, 200);
+                ema20Series.setData(ema20Data);
+                ema50Series.setData(ema50Data);
+                ema200Series.setData(ema200Data);
+                chart.timeScale().fitContent();
+                isInitialLoad = false;
+              } else {
+                const lastBar = data.candles[data.candles.length - 1];
+                lastBar.time = Math.floor(Number(lastBar.time));
+                candleSeries.update(lastBar);
+              }
+            } else if (data.candle && candleSeries) {
+              data.candle.time = Math.floor(Number(data.candle.time));
               candleSeries.update(data.candle);
             }
             updateHUD(data);
@@ -1584,7 +1613,10 @@
           }
         };
         ws.onclose = () => {
+          isWebSocketConnected = false;
           console.warn("WebSocket disconnected. Reconnecting in 3s...");
+          const dot = document.querySelector('.legend-dot');
+          if (dot) dot.style.background = '#f59e0b';
           setTimeout(initWebSocket, 3000);
         };
         ws.onerror = (err) => {
@@ -1735,9 +1767,13 @@
         .catch(() => {});
     }, 3500);
 
-    // Initial load + Polling fallback
+    // Initial load + Intelligent Polling fallback (only active when WS is offline)
     fetchFullSnapshot();
-    setInterval(fetchFullSnapshot, 2000);
+    setInterval(() => {
+      if (!isWebSocketConnected) {
+        fetchFullSnapshot();
+      }
+    }, 3500);
     initWebSocket();
   </script>
 </body>

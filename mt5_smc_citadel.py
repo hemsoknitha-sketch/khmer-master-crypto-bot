@@ -221,11 +221,16 @@ class MT5SMCCitadelEngine:
             if any(k in clean_sym for k in ["XAU", "GOLD"]):
                 target_urls = [
                     f"https://fapi.binance.com/fapi/v1/klines?symbol=XAUUSDT&interval={b_interval}&limit={limit}",
-                    f"https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}"
+                    f"https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}",
+                    f"https://api-gcp.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}",
+                    f"https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}",
+                    f"https://api1.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}"
                 ]
             elif "PAXG" in clean_sym:
                 target_urls = [
-                    f"https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}"
+                    f"https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}",
+                    f"https://api-gcp.binance.com/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}",
+                    f"https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval={b_interval}&limit={limit}"
                 ]
             else:
                 b_sym = clean_sym + "USDT" if not clean_sym.endswith("USDT") else clean_sym

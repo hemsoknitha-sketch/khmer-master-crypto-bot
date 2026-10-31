@@ -26528,6 +26528,44 @@ class TelegramBotThread(BaseThread):
                 await update.effective_message.reply_text(t_text, parse_mode="Markdown", reply_markup=t_kb)
                 return
 
+        async def admin_update_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            👑 Super Admin 1-Tap Directive to pull latest GitHub code & restart VPS cleanly.
+            Usage: /admin_update or /admin_restart
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id or not (chat_id == 859271875 or db.is_admin(chat_id)):
+                return
+
+            await update.effective_message.reply_text(
+                "🚀 **[GCP TOKYO VPS AUTO-UPDATE INITIALIZED]** ⚡\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "📥 កំពុងទាញយក Code ថ្មីបំផុតពី GitHub `origin main`...\n"
+                "🛡️ កំពុង Backup VIP Database & រៀបចំ Restart Systemd Daemon...\n"
+                "⏱️ _ដំណើរការនេះនឹងបញ្ចប់ក្នុងរយៈពេលប្រហែល ១៥ ទៅ ៣០ វិនាទី!_",
+                parse_mode="Markdown"
+            )
+
+            import subprocess
+            def _run_update():
+                try:
+                    cmd = "cd /opt/khmer-master-crypto-bot && bash auto_update_vps.sh"
+                    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    return True
+                except Exception as e:
+                    return str(e)
+
+            res = await asyncio.to_thread(_run_update)
+            if res is True:
+                await update.effective_message.reply_text(
+                    "✅ **[GCP VPS AUTO-UPDATE SCRIPT TRIGGERED]**\n"
+                    "Bot នឹង Reboot ក្នុងពេលបន្តិចទៀតនេះ។ សូមរង់ចាំប្រហែល 15 វិនាទី រួចវាយ `/status` ដើម្បីផ្ទៀងផ្ទាត់!",
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.effective_message.reply_text(f"❌ Error triggering auto_update: {res}")
+
         async def admin_mt5_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
             👑 Super Admin Command to manage GTCFX Tokyo MT5 VIP Users & Referral Gatekeeper:
@@ -29296,6 +29334,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("trailing_guard", trailing_guard_command))
         self.app.add_handler(CommandHandler("paper_trading", paper_trading_command))
         self.app.add_handler(CommandHandler("admin_capital", admin_capital_command))
+        self.app.add_handler(CommandHandler("admin_update", admin_update_command))
+        self.app.add_handler(CommandHandler("admin_restart", admin_update_command))
+        self.app.add_handler(CommandHandler("update_vps", admin_update_command))
+        self.app.add_handler(CommandHandler("restart_vps", admin_update_command))
         self.app.add_handler(CommandHandler("admincapital", admin_capital_command))
         self.app.add_handler(CommandHandler("admin_mt5", admin_mt5_command))
         self.app.add_handler(CommandHandler("adminmt5", admin_mt5_command))

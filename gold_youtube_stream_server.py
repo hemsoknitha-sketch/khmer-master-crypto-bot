@@ -123,7 +123,7 @@ def _generate_fallback_data() -> Dict[str, Any]:
 
 # Cache state & synchronization: pre-initialized so cache is NEVER empty
 _CACHE = {
-    "timestamp": _START_TIME,
+    "timestamp": 0.0,
     "snapshot": _generate_fallback_data()
 }
 _IS_REFRESHING = False
@@ -216,12 +216,14 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
                 if len(candles) > 120:
                     candles.pop(0)
 
+    active_c = _ACTIVE_CANDLE.copy()
+    active_c["time"] = int(active_c.get("time", candle_ts))
     return {
         "type": "tick",
         "current_price": price,
         "prev_price": prev_p,
         "spread": spread,
-        "candle": _ACTIVE_CANDLE.copy(),
+        "candle": active_c,
         "timestamp": now
     }
 
@@ -276,12 +278,9 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
             candle_ts = (now_ts // 300) * 300
             last_c = candles_list[-1]
             if last_c["time"] == candle_ts:
-                # Sanity check: only merge if prices are within $80 of each other
-                active_c = _ACTIVE_CANDLE.copy() if isinstance(_ACTIVE_CANDLE, dict) else {}
-                if abs(last_c["close"] - active_c.get("close", last_c["close"])) < 80.0:
-                    last_c["high"] = max(last_c["high"], active_c.get("high", last_c["high"]))
-                    last_c["low"] = min(last_c["low"], active_c.get("low", last_c["low"]))
                 last_c["close"] = current_price
+                last_c["high"] = max(last_c["high"], current_price)
+                last_c["low"] = min(last_c["low"], current_price)
                 _ACTIVE_CANDLE = last_c.copy()
             elif candle_ts > last_c["time"]:
                 _ACTIVE_CANDLE = {
@@ -293,6 +292,8 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
                     "volume": 1.0
                 }
                 candles_list.append(_ACTIVE_CANDLE.copy())
+            else:
+                _ACTIVE_CANDLE = last_c.copy()
     else:
         return _generate_fallback_data()
 
@@ -580,8 +581,12 @@ async def super_fast_live_gold_tick_loop():
 
     while True:
         try:
-            # Tier 1: WebSocket Stream from Binance
-            ws_url = "wss://stream.binance.com:9443/ws/paxgusdt@bookTicker"
+            # Tier 1: WebSocket Stream from Binance (with mirror failover)
+            ws_endpoints = [
+                "wss://stream.binance.com:9443/ws/paxgusdt@bookTicker",
+                "wss://data-stream.binance.vision/ws/paxgusdt@bookTicker"
+            ]
+            ws_url = ws_endpoints[0]
             timeout = aiohttp.ClientTimeout(total=None, sock_connect=5, sock_read=15)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.ws_connect(ws_url, heartbeat=15.0) as ws:

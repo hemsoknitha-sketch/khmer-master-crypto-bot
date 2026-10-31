@@ -3770,6 +3770,8 @@ async def start_web_gui_server(host: str = "0.0.0.0", port: int = 8080) -> web.A
     global _GOLD_TICK_TASK, _GOLD_BROADCAST_TASK
     try:
         import gold_youtube_stream_server as gys
+        # Immediately warm up cache so first requests have real candles!
+        asyncio.create_task(gys.warm_up_cache(app))
         if _GOLD_TICK_TASK is None or _GOLD_TICK_TASK.done():
             _GOLD_TICK_TASK = asyncio.create_task(gys.super_fast_live_gold_tick_loop())
         if _GOLD_BROADCAST_TASK is None or _GOLD_BROADCAST_TASK.done():
