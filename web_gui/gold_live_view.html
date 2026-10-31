@@ -763,21 +763,80 @@
       object-position: center center;
       display: block;
       transform: scale(1.0);
-      animation: photo-breathing 4.5s ease-in-out infinite;
+      transform-origin: center center;
+      transition: transform 0.05s ease-out;
+      animation: photo-breathing 4.2s ease-in-out infinite;
     }
 
     @keyframes photo-breathing {
       0%, 100% { transform: scale(1.0) translateY(0); filter: brightness(1.0) contrast(1.02); }
-      50% { transform: scale(1.025) translateY(-1px); filter: brightness(1.04) contrast(1.04); }
+      50% { transform: scale(1.022) translateY(-1px); filter: brightness(1.03) contrast(1.03); }
     }
 
-    .talking .mc-real-photo {
-      animation: photo-speaking 0.45s ease-in-out infinite alternate;
+    /* Natural Eyelid Blink Overlay */
+    .mc-eyelid-overlay {
+      position: absolute;
+      top: 36.4%;
+      width: 7.4%;
+      height: 2.9%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(228, 186, 162, 0.98) 0%, rgba(206, 162, 138, 0.96) 75%, transparent 100%);
+      opacity: 0;
+      transform-origin: top center;
+      pointer-events: none;
+      transition: opacity 0.08s ease, transform 0.08s ease;
+      z-index: 4;
+    }
+    .mc-eyelid-overlay.eye-left {
+      left: 40.0%;
+    }
+    .mc-eyelid-overlay.eye-right {
+      left: 52.8%;
+    }
+    .mc-eyelid-overlay.blink {
+      opacity: 1 !important;
+      transform: scaleY(1.35) translateY(1.5px) !important;
     }
 
-    @keyframes photo-speaking {
-      0% { transform: scale(1.015) translateY(0); filter: brightness(1.03) contrast(1.05); }
-      100% { transform: scale(1.035) translateY(-1.5px); filter: brightness(1.07) contrast(1.06); }
+    /* Real-Time Audio-Reactive Lip Aperture Viseme */
+    .mc-live-mouth-wrapper {
+      position: absolute;
+      left: 43.0%;
+      top: 50.2%;
+      width: 14.4%;
+      height: 5.4%;
+      pointer-events: none;
+      overflow: hidden;
+      border-radius: 40% 40% 50% 50%;
+      transform-origin: top center;
+      z-index: 4;
+      transition: transform 0.05s ease-out;
+      opacity: 0;
+    }
+
+    .talking .mc-live-mouth-wrapper {
+      opacity: 1;
+    }
+
+    .mc-inner-mouth {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center 40%, #4a0414 0%, #2b020a 65%, transparent 100%);
+      border-radius: 50%;
+      transform: scale(0);
+      transition: transform 0.05s ease-out;
+    }
+
+    .mc-lower-lip {
+      position: absolute;
+      bottom: 0;
+      left: 10%;
+      width: 80%;
+      height: 40%;
+      border-radius: 0 0 50% 50%;
+      background: radial-gradient(ellipse at center, rgba(230, 95, 115, 0.92) 0%, rgba(190, 50, 75, 0.96) 70%, transparent 100%);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      transition: transform 0.05s ease-out;
     }
 
     .mc-photo-vignette {
@@ -988,8 +1047,19 @@
             <div class="mc-voice-ripple" id="mc-voice-ripple-2"></div>
             
             <!-- Real Human Portrait Container -->
-            <div class="mc-portrait-frame">
+            <div class="mc-portrait-frame" id="mc-portrait-frame">
               <img src="/elena_avatar.jpg" alt="Elena AI Quant Host" class="mc-real-photo" id="mc-real-photo" onerror="this.onerror=null; this.src='elena_avatar.jpg';">
+              
+              <!-- Autonomous Biological Eye Blinking Layer -->
+              <div class="mc-eyelid-overlay eye-left" id="mc-eyelid-l"></div>
+              <div class="mc-eyelid-overlay eye-right" id="mc-eyelid-r"></div>
+
+              <!-- Real-Time Audio-Reactive Lip Aperture Viseme -->
+              <div class="mc-live-mouth-wrapper" id="mc-live-mouth">
+                <div class="mc-inner-mouth" id="mc-inner-mouth"></div>
+                <div class="mc-lower-lip" id="mc-lower-lip"></div>
+              </div>
+
               <!-- Cyber-Angkor Hologram & Vignette Overlays -->
               <div class="mc-photo-vignette"></div>
               <div class="mc-scanline-fx"></div>
@@ -1635,12 +1705,118 @@
     }
 
     // ----------------------------------------------------
-    // 6. AI GIRL MC (QUANT ANCHOR ELENA) CONTROLLER
+    // 6. AI GIRL MC (QUANT ANCHOR ELENA) CONTROLLER & AUDIO-REACTIVE VISEME
     // ----------------------------------------------------
     const mcSpeechQueue = [];
     let isMCSpeaking = false;
     const playedSpeechIds = new Set();
     let speechTimeout = null;
+
+    let elenaMasterAudio = null;
+    let elenaAudioCtx = null;
+    let elenaAnalyser = null;
+    let elenaAudioSrcNode = null;
+    let elenaFreqData = null;
+    let elenaAnimFrame = null;
+
+    function initElenaAudioSync() {
+      if (!elenaMasterAudio) {
+        elenaMasterAudio = new Audio();
+        elenaMasterAudio.crossOrigin = "anonymous";
+      }
+      if (!elenaAudioCtx) {
+        try {
+          const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtxClass) {
+            elenaAudioCtx = new AudioCtxClass();
+            elenaAnalyser = elenaAudioCtx.createAnalyser();
+            elenaAnalyser.fftSize = 128;
+            elenaAnalyser.smoothingTimeConstant = 0.3;
+            elenaAudioSrcNode = elenaAudioCtx.createMediaElementSource(elenaMasterAudio);
+            elenaAudioSrcNode.connect(elenaAnalyser);
+            elenaAnalyser.connect(elenaAudioCtx.destination);
+            elenaFreqData = new Uint8Array(elenaAnalyser.frequencyBinCount);
+          }
+        } catch(e) {
+          console.warn("AudioContext init notice:", e);
+        }
+      }
+    }
+
+    function updateElenaViseme(level) {
+      const mouth = document.getElementById('mc-live-mouth');
+      const innerMouth = document.getElementById('mc-inner-mouth');
+      const lowerLip = document.getElementById('mc-lower-lip');
+      const photo = document.getElementById('mc-real-photo');
+
+      if (level > 0.035) {
+        if (mouth) {
+          mouth.style.opacity = '1';
+          const scaleY = 1.0 + level * 2.4;
+          const scaleX = 1.0 + (level - 0.4) * 0.2;
+          const dropY = level * 3.2;
+          mouth.style.transform = `scaleY(${scaleY.toFixed(2)}) scaleX(${scaleX.toFixed(2)}) translateY(${dropY.toFixed(1)}px)`;
+        }
+        if (innerMouth) {
+          innerMouth.style.transform = `scale(${Math.min(1.25, level * 1.6).toFixed(2)})`;
+        }
+        if (lowerLip) {
+          lowerLip.style.transform = `translateY(${Math.min(3.0, level * 3.5).toFixed(1)}px)`;
+        }
+        if (photo) {
+          const nod = level * 2.0;
+          photo.style.transform = `scale(1.025) translateY(${nod.toFixed(1)}px)`;
+        }
+      } else {
+        if (mouth) {
+          mouth.style.opacity = '0';
+          mouth.style.transform = 'scale(0.2)';
+        }
+        if (photo && isMCSpeaking) {
+          photo.style.transform = 'scale(1.015) translateY(0)';
+        }
+      }
+    }
+
+    function startAutonomousBlinking() {
+      function doBlink() {
+        const leftEyelid = document.getElementById('mc-eyelid-l');
+        const rightEyelid = document.getElementById('mc-eyelid-r');
+        if (leftEyelid && rightEyelid) {
+          leftEyelid.classList.add('blink');
+          rightEyelid.classList.add('blink');
+          setTimeout(() => {
+            leftEyelid.classList.remove('blink');
+            rightEyelid.classList.remove('blink');
+          }, 120);
+        }
+        const nextTime = 3200 + Math.random() * 2200;
+        setTimeout(doBlink, nextTime);
+      }
+      setTimeout(doBlink, 2500);
+    }
+
+    function startAudioReactiveLoop() {
+      if (elenaAnimFrame) cancelAnimationFrame(elenaAnimFrame);
+      function loop() {
+        if (isMCSpeaking && elenaAnalyser && elenaFreqData) {
+          elenaAnalyser.getByteFrequencyData(elenaFreqData);
+          let sum = 0;
+          let count = 0;
+          for (let i = 2; i < 14; i++) {
+            sum += elenaFreqData[i];
+            count++;
+          }
+          const avg = sum / (count || 1);
+          const level = Math.min(1.0, avg / 125.0);
+          updateElenaViseme(level);
+        } else {
+          updateElenaViseme(0.0);
+        }
+        elenaAnimFrame = requestAnimationFrame(loop);
+      }
+      loop();
+    }
 
     function enqueueMCSpeech(speech) {
       if (!speech || !speech.id || playedSpeechIds.has(speech.id)) return;
@@ -1701,17 +1877,26 @@
 
       // 2. Play Audio via backend MP3 URL or Web Speech API fallback
       if (speech.audio_url) {
-        const audio = new Audio(speech.audio_url);
-        audio.volume = 1.0;
-        audio.onended = endSpeech;
-        audio.onerror = () => {
-          console.warn("Audio MP3 load error, fallback to Web Speech:", speech.audio_url);
+        initElenaAudioSync();
+        if (elenaAudioCtx && elenaAudioCtx.state === 'suspended') {
+          elenaAudioCtx.resume().catch(() => {});
+        }
+
+        if (elenaMasterAudio) {
+          elenaMasterAudio.src = speech.audio_url;
+          elenaMasterAudio.volume = 1.0;
+          elenaMasterAudio.onended = endSpeech;
+          elenaMasterAudio.onerror = () => {
+            console.warn("Master audio load error, fallback to Web Speech:", speech.audio_url);
+            fallbackWebSpeech(speech.text, endSpeech);
+          };
+          elenaMasterAudio.play().catch(err => {
+            console.warn("Master audio autoplay blocked, fallback to Web Speech:", err);
+            fallbackWebSpeech(speech.text, endSpeech);
+          });
+        } else {
           fallbackWebSpeech(speech.text, endSpeech);
-        };
-        audio.play().catch(err => {
-          console.warn("Audio autoplay blocked, fallback to Web Speech:", err);
-          fallbackWebSpeech(speech.text, endSpeech);
-        });
+        }
       } else {
         fallbackWebSpeech(speech.text, endSpeech);
       }
@@ -1781,6 +1966,8 @@
       }
     }, 3500);
     initWebSocket();
+    startAutonomousBlinking();
+    startAudioReactiveLoop();
   </script>
 </body>
 
