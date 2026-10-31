@@ -917,7 +917,7 @@ def generate_daily_macro_morning_briefing(lang: str = "km") -> str:
         f"2. **In-Memory Dual-Directional Stealth Radar (Invariant 76) ៖** Armed រួចរាល់ក្នុង RAM ដើម្បីត្រៀមស្ទាក់ចាប់ទាំង Breakout Thrust និង Turtle Soup Reversal ក្រោយពេលប្រកាស។\n"
         f"3. **Zero Negative Expectancy (Pillar 0) ៖** ហាមដាច់ខាតដាក់ Pending Order លើ Broker — រាល់ការចូលផ្សារត្រូវធ្វើឡើងតាមរយៈ Boundary Confirmation តែប៉ុណ្ណោះ!\n\n"
         f"{ui_standards.DIVIDER_HEAVY}\n"
-        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីពិនិត្យរ៉ាដាពេញលេញ ឬ ``/capital_scalp`` ដើម្បីពិនិត្យ Position សកម្ម!_"
+        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីពិនិត្យរ៉ាដាពេញលេញ ឬ ``/capital`` ដើម្បីពិនិត្យ Position សកម្ម!_"
     )
     return msg
 
@@ -1011,7 +1011,7 @@ def generate_pre_event_assessment(blackout_info: Dict[str, Any], lang: str = "km
         f"• ❌ **គ្មានការដាក់ Pending Order លើ Broker ដាច់ខាត** (លុបបំបាត់ Spread Blowout & Slippage Trap ១០០%)\n"
         f"• 🎯 **In-Memory Dual-Directional Stealth Radar ត្រូវបាន Armed នៅក្នុង RAM** រួចជាស្រេច (ស្ទាក់ចាប់ទាំង Breakout និង Turtle Soup Liquidity Sweep)\n"
         f"• 🛡️ **Breakeven Armor & Dynamic Volatility Breathing Stop** បានត្រៀមការពារដើមទុនជាស្វ័យប្រវត្តិនឹងបាញ់ចូលទីផ្សារភ្លាមៗក្រោយ Spread ត្រជាក់ចុះមកធម្មតា!\n\n"
-        f"👉 _វាយបញ្ជា ``/news`` ឬ ``/capital_scalp`` ដើម្បីពិនិត្យបច្ចុប្បន្នភាពរ៉ាដាគ្រប់ពេលវេលា!_"
+        f"👉 _វាយបញ្ជា ``/news`` ឬ ``/capital`` ដើម្បីពិនិត្យបច្ចុប្បន្នភាពរ៉ាដាគ្រប់ពេលវេលា!_"
     )
     return msg
 
@@ -1092,7 +1092,7 @@ def generate_post_event_outcome(blackout_info: Dict[str, Any], lang: str = "km")
         f"💡 **សេចក្តីសន្និដ្ឋានស្ថាប័ន & សកម្មភាពជួញដូរស្វ័យប្រវត្ត ៖**\n"
         f"ទីក្រុងញូវយ៉ក ៖ រលកប្រែប្រួលខ្លាំងនៃការប្រកាស «{event_name}» ត្រូវបានស្រូបយកដោយជោគជ័យ។ កម្រិត Spread របស់ឈ្មួញកណ្តាលបានត្រជាក់ចុះមកកម្រិតសុវត្ថិភាព។ ប្រព័ន្ធស្ទាក់កើបចំណេញ **Post-News Volatility Harvester (Invariant 59)** និង **In-Memory Virtual Radar (Invariant 76)** កំពុងត្រួតពិនិត្យរាល់ឱកាស Turtle Soup Reversal និង Fair Value Gap Retest ដើម្បីទាញយកប្រាក់ចំណេញដោយស្វ័យប្រវត្តិជាមួយ Stop Loss ចងភ្ជាប់នៅពីក្រោយចុង Wick ព័ត៌មានយ៉ាងរឹងមាំបំផុតជានិរន្តរ៍៕\n\n"
         f"{ui_standards.DIVIDER_HEAVY}\n"
-        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីអានអត្ថបទពេញ ឬ ``/capital_scalp`` ដើម្បីពិនិត្យ Position សកម្ម!_"
+        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីអានអត្ថបទពេញ ឬ ``/capital`` ដើម្បីពិនិត្យ Position សកម្ម!_"
     )
     return msg
 
@@ -1167,7 +1167,7 @@ def generate_live_conference_assessment(blackout_info: Dict[str, Any]) -> str:
         f"🧠 **ការវិភាគ & យុទ្ធសាស្ត្រប្រតិបត្តិការ (INSTITUTIONAL STRATEGY) ៖**\n"
         f"ទីក្រុងវ៉ាស៊ីនតោន ៖ ក្នុងអំឡុងពេលសន្និសីទសារព័ត៌មានផ្ទាល់ រាល់ពាក្យពេចន៍របស់អ្នកថ្លែង (ដូចជាប្រធាន Fed លោក Jerome Powell) អាចបង្កឱ្យមានរលកប្រែប្រួលរហ័ស (Whipsaw Volatility) ទាំងសងខាង។ ប្រព័ន្ធ Angkor Quant ដំណើរការ **In-Memory Dual-Directional Stealth Radar** នៅក្នុង RAM ដោយគ្មានការដាក់ Pending Order លើ Broker ដើម្បីការពារ Spread Blowout ១០០%។ ប្រព័ន្ធនឹងធ្វើការបញ្ជាទិញលក់ភ្លាមៗនៅពេលមានការបញ្ជាក់ Breakout ឬ Turtle Soup Reversal ក្រោយពេលសន្និសីទបញ្ចប់ និង Spread ត្រជាក់ចុះធម្មតា!\n\n"
         f"{ui_standards.DIVIDER_HEAVY}\n"
-        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីអានព័ត៌មានលម្អិត ឬ ``/capital_scalp`` ដើម្បីពិនិត្យ Position សកម្ម!_"
+        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីអានព័ត៌មានលម្អិត ឬ ``/capital`` ដើម្បីពិនិត្យ Position សកម្ម!_"
     )
     return msg
 

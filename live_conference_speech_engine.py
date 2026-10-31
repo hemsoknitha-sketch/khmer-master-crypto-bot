@@ -554,7 +554,7 @@ class ConferenceQuantStateMachine:
                 f"{ui_standards.DIVIDER_LIGHT}\n"
                 f"🧠 **INTERMARKET TRIANGULATION ៖**\n"
                 f"{divergence_text}\n"
-                "👉 _1-Tap Commands: `/conference simulate` | `/news FED` | `/capital_scalp`_"
+                "👉 _1-Tap Commands: `/conference simulate` | `/news FED` | `/capital`_"
             )
 
         # Khmer Output
@@ -580,7 +580,7 @@ class ConferenceQuantStateMachine:
             f"{divergence_text}\n"
             f"ទីក្រុងវ៉ាស៊ីនតោន ៖ ក្នុងពេលដែលសន្និសីទសារព័ត៌មានកំពុងប្រព្រឹត្តទៅ ប្រព័ន្ធ Angkor Quant បានចាក់សោរការបើក Market Order ថ្មីនៅលើ Broker ដើម្បីកម្ចាត់ Spread Blowout និង Whipsaw Trap ១០០%។ ទន្ទឹមនឹងនេះ ម៉ាស៊ីន **In-Memory Dual-Directional Stealth Radar** កំពុងចាំស្ទាក់ក្នុង RAM ដើម្បីអនុវត្ត **Turtle Soup Liquidity Sweep Reversal** នៅពេលសន្និសីទបញ្ចប់ និង Spread វិលរកប្រក្រតីភាពឡើងវិញ!\n\n"
             f"{ui_standards.DIVIDER_HEAVY}\n"
-            "👉 _បញ្ជា 1-Tap: `/conference simulate` | `/news FED` | `/capital_scalp`_"
+            "👉 _បញ្ជា 1-Tap: `/conference simulate` | `/news FED` | `/capital`_"
         )
 
 

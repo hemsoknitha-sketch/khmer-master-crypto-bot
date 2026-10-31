@@ -4125,14 +4125,16 @@ class CapitalAutonomousEngine:
             # 100% Dedicated to Capital Preservation & Flat Cash on Weekends (TradFi markets closed)
             return []
             
-        # Monday to Friday: Institutional Kill Zones
+        # Monday to Friday: Institutional Kill Zones (Option C: Core-Satellite Architecture)
+        # Core Anchor: GOLD (XAUUSD) prioritized across all sessions with gold_mathematical_radar.py
+        # Satellites: 10 ~ 15 Prime Liquid Leaders with tight institutional spreads & deep liquidity
+        # Tri-Regional Universe Reference: TOP_100_US_EPICS, TOP_100_EU_EPICS, TOP_100_ASIA_EPICS
         # Wall Street NY Session (13:30 - 20:30 UTC = 20:30 - 03:30 Phnom Penh) - Prime US Mega-Cap Equities & Indices
         if 810 <= utc_min < 1230:
-            raw_assets = ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "GERMANY40"]
+            raw_assets = ["GOLD", "US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "OIL_CRUDE", "GERMANY40"]
             try:
                 import capital_tri_regional_universe as ctru
-                us_epics = getattr(ctru, "TOP_300_US_EPICS", ctru.TOP_100_US_EPICS)
-                raw_assets.extend([a for a in us_epics if a not in raw_assets])
+                _ = ctru.TOP_100_US_EPICS
             except Exception:
                 pass
             if crypto_allowed:
@@ -4142,8 +4144,7 @@ class CapitalAutonomousEngine:
             raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER"]
             try:
                 import capital_tri_regional_universe as ctru
-                eu_epics = getattr(ctru, "TOP_300_EU_EPICS", ctru.TOP_100_EU_EPICS)
-                raw_assets.extend([a for a in eu_epics if a not in raw_assets])
+                _ = ctru.TOP_100_EU_EPICS
             except Exception:
                 pass
             if forex_allowed:
@@ -4155,8 +4156,7 @@ class CapitalAutonomousEngine:
             raw_assets = ["GOLD", "SILVER", "OIL_CRUDE"]
             try:
                 import capital_tri_regional_universe as ctru
-                asia_epics = getattr(ctru, "TOP_300_ASIA_EPICS", ctru.TOP_100_ASIA_EPICS)
-                raw_assets.extend([a for a in asia_epics if a not in raw_assets])
+                _ = ctru.TOP_100_ASIA_EPICS
             except Exception:
                 pass
             if forex_allowed:
@@ -10917,21 +10917,11 @@ class CapitalTrendScalpEngine:
 
     async def execute_scalp_cycle(self, app=None):
         """
-        Executes 24/7 autonomous scalping across registered active users.
-        Sub-50ms Parallel Fan-Out: Evaluates market setups once and dispatches
-        to Super Admin and all VIP users concurrently via asyncio.gather to eliminate sequential lag.
+        [DECOMMISSIONED]: /capital_scalp has been decommissioned in favor of
+        Option C Institutional Core-Satellite Architecture in /capital (AQ108).
+        Eradicates spread drag, double financing, and self-cannibalization.
         """
-        now = time.time()
-        if (now - self._last_cycle_ts) < self._scan_interval:
-            return
-        self._last_cycle_ts = now
-        self._stats["total_scanned"] += 1
-        self._stats["last_scan"] = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S UTC")
-
-        import database as db
-        active_users = db.get_active_capital_scalp_users()
-        if not active_users:
-            return
+        return
 
         sys_engine = get_capital_engine()
         valid_setups = []
@@ -11830,18 +11820,14 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SMART_SESSION_TIMED
     return True, f"Active Window ({current_day_str} {current_time_str} | 07:00-03:45 ICT Full Wall Street Coverage)", info
 
 async def run_capital_auto_cycle(app=None):
-    """Entry point for APScheduler in scheduler_tasks.py."""
+    """Entry point for APScheduler in scheduler_tasks.py (Option C Core-Satellite Architecture)."""
     await CAPITAL_AUTO_ENGINE.execute_autonomous_cycle(app=app)
     await asyncio.sleep(0.02)
     try:
         await get_capital_orb_engine().execute_orb_cycle(app=app)
     except Exception as e_orb:
         logger.debug(f"ORB cycle notice: {e_orb}")
-    await asyncio.sleep(0.02)
-    try:
-        await get_capital_trend_scalp_engine().execute_scalp_cycle(app=app)
-    except Exception as e_scalp:
-        logger.debug(f"Trend scalp cycle notice: {e_scalp}")
+    # Note: /capital_scalp decommissioned in favor of Option C Institutional Core-Satellite Architecture in /capital
 
 async def run_capital_forex_cycle(app=None):
     """Dedicated APScheduler cron task for Forex 24/7 Exchange."""

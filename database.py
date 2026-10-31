@@ -4313,6 +4313,8 @@ def get_active_capital_scalp_users() -> list:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # [DECOMMISSIONED]: /capital_scalp has been decommissioned in favor of Option C
+    return []
     cursor.execute("SELECT chat_id, budget, mode, max_positions, is_demo FROM capital_scalp_config WHERE is_enabled = 1")
     rows = cursor.fetchall()
     conn.close()

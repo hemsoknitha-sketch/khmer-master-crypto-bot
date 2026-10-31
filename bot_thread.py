@@ -7255,25 +7255,11 @@ class TelegramBotThread(BaseThread):
                 await capital_scalp_command(update, context)
             elif data == "btn_cap_scalp_radar":
                 try:
-                    await update.callback_query.answer("⚡ In-Memory Dual Radar Armed for Gold & Shares!")
+                    await update.callback_query.answer("ℹ️ Option C: Core-Satellite Architecture Active!")
                 except Exception:
                     pass
-                import capital_engine
-                scalp_engine = capital_engine.get_capital_trend_scalp_engine()
-                sys_engine = capital_engine.get_capital_engine()
-                await scalp_engine.auto_arm_event_universe_radar(sys_engine)
-                armed_traps = scalp_engine.get_armed_radar_traps()
-                t_lines = []
-                for ep, tr in armed_traps.items():
-                    t_lines.append(f"• `{ep}`: Buy @ `${tr.get('buy_breakout', 0):,.2f}` | Sell @ `${tr.get('sell_breakdown', 0):,.2f}` (SL: `${tr.get('buy_sl', 0):,.2f}`)")
-                traps_str = "\n".join(t_lines) if t_lines else "ពុំទាន់មាន Traps"
-                await update.effective_message.reply_text(
-                    f"🎯 **[IN-MEMORY DUAL RADAR ARMED (GOLD & SHARES)]** ⚡\n"
-                    f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"📡 **កម្រង Traps ក្នុង RAM (0% Broker Exposure) ៖**\n{traps_str}\n\n"
-                    f"🛡️ **ក្បួនការពារ ៖** គ្មាន Order លើ Broker Orderbook, កេះភ្លាម OCO Disarm ភ្លាម <0.1ms, Dynamic Breathing SL!",
-                    parse_mode="Markdown"
-                )
+                context.args = []
+                await capital_scalp_command(update, context)
             elif data == "btn_cap_kelly_toggle":
                 curr_state = db.is_capital_kelly_enabled(chat_id)
                 new_state = not curr_state
@@ -24649,6 +24635,28 @@ class TelegramBotThread(BaseThread):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import capital_engine
             import ui_standards
+
+            # Option C Institutional Core-Satellite Migration & Decommission Notice
+            decom_msg = (
+                f"🏛️ **[CAPITAL SCALP ត្រូវបានបង្រួបបង្រួមចូល /capital ពេញលេញ]** ⚡\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🛡️ **ការសម្រេចចិត្តវិស្វកម្មស្ថាប័ន (Option C: Core-Satellite Architecture) ៖**\n\n"
+                f"មុខងារ `/capital_scalp` ត្រូវបានលុបចោលទាំងស្រុង និងបង្រួបបង្រួមចូលទៅក្នុង `/capital` ដើម្បីលុបបំបាត់ការខាតបង់ដោយអចេតនា និងធានា Win Rate **៧០% – ៨៥%** ៖\n\n"
+                f"1️⃣ **កម្ចាត់ចោល Hedging Conflict & Self-Cannibalization ៖**\n"
+                f"   • លុបបំបាត់ការចូល Buy & Sell ប្រឆាំងគ្នាលើ Gold តែមួយ ដែលនាំឱ្យខាតថ្លៃ Spread ២ ដង និងស៊ីសងកម្ទេចចំណេញគ្នាឯង។\n\n"
+                f"2️⃣ **កម្ចាត់ចោល M1-M5 Spread Drag ៖**\n"
+                f"   • M1-M5 មាន Brownian Noise ខ្ពស់ ដែលធ្វើឱ្យ Spread របស់ឈ្មួញជើងសារស៊ីដាច់ផលចំណេញ។\n\n"
+                f"3️⃣ **ជំនួសដោយ Institutional Core-Satellite លើ M15 ៖**\n"
+                f"   • **Core Anchor (ស្នូលចម្បង) ៖** `GOLD` (XAUUSD) វិភាគស៊ីជម្រៅតាម `gold_mathematical_radar.py` (Hurst, Kalman, SMC FVG/OB, Turtle Soup Sweep)។\n"
+                f"   • **Satellite Majors (១០ ~ ១៥ ទ្រព្យរាវបំផុត) ៖** `US100`, `US500`, `DE40`, `NVDA`, `TSLA`, `AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `OIL_CRUDE` តាមម៉ោង Interbank Kill Zones។\n\n"
+                f"👉 _សូមប្រើប្រាស់ផ្ទាំងបញ្ជា `/capital` សម្រាប់គ្រប់គ្រងការវិនិយោគស្វ័យប្រវត្ត!_"
+            )
+            decom_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏛️ បើកផ្ទាំងបញ្ជា /capital (Core-Satellite)", callback_data="btn_cap_menu")],
+                [InlineKeyboardButton("💼 ពិនិត្យផលប័ត្រ /portfolio", callback_data="btn_menu_portfolio")]
+            ])
+            await update.effective_message.reply_text(decom_msg, parse_mode="Markdown", reply_markup=decom_kb)
+            return
 
             scalp_engine = capital_engine.get_capital_trend_scalp_engine()
             scalp_cfg = db.get_capital_scalp_config(chat_id)
