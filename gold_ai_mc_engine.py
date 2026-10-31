@@ -208,7 +208,7 @@ class GoldAIMCEngine:
         Decides whether Elena should broadcast a speech based on priority and cooldown.
         """
         now = time.time()
-        p = float(data.get("current_price", 2745.50))
+        p = float(data.get("current_price", 3891.00))
         sig = data.get("signal", {})
         action = sig.get("action", "WAIT")
         conf = float(sig.get("confidence", 75.0))

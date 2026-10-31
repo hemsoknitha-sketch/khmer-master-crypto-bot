@@ -60,7 +60,7 @@ except Exception:
 def _generate_fallback_data() -> Dict[str, Any]:
     """Generates clean institutional fallback data during initial cold start (M5 Timeframe)."""
     now = time.time()
-    current_price = _LIVE_TICK.get("price", 3900.00) if "_LIVE_TICK" in globals() else 3900.00
+    current_price = _LIVE_TICK.get("price", 3891.00) if "_LIVE_TICK" in globals() else 3891.00
     candle_ts = (int(now) // 300) * 300
     
     # Generate 60 realistic M5 historical candles around current price
@@ -133,20 +133,20 @@ _WS_CLIENTS = set()
 # SUPER FAST REAL LIVE CANDLES STATE & SUB-SECOND AGGREGATOR
 # -------------------------------------------------------------------------
 _LIVE_TICK = {
-    "price": 3900.00,
-    "prev_price": 3900.00,
-    "spread": 0.18,
-    "bid": 3899.91,
-    "ask": 3900.09,
+    "price": 3891.00,
+    "prev_price": 3891.00,
+    "spread": 0.01,
+    "bid": 3891.00,
+    "ask": 3891.01,
     "timestamp": time.time()
 }
 
 _ACTIVE_CANDLE = {
     "time": (int(time.time()) // 300) * 300,
-    "open": 3900.00,
-    "high": 3900.00,
-    "low": 3900.00,
-    "close": 3900.00,
+    "open": 3891.00,
+    "high": 3891.00,
+    "low": 3891.00,
+    "close": 3891.00,
     "volume": 10.0
 }
 
@@ -164,8 +164,20 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
     spread = round(float(spread), 2) if spread else 0.18
     prev_p = _LIVE_TICK.get("price", price)
     
-    # Sanity check against legacy price contamination
-    if _ACTIVE_CANDLE.get("open", 0.0) < 3200.0 and price > 3500.0:
+    # Sanity check against feed price mismatch or legacy contamination:
+    # If the active candle's open/low/high deviates (> 1.5%) from incoming tick price,
+    # reset active candle immediately so no freak wick or giant box can ever be rendered.
+    candle_open = _ACTIVE_CANDLE.get("open", 0.0)
+    if candle_open > 0 and (abs(price - candle_open) / candle_open > 0.015):
+        _ACTIVE_CANDLE = {
+            "time": candle_ts,
+            "open": price,
+            "high": price,
+            "low": price,
+            "close": price,
+            "volume": 1.0
+        }
+    elif _ACTIVE_CANDLE.get("open", 0.0) < 3200.0 and price > 3500.0:
         _ACTIVE_CANDLE = {
             "time": candle_ts,
             "open": price,
@@ -272,12 +284,22 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
                 "volume": round(float(row['volume']), 2),
             })
         
+        # Sanity filter: filter out any historical candles that deviate by > 3.0% from current_price
+        # (permanently prevents stale 2745.50 candles from ever contaminating the chart)
+        clean_candles = [c for c in candles_list if abs(c["close"] - current_price) / max(1.0, current_price) < 0.03]
+        candles_list = clean_candles if len(clean_candles) >= 15 else candles_list
+
         # Synchronize latest candle with _ACTIVE_CANDLE
         if candles_list:
             now_ts = int(time.time())
             candle_ts = (now_ts // 300) * 300
             last_c = candles_list[-1]
             if last_c["time"] == candle_ts:
+                # Clamp last_c if it differs from current_price due to feed disparity
+                if abs(last_c["open"] - current_price) / max(1.0, current_price) > 0.015:
+                    last_c["open"] = current_price
+                    last_c["high"] = current_price
+                    last_c["low"] = current_price
                 last_c["close"] = current_price
                 last_c["high"] = max(last_c["high"], current_price)
                 last_c["low"] = min(last_c["low"], current_price)
@@ -598,10 +620,11 @@ async def super_fast_live_gold_tick_loop():
 
     while True:
         try:
-            # Tier 1: WebSocket Stream from Binance (with mirror failover)
+            # Tier 1: WebSocket Stream from Binance Futures XAUUSDT (Direct Match with Candlesticks)
             ws_endpoints = [
-                "wss://stream.binance.com:9443/ws/paxgusdt@bookTicker",
-                "wss://data-stream.binance.vision/ws/paxgusdt@bookTicker"
+                "wss://fstream.binance.com/ws/xauusdt@bookTicker",
+                "wss://fstream.binance.com/ws/paxgusdt@bookTicker",
+                "wss://stream.binance.com:9443/ws/paxgusdt@bookTicker"
             ]
             ws_url = ws_endpoints[0]
             timeout = aiohttp.ClientTimeout(total=None, sock_connect=5, sock_read=15)
@@ -645,7 +668,7 @@ async def super_fast_live_gold_tick_loop():
                 async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2.0)) as rest_session:
                     for _ in range(30):  # 30 * 0.4s = 12s
                         try:
-                            async with rest_session.get("https://api.binance.com/api/v3/ticker/bookTicker?symbol=PAXGUSDT") as r:
+                            async with rest_session.get("https://fapi.binance.com/fapi/v1/ticker/bookTicker?symbol=XAUUSDT") as r:
                                 if r.status == 200:
                                     d = await r.json()
                                     bid = float(d.get("bidPrice", 0.0))
