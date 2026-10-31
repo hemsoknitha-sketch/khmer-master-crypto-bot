@@ -3491,6 +3491,12 @@ async def handle_style(request: web.Request) -> web.FileResponse:
     return resp
 
 
+async def handle_lightweight_charts(request: web.Request) -> web.FileResponse:
+    js_p = os.path.join(STATIC_DIR, "lightweight-charts.standalone.production.js")
+    resp = web.FileResponse(js_p)
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
+
 async def handle_gold_live_view(request: web.Request) -> web.FileResponse:
     html_p = os.path.join(STATIC_DIR, "gold_live_view.html")
     resp = web.FileResponse(html_p)
@@ -3651,6 +3657,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/app.js", handle_script)
     app.router.add_get("/gold_live_view", handle_gold_live_view)
     app.router.add_get("/chart", handle_gold_live_view)
+    app.router.add_get("/lightweight-charts.standalone.production.js", handle_lightweight_charts)
     app.router.add_get("/live_chart", handle_gold_live_view)
     app.router.add_get("/api/gold_m1_live", handle_api_gold_m1_live)
     app.router.add_get("/api/gold_m5_live", handle_api_gold_m1_live)

@@ -15,7 +15,13 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500;700;800&display=swap"
     rel="stylesheet">
   <!-- TradingView Lightweight Charts (CDN with Fallback) -->
-  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- TradingView Lightweight Charts (Local High-Speed Cache with CDN Fallback) -->
+  <script src="/lightweight-charts.standalone.production.js"></script>
+  <script>
+    if (typeof LightweightCharts === 'undefined') {
+      document.write('<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"><\/script>');
+    }
+  </script>
   <style>
     * {
       box-sizing: border-box;
@@ -1255,6 +1261,9 @@
         borderColor: 'rgba(255, 255, 255, 0.1)',
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 8,
+        barSpacing: 10,
+        minBarSpacing: 3,
       },
     });
 
@@ -1266,6 +1275,17 @@
         });
       }
     });
+
+    if (window.ResizeObserver && chartContainer) {
+      const resizeObserver = new ResizeObserver(entries => {
+        if (!entries || !entries[0] || !entries[0].contentRect) return;
+        const { width, height } = entries[0].contentRect;
+        if (width > 0 && height > 0 && chart) {
+          chart.applyOptions({ width: Math.floor(width), height: Math.floor(height) });
+        }
+      });
+      resizeObserver.observe(chartContainer);
+    }
 
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#00E676',

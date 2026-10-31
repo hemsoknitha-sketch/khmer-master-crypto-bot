@@ -63,6 +63,7 @@ sudo systemctl stop khmer-master-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto.service 2>/dev/null || \
 sudo systemctl stop khmer-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto-bot 2>/dev/null || true
+sudo systemctl stop angkor-gold-youtube-live.service 2>/dev/null || true
 { sudo pkill -9 -f "python.*main.py" >/dev/null 2>&1; } || true
 stty sane 2>/dev/null || true
 stty onlcr 2>/dev/null || true
@@ -207,6 +208,7 @@ else
     sudo systemctl restart khmer-master-crypto.service 2>/dev/null || \
     sudo systemctl restart khmer-crypto-bot.service 2>/dev/null || \
     sudo systemctl restart khmer-master-crypto-bot 2>/dev/null || true
+    sudo systemctl restart angkor-gold-youtube-live.service 2>/dev/null || true
 fi
 
 # Reset terminal to pristine clean state
