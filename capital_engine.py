@@ -4141,9 +4141,9 @@ class CapitalAutonomousEngine:
                 pass
             if crypto_allowed:
                 raw_assets.append("BTCUSD")
-        # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh) - Prime Focus on GOLD & DE40 (DAX)
+        # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh) - Prime Focus on GOLD & DE40 (DAX) + US500
         elif 420 <= utc_min < 810:
-            raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER"]
+            raw_assets = ["GOLD", "GERMANY40", "US500", "OIL_CRUDE", "SILVER"]
             try:
                 import capital_tri_regional_universe as ctru
                 _ = ctru.TOP_100_EU_EPICS

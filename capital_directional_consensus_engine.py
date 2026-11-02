@@ -183,16 +183,16 @@ class InstitutionalDirectionalConsensusEngine:
         # ----------------------------------------------------------------------
         # FINAL RESOLUTION (SINGLE-DIRECTION CONVICTION)
         # ----------------------------------------------------------------------
-        min_threshold = 68.0
+        min_threshold = 52.0  # Invariant 92: Dynamic Regime-Aware Threshold (p_cut = 0.52)
         final_dir = "STANDBY"
         final_conf = 50.0
 
-        if score_buy >= min_threshold and score_buy > (score_sell * 1.25) and not veto_long:
+        if score_buy >= min_threshold and score_buy > (score_sell * 1.15) and not veto_long:
             final_dir = "BUY"
-            final_conf = round(min(98.5, max(75.0, score_buy)), 1)
-        elif score_sell >= min_threshold and score_sell > (score_buy * 1.25) and not veto_short:
+            final_conf = round(min(98.5, max(70.0, score_buy)), 1)
+        elif score_sell >= min_threshold and score_sell > (score_buy * 1.15) and not veto_short:
             final_dir = "SELL"
-            final_conf = round(min(98.5, max(75.0, score_sell)), 1)
+            final_conf = round(min(98.5, max(70.0, score_sell)), 1)
         else:
             final_dir = "STANDBY"
             final_conf = round(max(score_buy, score_sell), 1)
@@ -363,14 +363,25 @@ class InstitutionalDirectionalConsensusEngine:
         try:
             raw_epic = epic.upper()
             if "GOLD" in raw_epic or "XAU" in raw_epic:
-                import gold_mathematical_radar as gmr
-                sig_data = gmr.get_cached_gold_signal() if hasattr(gmr, "get_cached_gold_signal") else {}
-                if sig_data and sig_data.get("status") == "success":
-                    sig = sig_data.get("signal", {})
-                    act = str(sig.get("action", "NEUTRAL")).upper()
-                    conf = float(sig.get("confidence", 75.0))
-                    dir_str = "BULLISH" if act == "BUY" else ("BEARISH" if act == "SELL" else "NEUTRAL")
-                    return {"direction": dir_str, "confidence": conf, "source": "GOLD_MATHEMATICAL_RADAR"}
+                try:
+                    import gold_mathematical_radar as gmr
+                    import pandas as pd
+                    df_c = pd.DataFrame(candles_15m) if candles_15m else None
+                    math_edge = gmr.analyze_gold_mathematical_edge(
+                        current_price=current_price,
+                        candles_df=df_c,
+                        tips_bias="STRONG_BULLISH"
+                    )
+                    m_verdict = str(math_edge.get("math_verdict", "NEUTRAL")).upper()
+                    bayes = math_edge.get("bayesian_confluence", {})
+                    p_bull = float(bayes.get("posterior_bullish_prob", 0.5))
+                    p_bear = float(bayes.get("posterior_bearish_prob", 0.5))
+                    if "BUY" in m_verdict or p_bull >= 0.65:
+                        return {"direction": "BULLISH", "confidence": round(p_bull * 100, 1), "source": "GOLD_MATHEMATICAL_RADAR"}
+                    elif "SELL" in m_verdict or p_bear >= 0.65:
+                        return {"direction": "BEARISH", "confidence": round(p_bear * 100, 1), "source": "GOLD_MATHEMATICAL_RADAR"}
+                except Exception as e_gm:
+                    logger.debug(f"Pillar 5 Gold radar note: {e_gm}")
 
             # For Indices and Equities: Evaluate Kalman Trend Drift & Hurst Exponent
             closes = [c["close"] for c in candles_15m]
@@ -400,6 +411,8 @@ class InstitutionalDirectionalConsensusEngine:
             losses.append(max(0.0, -chg))
         avg_gain = sum(gains[-period:]) / period
         avg_loss = sum(losses[-period:]) / period
+        if avg_gain == 0.0 and avg_loss == 0.0:
+            return 50.0
         if avg_loss == 0.0:
             return 100.0
         rs = avg_gain / avg_loss
@@ -418,11 +431,13 @@ class InstitutionalDirectionalConsensusEngine:
             r_range = max(cum_dev) - min(cum_dev)
             variance = sum(d ** 2 for d in deviations) / len(deviations)
             s_std = math.sqrt(max(1e-9, variance))
+            if s_std <= 0 or r_range <= 0:
+                return 0.50
             rs = r_range / s_std
-            if rs <= 0:
+            if rs <= 1.0:
                 return 0.50
             hurst = math.log(rs) / math.log(len(returns))
-            return max(0.0, min(1.0, hurst))
+            return max(0.10, min(0.95, hurst))
         except Exception:
             return 0.50
 

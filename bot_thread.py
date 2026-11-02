@@ -27105,6 +27105,132 @@ class TelegramBotThread(BaseThread):
                     await capital_scalp_command(update, context)
                     return
 
+                # Institutional 1-Tap Signal Fast Execution Handler (/capital buy / /capital sell)
+                elif action in ["BUY", "SELL", "LONG", "SHORT"]:
+                    norm_dir = "BUY" if action in ["BUY", "LONG"] else "SELL"
+                    if len(args) < 2:
+                        await update.effective_message.reply_text(
+                            f"⚠️ **Syntax:** `/capital {action.lower()} <EPIC> [lot=0.05] [sl=...] [tp=...]`\n"
+                            f"• Example: `/capital buy GOLD lot=0.05`",
+                            parse_mode="Markdown"
+                        )
+                        return
+
+                    target_epic = str(args[1]).upper().strip()
+                    res_epic = capital_engine.EPIC_MAP.get(target_epic, target_epic)
+
+                    # Parse optional kwargs (lot=..., sl=..., tp=...) or positional arguments
+                    order_lot = None
+                    order_sl = None
+                    order_tp = None
+
+                    for extra_tok in args[2:]:
+                        tok_s = str(extra_tok).strip()
+                        if "=" in tok_s:
+                            k_part, v_part = tok_s.split("=", 1)
+                            k_clean = k_part.lower().strip()
+                            try:
+                                v_val = float(v_part.strip())
+                                if k_clean in ["lot", "size", "lots"]:
+                                    order_lot = v_val
+                                elif k_clean in ["sl", "stop", "stoploss", "stop_loss"]:
+                                    order_sl = v_val
+                                elif k_clean in ["tp", "target", "takeprofit", "take_profit", "tp1"]:
+                                    order_tp = v_val
+                            except ValueError:
+                                pass
+                        else:
+                            try:
+                                num_val = float(tok_s)
+                                if order_lot is None:
+                                    order_lot = num_val
+                                elif order_sl is None:
+                                    order_sl = num_val
+                                elif order_tp is None:
+                                    order_tp = num_val
+                            except ValueError:
+                                pass
+
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    wait_msg = await update.effective_message.reply_text(
+                        f"⚡ **[ANGKOR QUANT EXECUTING TRADFI ORDER...]** 🎯\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ **ឧបករណ៍ ៖** `{res_epic}` | **ទិសដៅ ៖** `{'🟢 BUY' if norm_dir == 'BUY' else '🔴 SELL'}`\n"
+                        f"⏳ _កំពុងបញ្ជូនកុម្ម៉ង់ទៅកាន់ Capital.com ក្នុងល្បឿន Sub-Millisecond..._",
+                        parse_mode="Markdown"
+                    )
+
+                    t_res = await asyncio.to_thread(
+                        c_eng.execute_smart_tradfi_order,
+                        epic=res_epic,
+                        direction=norm_dir,
+                        size=order_lot,
+                        sl=order_sl,
+                        tp=order_tp,
+                        bypass_quant_eval=True,
+                        bypass_citadel=True,
+                        setup_type="VIP_1TAP_EXECUTION"
+                    )
+
+                    if t_res.get("success"):
+                        deal_id = t_res.get("deal_reference") or t_res.get("response", {}).get("dealId", "OK")
+                        exec_px = t_res.get("entry_price") or t_res.get("price") or 0.0
+                        exec_sl = t_res.get("sl", 0.0)
+                        exec_tp = t_res.get("tp", 0.0)
+                        exec_sz = t_res.get("size", order_lot or 0.05)
+                        prec = capital_engine._get_tradfi_precision(res_epic, exec_px or 1.0)
+
+                        # Record trade in DB for automated trailing and breakeven armor
+                        db.record_capital_auto_trade(
+                            chat_id=chat_id,
+                            deal_id=str(deal_id),
+                            deal_reference=str(deal_id),
+                            epic=res_epic,
+                            direction=norm_dir,
+                            size=exec_sz,
+                            entry_price=exec_px,
+                            sl=exec_sl,
+                            tp=exec_tp,
+                            scale_tier=0,
+                            sl_dist=t_res.get("sl_dist", 0.0),
+                            tranche_id="SINGLE",
+                            tp1=exec_tp,
+                            tp2=t_res.get("tp2", 0.0),
+                            tp3=0.0
+                        )
+
+                        close_kb = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("📊 មើល Positions ទាំងអស់", callback_data="btn_cap_positions")],
+                            [InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_cap_refresh")]
+                        ])
+
+                        succ_card = (
+                            f"🏆 **[CAPITAL.COM ORDER EXECUTED]** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏛️ **ឧបករណ៍ ៖** `{res_epic}`\n"
+                            f"🚀 **សកម្មភាព ៖** `{'🟢 LONG / BUY' if norm_dir == 'BUY' else '🔴 SHORT / SELL'}`\n"
+                            f"📦 **ទំហំកិច្ចសន្យា (Lot) ៖** `{exec_sz}`\n"
+                            f"💵 **តម្លៃចូល (Entry) ៖** `${exec_px:,.{prec}f}`\n"
+                            f"🛑 **Stop-Loss (1R) ៖** `${exec_sl:,.{prec}f}`\n"
+                            f"🎯 **Take-Profit (TP1) ៖** `${exec_tp:,.{prec}f}`\n"
+                            f"🆔 **Deal Reference ៖** `{deal_id}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛡️ _Breakeven Armor & Golden 85% Ratchet បានបើកដំណើរការការពារ ២៤/៧!_"
+                        )
+                        await wait_msg.edit_text(succ_card, parse_mode="Markdown", reply_markup=close_kb)
+                    else:
+                        err_text = t_res.get("error", "Unknown broker error")
+                        fail_card = (
+                            f"❌ **[CAPITAL.COM ORDER REJECTED]** ⚠️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏛️ **ឧបករណ៍ ៖** `{res_epic}` | **ទិសដៅ ៖** `{norm_dir}`\n"
+                            f"⚠️ **មូលហេតុ ៖** `{err_text}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _សូមពិនិត្យមើលសមតុល្យ Free Margin ឬភ្ជាប់ API ឡើងវិញតាម `/capital API`!_"
+                        )
+                        await wait_msg.edit_text(fail_card, parse_mode="Markdown")
+                    return
+
             # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
             if args:
                 first_tok = str(args[0]).strip().replace('$', '')

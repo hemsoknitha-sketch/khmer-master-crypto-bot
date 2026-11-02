@@ -1067,9 +1067,10 @@ class TradFiH4MarketStructureAnchor:
     @classmethod
     def evaluate_h4_trend_anchor(
         cls,
-        engine: Any,
-        epic: str,
-        current_price: float = 0.0
+        engine: Any = None,
+        epic: str = "",
+        current_price: float = 0.0,
+        candles_h4: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Analyzes H4 candles (up to 100-200 bars) to establish the Macro Trend Anchor.
@@ -1109,12 +1110,15 @@ class TradFiH4MarketStructureAnchor:
             "reason": "Insufficient H4 candles; anchor neutral."
         }
 
-        candles_h4 = get_cached_htf_candles(engine, resolved_epic, resolution="HOUR_4", max_bars=100, ttl_sec=120.0)
-        is_fallback = False
-        if not candles_h4 or len(candles_h4) < 15:
-            # Fallback to H1 candles if H4 unavailable
-            candles_h4 = get_cached_htf_candles(engine, resolved_epic, resolution="HOUR", max_bars=100, ttl_sec=60.0)
-            is_fallback = True
+        if candles_h4 is None or len(candles_h4) < 12:
+            candles_h4 = get_cached_htf_candles(engine, resolved_epic, resolution="HOUR_4", max_bars=100, ttl_sec=120.0)
+            is_fallback = False
+            if not candles_h4 or len(candles_h4) < 15:
+                # Fallback to H1 candles if H4 unavailable
+                candles_h4 = get_cached_htf_candles(engine, resolved_epic, resolution="HOUR", max_bars=100, ttl_sec=60.0)
+                is_fallback = True
+        else:
+            is_fallback = False
 
         if not candles_h4 or len(candles_h4) < 12:
             cls._ANCHOR_CACHE[cache_key] = (now, default_res)
@@ -1217,6 +1221,9 @@ class TradFiH4MarketStructureAnchor:
             "reason": reason
         }
         cls._ANCHOR_CACHE[cache_key] = (now, res)
+        return res
+
+
 class TradFiTurtleSoupEngine:
     """
     🏛️ Institutional TradFi Turtle Soup Liquidity Sweep Reversal Engine (Pillar 1 / Invariant 95).
@@ -4278,16 +4285,37 @@ class CapitalInMemoryVirtualRadar:
                             "setup": "INSTITUTIONAL_FVG_GOLDEN_POCKET_RETEST"
                         }
 
+            # Stateful Liquidity Sweep Tracking (Invariant 76 & 95)
+            # 1. Track Bearish Sweep (Punching above swing_high to harvest retail stop liquidity)
+            if current_ask >= swing_high or (sell_sweep > 0 and current_ask >= sell_sweep):
+                trap["has_swept_high"] = True
+                trap["highest_sweep_price"] = max(trap.get("highest_sweep_price", current_ask), current_ask)
+
+            # 2. Track Bullish Sweep (Punching below swing_low to harvest retail stop liquidity)
+            if current_bid <= swing_low or (buy_sweep > 0 and current_bid <= buy_sweep):
+                trap["has_swept_low"] = True
+                trap["lowest_sweep_price"] = min(trap.get("lowest_sweep_price", current_bid), current_bid)
+
             # Check 1: Bullish Breakout OR Sweep Spring Bounce
             is_buy_breakout = (mode not in ["SELL", "SELL_ONLY"] and buy_trigger > 0 and mid_price >= buy_trigger)
-            is_buy_sweep_spring = (mode in ["SWEEP", "DUAL", "BUY", "BUY_ONLY"] and buy_sweep > 0 and current_bid <= swing_low and mid_price >= swing_low)
+            is_buy_sweep_spring = (
+                mode in ["SWEEP", "DUAL", "BUY", "BUY_ONLY"] and
+                buy_sweep > 0 and
+                (
+                    (trap.get("has_swept_low", False) and mid_price >= swing_low)
+                    or (current_bid <= swing_low and mid_price >= swing_low)
+                )
+            )
 
             if is_buy_breakout or is_buy_sweep_spring:
                 exec_side = "BUY"
                 exec_price = current_ask if current_ask > 0 else mid_price
                 trigger_type = "BREAKOUT_MOMENTUM" if is_buy_breakout else "SWEEP_SPRING_BOUNCE"
                 if trigger_type == "SWEEP_SPRING_BOUNCE":
-                    sl_val = trap.get("sweep_buy_sl", trap["buy_sl"])
+                    lowest_p = trap.get("lowest_sweep_price", swing_low)
+                    prec = trap.get("precision", 2)
+                    sweep_sl = round(lowest_p - max(benchmark * 2.0, trap.get("atr_15m", 10.0) * 0.12), prec)
+                    sl_val = trap.get("sweep_buy_sl", sweep_sl)
                     tp1_val = trap.get("sweep_buy_tp1", trap["buy_tp1"])
                     tp2_val = trap.get("sweep_buy_tp2", trap["buy_tp2"])
                 else:
@@ -4321,20 +4349,30 @@ class CapitalInMemoryVirtualRadar:
                     "sl": sl_val,
                     "tp": tp1_val,
                     "tp2": tp2_val,
-                    "sl_dist": trap["sl_dist"],
+                    "sl_dist": abs(exec_price - sl_val),
                     "confidence": 92.5
                 }
 
             # Check 2: Bearish Breakdown OR Blow-off Top Rejection
             is_sell_breakdown = (mode not in ["BUY", "BUY_ONLY"] and sell_trigger > 0 and mid_price <= sell_trigger)
-            is_sell_sweep_rejection = (mode in ["SWEEP", "DUAL", "SELL", "SELL_ONLY"] and sell_sweep > 0 and current_ask >= swing_high and mid_price <= swing_high)
+            is_sell_sweep_rejection = (
+                mode in ["SWEEP", "DUAL", "SELL", "SELL_ONLY"] and
+                sell_sweep > 0 and
+                (
+                    (trap.get("has_swept_high", False) and mid_price <= swing_high)
+                    or (current_ask >= swing_high and mid_price <= swing_high)
+                )
+            )
 
             if is_sell_breakdown or is_sell_sweep_rejection:
                 exec_side = "SELL"
                 exec_price = current_bid if current_bid > 0 else mid_price
                 trigger_type = "BREAKDOWN_MOMENTUM" if is_sell_breakdown else "SWEEP_BLOWOFF_FADE"
                 if trigger_type == "SWEEP_BLOWOFF_FADE":
-                    sl_val = trap.get("sweep_sell_sl", trap["sell_sl"])
+                    highest_p = trap.get("highest_sweep_price", swing_high)
+                    prec = trap.get("precision", 2)
+                    sweep_sl = round(highest_p + max(benchmark * 2.0, trap.get("atr_15m", 10.0) * 0.12), prec)
+                    sl_val = trap.get("sweep_sell_sl", sweep_sl)
                     tp1_val = trap.get("sweep_sell_tp1", trap["sell_tp1"])
                     tp2_val = trap.get("sweep_sell_tp2", trap["sell_tp2"])
                 else:
