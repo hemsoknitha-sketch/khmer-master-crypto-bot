@@ -2052,3 +2052,27 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
    - **Adaptive Parameter Ratchet:** Dynamically calibrates Market Regime, ADX Threshold (25.0), Equilibrium Chop Zone Clamp (35% - 65%), Target R:R (1:3.0), and Breakeven Armor Floor ($2.50) across the entire 900-asset universe.
    - **Dual Storage Synchronization:** Syncs hot weights to Local NVMe disk and Hugging Face Cloud Hub (`hemsinath/angkor-quant-data`).
    - **Single Comprehensive Master Telegram Broadcast:** Emits exactly ONE unified institutional master report to Super Admin (859271875) at 03:30 AM ICT, completely eliminating split or confusing reports.
+
+
+
+### 2.2.33 INVARIANT 109: INSTITUTIONAL 5-PILLAR DIRECTIONAL CONSENSUS ENGINE, SINGLE-DIRECTION ARMING & REAL-TIME VIP SIGNAL ALERT STANDARD (AQ109)
+**(កតិកាសញ្ញាកាត់សេចក្តីទិសដៅតែមួយ ៥ ជាន់ កម្ចាត់ Pending ២ ទិសដៅក្នុង RAM & ផ្ញើ Signal Alerts ជាក់លាក់ទៅកាន់ VIPs - Invariant 109)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+1. **Elimination of Dual-Pending Ambiguity (លុបបំបាត់ការ Pending ២ ទិសដៅក្នុង RAM ១០០%):**
+   - The system strictly prohibits ambiguous dual-direction boundary traps (`mode="DUAL"`) where BUY and SELL triggers are armed simultaneously without prior directional conviction.
+   - All armed virtual traps in RAM (`arm_radar_trap`) must be pre-filtered and certified by the Institutional 5-Pillar Directional Consensus Engine (`capital_directional_consensus_engine.py`):
+     - `BUY_ONLY`: strictly locks `sell_breakdown = 0.0`, `sell_sweep = 0.0`, `sell_fvg_trigger = 0.0`.
+     - `SELL_ONLY`: strictly locks `buy_breakout = 0.0`, `buy_sweep = 0.0`, `buy_fvg_trigger = 0.0`.
+     - `STANDBY`: when models are in conflict or in chop, zero orders are armed in RAM, maintaining 100% Flat Cash capital preservation.
+2. **The 5-Pillar Directional Consensus Hierarchy (គណៈកម្មការកាត់សេចក្តីបរិមាណ ៥ ជាន់):**
+   - **Pillar 1: Wall Street Institutional H4 Structural Trend Anchor (25% Weight - Invariant 94):** Evaluates H4 EMA200 stack and swing structure (BOS, CHOCH, HH-HL vs LH-LL). Bullish H4 strictly vetoes Shorts; Bearish H4 strictly vetoes Longs.
+   - **Pillar 2: Gaussian HMM 3-State Probabilistic Market Regime (20% Weight - Invariant 86 & 93):** Evaluates rolling log-returns drift and variance. State 0 (Bull Trend) certifies Longs; State 1 (Bear Trend) certifies Shorts; State 2 (Chop) reduces score.
+   - **Pillar 3: Marcos López de Prado AFML Stacking Meta-Labeling Model (25% Weight - Invariant 85 & 96):** Heterogeneous ensemble (XGBoost 40% + LightGBM 40% + CatBoost 20%) computing real-time out-of-sample win probability $\hat{p} \ge 0.58$ from live Bollinger %B, Williams %R, and Shannon Entropy.
+   - **Pillar 4: Institutional CVD Order Flow Microstructure & Whale Absorption Engine (15% Weight - Invariant 97):** Reconstructs volume delta $\Delta V_t = V_t \cdot (C_t - O_t) / \max(\epsilon, H_t - L_t)$. Bullish Absorption (falling price + rising CVD) certifies Longs; Bearish Distribution certifies Shorts.
+   - **Pillar 5: Intermarket Macro Covariance & Gold Mathematical Radar (15% Weight - Invariant 88 & 100):** Multi-scale Hurst Surface ($H > 0.55$ persistent trend), Kalman 1D state drift extraction, US TIPS 10Y real yield inverse correlation, London Fix and Shanghai Gold Exchange (SGE) physical arbitrage premium.
+3. **Consensus Arbitration Matrix & Fiduciary Vetoes:**
+   - Directional Score $\ge 68.0$, winner ratio $> 1.25\times$, and zero fiduciary vetoes required for single-direction certification.
+   - Anti-Oversold Short Guard (15m RSI $\le 36.0$) strictly vetoes Shorts; Anti-Overbought Peak Guard (15m RSI $\ge 70.0$) strictly vetoes Longs.
+4. **Two-Tier Real-Time VIP Signal Alert Standard:**
+   - **Tier A (Pre-Arming Alert):** When 5-Pillar Consensus reaches $\ge 75.0\%$ confidence, system broadcasts Pre-Arming Radar Alert to VIP Telegram subscribers, detailing Direction, Awaiting Trigger Price, SL, TP1, and TP2, allowing users to prepare capital.
+   - **Tier B (Instant Execution Sniper Alert):** At sub-millisecond latency (<0.05ms) upon boundary trigger piercing, broadcasts Real-Time Sniper Alert with 1-Tap Copyable command (`/capital buy/sell epic lot=... sl=... tp=...`), entry price, structural SL, and asymmetric TP targets.

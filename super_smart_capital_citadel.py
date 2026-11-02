@@ -3967,6 +3967,17 @@ class CapitalInMemoryVirtualRadar:
             except Exception as e_fvg_arm:
                 logger.debug(f"FVG arming note for {raw_epic}: {e_fvg_arm}")
 
+        # Single-Direction Hard Clamping (Invariant 108: Eliminate Dual-Pending Order Ambiguity)
+        mode_u = mode.upper().strip()
+        if mode_u in ["BUY", "BUY_ONLY"]:
+            sell_breakdown = 0.0
+            sell_sweep = 0.0
+            sell_fvg_trigger = 0.0
+        elif mode_u in ["SELL", "SELL_ONLY"]:
+            buy_breakout = 0.0
+            buy_sweep = 0.0
+            buy_fvg_trigger = 0.0
+
         trap_data = {
             "trap_key": trap_key,
             "epic": raw_epic,
@@ -4016,11 +4027,22 @@ class CapitalInMemoryVirtualRadar:
 
         cls._ARMED_TRAPS[trap_key] = trap_data
         cls._STATS["total_traps_armed"] += 1
-        logger.info(
-            f"🎯 [CAPITAL RADAR ARMED] {raw_epic} ({engine_source}|{mode}) in RAM | "
-            f"BUY Trigger: ${buy_breakout:,.{prec}f} (SL: ${buy_sl:,.{prec}f}, TP1: ${buy_tp1:,.{prec}f}) | "
-            f"SELL Trigger: ${sell_breakdown:,.{prec}f} (SL: ${sell_sl:,.{prec}f}, TP1: ${sell_tp1:,.{prec}f})"
-        )
+        if mode_u in ["BUY", "BUY_ONLY"]:
+            logger.info(
+                f"🎯 [CAPITAL RADAR ARMED] {raw_epic} ({engine_source}|BUY_ONLY) in RAM | "
+                f"BUY Trigger: ${buy_breakout:,.{prec}f} (SL: ${buy_sl:,.{prec}f}, TP1: ${buy_tp1:,.{prec}f})"
+            )
+        elif mode_u in ["SELL", "SELL_ONLY"]:
+            logger.info(
+                f"🎯 [CAPITAL RADAR ARMED] {raw_epic} ({engine_source}|SELL_ONLY) in RAM | "
+                f"SELL Trigger: ${sell_breakdown:,.{prec}f} (SL: ${sell_sl:,.{prec}f}, TP1: ${sell_tp1:,.{prec}f})"
+            )
+        else:
+            logger.info(
+                f"🎯 [CAPITAL RADAR ARMED] {raw_epic} ({engine_source}|{mode}) in RAM | "
+                f"BUY Trigger: ${buy_breakout:,.{prec}f} (SL: ${buy_sl:,.{prec}f}, TP1: ${buy_tp1:,.{prec}f}) | "
+                f"SELL Trigger: ${sell_breakdown:,.{prec}f} (SL: ${sell_sl:,.{prec}f}, TP1: ${sell_tp1:,.{prec}f})"
+            )
         return trap_data
 
     @classmethod
@@ -4126,7 +4148,7 @@ class CapitalInMemoryVirtualRadar:
             # Check 0: Institutional Fair Value Gap (FVG) & Golden Pocket (0.618) Retest Trigger
             if trap.get("has_fvg_trap"):
                 # Bullish FVG Retest Bounce
-                if trap.get("buy_fvg_trigger", 0.0) > 0 and trap.get("buy_fvg_bottom", 0.0) > 0:
+                if mode not in ["SELL", "SELL_ONLY"] and trap.get("buy_fvg_trigger", 0.0) > 0 and trap.get("buy_fvg_bottom", 0.0) > 0:
                     b_top = trap["buy_fvg_top"]
                     b_bot = trap["buy_fvg_bottom"]
                     b_trig = trap["buy_fvg_trigger"]
@@ -4166,7 +4188,7 @@ class CapitalInMemoryVirtualRadar:
                         }
 
                 # Bearish FVG Retest Rejection
-                if trap.get("sell_fvg_trigger", 0.0) > 0 and trap.get("sell_fvg_top", 0.0) > 0:
+                if mode not in ["BUY", "BUY_ONLY"] and trap.get("sell_fvg_trigger", 0.0) > 0 and trap.get("sell_fvg_top", 0.0) > 0:
                     s_top = trap["sell_fvg_top"]
                     s_bot = trap["sell_fvg_bottom"]
                     s_trig = trap["sell_fvg_trigger"]
@@ -4206,8 +4228,8 @@ class CapitalInMemoryVirtualRadar:
                         }
 
             # Check 1: Bullish Breakout OR Sweep Spring Bounce
-            is_buy_breakout = (mid_price >= buy_trigger)
-            is_buy_sweep_spring = (mode in ["SWEEP", "DUAL"] and buy_sweep > 0 and current_bid <= swing_low and mid_price >= swing_low)
+            is_buy_breakout = (mode not in ["SELL", "SELL_ONLY"] and buy_trigger > 0 and mid_price >= buy_trigger)
+            is_buy_sweep_spring = (mode in ["SWEEP", "DUAL", "BUY", "BUY_ONLY"] and buy_sweep > 0 and current_bid <= swing_low and mid_price >= swing_low)
 
             if is_buy_breakout or is_buy_sweep_spring:
                 exec_side = "BUY"
@@ -4253,8 +4275,8 @@ class CapitalInMemoryVirtualRadar:
                 }
 
             # Check 2: Bearish Breakdown OR Blow-off Top Rejection
-            is_sell_breakdown = (mid_price <= sell_trigger)
-            is_sell_sweep_rejection = (mode in ["SWEEP", "DUAL"] and sell_sweep > 0 and current_ask >= swing_high and mid_price <= swing_high)
+            is_sell_breakdown = (mode not in ["BUY", "BUY_ONLY"] and sell_trigger > 0 and mid_price <= sell_trigger)
+            is_sell_sweep_rejection = (mode in ["SWEEP", "DUAL", "SELL", "SELL_ONLY"] and sell_sweep > 0 and current_ask >= swing_high and mid_price <= swing_high)
 
             if is_sell_breakdown or is_sell_sweep_rejection:
                 exec_side = "SELL"

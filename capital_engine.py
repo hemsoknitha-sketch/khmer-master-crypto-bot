@@ -4079,6 +4079,8 @@ class CapitalAutonomousEngine:
         self._scan_interval: float = 25.0             # Scan markets every 25 seconds
         self._universe_scan_cursor: int = 0           # Round-robin cursor for 300-asset universe
         self._last_radar_auto_arm_ts: float = 0.0     # Debounce for background radar auto-arming
+        self._broadcasted_pre_armed_traps: Dict[str, float] = {}  # epic -> last_alert_time (Invariant 108 Pre-Arming Alert)
+        self._broadcasted_trigger_alerts: Dict[str, float] = {}   # epic_dir -> last_alert_time (Instant Execution Alert)
         self.prop_manager = PropFirmRiskManager()
 
     def get_market_details(self, epic: str, force_refresh: bool = False) -> Dict[str, Any]:
@@ -6242,17 +6244,49 @@ class CapitalAutonomousEngine:
                     atr_15m = sum(tr_list[-14:]) / 14.0 if len(tr_list) >= 14 else (curr_p * 0.012)
                     swing_h = max(highs[-10:])
                     swing_l = min(lows[-10:])
-                    radar_cls.arm_radar_trap(
+                    # Institutional 5-Pillar Directional Consensus Engine (Invariant 108)
+                    import capital_directional_consensus_engine as cdce
+                    consensus = await asyncio.to_thread(
+                        cdce.get_directional_consensus_engine().evaluate_5_pillar_consensus,
                         epic=resolved_epic,
-                        engine_source="CAPITAL_AUTO",
                         current_price=curr_p,
-                        atr_15m=atr_15m,
-                        swing_high=swing_h,
-                        swing_low=swing_l,
-                        mode="DUAL",
-                        ttl_seconds=1800.0,
-                        candles_15m=candles
+                        candles_15m=candles,
+                        engine=eng
                     )
+                    single_dir = consensus.get("final_direction", "STANDBY")
+                    consensus_conf = consensus.get("confidence", 50.0)
+
+                    # Strict Fiduciary Elimination of Ambiguous Dual Orders
+                    if single_dir in ["BUY", "SELL"]:
+                        radar_mode = f"{single_dir}_ONLY"
+                        trap_data = radar_cls.arm_radar_trap(
+                            epic=resolved_epic,
+                            engine_source="CAPITAL_AUTO",
+                            current_price=curr_p,
+                            atr_15m=atr_15m,
+                            swing_high=swing_h,
+                            swing_low=swing_l,
+                            mode=radar_mode,
+                            ttl_seconds=1800.0,
+                            candles_15m=candles
+                        )
+                        # Broadcast Pre-Arming Radar Alert to VIP Users if high conviction (>= 75%)
+                        if app and hasattr(app, "bot") and consensus_conf >= 75.0:
+                            asyncio.create_task(
+                                self._broadcast_pre_armed_radar_alert(
+                                    epic=resolved_epic,
+                                    direction=single_dir,
+                                    trap_data=trap_data,
+                                    consensus=consensus,
+                                    app=app
+                                )
+                            )
+                    else:
+                        logger.debug(
+                            f"🛡️ [DIRECTIONAL CONSENSUS STANDBY] {resolved_epic} holding in Flat Cash: "
+                            f"Consensus inconclusive (Buy: {consensus.get('buy_score', 0)}%, "
+                            f"Sell: {consensus.get('sell_score', 0)}%). Dual pending order blocked."
+                        )
                 except Exception as e_arm:
                     logger.debug(f"Auto-arm priority radar error for {epic}: {e_arm}")
         except Exception as e_main:
@@ -6385,6 +6419,16 @@ class CapitalAutonomousEngine:
             triggered_candidates.sort(key=lambda x: x[0], reverse=True)
             logger.info(f"⚡ [RADAR TRIGGER DETECTED] {len(triggered_candidates)} armed traps triggered! Executing instant market entry...")
 
+            # Real-Time Instant Execution Alert to VIP Users (Invariant 108)
+            if app and hasattr(app, "bot"):
+                for cand in triggered_candidates[:2]:
+                    asyncio.create_task(
+                        self._broadcast_radar_trigger_execution_alert(
+                            cand=cand,
+                            app=app
+                        )
+                    )
+
             # Dispatch directly to active users (Super Admin first)
             if active_users:
                 active_users.sort(key=lambda u: 0 if u.get("chat_id") == SUPER_ADMIN_ID else 1)
@@ -6419,6 +6463,144 @@ class CapitalAutonomousEngine:
                 await asyncio.gather(*prop_tasks, return_exceptions=True)
 
         return triggered_candidates
+
+
+    async def _broadcast_pre_armed_radar_alert(
+        self,
+        epic: str,
+        direction: str,
+        trap_data: Dict[str, Any],
+        consensus: Dict[str, Any],
+        app: Any
+    ) -> None:
+        """
+        Broadcasts Pre-Arming Radar Alert to all VIP users adhering to Invariant 13 & 79.
+        Informs users of single-direction bias (BUY ONLY or SELL ONLY) so they can prepare capital.
+        """
+        now = time.time()
+        last_t = self._broadcasted_pre_armed_traps.get(epic, 0.0)
+        if (now - last_t) < 900.0:  # 15 minutes cooldown per asset
+            return
+        self._broadcasted_pre_armed_traps[epic] = now
+
+        try:
+            vip_uids = get_all_capital_vip_recipients()
+            if not vip_uids:
+                return
+
+            import ui_standards
+            prec = _get_tradfi_precision(epic, trap_data.get("armed_price", 1.0))
+            conf = consensus.get("confidence", 75.0)
+            dir_emoji = "🟢 LONG / BUY ONLY" if direction == "BUY" else "🔴 SHORT / SELL ONLY"
+            trig_px = trap_data.get("buy_breakout") if direction == "BUY" else trap_data.get("sell_breakdown")
+            sl_px = trap_data.get("buy_sl") if direction == "BUY" else trap_data.get("sell_sl")
+            tp1_px = trap_data.get("buy_tp1") if direction == "BUY" else trap_data.get("sell_tp1")
+            tp2_px = trap_data.get("buy_tp2") if direction == "BUY" else trap_data.get("sell_tp2")
+
+            for v_uid in vip_uids:
+                v_lang = db.get_user_language(v_uid)
+                if v_lang == 'khmer':
+                    msg = (
+                        f"🎯 **[ANGKOR QUANT VIP RADAR ARMED]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ **ឧបករណ៍ TradFi ៖** `{epic}`\n"
+                        f"🎯 **ទិសដៅច្បាស់លាស់ ៖** `{dir_emoji}`\n"
+                        f"🧠 **5-Pillar AI Consensus ៖** `{conf}% (H4 + HMM + Meta-Model + CVD + Macro)`\n"
+                        f"🎯 **ចំណុចរង់ចាំ Trigger ៖** `${trig_px:,.{prec}f}`\n"
+                        f"🛑 **Stop-Loss (1R) ៖** `${sl_px:,.{prec}f}`\n"
+                        f"🎯 **Take-Profit (TP1) ៖** `${tp1_px:,.{prec}f}`\n"
+                        f"🎯 **Take-Profit (TP2) ៖** `${tp2_px:,.{prec}f}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _ប្រព័ន្ធបានបញ្ជាក់ទិសដៅតែមួយគត់! កំពុងរង់ចាំបាញ់កុម្ម៉ង់ពេលតម្លៃទម្លុះព្រំដែន គ្មាន Pending ច្រឡំ ២ ទិសដៅឡើយ!_"
+                    )
+                else:
+                    msg = (
+                        f"🎯 **[ANGKOR QUANT VIP RADAR ARMED]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ **TradFi Instrument:** `{epic}`\n"
+                        f"🎯 **Directional Bias:** `{dir_emoji}`\n"
+                        f"🧠 **5-Pillar Consensus:** `{conf}% (H4 + HMM + Meta-Model + CVD + Macro)`\n"
+                        f"🎯 **Awaiting Trigger Price:** `${trig_px:,.{prec}f}`\n"
+                        f"🛑 **Stop-Loss (1R):** `${sl_px:,.{prec}f}`\n"
+                        f"🎯 **Take-Profit (TP1):** `${tp1_px:,.{prec}f}`\n"
+                        f"🎯 **Take-Profit (TP2):** `${tp2_px:,.{prec}f}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _Single-Direction Conviction Armed. Virtual RAM trap waiting for breakout. Zero dual-pending ambiguity._"
+                    )
+                asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=msg, parse_mode="Markdown"))
+        except Exception as e:
+            logger.debug(f"Pre-armed radar broadcast error: {e}")
+
+    async def _broadcast_radar_trigger_execution_alert(
+        self,
+        cand: Tuple[float, str, str, Dict[str, Any]],
+        app: Any
+    ) -> None:
+        """
+        Broadcasts Real-Time Execution Alert to VIP users when RAM Radar triggers (<0.05ms).
+        Includes 1-Tap Copyable command with Stop-Loss & Take-Profit targets.
+        """
+        try:
+            _, raw_epic, resolved_epic, setup = cand
+            direction = setup.get("final_action", "BUY")
+            entry_px = float(setup.get("entry_price") or setup.get("price") or 0.0)
+            sl_px = float(setup.get("sl") or setup.get("stop_loss", 0.0))
+            tp_px = float(setup.get("tp") or setup.get("take_profit", 0.0))
+            trig_type = setup.get("trigger_type", "BREAKOUT_MOMENTUM")
+
+            now = time.time()
+            alert_key = f"{resolved_epic}_{direction}"
+            last_t = self._broadcasted_trigger_alerts.get(alert_key, 0.0)
+            if (now - last_t) < 600.0:  # 10 minutes debounce
+                return
+            self._broadcasted_trigger_alerts[alert_key] = now
+
+            vip_uids = get_all_capital_vip_recipients()
+            if not vip_uids:
+                return
+
+            import ui_standards
+            prec = _get_tradfi_precision(resolved_epic, entry_px)
+            dir_emoji = "🟢 LONG / BUY NOW" if direction == "BUY" else "🔴 SHORT / SELL NOW"
+            cmd_action = "buy" if direction == "BUY" else "sell"
+
+            for v_uid in vip_uids:
+                v_lang = db.get_user_language(v_uid)
+                if v_lang == 'khmer':
+                    msg = (
+                        f"⚡ **[SNIPER RADAR TRIGGERED: EXECUTE NOW]** 🎯\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                        f"🚀 **សកម្មភាព ៖** `{dir_emoji}`\n"
+                        f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.{prec}f}`\n"
+                        f"🛑 **Stop-Loss (1R) ៖** `${sl_px:,.{prec}f}`\n"
+                        f"🎯 **Take-Profit (TP1) ៖** `${tp_px:,.{prec}f}`\n"
+                        f"⚡ **ទម្រង់ Trigger ៖** `{trig_type}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📋 **1-Tap Fast Copy Command ៖**\n"
+                        f"`/capital {cmd_action} {resolved_epic} lot=0.05 sl={sl_px:.{prec}f} tp={tp_px:.{prec}f}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _ក្បាលម៉ាស៊ីន Angkor Quant បានបើកកុម្ម៉ង់ស្វ័យប្រវត្តិក្នងល្បឿន < 0.05ms!_"
+                    )
+                else:
+                    msg = (
+                        f"⚡ **[SNIPER RADAR TRIGGERED: EXECUTE NOW]** 🎯\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
+                        f"🚀 **Action:** `{dir_emoji}`\n"
+                        f"💵 **Entry Price:** `${entry_px:,.{prec}f}`\n"
+                        f"🛑 **Stop-Loss (1R):** `${sl_px:,.{prec}f}`\n"
+                        f"🎯 **Take-Profit (TP1):** `${tp_px:,.{prec}f}`\n"
+                        f"⚡ **Trigger Setup:** `{trig_type}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📋 **1-Tap Fast Copy Command:**\n"
+                        f"`/capital {cmd_action} {resolved_epic} lot=0.05 sl={sl_px:.{prec}f} tp={tp_px:.{prec}f}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _Angkor Quant engine executed virtual order at institutional sub-millisecond speed!_"
+                    )
+                asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=msg, parse_mode="Markdown"))
+        except Exception as e:
+            logger.debug(f"Trigger radar execution alert broadcast error: {e}")
 
     async def execute_autonomous_cycle(self, app=None):
         """

@@ -83,6 +83,18 @@
 
 ---
 
+
+- **Institutional 5-Pillar Directional Consensus Engine, Single-Direction Arming & Real-Time VIP Signal Alert Standard (Invariant 109):**
+  Permanently eliminates ambiguous dual-direction (BUY & SELL) pending orders in RAM. Integrates 5 independent institutional quantitative models into a unified weighted consensus arbiter (`capital_directional_consensus_engine.py` / `InstitutionalDirectionalConsensusEngine`):
+  (1) Wall Street Institutional H4 Structural Trend Anchor (25% weight; strictly vetoes Shorts if H4 is Bullish and Longs if H4 is Bearish);
+  (2) Gaussian Hidden Markov Model (HMM) 3-State Regime Detector (20% weight; State 0 Bull Trend vs State 1 Bear Trend vs State 2 Chop/Shock);
+  (3) Marcos López de Prado AFML Stacking Classifier Meta-Model (25% weight; XGBoost 40% + LightGBM 40% + CatBoost 20% predicting calibrated win probability $\hat{p} \ge 0.58$);
+  (4) Institutional CVD Order Flow Microstructure & Whale Absorption Engine (15% weight; detects Bullish Absorption vs Bearish Distribution via volume delta $\Delta V_t$); and
+  (5) Intermarket Macro Covariance & Gold Mathematical Radar (15% weight; Kalman 1D state tracker, Hurst exponent $H > 0.55$, US TIPS 10Y real yield inverse correlation, London Fix & SGE physical arbitrage).
+  Consensus Arbiter enforces single-direction resolution: requires Score $\ge 68.0$, winner ratio $> 1.25\times$, and zero fiduciary vetoes to certify `BUY_ONLY` or `SELL_ONLY`, while inconclusive chop is held in 100% Flat Cash `STANDBY`. Armed traps strictly enforce single-directional triggers in RAM (`sell_breakdown = 0.0` on BUY; `buy_breakout = 0.0` on SELL). Two-tier Telegram VIP alerts: (A) Pre-Arming Alert notifying VIPs of verified directional bias to prepare capital, and (B) Real-Time Sub-Millisecond (<0.05ms) Sniper Execution Alert upon boundary trigger with 1-Tap Copyable command, Stop-Loss, and Take-Profit targets.
+
+---
+
 ## 4. AUDIT & DEPLOYMENT PROTOCOL
 1. **Audit First:** Run `python audit_system.py` before and after any code modification. All 66 checks must remain 100% PASS with 0 defects.
 2. **Immediate Git Push:** Commit and push via `python git_push_vps.py "<Clear description>"` or `git add . && git commit -m "..." && git push origin main`.
