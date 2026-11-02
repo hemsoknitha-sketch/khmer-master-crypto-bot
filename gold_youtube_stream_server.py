@@ -401,6 +401,21 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     elif smc_score >= 85:
         action = smc_action
 
+    # 10-Year Candlestick Pattern RAM Memory lookup on live M15 candles (<0.0001ms RAM stats)
+    pattern_wr = 50.0
+    pattern_name = "M15 SMC STRUCTURE"
+    try:
+        import gold_candlestick_pattern_memory as _gcpm
+        pat_res = _gcpm.detect_live_gold_candlestick_patterns(df, timeframe="M15", current_price=current_price)
+        if pat_res.get("has_pattern"):
+            pat_dir = pat_res.get("direction", "")
+            # Only credit the pattern's win rate when it agrees with the final action (or no action yet)
+            if action == "WAIT" or pat_dir == action:
+                pattern_wr = float(pat_res.get("win_rate_confluence", 50.0))
+                pattern_name = str(pat_res.get("highest_conviction_pattern", pattern_name)).replace("_", " ")
+    except Exception as e_pat:
+        print(f"[YOUTUBE STREAM] Pattern memory note: {e_pat}", flush=True)
+
     # Calculate Real-Time Calibrated Win Rate (10Y Pattern Confluence + Bayesian Posterior + SMC Score)
     bayes_bull = float(bayes.get("bullish_pct", 50.0))
     bayes_bear = float(bayes.get("bearish_pct", 50.0))
