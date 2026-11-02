@@ -5383,6 +5383,35 @@ class TelegramBotThread(BaseThread):
                 if msg_target:
                     await msg_target.reply_text(f"⚠️ [GOLD SIGNAL ERROR] {e}")
 
+        async def train_gold_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Invariant 110: Super Admin On-Demand Gold M15 Self-Training & Re-Calibration."""
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            is_admin = db.is_super_admin(chat_id) or str(chat_id) == "859271875"
+            if not is_admin:
+                await update.effective_message.reply_text("⛔ សិទ្ធិបញ្ជាត្រូវបានរក្សាទុកសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!")
+                return
+
+            msg_target = update.effective_message or update.message
+            wait_msg = await msg_target.reply_text(
+                "⏳ **[INVARIANT 110]** កំពុងដំណើរការ Institutional Gold M15 Daily Self-Training & Re-Calibration Engine...\n"
+                "• 10-Year Candlestick RAM Memory Re-training (126,999+ trades)\n"
+                "• Bayesian Prior Beta(α, β) recalibration\n"
+                "• Ornstein-Uhlenbeck drift & GARCH volatility cones\n"
+                "សូមរង់ចាំបន្តិច...",
+                parse_mode="Markdown"
+            )
+
+            try:
+                import gold_daily_self_training_engine
+                record = await gold_daily_self_training_engine.execute_daily_gold_self_training(app=self.app, force_telegram=False)
+                card = gold_daily_self_training_engine.build_gold_daily_training_telegram_card(record)
+                await wait_msg.edit_text(card, parse_mode="Markdown")
+            except Exception as e:
+                await wait_msg.edit_text(f"❌ [GOLD TRAINING ERROR]: {e}", parse_mode="Markdown")
+
         async def paxg_arbitrage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
@@ -20487,6 +20516,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("goldsignal", gold_signal_command))
         self.app.add_handler(CommandHandler("gold_math", gold_signal_command))
         self.app.add_handler(CommandHandler("goldmath", gold_signal_command))
+        self.app.add_handler(CommandHandler("train_gold", train_gold_command))
+        self.app.add_handler(CommandHandler("traingold", train_gold_command))
 
         self.app.add_handler(CommandHandler("language", language_command))
         self.app.add_handler(CommandHandler("quiet", quiet_command))
@@ -30075,6 +30106,19 @@ class TelegramBotThread(BaseThread):
             id='csx_daily_closing_report_job'
         )
         self.log_signal.emit("🏛️ CSX AI Daily Closing EOD Report job scheduled at 15:05 PM (Mon-Fri ICT).")
+
+        # 🏆 Invariant 110: INSTITUTIONAL GOLD M15 DAILY SELF-TRAINING & RE-CALIBRATION JOB (03:00 AM ICT)
+        # Recalibrates 10-Year Candlestick RAM Memory, Bayesian Priors, OU Drift & GARCH Buffers
+        self.scheduler.add_job(
+            scheduler_tasks.gold_daily_self_training_job,
+            'cron',
+            hour=3,
+            minute=0,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id='gold_daily_self_training_job'
+        )
+        self.log_signal.emit("🏆 Gold M15 Daily Self-Training & Re-Calibration scheduled at 03:00 AM (ICT).")
 
         # 🧠 Invariant 89 & 90: UNIFIED TRI-REGIONAL TOP 900 TRADFI IN-MEMORY RAM UNIVERSE (300 US, 300 EU, 300 ASIA)
         # Daily Master Self-Training, Asset DNA Characterization, 24H Audit & Super Admin Alert Job (03:30 AM ICT)

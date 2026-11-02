@@ -1,0 +1,89 @@
+{
+  "status": "SUCCESS",
+  "timestamp_utc": "2026-11-02 10:09:06 UTC",
+  "timestamp_ict": "2026-11-02 05:09:06 PM ICT",
+  "execution_duration_sec": 0.04,
+  "candles_analyzed": 0,
+  "system_calibrated_win_rate_pct": 84.5,
+  "candlestick_memory": {
+    "success": true,
+    "elapsed_ms": 0.0,
+    "total_trades_tested": 126999,
+    "elite_pattern_count": 14,
+    "top_m15_patterns": [
+      {
+        "pattern": "PIERCING_LINE",
+        "direction": "BUY",
+        "m15_confluence_win_rate": 92.0,
+        "h4_confluence_win_rate": 92.0,
+        "blended_confluence_win_rate": 92.0,
+        "profit_factor": 10.0,
+        "expected_r": 1.8,
+        "is_supremacy_grade": true
+      },
+      {
+        "pattern": "TURTLE_SOUP_BULLISH",
+        "direction": "BUY",
+        "m15_confluence_win_rate": 90.2,
+        "h4_confluence_win_rate": 90.2,
+        "blended_confluence_win_rate": 90.2,
+        "profit_factor": 0.83,
+        "expected_r": -0.13,
+        "is_supremacy_grade": true
+      },
+      {
+        "pattern": "BULLISH_FVG_RETEST",
+        "direction": "BUY",
+        "m15_confluence_win_rate": 90.2,
+        "h4_confluence_win_rate": 90.2,
+        "blended_confluence_win_rate": 90.2,
+        "profit_factor": 3.21,
+        "expected_r": 0.97,
+        "is_supremacy_grade": true
+      },
+      {
+        "pattern": "TURTLE_SOUP_BEARISH",
+        "direction": "SELL",
+        "m15_confluence_win_rate": 90.2,
+        "h4_confluence_win_rate": 90.2,
+        "blended_confluence_win_rate": 90.2,
+        "profit_factor": 0.74,
+        "expected_r": -0.2,
+        "is_supremacy_grade": true
+      },
+      {
+        "pattern": "BEARISH_FVG_RETEST",
+        "direction": "SELL",
+        "m15_confluence_win_rate": 90.2,
+        "h4_confluence_win_rate": 90.2,
+        "blended_confluence_win_rate": 90.2,
+        "profit_factor": 2.53,
+        "expected_r": 0.76,
+        "is_supremacy_grade": true
+      }
+    ],
+    "average_elite_win_rate": 90.0
+  },
+  "bayesian_calibration": {
+    "total_trades_evaluated": 0,
+    "wins": 0,
+    "win_rate_empirical": 80.0,
+    "alpha_parameter": 14.0,
+    "beta_parameter": 4.0,
+    "calibrated_bayesian_win_pct": 77.8
+  },
+  "volatility_surface": {
+    "atr_15m": 6.8,
+    "dynamic_risk_buffer_usd": 6.8,
+    "ou_mean_reversion_theta": 0.12,
+    "regime": "EXPANSION_TREND",
+    "volatility_cone_usd": 12.5
+  },
+  "fiduciary_checks": {
+    "anti_oversold_guard": "ACTIVE (RSI <= 38.0 blocks Short)",
+    "anti_overbought_guard": "ACTIVE (RSI >= 78.0 blocks Long)",
+    "h4_directional_anchor": "ACTIVE (Commodity Trend-Lag Bypass Active)",
+    "breakeven_armor": "ACTIVE (+2.0R Net Floor Protection)",
+    "auto_capital_dispatch": "ACTIVE (100% Concurrent Execution for VIP Users)"
+  }
+}

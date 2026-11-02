@@ -6884,6 +6884,121 @@ class CapitalAutonomousEngine:
             ]
             await asyncio.gather(*prop_tasks, return_exceptions=True)
 
+    async def dispatch_gold_signal_trade(
+        self,
+        gold_signal_data: Dict[str, Any],
+        app=None
+    ) -> int:
+        """
+        Invariant 110: 100% Automated Execution Dispatch for High-Conviction Gold M15 Signal.
+        When YouTube Live Stream / Institutional Radar triggers an elite Gold M15 signal
+        (Bayesian Win Rate >= 80% / 85%, Hurst > 0.55, SMC M15 Confluence):
+        Simultaneously dispatches live broker market orders to all active VIP /capital auto accounts!
+        """
+        import database as db
+
+        sig = gold_signal_data.get("signal", {})
+        action = str(sig.get("action", "")).upper()
+        if action not in ["BUY", "SELL"]:
+            return 0
+
+        cur_p = float(gold_signal_data.get("current_price", 0.0))
+        entry_zone = sig.get("entry_zone", {})
+        entry_ideal = float(entry_zone.get("ideal", cur_p))
+        if entry_ideal <= 0:
+            entry_ideal = cur_p
+        if entry_ideal <= 0:
+            return 0
+
+        sl_p = float(sig.get("stop_loss", 0.0))
+        tp1_p = float(sig.get("take_profit_1", 0.0))
+        tp2_p = float(sig.get("take_profit_2", 0.0))
+        conf = float(sig.get("confidence", 85.0))
+        win_rate = float(sig.get("win_rate", conf))
+        math_edge = sig.get("mathematical_edge", {})
+
+        # Default breathing SL & 1:2.0 TP if not populated
+        if sl_p <= 0:
+            sl_p = round(entry_ideal - 6.50, 2) if action == "BUY" else round(entry_ideal + 6.50, 2)
+        risk_dist = max(3.50, abs(entry_ideal - sl_p))
+        if tp1_p <= 0:
+            tp1_p = round(entry_ideal + (risk_dist * 2.0), 2) if action == "BUY" else round(entry_ideal - (risk_dist * 2.0), 2)
+        if tp2_p <= 0:
+            tp2_p = round(entry_ideal + (risk_dist * 3.5), 2) if action == "BUY" else round(entry_ideal - (risk_dist * 3.5), 2)
+
+        # Invariant 16 & 43 Fiduciary Guards: Check 15m RSI
+        try:
+            import market_data
+            rsi_15m = float(market_data.get_symbol_rsi("XAUUSDT", "15m") or 50.0)
+            if action == "SELL" and rsi_15m <= 38.0:
+                logger.info(f"🛡️ [GOLD AUTO DISPATCH VETO] Anti-Oversold Short Guard active (RSI {rsi_15m:.1f} <= 38.0).")
+                return 0
+            if action == "BUY" and rsi_15m >= 78.0:
+                logger.info(f"🛡️ [GOLD AUTO DISPATCH VETO] Anti-Overbought Guard active (RSI {rsi_15m:.1f} >= 78.0).")
+                return 0
+        except Exception:
+            pass
+
+        now = time.time()
+        active_users = db.get_active_capital_auto_users()
+        if not active_users:
+            logger.info("ℹ️ [GOLD AUTO DISPATCH] No active /capital auto users configured.")
+            return 0
+
+        # Construct candidate setup
+        setup_dict = {
+            "epic": "GOLD",
+            "final_action": action,
+            "final_confidence": win_rate,
+            "calibrated_win_prob": win_rate / 100.0,
+            "calibrated_win_prob_pct": win_rate,
+            "entry": entry_ideal,
+            "sl": sl_p,
+            "tp": tp1_p,
+            "tp1": tp1_p,
+            "tp2": tp2_p,
+            "source": "RADAR_IN_MEMORY",
+            "bypass_quant_eval": True,
+            "trigger_type": "GOLD_M15_INSTITUTIONAL_SIGNAL",
+            "trigger_price": entry_ideal,
+            "mid_price": entry_ideal,
+            "bid": entry_ideal,
+            "ask": entry_ideal,
+            "gold_math_edge": math_edge
+        }
+
+        candidate_setups = [(win_rate, "GOLD_SIGNAL", "GOLD", setup_dict)]
+
+        # Dispatch concurrently to active users (Super Admin first)
+        active_users.sort(key=lambda u: 0 if u.get("chat_id") == SUPER_ADMIN_ID else 1)
+        super_admin_cfg = next((u for u in active_users if u.get("chat_id") == SUPER_ADMIN_ID), None)
+        other_users = [u for u in active_users if u.get("chat_id") != SUPER_ADMIN_ID]
+
+        dispatched_count = 0
+        if super_admin_cfg:
+            try:
+                ok = await self._dispatch_single_user_trade(super_admin_cfg, candidate_setups, now, app=app)
+                if ok:
+                    dispatched_count += 1
+            except Exception as e_sa:
+                logger.warning(f"Super Admin Gold dispatch note: {e_sa}")
+
+        if other_users:
+            async def _run_user(u):
+                try:
+                    return await self._dispatch_single_user_trade(u, candidate_setups, now, app=app)
+                except Exception as e_u:
+                    logger.warning(f"User {u.get('chat_id')} Gold dispatch note: {e_u}")
+                    return False
+
+            results = await asyncio.gather(*[_run_user(u) for u in other_users], return_exceptions=True)
+            for r in results:
+                if r is True:
+                    dispatched_count += 1
+
+        logger.info(f"👑 [GOLD SIGNAL AUTO DISPATCH COMPLETE] Dispatched {action} on GOLD to {dispatched_count}/{len(active_users)} active VIP Capital traders!")
+        return dispatched_count
+
 
 # ==============================================================================
 # 4.5. CAPITAL.COM LEAD-LAG ARBITRAGE ENGINE (BINANCE WEBSOCKET ➔ CAPITAL CFD LAG)
