@@ -1152,6 +1152,10 @@ class MT5BridgeEngine:
             logger.debug(f"⚠️ [MT5 PACKET] Non-JSON payload dropped ({len(line)} bytes)")
             return
 
+        if not isinstance(payload, dict):
+            logger.debug(f"⚠️ [MT5 PACKET] Non-dict JSON payload dropped ({type(payload).__name__})")
+            return
+
         msg_type = payload.get("type", "").upper()
         account_id = str(payload.get("account_id", "") or payload.get("account", ""))
 

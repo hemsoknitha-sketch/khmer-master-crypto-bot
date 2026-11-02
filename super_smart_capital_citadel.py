@@ -2007,8 +2007,9 @@ class SuperSmartCapitalCitadel:
                     rsi_15m=rsi_15m
                 )
                 s_dir = consensus.get("final_direction", "STANDBY")
-            except Exception:
-                s_dir = f"{norm_side}_ONLY" if norm_side in ["BUY", "SELL"] else "STANDBY"
+            except Exception as e_cs:
+                logger.debug(f"Citadel chop consensus exception: {e_cs}")
+                s_dir = "STANDBY"
 
             if s_dir in ["BUY_ONLY", "SELL_ONLY", "BUY", "SELL"]:
                 resolved_radar_mode = "BUY_ONLY" if "BUY" in s_dir else "SELL_ONLY"
@@ -4026,7 +4027,15 @@ class CapitalInMemoryVirtualRadar:
                         }
                 except Exception as e_res:
                     logger.debug(f"Consensus auto-resolution note: {e_res}")
-                    mode_u = "BUY_ONLY" if current_price >= range_mid else "SELL_ONLY"
+                    logger.info(f"🛡️ [RADAR STANDBY] {raw_epic}: 5-Pillar Consensus exception. Holding 100% Flat Cash.")
+                    return {
+                        "status": "STANDBY",
+                        "epic": raw_epic,
+                        "reason": "CONSENSUS_EXCEPTION_STANDBY",
+                        "mode": "STANDBY",
+                        "buy_breakout": 0.0,
+                        "sell_breakdown": 0.0
+                    }
 
         if mode_u in ["BUY", "BUY_ONLY"]:
             sell_breakdown = 0.0

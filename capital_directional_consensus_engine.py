@@ -64,7 +64,10 @@ class InstitutionalDirectionalConsensusEngine:
         current_price: float,
         candles_15m: List[Dict[str, Any]],
         candles_h4: Optional[List[Dict[str, Any]]] = None,
-        engine: Optional[Any] = None
+        engine: Optional[Any] = None,
+        atr_15m: float = 0.0,
+        rsi_15m: float = 0.0,
+        **kwargs: Any
     ) -> Dict[str, Any]:
         """
         Runs the 5-Pillar Directional Arbitration across live market data.
@@ -174,7 +177,8 @@ class InstitutionalDirectionalConsensusEngine:
             score_buy = 0.0   # Buying into Bearish H4 macro trend is strictly forbidden!
 
         # Veto 2: Anti-Oversold / Anti-Overbought 15m RSI Guards
-        rsi_15m = self._calculate_rsi([c["close"] for c in candles_15m], period=14)
+        if rsi_15m <= 0.0 and candles_15m:
+            rsi_15m = self._calculate_rsi([c["close"] for c in candles_15m], period=14)
         if rsi_15m <= 36.0:
             score_sell = 0.0  # Invariant 13: Strictly VETO selling into oversold panic bottoms!
         elif rsi_15m >= 70.0:
