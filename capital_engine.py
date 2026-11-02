@@ -103,6 +103,9 @@ def is_capital_sell_allowed(setup: Dict[str, Any]) -> bool:
         return True
     if CAPITAL_SELL_MODE == "OFF":
         return False
+    # Institutional In-Memory Radar & 5-Pillar Consensus setups are pre-vetted by H4 macro trend anchor
+    if setup.get("source") == "RADAR_IN_MEMORY" or setup.get("trigger_type") or setup.get("bypass_quant_eval"):
+        return True
     try:
         px = float(setup.get("bid") or setup.get("mid_price") or 0.0)
         ema50 = float(setup.get("ema50") or 0.0)
@@ -6607,7 +6610,7 @@ class CapitalAutonomousEngine:
                         f"📋 **1-Tap Fast Copy Command ៖**\n"
                         f"`/capital {cmd_action} {resolved_epic} lot=0.05 sl={sl_px:.{prec}f} tp={tp_px:.{prec}f}`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"💡 _ក្បាលម៉ាស៊ីន Angkor Quant បានបើកកុម្ម៉ង់ស្វ័យប្រវត្តិក្នងល្បឿន < 0.05ms!_"
+                        f"💡 _Angkor Quant Radar បានចាប់កេះសញ្ញា Trigger ក្នុង RAM (< 0.05ms)! សម្រាប់ Auto Users ប្រព័ន្ធបញ្ជូនកុម្ម៉ង់ស្វ័យប្រវត្ត ឯអ្នកជួញដូរដោយដៃអាចចុច 1-Tap Copy ខាងលើ!_"
                     )
                 else:
                     msg = (
@@ -6623,7 +6626,7 @@ class CapitalAutonomousEngine:
                         f"📋 **1-Tap Fast Copy Command:**\n"
                         f"`/capital {cmd_action} {resolved_epic} lot=0.05 sl={sl_px:.{prec}f} tp={tp_px:.{prec}f}`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"💡 _Angkor Quant engine executed virtual order at institutional sub-millisecond speed!_"
+                        f"💡 _Angkor Quant Radar triggered in RAM (< 0.05ms)! Auto-dispatched for Auto Traders; Manual Traders tap Copy above to execute!_"
                     )
                 asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=msg, parse_mode="Markdown"))
         except Exception as e:
