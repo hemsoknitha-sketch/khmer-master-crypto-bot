@@ -430,3 +430,4 @@ class InstitutionalDirectionalConsensusEngine:
 # Global Singleton Factory
 def get_directional_consensus_engine() -> InstitutionalDirectionalConsensusEngine:
     return InstitutionalDirectionalConsensusEngine.get_instance()
+

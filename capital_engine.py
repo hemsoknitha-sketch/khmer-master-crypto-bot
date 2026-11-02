@@ -6196,12 +6196,20 @@ class CapitalAutonomousEngine:
 
         return False
 
-    async def auto_arm_priority_radars(self, engine: Optional[CapitalComEngine] = None):
+    async def auto_arm_priority_radars(self, engine: Optional[CapitalComEngine] = None, app: Any = None):
         """
         Pre-arms stealth radar traps in Python RAM for key session assets if RAM traps are empty.
         Ensures 24/7 boundary breakout and liquidity sweep monitoring is continuously armed on Gold, Oil, Shares, and Indices.
         """
         try:
+            bot_app = app
+            if not bot_app or not hasattr(bot_app, "bot"):
+                try:
+                    import bot_thread
+                    bot_app = getattr(bot_thread, "MAIN_BOT_APP", None) or bot_thread.get_main_bot_app()
+                except Exception:
+                    bot_app = None
+
             import super_smart_capital_citadel
             radar_cls = super_smart_capital_citadel.CapitalInMemoryVirtualRadar
             curr_traps = radar_cls.get_armed_traps()
@@ -6271,14 +6279,14 @@ class CapitalAutonomousEngine:
                             candles_15m=candles
                         )
                         # Broadcast Pre-Arming Radar Alert to VIP Users if high conviction (>= 75%)
-                        if app and hasattr(app, "bot") and consensus_conf >= 75.0:
+                        if bot_app and hasattr(bot_app, "bot") and consensus_conf >= 75.0:
                             asyncio.create_task(
                                 self._broadcast_pre_armed_radar_alert(
                                     epic=resolved_epic,
                                     direction=single_dir,
                                     trap_data=trap_data,
                                     consensus=consensus,
-                                    app=app
+                                    app=bot_app
                                 )
                             )
                     else:
@@ -6310,11 +6318,12 @@ class CapitalAutonomousEngine:
         now = time.time()
         sys_engine = get_capital_engine()
 
-        # If zero traps armed, trigger auto-arming in background
+        # Trigger periodic auto-arming in background if fewer than 4 traps armed
+        if len(armed_traps) < 4 and (now - getattr(self, "_last_radar_auto_arm_ts", 0.0)) > 60.0:
+            self._last_radar_auto_arm_ts = now
+            asyncio.create_task(self.auto_arm_priority_radars(sys_engine, app=app))
+
         if not armed_traps:
-            if (now - getattr(self, "_last_radar_auto_arm_ts", 0.0)) > 60.0:
-                self._last_radar_auto_arm_ts = now
-                asyncio.create_task(self.auto_arm_priority_radars(sys_engine))
             return []
 
         # Gather unique epics from armed traps
@@ -6419,13 +6428,21 @@ class CapitalAutonomousEngine:
             triggered_candidates.sort(key=lambda x: x[0], reverse=True)
             logger.info(f"⚡ [RADAR TRIGGER DETECTED] {len(triggered_candidates)} armed traps triggered! Executing instant market entry...")
 
-            # Real-Time Instant Execution Alert to VIP Users (Invariant 108)
-            if app and hasattr(app, "bot"):
+            # Real-Time Instant Execution Alert to VIP Users (Invariant 108 & 109)
+            bot_app = app
+            if not bot_app or not hasattr(bot_app, "bot"):
+                try:
+                    import bot_thread
+                    bot_app = getattr(bot_thread, "MAIN_BOT_APP", None) or bot_thread.get_main_bot_app()
+                except Exception:
+                    bot_app = None
+
+            if bot_app and hasattr(bot_app, "bot"):
                 for cand in triggered_candidates[:2]:
                     asyncio.create_task(
                         self._broadcast_radar_trigger_execution_alert(
                             cand=cand,
-                            app=app
+                            app=bot_app
                         )
                     )
 
@@ -6527,7 +6544,7 @@ class CapitalAutonomousEngine:
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"💡 _Single-Direction Conviction Armed. Virtual RAM trap waiting for breakout. Zero dual-pending ambiguity._"
                     )
-                asyncio.create_task(_safe_send_telegram_msg(app.bot, chat_id=v_uid, text=msg, parse_mode="Markdown"))
+                asyncio.create_task(_safe_send_telegram_msg(bot_app.bot, chat_id=v_uid, text=msg, parse_mode="Markdown"))
         except Exception as e:
             logger.debug(f"Pre-armed radar broadcast error: {e}")
 
@@ -6541,6 +6558,16 @@ class CapitalAutonomousEngine:
         Includes 1-Tap Copyable command with Stop-Loss & Take-Profit targets.
         """
         try:
+            bot_app = app
+            if not bot_app or not hasattr(bot_app, "bot"):
+                try:
+                    import bot_thread
+                    bot_app = getattr(bot_thread, "MAIN_BOT_APP", None) or bot_thread.get_main_bot_app()
+                except Exception:
+                    bot_app = None
+            if not bot_app or not hasattr(bot_app, "bot"):
+                return
+
             _, raw_epic, resolved_epic, setup = cand
             direction = setup.get("final_action", "BUY")
             entry_px = float(setup.get("entry_price") or setup.get("price") or 0.0)

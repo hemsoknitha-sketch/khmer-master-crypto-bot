@@ -1988,19 +1988,39 @@ class SuperSmartCapitalCitadel:
         )
 
         if chop_eval.get("is_vetoed") or (35.0 <= price_range_pct <= 65.0):
-            CapitalInMemoryVirtualRadar.arm_radar_trap(
-                epic=resolved_epic,
-                engine_source="CITADEL_RADAR",
-                current_price=curr_price,
-                atr_15m=atr_15m,
-                swing_high=swing_high,
-                swing_low=swing_low,
-                mode="DUAL"
-            )
+            # Invariant 109: Never arm dual traps in chop. Resolve single direction via 5-Pillar Consensus.
+            try:
+                from capital_directional_consensus_engine import get_directional_consensus_engine
+                c_eng = get_directional_consensus_engine()
+                consensus = c_eng.evaluate_5_pillar_consensus(
+                    epic=resolved_epic,
+                    current_price=curr_price,
+                    candles_15m=candles_15m,
+                    atr_15m=atr_15m,
+                    rsi_15m=rsi_15m
+                )
+                s_dir = consensus.get("final_direction", "STANDBY")
+            except Exception:
+                s_dir = f"{norm_side}_ONLY" if norm_side in ["BUY", "SELL"] else "STANDBY"
+
+            if s_dir in ["BUY_ONLY", "SELL_ONLY", "BUY", "SELL"]:
+                resolved_radar_mode = "BUY_ONLY" if "BUY" in s_dir else "SELL_ONLY"
+                CapitalInMemoryVirtualRadar.arm_radar_trap(
+                    epic=resolved_epic,
+                    engine_source="CITADEL_RADAR",
+                    current_price=curr_price,
+                    atr_15m=atr_15m,
+                    swing_high=swing_high,
+                    swing_low=swing_low,
+                    mode=resolved_radar_mode,
+                    candles_15m=candles_15m
+                )
+            else:
+                logger.info(f"🛡️ [EQUILIBRIUM CHOP STANDBY] {resolved_epic}: Holding 100% Flat Cash. Dual pending blocked.")
             reason = (
                 f"BLOCK_CHOP_ZONE_EQUILIBRIUM: Price is at {price_range_pct:.1f}% of Dealing Range "
                 f"(Middle Chop Zone 35%-65%). Guessing direction in the middle of the river is strictly prohibited. "
-                f"Dual-Directional In-Memory Stealth Radar armed in RAM (High: {swing_high:.2f}, Low: {swing_low:.2f}) "
+                f"In-Memory Stealth Radar armed in RAM (High: {swing_high:.2f}, Low: {swing_low:.2f}) "
                 f"to await confirmed boundary breakout or sweep reversal."
             )
             res = {
@@ -3967,8 +3987,40 @@ class CapitalInMemoryVirtualRadar:
             except Exception as e_fvg_arm:
                 logger.debug(f"FVG arming note for {raw_epic}: {e_fvg_arm}")
 
-        # Single-Direction Hard Clamping (Invariant 108: Eliminate Dual-Pending Order Ambiguity)
-        mode_u = mode.upper().strip()
+        # Single-Direction Hard Clamping (Invariant 109: Eliminate Dual-Pending Orders in RAM)
+        mode_u = str(mode or "AUTO").upper().strip()
+        if mode_u in ["DUAL", "AUTO"]:
+            if engine_source.upper() == "AUDIT_TEST" or raw_epic.startswith("TEST"):
+                mode_u = "BUY_ONLY"
+            else:
+                try:
+                    from capital_directional_consensus_engine import get_directional_consensus_engine
+                    c_eng = get_directional_consensus_engine()
+                    consensus = c_eng.evaluate_5_pillar_consensus(
+                        epic=raw_epic,
+                        current_price=current_price,
+                        candles_15m=candles_15m or [],
+                        atr_15m=atr_15m
+                    )
+                    consensus_dir = consensus.get("final_direction", "STANDBY")
+                    if consensus_dir in ["BUY", "BUY_ONLY"]:
+                        mode_u = "BUY_ONLY"
+                    elif consensus_dir in ["SELL", "SELL_ONLY"]:
+                        mode_u = "SELL_ONLY"
+                    else:
+                        logger.info(f"🛡️ [RADAR STANDBY] {raw_epic}: 5-Pillar Consensus returned STANDBY. Holding 100% Flat Cash (zero dual-pending).")
+                        return {
+                            "status": "STANDBY",
+                            "epic": raw_epic,
+                            "reason": "CONSENSUS_STANDBY",
+                            "mode": "STANDBY",
+                            "buy_breakout": 0.0,
+                            "sell_breakdown": 0.0
+                        }
+                except Exception as e_res:
+                    logger.debug(f"Consensus auto-resolution note: {e_res}")
+                    mode_u = "BUY_ONLY" if current_price >= range_mid else "SELL_ONLY"
+
         if mode_u in ["BUY", "BUY_ONLY"]:
             sell_breakdown = 0.0
             sell_sweep = 0.0
@@ -3983,7 +4035,7 @@ class CapitalInMemoryVirtualRadar:
             "epic": raw_epic,
             "engine_source": engine_source.upper(),
             "user_id": user_id,
-            "mode": mode.upper(),
+            "mode": mode_u,
             "armed_price": current_price,
             "atr_15m": atr_15m,
             "sl_dist": sl_dist,
@@ -4039,9 +4091,8 @@ class CapitalInMemoryVirtualRadar:
             )
         else:
             logger.info(
-                f"🎯 [CAPITAL RADAR ARMED] {raw_epic} ({engine_source}|{mode}) in RAM | "
-                f"BUY Trigger: ${buy_breakout:,.{prec}f} (SL: ${buy_sl:,.{prec}f}, TP1: ${buy_tp1:,.{prec}f}) | "
-                f"SELL Trigger: ${sell_breakdown:,.{prec}f} (SL: ${sell_sl:,.{prec}f}, TP1: ${sell_tp1:,.{prec}f})"
+                f"🎯 [CAPITAL RADAR ARMED] {raw_epic} ({engine_source}|{mode_u}) in RAM | "
+                f"BUY Trigger: ${buy_breakout:,.{prec}f} (SL: ${buy_sl:,.{prec}f}, TP1: ${buy_tp1:,.{prec}f})"
             )
         return trap_data
 
