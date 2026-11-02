@@ -1425,6 +1425,56 @@
     // ----------------------------------------------------
     let isInitialLoad = true;
     let isWebSocketConnected = false;
+    let hasRealCandlesLoaded = false;
+    let lastRenderedCandlesCount = 0;
+    let firstRenderedPrice = 0.0;
+    let lastRenderedPrice = 0.0;
+    let lastRenderedCandleTime = 0;
+
+    function applyCandleData(candles, isFallback = false) {
+      if (!candles || candles.length === 0 || !candleSeries) return;
+
+      const isFb = Boolean(isFallback);
+      const firstPrice = Number(candles[0].close || 0);
+      const lastCandle = candles[candles.length - 1];
+      const lastPrice = Number(lastCandle.close || 0);
+      const lastTime = Math.floor(Number(lastCandle.time || 0));
+
+      const needsFullSet = isInitialLoad ||
+                           (!isFb && !hasRealCandlesLoaded) ||
+                           (lastRenderedCandlesCount !== candles.length) ||
+                           (lastRenderedCandleTime === 0) ||
+                           (Math.abs(firstPrice - firstRenderedPrice) > 5.0) ||
+                           (Math.abs(lastPrice - lastRenderedPrice) > 8.0);
+
+      if (needsFullSet) {
+        candleSeries.setData(candles);
+        updateEMAs(candles);
+        chart.timeScale().fitContent();
+        chart.timeScale().scrollToRealTime();
+        isInitialLoad = false;
+        if (!isFb) {
+          hasRealCandlesLoaded = true;
+        }
+        lastRenderedCandlesCount = candles.length;
+        firstRenderedPrice = firstPrice;
+        lastRenderedPrice = lastPrice;
+        lastRenderedCandleTime = lastTime;
+      } else {
+        const len = candles.length;
+        if (len >= 2) {
+          const prevBar = candles[len - 2];
+          prevBar.time = Math.floor(Number(prevBar.time));
+          candleSeries.update(prevBar);
+        }
+        lastCandle.time = lastTime;
+        candleSeries.update(lastCandle);
+        updateEMAs(candles);
+        chart.timeScale().scrollToRealTime();
+        lastRenderedPrice = lastPrice;
+        lastRenderedCandleTime = lastTime;
+      }
+    }
 
     async function fetchFullSnapshot() {
       try {
@@ -1432,28 +1482,9 @@
         if (!res.ok) return;
         const data = await res.json();
 
-        // 1. Candlestick Data (Smooth initial render & non-destructive live updates)
+        // 1. Candlestick Data (Smooth initial render & instant full dataset replacement on real market data)
         if (data.candles && data.candles.length > 0) {
-          if (isInitialLoad) {
-            candleSeries.setData(data.candles);
-            updateEMAs(data.candles);
-            chart.timeScale().fitContent();
-            chart.timeScale().scrollToRealTime();
-            isInitialLoad = false;
-          } else {
-            // Synchronize last closed bar and current forming bar
-            const len = data.candles.length;
-            if (len >= 2) {
-              const prevBar = data.candles[len - 2];
-              prevBar.time = Math.floor(Number(prevBar.time));
-              candleSeries.update(prevBar);
-            }
-            const lastCandle = data.candles[len - 1];
-            lastCandle.time = Math.floor(Number(lastCandle.time));
-            candleSeries.update(lastCandle);
-            updateEMAs(data.candles);
-            chart.timeScale().scrollToRealTime();
-          }
+          applyCandleData(data.candles, data.is_fallback);
         }
 
         // 2. Update Telemetry HUD
@@ -1647,6 +1678,9 @@
 
             // 1. Super Fast Sub-Second Real Live Tick Handling (<0.05ms)
             if (data.type === "tick") {
+              if (!hasRealCandlesLoaded) {
+                fetchFullSnapshot();
+              }
               if (data.candle && candleSeries) {
                 data.candle.time = Math.floor(Number(data.candle.time));
                 candleSeries.update(data.candle);
@@ -1658,26 +1692,7 @@
 
             // 2. Full Snapshot Data Stream
             if (data.candles && data.candles.length > 0 && candleSeries) {
-              if (isInitialLoad) {
-                candleSeries.setData(data.candles);
-                updateEMAs(data.candles);
-                chart.timeScale().fitContent();
-                chart.timeScale().scrollToRealTime();
-                isInitialLoad = false;
-              } else {
-                // Synchronize last closed bar and current forming bar
-                const len = data.candles.length;
-                if (len >= 2) {
-                  const prevBar = data.candles[len - 2];
-                  prevBar.time = Math.floor(Number(prevBar.time));
-                  candleSeries.update(prevBar);
-                }
-                const lastBar = data.candles[len - 1];
-                lastBar.time = Math.floor(Number(lastBar.time));
-                candleSeries.update(lastBar);
-                updateEMAs(data.candles);
-                chart.timeScale().scrollToRealTime();
-              }
+              applyCandleData(data.candles, data.is_fallback);
             } else if (data.candle && candleSeries) {
               data.candle.time = Math.floor(Number(data.candle.time));
               candleSeries.update(data.candle);

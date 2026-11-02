@@ -88,6 +88,7 @@ def _generate_fallback_data() -> Dict[str, Any]:
 
     return {
         "timestamp": now,
+        "is_fallback": True,
         "current_price": current_price,
         "spread": 0.18,
         "timeframe": "M5",
@@ -133,21 +134,22 @@ _WS_CLIENTS = set()
 # SUPER FAST REAL LIVE CANDLES STATE & SUB-SECOND AGGREGATOR
 # -------------------------------------------------------------------------
 _LIVE_TICK = {
-    "price": 3891.00,
-    "prev_price": 3891.00,
+    "price": 0.0,
+    "prev_price": 0.0,
     "spread": 0.01,
-    "bid": 3891.00,
-    "ask": 3891.01,
-    "timestamp": time.time()
+    "bid": 0.0,
+    "ask": 0.0,
+    "timestamp": 0.0,
+    "is_real_tick": False
 }
 
 _ACTIVE_CANDLE = {
     "time": (int(time.time()) // 300) * 300,
-    "open": 3891.00,
-    "high": 3891.00,
-    "low": 3891.00,
-    "close": 3891.00,
-    "volume": 10.0
+    "open": 0.0,
+    "high": 0.0,
+    "low": 0.0,
+    "close": 0.0,
+    "volume": 0.0
 }
 
 
@@ -168,7 +170,7 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
     # If the active candle's open/low/high deviates (> 1.5%) from incoming tick price,
     # reset active candle immediately so no freak wick or giant box can ever be rendered.
     candle_open = _ACTIVE_CANDLE.get("open", 0.0)
-    if candle_open > 0 and (abs(price - candle_open) / candle_open > 0.015):
+    if candle_open <= 0.0 or (abs(price - candle_open) / max(1.0, candle_open) > 0.015):
         _ACTIVE_CANDLE = {
             "time": candle_ts,
             "open": price,
@@ -213,6 +215,7 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
     if ask:
         _LIVE_TICK["ask"] = round(float(ask), 2)
     _LIVE_TICK["timestamp"] = now
+    _LIVE_TICK["is_real_tick"] = True
 
     # 3. Synchronize with _CACHE snapshot if present
     snapshot = _CACHE.get("snapshot")
@@ -267,12 +270,13 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         except Exception:
             df = None
 
-    current_price = _LIVE_TICK.get("price", 3900.00)
+    current_price = 3915.00
     candles_list = []
     if df is not None and not df.empty:
         current_price = round(float(df['close'].iloc[-1]), 2)
-        if _LIVE_TICK.get("price", 0) > 1000.0:
-            current_price = _LIVE_TICK["price"]
+        live_p = _LIVE_TICK.get("price", 0.0)
+        if live_p > 1000.0 and (time.time() - _LIVE_TICK.get("timestamp", 0)) < 10.0 and _LIVE_TICK.get("is_real_tick", False):
+            current_price = live_p
         for idx, row in df.iterrows():
             ts = int(row['timestamp'].timestamp()) if hasattr(row['timestamp'], 'timestamp') else int(time.time())
             candles_list.append({
@@ -417,6 +421,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
 
     return {
         "timestamp": time.time(),
+        "is_fallback": False,
         "current_price": current_price,
         "spread": _LIVE_TICK.get("spread", 0.18),
         "candles": candles_list,
