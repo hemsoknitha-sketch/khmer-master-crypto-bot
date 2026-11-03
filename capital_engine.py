@@ -3540,9 +3540,9 @@ class PropFirmRiskManager:
             return round(min(5.0, max(0.05, raw_size)), 2)
 
         elif resolved_epic in ["OIL", "OIL_CRUDE", "OIL_BRENT"]:
-            # Crude Oil: 1 contract = 10 barrels
-            raw_size = max_dollar_risk / (sl_dist * 10.0)
-            return round(min(5.0, max(0.1, raw_size)), 1)
+            # Crude Oil: Capital.com CFD 1 contract = 1 barrel ($1/point)
+            raw_size = max_dollar_risk / sl_dist
+            return round(min(5.0, max(1.0, raw_size)), 0)
 
         elif resolved_epic == "BTCUSD":
             # Bitcoin CFD: 1 contract = 1 BTC
@@ -8987,7 +8987,7 @@ class CapitalKellyPositionSizer:
         """Returns physical unit multiplier per point for CFD contract risk calculation."""
         clean = (epic or "").upper().strip()
         if any(x in clean for x in ["OIL", "OIL_CRUDE"]):
-            return 10.0
+            return 1.0  # Capital.com Spot Crude CFD: 1 contract = 1 barrel ($1/point)
         elif any(x in clean for x in ["NATURALGAS", "GAS"]):
             return 100.0
         return 1.0
@@ -9422,7 +9422,7 @@ class CapitalKellyPositionSizer:
                 max_safe_lot = max_allowed_risk_dollar / sl_dist
                 final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
             elif clean_epic in ["OIL", "OIL_CRUDE"]:
-                max_safe_lot = max_allowed_risk_dollar / (sl_dist * 10.0)
+                max_safe_lot = max_allowed_risk_dollar / sl_dist
                 final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
 
         # Snap to lot_step and clamp between min_lot and max_lot
