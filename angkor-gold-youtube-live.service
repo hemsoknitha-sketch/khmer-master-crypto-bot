@@ -1,5 +1,5 @@
 [Unit]
-Description=Angkor Quant - Auto YouTube Live Stream 24/7 (Gold M1 HFT Signal)
+Description=Angkor Quant - Auto YouTube Live Stream 24/7 (Gold M15 Institutional Signal)
 After=network.target sound.target
 
 [Service]

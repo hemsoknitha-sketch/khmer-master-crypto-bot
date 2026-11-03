@@ -102,9 +102,9 @@ else
 fi
 export DISPLAY=:99
 
-# 4. Start Gold M5 Stream Web Server (Unbuffered output)
+# 4. Start Gold M15 Stream Web Server (Unbuffered output)
 if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
-    echo "📡 Starting Gold M5 Stream Server (Port $PORT)..."
+    echo "📡 Starting Gold M15 Stream Server (Port $PORT)..."
     # Ensure port is released from any zombie process
     fuser -k ${PORT}/tcp 2>/dev/null || true
     pkill -f "gold_youtube_stream_server.py" 2>/dev/null || true
@@ -113,18 +113,18 @@ if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
     # Wait up to 10s for server health endpoint to come up
     for i in {1..20}; do
         if curl -s "http://localhost:${PORT}/api/health" | grep -q "ok"; then
-            echo "✅ Gold M5 Stream Server active and verified on Port $PORT."
+            echo "✅ Gold M15 Stream Server active and verified on Port $PORT."
             break
         fi
         sleep 0.5
     done
 
     if ! pgrep -f "gold_youtube_stream_server.py" > /dev/null; then
-        echo "⚠️ Gold M5 Stream Server failed to stay alive! Inspecting logs/stream_server.log:"
+        echo "⚠️ Gold M15 Stream Server failed to stay alive! Inspecting logs/stream_server.log:"
         tail -n 15 "$SCRIPT_DIR/logs/stream_server.log" 2>/dev/null || true
     fi
 else
-    echo "📡 Gold M5 Stream Server already running."
+    echo "📡 Gold M15 Stream Server already running."
 fi
 
 # 5. Start Fresh Chromium in Kiosk Mode on :99 (Zero Stale Cache)

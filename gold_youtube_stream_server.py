@@ -158,7 +158,7 @@ _ACTIVE_CANDLE = {
 
 def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[float] = None, ask: Optional[float] = None) -> Dict[str, Any]:
     """
-    Sub-millisecond candle aggregator that dynamically updates the live M5 candle
+    Sub-millisecond candle aggregator that dynamically updates the live M15 candle
     on every tick and maintains live order book state.
     """
     global _LIVE_TICK, _ACTIVE_CANDLE
@@ -248,7 +248,7 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
 
 def _fetch_gold_m1_data() -> Dict[str, Any]:
     """
-    Synthesizes Live Gold M5 Candlesticks, SMC Structures, and Math Radar.
+    Synthesizes Live Gold M15 Candlesticks, SMC Structures, and Math Radar.
     Runs in background thread to avoid blocking the event loop.
     """
     global _ACTIVE_CANDLE, _LIVE_TICK
@@ -259,7 +259,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         print(f"⚠️ [YOUTUBE STREAM] Engine import note: {e}", flush=True)
         return _generate_fallback_data()
 
-    # 1. Fetch M5 Candlesticks (Optimal Institutional Sniper Timeframe)
+    # 1. Fetch M15 Candlesticks (Optimal Institutional Sniper Timeframe)
     df = None
     try:
         df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("XAUUSD", "15m", limit=120)
@@ -326,7 +326,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     else:
         return _generate_fallback_data()
 
-    # 2. Institutional 9 SMC Citadel Analysis on M5
+    # 2. Institutional 9 SMC Citadel Analysis on M15
     smc_score = 75
     ob_summary = "1 Bullish M15 OB"
     fvg_summary = "1 Imbalance Retest"
@@ -596,10 +596,10 @@ async def handle_mc_test(request: web.Request) -> web.Response:
                 text = f"Institutional alert! Strong Sell confluence confirmed on Gold at {cur_p:.2f} dollars. Order block rejection confirmed. Stop loss anchored above high."
                 mood = "sell"
             elif test_type == "tp":
-                text = "Target One reached on Gold M5! Realizing 50% lot cash profit into the vault. Breakeven Armor is now locked at risk zero."
+                text = "Target One reached on Gold M15! Realizing 50% lot cash profit into the vault. Breakeven Armor is now locked at risk zero."
                 mood = "tp"
             else:
-                text = "Welcome to Angkor Quant Institutional Live. I am Elena, your eighteen-year-old market anchor. Monitoring Gold M5 sniper order flow and institutional liquidity pools."
+                text = "Welcome to Angkor Quant Institutional Live. I am Elena, your eighteen-year-old market anchor. Monitoring Gold M15 sniper order flow and institutional liquidity pools."
                 mood = "brief"
 
             speech_id = f"test_{int(now)}"

@@ -92,7 +92,7 @@ SERVICE_FILE="/etc/systemd/system/angkor-gold-youtube-live.service"
 echo "⚙️ Configuring Systemd 24/7 service at $SERVICE_FILE..."
 sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
-Description=Angkor Quant - Auto YouTube Live Stream 24/7 (Gold M5 Sniper Scalping & AI Elena)
+Description=Angkor Quant - Auto YouTube Live Stream 24/7 (Gold M15 Institutional Scalping & AI Elena)
 After=network.target sound.target
 
 [Service]
