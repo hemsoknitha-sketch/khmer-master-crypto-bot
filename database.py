@@ -2929,8 +2929,8 @@ def record_capital_auto_trade(
     conn.close()
     return trade_id
 
-def update_capital_auto_trade_scale_tier(deal_id: str, scale_tier: int, status: Optional[str] = None):
-    """Updates scale_tier and status for a TradFi position in capital_auto_trades."""
+def update_capital_auto_trade_scale_tier(deal_id: str, scale_tier: int, status: Optional[str] = None, sl: Optional[float] = None):
+    """Updates scale_tier, status, and optionally updated SL (Breakeven/Trailing) in capital_auto_trades."""
     conn = get_db_connection()
     cursor = conn.cursor()
     for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
@@ -2939,12 +2939,24 @@ def update_capital_auto_trade_scale_tier(deal_id: str, scale_tier: int, status: 
         except Exception:
             pass
 
-    if status:
+    if sl is not None and status:
+        cursor.execute("""
+            UPDATE capital_auto_trades
+            SET scale_tier = ?, status = ?, sl = ?
+            WHERE (deal_id = ? OR deal_reference = ?) AND status != 'CLOSED'
+        """, (int(scale_tier), str(status), float(sl), str(deal_id), str(deal_id)))
+    elif status:
         cursor.execute("""
             UPDATE capital_auto_trades
             SET scale_tier = ?, status = ?
             WHERE (deal_id = ? OR deal_reference = ?) AND status != 'CLOSED'
         """, (int(scale_tier), str(status), str(deal_id), str(deal_id)))
+    elif sl is not None:
+        cursor.execute("""
+            UPDATE capital_auto_trades
+            SET scale_tier = ?, sl = ?
+            WHERE (deal_id = ? OR deal_reference = ?) AND status != 'CLOSED'
+        """, (int(scale_tier), float(sl), str(deal_id), str(deal_id)))
     else:
         cursor.execute("""
             UPDATE capital_auto_trades

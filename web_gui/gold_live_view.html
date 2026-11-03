@@ -1510,16 +1510,9 @@
       if (!candles || candles.length === 0) return [];
       const k = 2 / (period + 1);
       const emaData = [];
-      const smaCount = Math.min(candles.length, period);
-      let sum = 0;
-      for (let i = 0; i < smaCount; i++) {
-        sum += Number(candles[i].close);
-      }
-      let ema = sum / smaCount;
-      for (let i = 0; i < smaCount; i++) {
-        emaData.push({ time: Math.floor(Number(candles[i].time)), value: Number(ema.toFixed(2)) });
-      }
-      for (let i = smaCount; i < candles.length; i++) {
+      let ema = Number(candles[0].close);
+      emaData.push({ time: Math.floor(Number(candles[0].time)), value: Number(ema.toFixed(2)) });
+      for (let i = 1; i < candles.length; i++) {
         const closeP = Number(candles[i].close);
         ema = closeP * k + ema * (1 - k);
         emaData.push({ time: Math.floor(Number(candles[i].time)), value: Number(ema.toFixed(2)) });

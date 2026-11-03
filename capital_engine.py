@@ -962,13 +962,13 @@ class CapitalComEngine:
                     cur.execute("""
                         SELECT deal_id, epic, direction, size, entry_price, sl, tp, 'AUTO' as origin
                         FROM capital_auto_trades
-                        WHERE chat_id = ? AND status = 'OPEN'
+                        WHERE chat_id = ? AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
                     """, (cid,))
                 else:
                     cur.execute("""
                         SELECT deal_id, epic, direction, size, entry_price, sl, tp, 'AUTO' as origin
                         FROM capital_auto_trades
-                        WHERE status = 'OPEN'
+                        WHERE (status = 'OPEN' OR status LIKE 'ACTIVE%')
                     """)
                 all_open_trades.extend(cur.fetchall())
             except Exception:
@@ -998,13 +998,13 @@ class CapitalComEngine:
                     cur.execute("""
                         SELECT deal_id, epic, direction, 0.05 as size, entry_price, sl, tp, 'SCALP' as origin
                         FROM capital_scalp_trades
-                        WHERE chat_id = ? AND status = 'OPEN'
+                        WHERE chat_id = ? AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
                     """, (cid,))
                 else:
                     cur.execute("""
                         SELECT deal_id, epic, direction, 0.05 as size, entry_price, sl, tp, 'SCALP' as origin
                         FROM capital_scalp_trades
-                        WHERE status = 'OPEN'
+                        WHERE (status = 'OPEN' OR status LIKE 'ACTIVE%')
                     """)
                 all_open_trades.extend(cur.fetchall())
             except Exception:
@@ -4713,7 +4713,7 @@ class CapitalAutonomousEngine:
                 if should_p1:
                     upd_p1 = engine.update_position_stops(deal_id=deal_id, stop_loss=p1_safe)
                     if upd_p1.get("success"):
-                        db.update_capital_auto_trade_scale_tier(str(deal_id), 0.5, status="ACTIVE_PHASE1")
+                        db.update_capital_auto_trade_scale_tier(str(deal_id), 0.5, status="ACTIVE_PHASE1", sl=p1_safe)
                         ratcheted_count += 1
                         scale_tier = 0.5
                         logger.info(f"🛡️ [PHASE 1: RISK REDUCTION 60%] Tightened SL for {epic} ({direction}) to {p1_safe} (+{r_gain:.2f}R, Entry - 0.5x ATR)")
@@ -4733,10 +4733,10 @@ class CapitalAutonomousEngine:
                             for ct in db.get_active_capital_auto_trades():
                                 if ct.get("chat_id") == chat_id and ct.get("epic") == epic and ct.get("deal_id") != str(deal_id):
                                     c_deal = ct.get("deal_id")
-                                    be_sl = round(entry_level + max(spread * 0.5, entry_level * 0.001), prec) if direction == "BUY" else round(entry_level - max(spread * 0.5, entry_level * 0.001), prec)
-                                    safe_be = min(be_sl, round(current_price - (spread * 1.5), prec)) if direction == "BUY" else max(be_sl, round(current_price + (spread * 1.5), prec))
+                                    be_sl = round(entry_level + max(spread * 0.5, 0.01), prec) if direction == "BUY" else round(entry_level - max(spread * 0.5, 0.01), prec)
+                                    safe_be = max(be_sl, round(entry_level + (spread * 0.5), prec)) if direction == "BUY" else min(be_sl, round(entry_level - (spread * 0.5), prec))
                                     engine.update_position_stops(deal_id=c_deal, stop_loss=safe_be)
-                                    db.update_capital_auto_trade_scale_tier(c_deal, 1, status="ACTIVE_TIER1")
+                                    db.update_capital_auto_trade_scale_tier(c_deal, 1, status="ACTIVE_TIER1", sl=safe_be)
                         except Exception:
                             pass
                         if chat_id:
@@ -4758,13 +4758,13 @@ class CapitalAutonomousEngine:
                                 pass
                         continue
                 elif tranche_id == "SINGLE":
-                    be_sl = round(entry_level + max(spread * 0.5, entry_level * 0.001), prec) if direction == "BUY" else round(entry_level - max(spread * 0.5, entry_level * 0.001), prec)
-                    safe_be = min(be_sl, round(current_price - (spread * 1.5), prec)) if direction == "BUY" else max(be_sl, round(current_price + (spread * 1.5), prec))
+                    be_sl = round(entry_level + max(spread * 0.5, 0.01), prec) if direction == "BUY" else round(entry_level - max(spread * 0.5, 0.01), prec)
+                    safe_be = max(be_sl, round(entry_level + (spread * 0.5), prec)) if direction == "BUY" else min(be_sl, round(entry_level - (spread * 0.5), prec))
                     should_upd_be = (safe_be > sl) if direction == "BUY" else (sl <= 0 or safe_be < sl)
                     if should_upd_be:
                         upd_be = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_be)
                         if upd_be.get("success"):
-                            db.update_capital_auto_trade_scale_tier(str(deal_id), 1, status="ACTIVE_TP1")
+                            db.update_capital_auto_trade_scale_tier(str(deal_id), 1, status="ACTIVE_TP1", sl=safe_be)
                             self._be_locked_set.add(deal_id)
                             ratcheted_count += 1
                             logger.info(f"🎯 [MULTI-TARGET TP1 HIT] Shifted SL for {epic} to Breakeven Armor {safe_be} (R: +{r_gain:.2f}R, Risk: 0.00R Free Roll)")
@@ -4801,7 +4801,7 @@ class CapitalAutonomousEngine:
                                     t2_floor = round(entry_level + (2.0 * trade_sl_dist), prec) if direction == "BUY" else round(entry_level - (2.0 * trade_sl_dist), prec)
                                     safe_t2 = min(t2_floor, round(current_price - (spread * 1.5), prec)) if direction == "BUY" else max(t2_floor, round(current_price + (spread * 1.5), prec))
                                     engine.update_position_stops(deal_id=c_deal, stop_loss=safe_t2)
-                                    db.update_capital_auto_trade_scale_tier(c_deal, 2, status="ACTIVE_TIER2")
+                                    db.update_capital_auto_trade_scale_tier(c_deal, 2, status="ACTIVE_TIER2", sl=safe_t2)
                         except Exception:
                             pass
                         if chat_id:
@@ -4828,7 +4828,7 @@ class CapitalAutonomousEngine:
                     if should_upd_t2:
                         upd_t2 = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_t2)
                         if upd_t2.get("success"):
-                            db.update_capital_auto_trade_scale_tier(str(deal_id), 2, status="ACTIVE_TP2")
+                            db.update_capital_auto_trade_scale_tier(str(deal_id), 2, status="ACTIVE_TP2", sl=safe_t2)
                             ratcheted_count += 1
                             is_runner = True
                             logger.info(f"💎 [MULTI-TARGET TP2 HIT] Ratcheted SL for {epic} to +2.0R Profit Floor {safe_t2} (R: +{r_gain:.2f}R, Cash Locked)")

@@ -113,10 +113,10 @@ def _generate_fallback_data() -> Dict[str, Any]:
             "close": p,
             "volume": 180.0
         })
-        # True EMA 200 starts at 3958.08 (ABOVE price on Oct 31) and converges smoothly to 3928.36
-        e200_val = round(3928.36 + (3958.08 - 3928.36) * ((i / 300.0) ** 1.3), 2)
-        e50_val = round(p + 8.50 + np.sin(i / 12.0) * 3.0, 2)
-        e20_val = round(p + 2.50 + np.sin(i / 6.0) * 2.0, 2)
+        # True MT5 Alignment: EMA 200 runs at ~3943.40 (ABOVE price), EMA 50 at ~3935.20, EMA 20 at ~3920.50
+        e200_val = round(3943.40 + (3958.08 - 3943.40) * ((i / 300.0) ** 1.1), 2)
+        e50_val = round(3935.20 + (3952.00 - 3935.20) * (i / 300.0) + np.sin(i / 12.0) * 1.5, 2)
+        e20_val = round(3920.50 + (3945.00 - 3920.50) * (i / 300.0) + np.sin(i / 6.0) * 1.2, 2)
         ema20_list.append({"time": t, "value": e20_val})
         ema50_list.append({"time": t, "value": e50_val})
         ema200_list.append({"time": t, "value": e200_val})
@@ -129,9 +129,9 @@ def _generate_fallback_data() -> Dict[str, Any]:
         "close": current_price,
         "volume": 25.0
     })
-    ema20_list.append({"time": candle_ts, "value": round(current_price + 2.50, 2)})
-    ema50_list.append({"time": candle_ts, "value": round(current_price + 8.50, 2)})
-    ema200_list.append({"time": candle_ts, "value": 3928.36})
+    ema20_list.append({"time": candle_ts, "value": 3920.50})
+    ema50_list.append({"time": candle_ts, "value": 3935.20})
+    ema200_list.append({"time": candle_ts, "value": 3943.40})
 
     return {
         "timestamp": now,

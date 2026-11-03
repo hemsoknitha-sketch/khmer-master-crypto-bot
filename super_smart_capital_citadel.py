@@ -2067,8 +2067,25 @@ class SuperSmartCapitalCitadel:
         except Exception:
             pass
 
+        # Evaluate Turtle Soup Liquidity Sweep (Invariant 95 & Pillar 1) prior to boundary clearance
+        turtle_soup_res = TradFiTurtleSoupEngine.detect_turtle_soup_liquidity_sweep(
+            candles_15m=candles_15m,
+            current_price=curr_price,
+            atr_15m=atr_15m,
+            spread=spread,
+            lookback=lookback_window
+        )
+        has_bsl_sweep = bool(turtle_soup_res.get("has_bsl_sweep", False))
+        has_ssl_sweep = bool(turtle_soup_res.get("has_ssl_sweep", False))
+        is_turtle_soup = bool(turtle_soup_res.get("has_turtle_soup", False))
+
         if norm_side == "BUY" and price_range_pct > 82.0:
-            if is_breakout_mode or has_armed_radar or (price_range_pct >= 98.0 and curr_price >= swing_high):
+            can_clear_premium_breakout = (
+                (is_breakout_mode or has_armed_radar)
+                and rsi_15m < 68.0
+                and not has_bsl_sweep
+            )
+            if can_clear_premium_breakout:
                 logger.info(
                     f"⚡ [CITADEL BREAKOUT CLEARANCE] {resolved_epic} BUY at {price_range_pct:.1f}% dealing range "
                     f"recognized as Invariant 76 Path A Boundary Breakout Thrust (Swing High: {swing_high:.2f}). "
@@ -2096,8 +2113,14 @@ class SuperSmartCapitalCitadel:
                 return res
 
         # Shorting in Extreme Discount (< 18.0%) without structural breakdown is retail suicide
+        # Invariant 95 & Invariant 103: Disallow selling into oversold bottoms or SSL sweeps
         if norm_side == "SELL" and price_range_pct < 18.0:
-            if is_breakout_mode or has_armed_radar or (price_range_pct <= 2.0 and curr_price <= swing_low):
+            can_clear_discount_breakdown = (
+                (is_breakout_mode or has_armed_radar)
+                and rsi_15m > 38.0
+                and not has_ssl_sweep
+            )
+            if can_clear_discount_breakdown:
                 logger.info(
                     f"⚡ [CITADEL BREAKDOWN CLEARANCE] {resolved_epic} SELL at {price_range_pct:.1f}% dealing range "
                     f"recognized as Invariant 76 Path A Boundary Breakdown Thrust (Swing Low: {swing_low:.2f}). "
@@ -2176,16 +2199,7 @@ class SuperSmartCapitalCitadel:
         # --------------------------------------------------------------------
         # 3. PILLAR 1: TRADFI LIQUIDITY TRAP HUNTER (BSL / SSL SWEEPS & TURTLE SOUP)
         # --------------------------------------------------------------------
-        turtle_soup_res = TradFiTurtleSoupEngine.detect_turtle_soup_liquidity_sweep(
-            candles_15m=candles_15m,
-            current_price=curr_price,
-            atr_15m=atr_15m,
-            spread=spread,
-            lookback=lookback_window
-        )
-        has_bsl_sweep = bool(turtle_soup_res.get("has_bsl_sweep", False))
-        has_ssl_sweep = bool(turtle_soup_res.get("has_ssl_sweep", False))
-        is_turtle_soup = bool(turtle_soup_res.get("has_turtle_soup", False))
+        # Note: turtle_soup_res pre-computed prior to boundary gatekeepers
 
         # Inspect recent 4 candles for supplemental legacy Liquidity Sweep Wicks
         for i in range(-5, -1):
