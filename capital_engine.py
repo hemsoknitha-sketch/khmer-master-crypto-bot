@@ -361,13 +361,18 @@ def get_fresh_cached_market(epic: str, max_age_seconds: float = 5.0) -> Optional
 _ASSET_EXECUTION_MUTEX = threading.Lock()
 _ASSET_LOCKS: Dict[str, threading.Lock] = {}
 
-def _get_asset_lock(epic: str) -> threading.Lock:
-    """Returns a thread lock dedicated to a specific asset epic."""
+def _get_asset_lock(epic: str, account_key: str = "") -> threading.Lock:
+    """
+    Returns a thread lock dedicated to a specific (account, asset epic) pair.
+    Scoping by account preserves double-fill protection per broker account while
+    letting different VIP accounts execute the same epic (e.g. GOLD) concurrently.
+    """
     resolved = EPIC_MAP.get(str(epic).upper(), str(epic).upper())
+    lock_key = f"{account_key}|{resolved}" if account_key else resolved
     with _ASSET_EXECUTION_MUTEX:
-        if resolved not in _ASSET_LOCKS:
-            _ASSET_LOCKS[resolved] = threading.Lock()
-        return _ASSET_LOCKS[resolved]
+        if lock_key not in _ASSET_LOCKS:
+            _ASSET_LOCKS[lock_key] = threading.Lock()
+        return _ASSET_LOCKS[lock_key]
 
 
 # ==============================================================================
@@ -1383,9 +1388,11 @@ class CapitalComEngine:
         Guarantees cross-engine mutex isolation against concurrent double execution on the same epic.
         """
         resolved_epic = EPIC_MAP.get(str(epic).upper(), str(epic).upper())
-        asset_lock = _get_asset_lock(resolved_epic)
+        _acct_id = str(getattr(self, "identifier", "") or getattr(self, "api_key", "") or "")
+        _acct_key = f"{_acct_id}|{'DEMO' if getattr(self, 'is_demo', False) else 'LIVE'}"
+        asset_lock = _get_asset_lock(resolved_epic, _acct_key)
         if not asset_lock.acquire(blocking=False):
-            logger.warning(f"🛑 [MUTEX ORDER LOCK] Concurrent order rejected: Another order is in-flight for {resolved_epic}")
+            logger.warning(f"🛑 [MUTEX ORDER LOCK] Concurrent order rejected: Another order is in-flight for {resolved_epic} on this account")
             return {
                 "success": False,
                 "error": f"CONCURRENT_ORDER_LOCK: Another order is currently being executed on {resolved_epic}."
@@ -7718,6 +7725,7 @@ class CapitalOpeningRangeBreakoutEngine:
             open_pos = await asyncio.to_thread(user_engine.get_open_positions)
             max_pos = get_dynamic_max_positions_for_equity(eff_equity, user_cfg.get("max_positions"))
             if len(open_pos) >= max_pos:
+                logger.info(f"🛡️ [ORB SKIP] User {chat_id}: open positions {len(open_pos)} >= max {max_pos}. Skipping {resolved_epic}.")
                 return False
 
             # Pillar 6: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
@@ -7798,6 +7806,37 @@ class CapitalOpeningRangeBreakoutEngine:
                 take_profit=eff_tp,
                 bypass_citadel=True
             )
+
+            # Transient-failure recovery (network/rate-limit/session). Re-checks live positions first so a
+            # timed-out-but-filled order can never be double-filled; never retries broker/risk rejections.
+            if not trade_res.get("success"):
+                _err_up = str(trade_res.get("error") or trade_res.get("errorCode") or "").upper()
+                if any(tok in _err_up for tok in ("TIMEOUT", "TIMED OUT", "CONNECTION", "429", "RATE", "TOO MANY", "SESSION", "401")):
+                    for _retry in range(2):
+                        await asyncio.sleep(0.4 * (_retry + 1))
+                        try:
+                            _pos_now = await asyncio.to_thread(user_engine.get_open_positions)
+                        except Exception:
+                            _pos_now = []
+                        _held = {
+                            (p_.get("position", {}).get("epic") or p_.get("market", {}).get("epic") or "").upper()
+                            for p_ in (_pos_now or [])
+                        }
+                        if resolved_epic.upper() in _held:
+                            logger.info(f"🛡️ [ORB RETRY GUARD] {resolved_epic} already filled for user {chat_id} after transient error. No retry needed.")
+                            return False
+                        trade_res = await asyncio.to_thread(
+                            user_engine.place_position,
+                            epic=resolved_epic,
+                            direction=direction,
+                            size=size,
+                            stop_loss=sl,
+                            take_profit=eff_tp,
+                            bypass_citadel=True
+                        )
+                        if trade_res.get("success"):
+                            logger.info(f"🔁 [ORB RETRY OK] {resolved_epic} filled for user {chat_id} on retry {_retry + 1}.")
+                            break
 
             if trade_res.get("success"):
                 self._stats["orders_dispatched"] += 1
@@ -7917,6 +7956,10 @@ class CapitalOpeningRangeBreakoutEngine:
                     except Exception as notif_e:
                         logger.debug(f"ORB notification error: {notif_e}")
                 return True
+
+            _fail_txt = str(trade_res.get("error") or trade_res.get("errorCode") or trade_res)[:220]
+            logger.warning(f"⚠️ [ORB EXEC FAILED] User {chat_id} {resolved_epic} {direction} ({'DEMO' if is_demo else 'LIVE'}): {_fail_txt}")
+            return False
         except Exception as user_orb_e:
             logger.error(f"Error executing ORB trade for user {chat_id}: {user_orb_e}")
             return False
@@ -8621,6 +8664,12 @@ class CapitalOpeningRangeBreakoutEngine:
                 for chat_id, user_cfg in all_target_users.items()
             ]
             dispatch_results = await asyncio.gather(*orb_tasks, return_exceptions=True)
+            _ok_n = sum(1 for r_ in dispatch_results if r_ is True)
+            _exc_n = sum(1 for r_ in dispatch_results if isinstance(r_, BaseException))
+            logger.info(f"📊 [ORB FAN-OUT] {session_name} {resolved_epic} {direction}: {_ok_n}/{len(dispatch_results)} accounts filled, {len(dispatch_results) - _ok_n - _exc_n} skipped/rejected, {_exc_n} exceptions.")
+            for (_cid_, _), r_ in zip(all_target_users.items(), dispatch_results):
+                if isinstance(r_, BaseException):
+                    logger.error(f"❌ [ORB FAN-OUT EXCEPTION] User {_cid_}: {type(r_).__name__}: {r_}")
 
             # ==================================================================
             # 🚀 UNIVERSAL VIP ORB 15M AUTO-TRADE BREAKOUT BROADCAST 🟢
