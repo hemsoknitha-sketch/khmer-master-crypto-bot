@@ -314,25 +314,28 @@
       gap: 6px;
     }
 
-    .dot-cyan {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #06b6d4;
-    }
-
     .dot-gold {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #f59e0b;
+      background: #facc15;
+      box-shadow: 0 0 6px rgba(250, 204, 21, 0.6);
     }
 
-    .dot-purple {
+    .dot-silver {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #a855f7;
+      background: #cbd5e1;
+      box-shadow: 0 0 6px rgba(203, 213, 225, 0.6);
+    }
+
+    .dot-blue {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3b82f6;
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
     }
 
     /* RIGHT SIDEBAR */
@@ -1003,13 +1006,13 @@
     <div id="chart-wrapper">
       <div class="chart-overlay-top">
         <div class="indicator-pill">
-          <div class="dot-cyan"></div> EMA 20
+          <div class="dot-gold"></div> EMA 20
         </div>
         <div class="indicator-pill">
-          <div class="dot-gold"></div> EMA 50
+          <div class="dot-silver"></div> EMA 50
         </div>
         <div class="indicator-pill">
-          <div class="dot-purple"></div> EMA 200
+          <div class="dot-blue"></div> EMA 200
         </div>
         <div class="indicator-pill" id="chart-watermark" style="color:#cbd5e1; font-weight:700;">
           GOLD XAUUSD (M15) • TOKYO VPS DIRECT FEED
@@ -1334,21 +1337,21 @@
     });
 
     const ema20Series = chart.addLineSeries({
-      color: '#06b6d4',
+      color: '#facc15',
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
     });
 
     const ema50Series = chart.addLineSeries({
-      color: '#f59e0b',
+      color: '#cbd5e1',
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
     });
 
     const ema200Series = chart.addLineSeries({
-      color: '#c084fc',
+      color: '#3b82f6',
       lineWidth: 2.5,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -1507,17 +1510,19 @@
       if (!candles || candles.length === 0) return [];
       const k = 2 / (period + 1);
       const emaData = [];
-      let prevEma = Number(candles[0].close);
-
-      for (let i = 0; i < candles.length; i++) {
-        const c = candles[i];
-        const closeP = Number(c.close);
-        if (i === 0) {
-          prevEma = closeP;
-        } else {
-          prevEma = closeP * k + prevEma * (1 - k);
-        }
-        emaData.push({ time: Math.floor(Number(c.time)), value: prevEma });
+      const smaCount = Math.min(candles.length, period);
+      let sum = 0;
+      for (let i = 0; i < smaCount; i++) {
+        sum += Number(candles[i].close);
+      }
+      let ema = sum / smaCount;
+      for (let i = 0; i < smaCount; i++) {
+        emaData.push({ time: Math.floor(Number(candles[i].time)), value: Number(ema.toFixed(2)) });
+      }
+      for (let i = smaCount; i < candles.length; i++) {
+        const closeP = Number(candles[i].close);
+        ema = closeP * k + ema * (1 - k);
+        emaData.push({ time: Math.floor(Number(candles[i].time)), value: Number(ema.toFixed(2)) });
       }
       return emaData;
     }
