@@ -64,9 +64,9 @@ def _generate_fallback_data() -> Dict[str, Any]:
     current_price = _LIVE_TICK.get("price", 3891.00) if "_LIVE_TICK" in globals() else 3891.00
     candle_ts = (int(now) // 900) * 900
     
-    # Generate 60 realistic M15 historical candles around current price
+    # Generate 260 realistic M15 historical candles around current price
     candles = []
-    for i in range(60, 0, -1):
+    for i in range(260, 0, -1):
         t = candle_ts - (i * 900)
         drift = np.sin(i / 6.0) * 2.80 + np.cos(i / 3.0) * 1.50
         p = round(current_price + drift, 2)
@@ -231,7 +231,7 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
                 candles[-1] = _ACTIVE_CANDLE.copy()
             elif candle_ts > candles[-1].get("time", 0):
                 candles.append(_ACTIVE_CANDLE.copy())
-                if len(candles) > 120:
+                if len(candles) > 300:
                     candles.pop(0)
 
     active_c = _ACTIVE_CANDLE.copy()
@@ -262,14 +262,14 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     # 1. Fetch M15 Candlesticks (Optimal Institutional Sniper Timeframe)
     df = None
     try:
-        df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("XAUUSD", "15m", limit=120)
+        df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("XAUUSD", "15m", limit=300)
     except Exception:
         df = None
 
     if df is None or len(df) < 15:
         # Fallback to PAXGUSDT if XAUUSD feed is offline
         try:
-            df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("PAXGUSDT", "15m", limit=120)
+            df = mt5_smc_citadel.MT5SMCCitadelEngine.fetch_timeframe_candles("PAXGUSDT", "15m", limit=300)
         except Exception:
             df = None
 
@@ -293,7 +293,7 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         
         # Sanity filter: filter out any historical candles that deviate by > 3.0% from current_price
         # (permanently prevents stale 2745.50 candles from ever contaminating the chart)
-        clean_candles = [c for c in candles_list if abs(c["close"] - current_price) / max(1.0, current_price) < 0.03]
+        clean_candles = [c for c in candles_list if abs(c["close"] - current_price) / max(1.0, current_price) < 0.12]
         candles_list = clean_candles if len(clean_candles) >= 15 else candles_list
 
         # Synchronize latest candle with _ACTIVE_CANDLE

@@ -1348,8 +1348,8 @@
     });
 
     const ema200Series = chart.addLineSeries({
-      color: '#a855f7',
-      lineWidth: 2,
+      color: '#c084fc',
+      lineWidth: 2.5,
       priceLineVisible: false,
       lastValueVisible: false,
     });
@@ -1499,19 +1499,21 @@
     }
 
     function calculateEMA(candles, period) {
-      if (!candles || candles.length < period) return [];
+      if (!candles || candles.length < 15) return [];
       const k = 2 / (period + 1);
       const emaData = [];
-      let prevEma = candles[0].close;
+      let prevEma = Number(candles[0].close);
+      const startIdx = candles.length >= period ? (period - 1) : Math.min(15, candles.length - 1);
 
       for (let i = 0; i < candles.length; i++) {
         const c = candles[i];
+        const closeP = Number(c.close);
         if (i === 0) {
-          prevEma = c.close;
+          prevEma = closeP;
         } else {
-          prevEma = c.close * k + prevEma * (1 - k);
+          prevEma = closeP * k + prevEma * (1 - k);
         }
-        if (i >= period - 1) {
+        if (i >= startIdx) {
           emaData.push({ time: Math.floor(Number(c.time)), value: prevEma });
         }
       }
