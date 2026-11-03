@@ -209,8 +209,8 @@ class MT5SMCCitadelEngine:
 
         if cache_key in cls._CANDLE_CACHE:
             ts, df_cached = cls._CANDLE_CACHE[cache_key]
-            if (now_ts - ts) < ttl and df_cached is not None and len(df_cached) >= 20:
-                return df_cached
+            if (now_ts - ts) < ttl and df_cached is not None and len(df_cached) >= limit:
+                return df_cached.tail(limit).copy()
 
         df = None
 

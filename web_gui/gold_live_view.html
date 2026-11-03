@@ -1435,8 +1435,13 @@
     let lastRenderedPrice = 0.0;
     let lastRenderedCandleTime = 0;
 
-    function applyCandleData(candles, isFallback = false) {
+    let lastBackendEMAs = null;
+
+    function applyCandleData(candles, isFallback = false, backendEMAs = null) {
       if (!candles || candles.length === 0 || !candleSeries) return;
+      if (backendEMAs && backendEMAs.ema200 && backendEMAs.ema200.length > 0) {
+        lastBackendEMAs = backendEMAs;
+      }
 
       const isFb = Boolean(isFallback);
       const firstPrice = Number(candles[0].close || 0);
@@ -1453,7 +1458,7 @@
 
       if (needsFullSet) {
         candleSeries.setData(candles);
-        updateEMAs(candles);
+        updateEMAs(candles, backendEMAs || lastBackendEMAs);
         chart.timeScale().fitContent();
         chart.timeScale().scrollToRealTime();
         isInitialLoad = false;
@@ -1473,7 +1478,7 @@
         }
         lastCandle.time = lastTime;
         candleSeries.update(lastCandle);
-        updateEMAs(candles);
+        updateEMAs(candles, backendEMAs || lastBackendEMAs);
         chart.timeScale().scrollToRealTime();
         lastRenderedPrice = lastPrice;
         lastRenderedCandleTime = lastTime;
@@ -1488,7 +1493,7 @@
 
         // 1. Candlestick Data (Smooth initial render & instant full dataset replacement on real market data)
         if (data.candles && data.candles.length > 0) {
-          applyCandleData(data.candles, data.is_fallback);
+          applyCandleData(data.candles, data.is_fallback, { ema20: data.ema20, ema50: data.ema50, ema200: data.ema200 });
         }
 
         // 2. Update Telemetry HUD
@@ -1499,11 +1504,10 @@
     }
 
     function calculateEMA(candles, period) {
-      if (!candles || candles.length < 15) return [];
+      if (!candles || candles.length === 0) return [];
       const k = 2 / (period + 1);
       const emaData = [];
       let prevEma = Number(candles[0].close);
-      const startIdx = candles.length >= period ? (period - 1) : Math.min(15, candles.length - 1);
 
       for (let i = 0; i < candles.length; i++) {
         const c = candles[i];
@@ -1513,16 +1517,30 @@
         } else {
           prevEma = closeP * k + prevEma * (1 - k);
         }
-        if (i >= startIdx) {
-          emaData.push({ time: Math.floor(Number(c.time)), value: prevEma });
-        }
+        emaData.push({ time: Math.floor(Number(c.time)), value: prevEma });
       }
       return emaData;
     }
 
-    function updateEMAs(candles) {
-      if (!candles || candles.length < 20) return;
+    function updateEMAs(candles, backendEMAs) {
+      if (!candles || candles.length === 0) return;
       try {
+        if (backendEMAs && backendEMAs.ema200 && backendEMAs.ema200.length > 0) {
+          if (ema20Series && backendEMAs.ema20) {
+            backendEMAs.ema20.forEach(p => p.time = Math.floor(Number(p.time)));
+            ema20Series.setData(backendEMAs.ema20);
+          }
+          if (ema50Series && backendEMAs.ema50) {
+            backendEMAs.ema50.forEach(p => p.time = Math.floor(Number(p.time)));
+            ema50Series.setData(backendEMAs.ema50);
+          }
+          if (ema200Series && backendEMAs.ema200) {
+            backendEMAs.ema200.forEach(p => p.time = Math.floor(Number(p.time)));
+            ema200Series.setData(backendEMAs.ema200);
+          }
+          return;
+        }
+
         const ema20Data = calculateEMA(candles, 20);
         const ema50Data = calculateEMA(candles, 50);
         const ema200Data = calculateEMA(candles, 200);
@@ -1707,8 +1725,12 @@
                 fetchFullSnapshot();
               }
               if (data.candle && candleSeries) {
-                data.candle.time = Math.floor(Number(data.candle.time));
+                const cTime = Math.floor(Number(data.candle.time));
+                data.candle.time = cTime;
                 candleSeries.update(data.candle);
+                if (data.ema20 && ema20Series) ema20Series.update({ time: cTime, value: Number(data.ema20) });
+                if (data.ema50 && ema50Series) ema50Series.update({ time: cTime, value: Number(data.ema50) });
+                if (data.ema200 && ema200Series) ema200Series.update({ time: cTime, value: Number(data.ema200) });
                 chart.timeScale().scrollToRealTime();
               }
               updateLivePriceTick(Number(data.current_price), Number(data.prev_price), Number(data.spread));
@@ -1717,7 +1739,7 @@
 
             // 2. Full Snapshot Data Stream
             if (data.candles && data.candles.length > 0 && candleSeries) {
-              applyCandleData(data.candles, data.is_fallback);
+              applyCandleData(data.candles, data.is_fallback, { ema20: data.ema20, ema50: data.ema50, ema200: data.ema200 });
             } else if (data.candle && candleSeries) {
               data.candle.time = Math.floor(Number(data.candle.time));
               candleSeries.update(data.candle);
