@@ -252,6 +252,17 @@ class MT5SMCCitadelEngine:
                             for col in ['open', 'high', 'low', 'close', 'volume']:
                                 df[col] = df[col].astype(float)
                             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+
+                            if any(k in clean_sym for k in ["XAU", "GOLD"]):
+                                # TradFi Market Calendar Alignment (MetaTrader 5 & Interbank Session Sync):
+                                # TradFi Gold (XAUUSD) markets are closed from Friday 21:00 UTC to Sunday 22:00 UTC.
+                                # Crypto PAXG continues trading 24/7 over the weekend (192 candles of artificial sideways chop),
+                                # which severely distorts EMA 20, EMA 50, and EMA 200 convergence.
+                                # We strictly filter out weekend candles to match MetaTrader 5 institutional OHLCV.
+                                weekday = df['timestamp'].dt.weekday
+                                hour = df['timestamp'].dt.hour
+                                tradfi_mask = (weekday < 4) | ((weekday == 4) & (hour < 21)) | ((weekday == 6) & (hour >= 22))
+                                df = df[tradfi_mask].reset_index(drop=True)
                             break
                 except Exception as e_bin:
                     logger.debug(f"Exchange candle fetch notice for {clean_sym} ({url}): {e_bin}")

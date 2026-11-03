@@ -3556,8 +3556,8 @@ def set_capital_global_trading_switch(enabled: bool, engine: str = "ALL"):
     elif eng in ["SCALP", "CAPITAL_SCALP"]:
         update_system_setting("cap_global_scalp_enabled", s_val)
 
-def enable_all_capital_users(engine: str = "ALL") -> int:
-    """Enables auto trade / trend scalp for all registered Capital.com users in batch."""
+def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None, max_positions: Optional[int] = None) -> int:
+    """Enables auto trade / trend scalp for all registered Capital.com users in batch with optional budget and max positions."""
     set_capital_global_trading_switch(True, engine)
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -3565,9 +3565,44 @@ def enable_all_capital_users(engine: str = "ALL") -> int:
     try:
         eng = engine.upper()
         if eng in ["ALL", "AUTO"]:
-            cursor.execute("UPDATE capital_auto_config SET is_enabled = 1, is_demo = 0 WHERE chat_id != 859271875")
+            # 1. Update existing records in capital_auto_config
+            if budget is not None and max_positions is not None:
+                cursor.execute("""
+                    UPDATE capital_auto_config 
+                    SET is_enabled = 1, is_demo = 0, budget = ?, max_positions = ? 
+                    WHERE chat_id != 859271875
+                """, (float(budget), int(max_positions)))
+            elif budget is not None:
+                cursor.execute("""
+                    UPDATE capital_auto_config 
+                    SET is_enabled = 1, is_demo = 0, budget = ? 
+                    WHERE chat_id != 859271875
+                """, (float(budget),))
+            elif max_positions is not None:
+                cursor.execute("""
+                    UPDATE capital_auto_config 
+                    SET is_enabled = 1, is_demo = 0, max_positions = ? 
+                    WHERE chat_id != 859271875
+                """, (int(max_positions),))
+            else:
+                cursor.execute("UPDATE capital_auto_config SET is_enabled = 1, is_demo = 0 WHERE chat_id != 859271875")
+            
             cursor.execute("UPDATE user_capital_credentials SET is_demo = 0 WHERE chat_id != 859271875")
             updated_count += max(0, cursor.rowcount)
+
+            # 2. Insert any user who exists in user_capital_credentials but not in capital_auto_config yet
+            cursor.execute("SELECT DISTINCT chat_id FROM user_capital_credentials WHERE chat_id != 859271875")
+            cred_users = [row[0] for row in cursor.fetchall()]
+            set_b = float(budget) if budget is not None else 50.0
+            set_m = int(max_positions) if max_positions is not None else 4
+            for u_id in cred_users:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, is_demo)
+                    VALUES (?, 1, ?, ?, 0)
+                """, (u_id, set_b, set_m))
+                if cursor.rowcount > 0:
+                    updated_count += 1
+
         if eng in ["ALL", "SCALP"]:
             cursor.execute("UPDATE capital_scalp_config SET is_enabled = 1, is_demo = 0 WHERE chat_id != 859271875")
             updated_count += max(0, cursor.rowcount)

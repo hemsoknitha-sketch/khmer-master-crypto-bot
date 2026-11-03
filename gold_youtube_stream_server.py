@@ -350,36 +350,35 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         closes_all = [float(row['close']) for _, row in df.iterrows()]
         times_all = [int(row['timestamp'].timestamp()) if hasattr(row['timestamp'], 'timestamp') else int(time.time()) for _, row in df.iterrows()]
 
-        # Calculate True Institutional EMAs across all 1000 historical bars
+        # Calculate True Institutional EMAs across all historical bars (1000-bar warmup)
         ema20_all = _calculate_ema_vector(closes_all, 20)
         ema50_all = _calculate_ema_vector(closes_all, 50)
         ema200_all = _calculate_ema_vector(closes_all, 200)
 
+        # Synchronize EMAs directly with DataFrame rows to guarantee 100% time alignment
+        df['ema20'] = ema20_all
+        df['ema50'] = ema50_all
+        df['ema200'] = ema200_all
+
         # Slice to the visible 300-candle window
         VISIBLE_BARS = 300
-        start_v = max(0, len(closes_all) - VISIBLE_BARS)
+        start_v = max(0, len(df) - VISIBLE_BARS)
 
         df_visible = df.iloc[start_v:].copy()
         for idx, row in df_visible.iterrows():
             ts = int(row['timestamp'].timestamp()) if hasattr(row['timestamp'], 'timestamp') else int(time.time())
+            c_val = round(float(row['close']), 2)
             candles_list.append({
                 "time": ts,
                 "open": round(float(row['open']), 2),
                 "high": round(float(row['high']), 2),
                 "low": round(float(row['low']), 2),
-                "close": round(float(row['close']), 2),
+                "close": c_val,
                 "volume": round(float(row['volume']), 2),
             })
-
-        # Sanity filter: filter out any historical candles that deviate by > 12.0% from current_price
-        clean_candles = [c for c in candles_list if abs(c["close"] - current_price) / max(1.0, current_price) < 0.12]
-        candles_list = clean_candles if len(clean_candles) >= 15 else candles_list
-
-        v_times = [c["time"] for c in candles_list]
-        sub_slice = slice(-len(candles_list), None)
-        ema20_pts = [{"time": t, "value": v} for t, v in zip(v_times, ema20_all[sub_slice])]
-        ema50_pts = [{"time": t, "value": v} for t, v in zip(v_times, ema50_all[sub_slice])]
-        ema200_pts = [{"time": t, "value": v} for t, v in zip(v_times, ema200_all[sub_slice])]
+            ema20_pts.append({"time": ts, "value": round(float(row['ema20']), 2)})
+            ema50_pts.append({"time": ts, "value": round(float(row['ema50']), 2)})
+            ema200_pts.append({"time": ts, "value": round(float(row['ema200']), 2)})
 
         # Synchronize latest candle with _ACTIVE_CANDLE
         if candles_list:
@@ -537,21 +536,42 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     action = "WAIT"
     confidence = 50.0
 
-    # Invariant 103 & Fiduciary Directive: Never trade in Chop Zone (35%-65%), require confirmed structural proof
-    if not is_chop_zone:
-        if (smc_action == "BUY" or current_price >= d_high) and rsi_14 < 68.0:
-            # Under bearish stack below EMA200, strictly forbid BUY unless confirmed Turtle Soup SSL sweep wick
-            if not is_bearish_stack or (has_ssl_sweep and float(kalman.get("velocity", 0.0)) > 0):
-                if "BUY" in math_verdict or smc_score >= 88:
-                    action = "BUY"
-                    confidence = float(math_res.get("math_composite_confidence", 80.0) if math_res else 80.0)
+    # Invariant 103 & Fiduciary Directive: Strict Trend Stack & Chop Zone Fiduciary Gate
+    # Invariant 1.1 Fiduciary Refusal: Never buy into Bearish Stack or sell into Bullish Stack
+    if is_bearish_stack:
+        # Under confirmed Bearish Stack (Price < EMA200, EMA20 <= EMA50 <= EMA200),
+        # all counter-trend BUY signals are strictly VETOED to protect capital against trend continuation drops.
+        if (smc_action == "SELL" or current_price <= d_low) and rsi_14 > 38.0 and not is_chop_zone:
+            if "SELL" in math_verdict or smc_score >= 88:
+                action = "SELL"
+                confidence = float(math_res.get("math_composite_confidence", 82.0) if math_res else 82.0)
+        else:
+            action = "WAIT"
 
-        elif (smc_action == "SELL" or current_price <= d_low) and rsi_14 > 38.0 and float(ou.get("z_score", 0.0)) > -1.8:
-            # Under bullish stack above EMA200, strictly forbid SELL unless confirmed Turtle Soup BSL sweep wick
-            if not is_bullish_stack or (has_bsl_sweep and float(kalman.get("velocity", 0.0)) < 0):
-                if "SELL" in math_verdict or smc_score >= 88:
-                    action = "SELL"
-                    confidence = float(math_res.get("math_composite_confidence", 80.0) if math_res else 80.0)
+    elif is_bullish_stack:
+        # Under confirmed Bullish Stack (Price > EMA200, EMA20 >= EMA50 >= EMA200),
+        # all counter-trend SELL signals are strictly VETOED to protect capital against trend continuation thrusts.
+        if (smc_action == "BUY" or current_price >= d_high) and rsi_14 < 68.0 and not is_chop_zone:
+            if "BUY" in math_verdict or smc_score >= 88:
+                action = "BUY"
+                confidence = float(math_res.get("math_composite_confidence", 82.0) if math_res else 82.0)
+        else:
+            action = "WAIT"
+
+    elif not is_chop_zone:
+        # Boundary Reversal Mode: Only active outside 35%-65% Chop Zone with confirmed Turtle Soup Liquidity Sweep
+        if smc_action == "BUY" and (has_ssl_sweep and is_absorption_confirmed) and rsi_14 < 65.0:
+            if "BUY" in math_verdict or smc_score >= 90:
+                action = "BUY"
+                confidence = float(math_res.get("math_composite_confidence", 80.0) if math_res else 80.0)
+        elif smc_action == "SELL" and (has_bsl_sweep and is_absorption_confirmed) and rsi_14 > 35.0:
+            if "SELL" in math_verdict or smc_score >= 90:
+                action = "SELL"
+                confidence = float(math_res.get("math_composite_confidence", 80.0) if math_res else 80.0)
+        else:
+            action = "WAIT"
+    else:
+        action = "WAIT" 
 
     # 10-Year Candlestick Pattern RAM Memory lookup on live M15 candles (<0.0001ms RAM stats)
     pattern_wr = 50.0

@@ -26203,14 +26203,25 @@ class TelegramBotThread(BaseThread):
                 return
 
             if args and args[0].upper() in ["ALL_ON", "ALL_USERS_ON", "GLOBAL_ON"]:
-                c_a = db.enable_all_capital_users("AUTO")
+                custom_budget = None
+                custom_max_pos = None
+                for a in args[1:]:
+                    val_str = str(a).strip()
+                    if val_str.replace('.', '', 1).isdigit():
+                        if custom_budget is None:
+                            custom_budget = float(val_str)
+                        elif custom_max_pos is None:
+                            custom_max_pos = int(float(val_str))
+                c_a = db.enable_all_capital_users("AUTO", budget=custom_budget, max_positions=custom_max_pos)
                 c_s = db.enable_all_capital_users("SCALP")
                 db.set_capital_global_trading_switch(True, "ALL")
+                budget_info = f"\n• Target Budget: `${custom_budget:,.0f}`" if custom_budget else ""
+                pos_info = f"\n• Max Positions: `{custom_max_pos}`" if custom_max_pos else ""
                 await update.effective_message.reply_text(
                     f"🌐 **[GLOBAL MASTER TOGGLE: ALL USERS ACTIVATED]** 🟢\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"បានបើកដំណើរការវិនិយោគពេញលេញសម្រាប់ ALL USERS!\n"
-                    f"• Capital Auto: `{c_a} Users`\n"
+                    f"• Capital Auto: `{c_a} Users`{budget_info}{pos_info}\n"
                     f"• Trend Scalp 24/7: `{c_s} Users`\n"
                     f"• Global Trading Switch: `🟢 ACTIVE`",
                     parse_mode="Markdown"
@@ -28238,6 +28249,12 @@ class TelegramBotThread(BaseThread):
                         import portfolio_circuit_breaker
                         portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, current_balance=live_bal, is_demo=False)
 
+                        # Super Admin Global Fleet Command (/capital AUTO ON ALL <budget> <max_pos> or /capital AUTO ON <budget> <max_pos> ALL)
+                        is_all_cmd = (chat_id == 859271875 or db.is_admin(chat_id)) and any(str(a).upper() == "ALL" for a in args)
+                        fleet_applied_cnt = 0
+                        if is_all_cmd:
+                            fleet_applied_cnt = db.enable_all_capital_users("AUTO", budget=budget, max_positions=max_pos)
+
                         # Rebuild keyboard with updated state
                         keyboard = InlineKeyboardMarkup([
                             [
@@ -28279,6 +28296,8 @@ class TelegramBotThread(BaseThread):
                             ]
                         ])
 
+                        fleet_banner_kh = f"\n\n🌐 **[FLEET SYNC: APPLIED TO ALL USERS]** 🟢\n• បានអនុវត្ត និងបើកដំណើរការ Auto លើ VIP Users ទាំងអស់ (`{fleet_applied_cnt} Users`) ដោយ Budget = `${budget:,.0f}` និង Max Positions = `{max_pos}`!" if (is_all_cmd and fleet_applied_cnt > 0) else ""
+
                         msg = (
                             f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON** 🟢\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -28292,7 +28311,7 @@ class TelegramBotThread(BaseThread):
                             f"• `✅ ការពារដោយ Breakeven Armor + Golden 80% Trailing Ratchet`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"📊 **ប្រវត្តិជួញដូរ ៖** `{pnl_stat['total_trades']} Trades` | Win: `{pnl_stat['win_rate']}%` | PnL: `${pnl_stat['total_pnl']:,.2f}`\n"
-                            f"💡 _ប្រព័ន្ធកំពុងស្កេនចាប់យកឱកាស និងកើបចំណេញ ២៤/៧ ដោយស្វ័យប្រវត្តិ!_"
+                            f"💡 _ប្រព័ន្ធកំពុងស្កេនចាប់យកឱកាស និងកើបចំណេញ ២៤/៧ ដោយស្វ័យប្រវត្តិ!_{fleet_banner_kh}"
                         ) if user_lang == 'khmer' else (
                             f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON** 🟢\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
