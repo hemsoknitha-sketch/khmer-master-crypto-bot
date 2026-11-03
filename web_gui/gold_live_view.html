@@ -1610,10 +1610,17 @@
       const tp1 = Number(sig.tp1 || (action === 'BUY' ? entry + 9.0 : entry - 9.0));
       const tp2 = Number(sig.tp2 || (action === 'BUY' ? entry + 18.0 : entry - 18.0));
 
-      document.getElementById('val-entry').innerText = `$${entry.toFixed(2)}`;
-      document.getElementById('val-sl').innerText = `$${sl.toFixed(2)}`;
-      document.getElementById('val-tp1').innerText = `$${tp1.toFixed(2)}`;
-      document.getElementById('val-tp2').innerText = `$${tp2.toFixed(2)}`;
+      if (action === 'BUY' || action === 'SELL') {
+        document.getElementById('val-entry').innerText = `$${entry.toFixed(2)}`;
+        document.getElementById('val-sl').innerText = `$${sl.toFixed(2)}`;
+        document.getElementById('val-tp1').innerText = `$${tp1.toFixed(2)}`;
+        document.getElementById('val-tp2').innerText = `$${tp2.toFixed(2)}`;
+      } else {
+        document.getElementById('val-entry').innerText = `STANDBY`;
+        document.getElementById('val-sl').innerText = `FLAT CASH`;
+        document.getElementById('val-tp1').innerText = `--`;
+        document.getElementById('val-tp2').innerText = `--`;
+      }
 
       updatePriceLines(entry, sl, tp1, tp2, action);
 

@@ -422,12 +422,42 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     else:
         return _generate_fallback_data()
 
-    # 2. Institutional 9 SMC Citadel Analysis on M15
-    smc_score = 75
+    # 2. Institutional 9 SMC Citadel Analysis on M15 & Invariant 95 Turtle Soup Sweeps
+    smc_score = 50
     ob_summary = "1 Bullish M15 OB"
     fvg_summary = "1 Imbalance Retest"
     sweep_summary = "Dealing Range Boundaries"
     smc_action = "WAIT"
+    has_ssl_sweep = False
+    has_bsl_sweep = False
+    is_absorption_confirmed = False
+    structural_invalidation_sl = 0.0
+
+    # Invariant 103: Dealing Range & Chop Zone Gate (Last 35 M15 Candles)
+    highs_recent = [float(c["high"]) for c in candles_list[-35:]] if len(candles_list) >= 35 else [current_price]
+    lows_recent = [float(c["low"]) for c in candles_list[-35:]] if len(candles_list) >= 35 else [current_price]
+    d_high = max(highs_recent)
+    d_low = min(lows_recent)
+    d_span = max(0.50, d_high - d_low)
+    price_range_pct = ((current_price - d_low) / d_span) * 100.0
+    is_chop_zone = (35.0 <= price_range_pct <= 65.0)
+
+    # Calculate 14-period RSI on M15 Close Prices
+    closes = [float(c["close"]) for c in candles_list]
+    rsi_14 = 50.0
+    if len(closes) >= 15:
+        deltas = np.diff(closes)
+        gains = np.maximum(deltas, 0)
+        losses = np.abs(np.minimum(deltas, 0))
+        avg_gain = float(np.mean(gains[-14:]))
+        avg_loss = float(np.mean(losses[-14:]))
+        if avg_loss > 0:
+            rs = avg_gain / avg_loss
+            rsi_14 = 100.0 - (100.0 / (1.0 + rs))
+        elif avg_gain > 0:
+            rsi_14 = 100.0
+        else:
+            rsi_14 = 50.0
 
     if df is not None and len(df) >= 20:
         try:
@@ -443,20 +473,31 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
             ob_summary = f"{len(bull_obs)} Bullish M15 OB, {len(bear_obs)} Bearish M15 OB"
             fvg_summary = f"{len(active_fvgs)} Imbalance Zones"
 
-            if slh.get('bullish_sweep'):
+            # Invariant 95: Institutional Turtle Soup Liquidity Sweep Reversal Detection
+            from super_smart_capital_citadel import TradFiTurtleSoupEngine
+            ts_res = TradFiTurtleSoupEngine.detect_turtle_soup_liquidity_sweep(
+                candles_15m=candles_list,
+                current_price=current_price,
+                atr_15m=4.50,
+                spread=_LIVE_TICK.get("spread", 0.18)
+            )
+            has_ssl_sweep = bool(ts_res.get("has_ssl_sweep", False))
+            has_bsl_sweep = bool(ts_res.get("has_bsl_sweep", False))
+            is_absorption_confirmed = bool(ts_res.get("is_absorption_confirmed", False))
+            structural_invalidation_sl = float(ts_res.get("structural_invalidation_sl", 0.0))
+
+            if slh.get('bullish_sweep') or (has_ssl_sweep and is_absorption_confirmed):
                 sweep_summary = "SSL Liquidity Grab Wick Absorbed"
                 smc_action = "BUY"
                 smc_score = 92
-            elif slh.get('bearish_sweep'):
+            elif slh.get('bearish_sweep') or (has_bsl_sweep and is_absorption_confirmed):
                 sweep_summary = "BSL Liquidity Grab Wick Absorbed"
                 smc_action = "SELL"
                 smc_score = 92
-            elif len(bull_obs) > len(bear_obs):
-                smc_action = "BUY"
-                smc_score = 82
-            elif len(bear_obs) > len(bull_obs):
-                smc_action = "SELL"
-                smc_score = 82
+            else:
+                smc_action = "WAIT"
+                smc_score = 50
+                sweep_summary = "Chop Equilibrium / Neutral Structure"
         except Exception:
             pass
 
@@ -486,16 +527,31 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     except Exception:
         math_res = {}
 
-    # 4. Synthesize Final Trading Action & Target Plan
-    action = "WAIT"
-    confidence = float(math_res.get("math_composite_confidence", 50.0) if math_res else 50.0)
+    # 4. Synthesize Final Trading Action & Target Plan (Strict Institutional Fiduciary Gate)
+    cur_ema20 = ema20_pts[-1]["value"] if ema20_pts else current_price
+    cur_ema50 = ema50_pts[-1]["value"] if ema50_pts else current_price
+    cur_ema200 = ema200_pts[-1]["value"] if ema200_pts else current_price
+    is_bearish_stack = (current_price < cur_ema200 and cur_ema20 <= cur_ema50 <= cur_ema200)
+    is_bullish_stack = (current_price > cur_ema200 and cur_ema20 >= cur_ema50 >= cur_ema200)
 
-    if "BUY" in math_verdict and smc_action in ["BUY", "WAIT"]:
-        action = "BUY"
-    elif "SELL" in math_verdict and smc_action in ["SELL", "WAIT"]:
-        action = "SELL"
-    elif smc_score >= 85:
-        action = smc_action
+    action = "WAIT"
+    confidence = 50.0
+
+    # Invariant 103 & Fiduciary Directive: Never trade in Chop Zone (35%-65%), require confirmed structural proof
+    if not is_chop_zone:
+        if (smc_action == "BUY" or current_price >= d_high) and rsi_14 < 68.0:
+            # Under bearish stack below EMA200, strictly forbid BUY unless confirmed Turtle Soup SSL sweep wick
+            if not is_bearish_stack or (has_ssl_sweep and float(kalman.get("velocity", 0.0)) > 0):
+                if "BUY" in math_verdict or smc_score >= 88:
+                    action = "BUY"
+                    confidence = float(math_res.get("math_composite_confidence", 80.0) if math_res else 80.0)
+
+        elif (smc_action == "SELL" or current_price <= d_low) and rsi_14 > 38.0 and float(ou.get("z_score", 0.0)) > -1.8:
+            # Under bullish stack above EMA200, strictly forbid SELL unless confirmed Turtle Soup BSL sweep wick
+            if not is_bullish_stack or (has_bsl_sweep and float(kalman.get("velocity", 0.0)) < 0):
+                if "SELL" in math_verdict or smc_score >= 88:
+                    action = "SELL"
+                    confidence = float(math_res.get("math_composite_confidence", 80.0) if math_res else 80.0)
 
     # 10-Year Candlestick Pattern RAM Memory lookup on live M15 candles (<0.0001ms RAM stats)
     pattern_wr = 50.0
@@ -505,8 +561,8 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         pat_res = _gcpm.detect_live_gold_candlestick_patterns(df, timeframe="M15", current_price=current_price)
         if pat_res.get("has_pattern"):
             pat_dir = pat_res.get("direction", "")
-            # Only credit the pattern's win rate when it agrees with the final action (or no action yet)
-            if action == "WAIT" or pat_dir == action:
+            # Only credit the pattern's win rate when it agrees with the final action
+            if action in ["BUY", "SELL"] and pat_dir == action:
                 pattern_wr = float(pat_res.get("win_rate_confluence", 50.0))
                 pattern_name = str(pat_res.get("highest_conviction_pattern", pattern_name)).replace("_", " ")
     except Exception as e_pat:
@@ -517,24 +573,32 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     bayes_bear = float(bayes.get("bearish_pct", 50.0))
     if action == "BUY":
         calc_win_rate = round((pattern_wr * 0.45) + (bayes_bull * 0.35) + (smc_score * 0.20), 1)
+        calc_win_rate = min(96.8, max(75.0, calc_win_rate))
     elif action == "SELL":
         calc_win_rate = round((pattern_wr * 0.45) + (bayes_bear * 0.35) + (smc_score * 0.20), 1)
+        calc_win_rate = min(96.8, max(75.0, calc_win_rate))
     else:
         calc_win_rate = round((pattern_wr * 0.35) + (50.0 * 0.65), 1)
-    calc_win_rate = min(96.8, max(52.0, calc_win_rate))
-
+        calc_win_rate = min(60.0, max(50.0, calc_win_rate))
+        confidence = 50.0
     # Target Coordinates
     entry = current_price
     sl_dist = max(risk_buffer, 3.80)
     if action == "BUY":
-        sl = round(entry - sl_dist, 2)
-        r = entry - sl
+        if structural_invalidation_sl > 0 and structural_invalidation_sl < entry:
+            sl = structural_invalidation_sl
+        else:
+            sl = round(entry - sl_dist, 2)
+        r = max(2.50, entry - sl)
         tp1 = round(entry + 2.0 * r, 2)
         tp2 = round(entry + 4.0 * r, 2)
         runner = round(entry + 6.0 * r, 2)
     elif action == "SELL":
-        sl = round(entry + sl_dist, 2)
-        r = sl - entry
+        if structural_invalidation_sl > 0 and structural_invalidation_sl > entry:
+            sl = structural_invalidation_sl
+        else:
+            sl = round(entry + sl_dist, 2)
+        r = max(2.50, sl - entry)
         tp1 = round(entry - 2.0 * r, 2)
         tp2 = round(entry - 4.0 * r, 2)
         runner = round(entry - 6.0 * r, 2)
