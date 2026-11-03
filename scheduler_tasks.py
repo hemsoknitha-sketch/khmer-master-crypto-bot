@@ -5460,14 +5460,15 @@ async def live_gold_signal_alert_monitor(app: Application):
             return
 
         conf = float(sig.get("confidence", 0.0))
+        win_rate = float(sig.get("win_rate", conf))
         math_edge = sig.get("mathematical_edge", {})
         bayes_prob = float(math_edge.get("bayesian_win_probability_pct", conf))
         hurst_h = float(math_edge.get("hurst_exponent", 0.50))
         market_regime = math_edge.get("market_regime", "RANDOM_WALK")
 
         # 2. High-Conviction Confluence Filter:
-        # Must have Bayesian Win Probability >= 90.0% AND Hurst Exponent > 0.55 (Persistent Trend)
-        if bayes_prob < 90.0 or hurst_h <= 0.55 or market_regime == "RANDOM_WALK":
+        # Calibrated Win Rate >= 80.0% OR (Bayes Win Prob >= 75.0% AND Hurst > 0.52)
+        if (win_rate < 80.0 and bayes_prob < 75.0) or hurst_h <= 0.52 or market_regime == "RANDOM_WALK":
             return
 
         now_ts = time.time()

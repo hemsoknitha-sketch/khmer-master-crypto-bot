@@ -6911,18 +6911,18 @@ class CapitalAutonomousEngine:
 
         cur_p = float(gold_signal_data.get("current_price", 0.0))
         entry_zone = sig.get("entry_zone", {})
-        entry_ideal = float(entry_zone.get("ideal", cur_p))
+        entry_ideal = float(entry_zone.get("ideal", cur_p)) if isinstance(entry_zone, dict) else cur_p
         if entry_ideal <= 0:
-            entry_ideal = cur_p
+            entry_ideal = float(sig.get("entry", cur_p) or cur_p)
         if entry_ideal <= 0:
             return 0
 
-        sl_p = float(sig.get("stop_loss", 0.0))
-        tp1_p = float(sig.get("take_profit_1", 0.0))
-        tp2_p = float(sig.get("take_profit_2", 0.0))
+        sl_p = float(sig.get("stop_loss") or sig.get("sl") or 0.0)
+        tp1_p = float(sig.get("take_profit_1") or sig.get("tp1") or 0.0)
+        tp2_p = float(sig.get("take_profit_2") or sig.get("tp2") or 0.0)
         conf = float(sig.get("confidence", 85.0))
         win_rate = float(sig.get("win_rate", conf))
-        math_edge = sig.get("mathematical_edge", {})
+        math_edge = sig.get("mathematical_edge") or gold_signal_data.get("math", {})
 
         # Default breathing SL & 1:2.0 TP if not populated
         if sl_p <= 0:

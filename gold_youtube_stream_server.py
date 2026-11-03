@@ -487,6 +487,71 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     }
 
 
+_LAST_DISPATCHED_ACTION = ""
+_LAST_DISPATCH_TIME = 0.0
+
+
+async def _check_and_dispatch_gold_live_trade(snapshot: Dict[str, Any]):
+    """
+    Direct Institutional Zero-Lag Bridge (Invariant 110):
+    When YouTube Live Stream emits a clear M15 BUY/SELL with Win Rate >= 80% & Conf >= 75%:
+    Immediately dispatches live broker market orders to all active VIP /capital auto accounts!
+    """
+    global _LAST_DISPATCHED_ACTION, _LAST_DISPATCH_TIME
+    if not snapshot or snapshot.get("is_fallback"):
+        return
+
+    sig = snapshot.get("signal", {})
+    action = str(sig.get("action", "")).upper()
+    if action not in ["BUY", "SELL"]:
+        return
+
+    win_rate = float(sig.get("win_rate", 50.0))
+    conf = float(sig.get("confidence", 50.0))
+
+    # Confluence standard: Win Rate >= 80.0% and Confidence >= 75.0%
+    if win_rate < 80.0 or conf < 75.0:
+        return
+
+    now = time.time()
+    elapsed = now - _LAST_DISPATCH_TIME
+    # Cooldown: 900s (15 min) for same action, or 300s (5 min) if action flipped
+    min_cd = 300.0 if (action != _LAST_DISPATCHED_ACTION and _LAST_DISPATCHED_ACTION != "") else 900.0
+    if elapsed < min_cd:
+        return
+
+    try:
+        import capital_engine
+        cap_engine = capital_engine.CapitalAutonomousEngine()
+        dispatched = await cap_engine.dispatch_gold_signal_trade(snapshot, app=None)
+        if dispatched > 0:
+            _LAST_DISPATCHED_ACTION = action
+            _LAST_DISPATCH_TIME = now
+            print(f"🚀 [YOUTUBE LIVE -> CAPITAL DISPATCH] Successfully dispatched {action} on GOLD to {dispatched} VIP accounts!", flush=True)
+
+            # Send Telegram Alert to Admins & VIPs via notification_manager
+            try:
+                import notification_manager
+                alert_text = (
+                    f"👑 <b>[ANGKOR QUANT • YOUTUBE LIVE GOLD SIGNAL]</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"⚡ <b>Action:</b> {'🟢 STRONG BUY' if action == 'BUY' else '🔴 STRONG SELL'}\n"
+                    f"🏆 <b>Win Rate:</b> <code>{win_rate:.1f}%</code>\n"
+                    f"🎯 <b>Confidence:</b> <code>{conf:.1f}%</code>\n"
+                    f"💵 <b>Entry Price:</b> <code>${snapshot.get('current_price', 0):.2f}</code>\n"
+                    f"🛑 <b>Stop Loss:</b> <code>${sig.get('sl', 0):.2f}</code>\n"
+                    f"🎯 <b>Take Profit 1:</b> <code>${sig.get('tp1', 0):.2f}</code> (+2.0R)\n"
+                    f"🎯 <b>Take Profit 2:</b> <code>${sig.get('tp2', 0):.2f}</code> (+4.0R)\n"
+                    f"🤖 <b>/capital Auto Dispatch:</b> <code>{dispatched} VIP Accounts Executed!</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━"
+                )
+                await notification_manager.broadcast_admin(alert_text, parse_mode="HTML")
+            except Exception as e_notif:
+                print(f"⚠️ [YOUTUBE LIVE DISPATCH ALERT NOTE] {e_notif}", flush=True)
+    except Exception as e_disp:
+        print(f"⚠️ [YOUTUBE LIVE DISPATCH ERROR] {e_disp}", flush=True)
+
+
 async def _refresh_cache_in_background():
     """Asynchronously refreshes the RAM snapshot in the background."""
     global _IS_REFRESHING
@@ -494,6 +559,9 @@ async def _refresh_cache_in_background():
         snapshot = await asyncio.to_thread(_fetch_gold_m1_data)
         _CACHE["timestamp"] = time.time()
         _CACHE["snapshot"] = snapshot
+        
+        # Invariant 110: Direct Zero-Lag Execution Dispatch to /capital active users
+        await _check_and_dispatch_gold_live_trade(snapshot)
     except Exception as e:
         print(f"⚠️ [YOUTUBE STREAM] Background refresh error: {e}", flush=True)
     finally:
