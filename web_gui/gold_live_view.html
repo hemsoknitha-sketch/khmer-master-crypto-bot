@@ -584,23 +584,21 @@
     }
 
     /* ========================================================
-       AI GIRL MC (QUANT ANCHOR ELENA) PICTURE-IN-PICTURE (PIP)
+       AI GIRL MC (ON AIR GOLD SIGNAL) IN RIGHT SIDEBAR
        ======================================================== */
     #ai-mc-pip {
-      position: absolute;
-      bottom: 35px;
-      left: 30px;
-      width: 340px;
-      height: 315px;
+      position: relative;
+      width: 100%;
+      height: 275px;
       background: rgba(10, 15, 26, 0.95);
-      border: 1.5px solid rgba(245, 158, 11, 0.55);
-      border-radius: 14px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(245, 158, 11, 0.15);
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 16px rgba(245, 158, 11, 0.12);
       backdrop-filter: blur(16px);
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      z-index: 25;
+      z-index: 5;
       transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
@@ -746,12 +744,12 @@
 
     .mc-portrait-frame {
       position: relative;
-      width: 175px;
-      height: 195px;
-      border-radius: 14px;
+      width: 155px;
+      height: 165px;
+      border-radius: 12px;
       overflow: hidden;
       border: 1.5px solid rgba(245, 158, 11, 0.45);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.8), 0 0 15px rgba(245, 158, 11, 0.2);
       transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
       background: #090e1a;
     }
@@ -858,9 +856,9 @@
 
     .mc-voice-ripple {
       position: absolute;
-      width: 185px;
-      height: 205px;
-      border-radius: 18px;
+      width: 165px;
+      height: 175px;
+      border-radius: 16px;
       border: 1.5px solid #38bdf8;
       opacity: 0;
       pointer-events: none;
@@ -924,11 +922,11 @@
 
     /* Closed Caption Subtitle Bar */
     .mc-caption-bar {
-      min-height: 56px;
-      max-height: 56px;
+      min-height: 48px;
+      max-height: 48px;
       background: rgba(5, 8, 15, 0.96);
       border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 6px 12px;
+      padding: 5px 12px;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -1023,71 +1021,6 @@
         </div>
       </div>
       <div id="chart-container"></div>
-
-      <!-- AI GIRL MC PICTURE-IN-PICTURE (PIP) CARD -->
-      <div id="ai-mc-pip" class="aura-normal">
-        <div class="mc-pip-header">
-          <div class="mc-onair-badge">
-            <div class="mc-pulse-dot"></div>
-            <span id="mc-status-text">ON AIR</span>
-            <div class="mc-equalizer" id="mc-equalizer">
-              <span></span><span></span><span></span><span></span>
-            </div>
-          </div>
-          <div class="mc-anchor-title mono">ELENA • QUANT HOST (18)</div>
-        </div>
-
-        <div class="mc-avatar-stage" id="mc-stage">
-          <div class="mc-studio-ambient"></div>
-          
-          <!-- REAL AI HUMAN ANCHOR (ELENA 18 - CYBER-ANGKOR PHOTOREALISTIC HOST) -->
-          <div class="mc-real-anchor-wrapper" id="mc-anchor-wrapper">
-            <!-- Studio Backlight Ripple Waves (Active when speaking) -->
-            <div class="mc-voice-ripple" id="mc-voice-ripple-1"></div>
-            <div class="mc-voice-ripple" id="mc-voice-ripple-2"></div>
-            
-            <!-- Real Human Portrait Container -->
-            <div class="mc-portrait-frame" id="mc-portrait-frame">
-              <img src="/elena_avatar.jpg" alt="Elena AI Quant Host" class="mc-real-photo" id="mc-real-photo" onerror="this.onerror=null; this.src='elena_avatar.jpg';">
-              
-              <!-- Autonomous Biological Eye Blinking Layer -->
-              <div class="mc-eyelid-overlay eye-left" id="mc-eyelid-l"></div>
-              <div class="mc-eyelid-overlay eye-right" id="mc-eyelid-r"></div>
-
-              <!-- Real-Time Audio-Reactive Lip Aperture Viseme -->
-              <div class="mc-live-mouth-wrapper" id="mc-live-mouth">
-                <div class="mc-inner-mouth" id="mc-inner-mouth"></div>
-                <div class="mc-lower-lip" id="mc-lower-lip"></div>
-              </div>
-
-              <!-- Cyber-Angkor Hologram & Vignette Overlays -->
-              <div class="mc-photo-vignette"></div>
-              <div class="mc-scanline-fx"></div>
-              <div class="mc-corner-bracket top-left"></div>
-              <div class="mc-corner-bracket top-right"></div>
-              <div class="mc-corner-bracket bottom-left"></div>
-              <div class="mc-corner-bracket bottom-right"></div>
-            </div>
-
-            <!-- Floating Studio HUD Tag -->
-            <div class="mc-hud-tag-role mono">
-              <span class="mc-hud-dot"></span>
-              <span>ANGKOR QUANT • AI ANCHOR (18)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Subtitles / Closed Caption -->
-        <div class="mc-caption-bar">
-          <div class="mc-caption-tag">
-            <span style="color:#f59e0b;">🎙️ ELENA (18)</span>
-            <span id="mc-caption-mood" style="color:#64748b; font-size:10px;">• ORDER FLOW RADAR</span>
-          </div>
-          <div class="mc-caption-text mono" id="mc-caption-text">
-            "Monitoring Gold M15 order flow & institutional liquidity pools..."
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- RIGHT SIDEBAR HUD -->
@@ -1163,8 +1096,75 @@
         </div>
       </div>
 
-      <!-- 3. 9 SMC CITADEL CONFLUENCE -->
-      <div class="card">
+      <!-- 3. ON AIR GOLD SIGNAL & AI QUANT HOST (REPLACING 9 SMC BLOCK) -->
+      <div id="ai-mc-pip" class="aura-normal">
+        <div class="mc-pip-header">
+          <div class="mc-onair-badge" style="display:flex; align-items:center; gap:6px;">
+            <div class="mc-pulse-dot" style="width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></div>
+            <span class="mono" id="mc-header-winrate" style="font-size:12px; color:#10b981; font-weight:800; letter-spacing:0.5px;">🏆 WIN RATE: 92.4%</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="mono" id="mc-header-conf" style="font-size:11px; color:#f59e0b; font-weight:700; letter-spacing:0.5px;">CONFIDENCE: 86.5%</span>
+            <div class="mc-equalizer" id="mc-equalizer">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mc-avatar-stage" id="mc-stage">
+          <div class="mc-studio-ambient"></div>
+          
+          <!-- REAL AI HUMAN ANCHOR (ELENA 18 - CYBER-ANGKOR PHOTOREALISTIC HOST) -->
+          <div class="mc-real-anchor-wrapper" id="mc-anchor-wrapper">
+            <!-- Studio Backlight Ripple Waves (Active when speaking) -->
+            <div class="mc-voice-ripple" id="mc-voice-ripple-1"></div>
+            <div class="mc-voice-ripple" id="mc-voice-ripple-2"></div>
+            
+            <!-- Real Human Portrait Container -->
+            <div class="mc-portrait-frame" id="mc-portrait-frame">
+              <img src="/elena_avatar.jpg" alt="Elena AI Quant Host" class="mc-real-photo" id="mc-real-photo" onerror="this.onerror=null; this.src='elena_avatar.jpg';">
+              
+              <!-- Autonomous Biological Eye Blinking Layer -->
+              <div class="mc-eyelid-overlay eye-left" id="mc-eyelid-l"></div>
+              <div class="mc-eyelid-overlay eye-right" id="mc-eyelid-r"></div>
+
+              <!-- Real-Time Audio-Reactive Lip Aperture Viseme -->
+              <div class="mc-live-mouth-wrapper" id="mc-live-mouth">
+                <div class="mc-inner-mouth" id="mc-inner-mouth"></div>
+                <div class="mc-lower-lip" id="mc-lower-lip"></div>
+              </div>
+
+              <!-- Cyber-Angkor Hologram & Vignette Overlays -->
+              <div class="mc-photo-vignette"></div>
+              <div class="mc-scanline-fx"></div>
+              <div class="mc-corner-bracket top-left"></div>
+              <div class="mc-corner-bracket top-right"></div>
+              <div class="mc-corner-bracket bottom-left"></div>
+              <div class="mc-corner-bracket bottom-right"></div>
+            </div>
+
+            <!-- Floating Studio HUD Tag -->
+            <div class="mc-hud-tag-role mono">
+              <span class="mc-hud-dot"></span>
+              <span>ON AIR GOLD SIGNAL</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtitles / Closed Caption -->
+        <div class="mc-caption-bar">
+          <div class="mc-caption-tag">
+            <span style="color:#f59e0b;">🎙️ ELENA (18)</span>
+            <span id="mc-caption-mood" style="color:#64748b; font-size:10px;">• ORDER FLOW RADAR</span>
+          </div>
+          <div class="mc-caption-text mono" id="mc-caption-text">
+            "Monitoring Gold M15 order flow & institutional liquidity pools..."
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 9 SMC CITADEL CONFLUENCE (HIDDEN AS REQUESTED) -->
+      <div class="card" id="smc-card" style="display: none !important;">
         <div class="card-header">
           <div class="card-title">🏰 9 SMC CITADEL CONFLUENCE</div>
           <div class="mono" style="font-size:10px; color:#10b981; font-weight:700;" id="smc-score">SCORE: 85/100</div>
@@ -1550,7 +1550,20 @@
       if (wrEl) {
         wrEl.innerText = `🏆 WIN RATE: ${winRate.toFixed(1)}%`;
       }
-      document.getElementById('signal-conf').innerText = `CONFIDENCE: ${conf.toFixed(1)}%`;
+      const confEl = document.getElementById('signal-conf');
+      if (confEl) {
+        confEl.innerText = `CONFIDENCE: ${conf.toFixed(1)}%`;
+      }
+
+      // Synchronize MC Header Win Rate and Confidence
+      const mcWrEl = document.getElementById('mc-header-winrate');
+      if (mcWrEl) {
+        mcWrEl.innerText = `🏆 WIN RATE: ${winRate.toFixed(1)}%`;
+      }
+      const mcConfEl = document.getElementById('mc-header-conf');
+      if (mcConfEl) {
+        mcConfEl.innerText = `CONFIDENCE: ${conf.toFixed(1)}%`;
+      }
 
       const badge = document.getElementById('signal-badge');
       if (action === 'BUY') {
