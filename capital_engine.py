@@ -6905,8 +6905,12 @@ class CapitalAutonomousEngine:
         import database as db
 
         sig = gold_signal_data.get("signal", {})
-        action = str(sig.get("action", "")).upper()
-        if action not in ["BUY", "SELL"]:
+        raw_action = str(sig.get("action", "")).upper()
+        if "BUY" in raw_action:
+            action = "BUY"
+        elif "SELL" in raw_action:
+            action = "SELL"
+        else:
             return 0
 
         cur_p = float(gold_signal_data.get("current_price", 0.0))
@@ -6948,8 +6952,38 @@ class CapitalAutonomousEngine:
 
         now = time.time()
         active_users = db.get_active_capital_auto_users()
+        existing_chat_ids = {u.get("chat_id") for u in active_users}
+        try:
+            for su in db.get_active_capital_scalp_users():
+                cid = su.get("chat_id")
+                if cid and cid not in existing_chat_ids:
+                    active_users.append({
+                        "chat_id": cid,
+                        "budget": su.get("budget", 200.0),
+                        "max_positions": su.get("max_positions", 5),
+                        "is_demo": su.get("is_demo", False),
+                        "schedule_mode": "SMART_SESSION_TIMED"
+                    })
+                    existing_chat_ids.add(cid)
+        except Exception:
+            pass
+        try:
+            for ou in db.get_active_capital_orb_users():
+                cid = ou.get("chat_id")
+                if cid and cid not in existing_chat_ids:
+                    active_users.append({
+                        "chat_id": cid,
+                        "budget": ou.get("budget", 200.0),
+                        "max_positions": ou.get("max_positions", 5),
+                        "is_demo": ou.get("is_demo", False),
+                        "schedule_mode": "SMART_SESSION_TIMED"
+                    })
+                    existing_chat_ids.add(cid)
+        except Exception:
+            pass
+
         if not active_users:
-            logger.info("ℹ️ [GOLD AUTO DISPATCH] No active /capital auto users configured.")
+            logger.info("ℹ️ [GOLD AUTO DISPATCH] No active /capital auto/scalp/orb users configured.")
             return 0
 
         # Construct candidate setup

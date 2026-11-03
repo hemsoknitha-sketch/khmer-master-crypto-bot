@@ -601,15 +601,26 @@ async def _check_and_dispatch_gold_live_trade(snapshot: Dict[str, Any]):
         return
 
     sig = snapshot.get("signal", {})
-    action = str(sig.get("action", "")).upper()
-    if action not in ["BUY", "SELL"]:
+    raw_action = str(sig.get("action", "")).upper()
+    if "BUY" in raw_action:
+        action = "BUY"
+    elif "SELL" in raw_action:
+        action = "SELL"
+    else:
         return
 
     win_rate = float(sig.get("win_rate", 50.0))
     conf = float(sig.get("confidence", 50.0))
 
-    # Confluence standard: Win Rate >= 80.0% and Confidence >= 75.0%
-    if win_rate < 80.0 or conf < 75.0:
+    # Confluence standard (Invariant 110 Elite Signal Conviction):
+    # Matches Strong Buy / Strong Sell Confluence (e.g. Win Rate >= 75% & Conf >= 75%, or Win Rate >= 70% & Conf >= 80%)
+    is_elite_conviction = (
+        (win_rate >= 75.0 and conf >= 75.0) or
+        (win_rate >= 70.0 and conf >= 80.0) or
+        (win_rate >= 80.0 and conf >= 70.0)
+    )
+    if not is_elite_conviction:
+        print(f"ℹ️ [GOLD DISPATCH GATE] Action: {action} ({win_rate:.1f}% WR, {conf:.1f}% Conf) waiting for >=75%/75% confluence.", flush=True)
         return
 
     now = time.time()
