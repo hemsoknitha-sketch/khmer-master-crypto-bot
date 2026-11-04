@@ -1398,9 +1398,11 @@
 
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
-      priceScaleId: '', // Overlay volume at bottom of candle chart
+      priceScaleId: 'volume-scale',
+    });
+    chart.priceScale('volume-scale').applyOptions({
       scaleMargins: {
-        top: 0.82,
+        top: 0.85,
         bottom: 0,
       },
     });
@@ -1438,6 +1440,30 @@
     let rangeMidLine = null;
     let bullObLine = null;
     let bearObLine = null;
+
+    // REAL-TIME DYNAMIC LIVE PRICE LINE (TradingView Style)
+    let livePriceLine = null;
+    function updateLivePriceLine(price, prevPrice) {
+      if (!candleSeries || isNaN(price) || price <= 0) return;
+      const isUp = price >= prevPrice;
+      const lineColor = isUp ? '#00E676' : '#FF1744';
+      if (!livePriceLine) {
+        livePriceLine = candleSeries.createPriceLine({
+          price: price,
+          color: lineColor,
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `LIVE BID: $${price.toFixed(2)}`,
+        });
+      } else {
+        livePriceLine.applyOptions({
+          price: price,
+          color: lineColor,
+          title: `LIVE BID: $${price.toFixed(2)}`,
+        });
+      }
+    }
 
     function updateSMCLines(smc) {
       if (!smc || !candleSeries) return;
@@ -1987,6 +2013,7 @@
       const headerPriceEl = document.getElementById('header-price');
       if (!headerPriceEl || isNaN(price) || price <= 0) return;
       headerPriceEl.innerText = price.toFixed(2);
+      updateLivePriceLine(price, prevPrice);
 
       if (spread && !isNaN(spread)) {
         const spreadEl = document.getElementById('header-spread');
@@ -2045,6 +2072,9 @@
               if (!hasRealCandlesLoaded) {
                 fetchFullSnapshot();
               }
+              const curP = Number(data.current_price);
+              const prevP = Number(data.prev_price || curP);
+              updateLivePriceLine(curP, prevP);
               if (data.candle && candleSeries) {
                 const cTime = Math.floor(Number(data.candle.time));
                 data.candle.time = cTime;
