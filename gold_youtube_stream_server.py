@@ -167,10 +167,27 @@ def _generate_fallback_data() -> Dict[str, Any]:
         },
         "smc": {
             "confluence_score": 75,
+            "range_high": round(current_price + 12.0, 2),
+            "range_low": round(current_price - 12.0, 2),
+            "range_mid": current_price,
+            "bull_ob_price": round(current_price - 8.5, 2),
+            "bear_ob_price": round(current_price + 8.5, 2),
+            "fvg_top": round(current_price + 4.0, 2),
+            "fvg_bottom": round(current_price - 4.0, 2),
             "order_blocks_summary": "1 Bullish M15 OB",
             "fvg_summary": "1 Imbalance Zone",
             "sweep_summary": "Boundary Dealing Range"
-        }
+        },
+        "indicators": {
+            "rsi_14": 52.0,
+            "atr_15m": 4.50,
+            "trend_regime": "CHOP EQUILIBRIUM",
+            "is_chop_zone": True,
+            "d_high": round(current_price + 12.0, 2),
+            "d_low": round(current_price - 12.0, 2),
+            "d_mid": current_price
+        },
+        "markers": []
     }
 
 # Cache state & synchronization: pre-initialized so cache is NEVER empty
@@ -436,9 +453,11 @@ def _update_live_candle_tick(price: float, spread: float = 0.18, bid: Optional[f
 
     active_c = _ACTIVE_CANDLE.copy()
     active_c["time"] = int(active_c.get("time", candle_ts))
+    ind_data = snapshot.get("indicators", {}) if (snapshot and isinstance(snapshot, dict)) else {}
     return {
         "type": "tick",
         "current_price": price,
+        "indicators": ind_data,
         "prev_price": prev_p,
         "spread": spread,
         "bid": _LIVE_TICK.get("bid", round(price - spread / 2.0, 2)),
@@ -829,6 +848,43 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
     else:
         _ACTIVE_TRADE_PLAN["action"] = "WAIT"
 
+    trend_regime = "BULLISH EXPANSION" if is_bullish_stack else ("BEARISH CASCADE" if is_bearish_stack else ("CHOP EQUILIBRIUM" if is_chop_zone else "BOUNDARY BREAKOUT"))
+    markers = []
+    if action in ("BUY", "SELL") and candles_list:
+        last_ts = candles_list[-1]["time"]
+        if action == "BUY":
+            markers.append({
+                "time": last_ts,
+                "position": "belowBar",
+                "color": "#10b981",
+                "shape": "arrowUp",
+                "text": f"BUY CONFLUENCE ({calc_win_rate}%)"
+            })
+        elif action == "SELL":
+            markers.append({
+                "time": last_ts,
+                "position": "aboveBar",
+                "color": "#ef4444",
+                "shape": "arrowDown",
+                "text": f"SELL CONFLUENCE ({calc_win_rate}%)"
+            })
+    elif has_ssl_sweep and is_absorption_confirmed and candles_list:
+        markers.append({
+            "time": candles_list[-1]["time"],
+            "position": "belowBar",
+            "color": "#38bdf8",
+            "shape": "arrowUp",
+            "text": "TURTLE SOUP SWEEP"
+        })
+    elif has_bsl_sweep and is_absorption_confirmed and candles_list:
+        markers.append({
+            "time": candles_list[-1]["time"],
+            "position": "aboveBar",
+            "color": "#f97316",
+            "shape": "arrowDown",
+            "text": "TURTLE SOUP SWEEP"
+        })
+
     return {
         "timestamp": time.time(),
         "is_fallback": False,
@@ -874,7 +930,17 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
             "order_blocks_summary": ob_summary,
             "fvg_summary": fvg_summary,
             "sweep_summary": sweep_summary
-        }
+        },
+        "indicators": {
+            "rsi_14": round(float(rsi_14), 1),
+            "atr_15m": round(float(risk_buffer), 2),
+            "trend_regime": trend_regime,
+            "is_chop_zone": is_chop_zone,
+            "d_high": round(float(d_high), 2),
+            "d_low": round(float(d_low), 2),
+            "d_mid": round(float((d_high + d_low) / 2.0), 2)
+        },
+        "markers": markers
     }
 
 

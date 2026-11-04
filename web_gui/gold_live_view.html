@@ -390,10 +390,10 @@
       max-width: 480px;
       height: 100%;
       background: rgba(10, 14, 23, 0.95);
-      padding: 16px;
+      padding: 14px 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       overflow-y: hidden;
     }
 
@@ -639,7 +639,7 @@
       position: relative;
       width: 100%;
       flex: 1;
-      min-height: 480px;
+      min-height: 360px;
       height: 100%;
       background: rgba(10, 15, 26, 0.95);
       border: 1.5px solid rgba(245, 158, 11, 0.45);
@@ -795,8 +795,8 @@
 
     .mc-portrait-frame {
       position: relative;
-      width: 320px;
-      height: 345px;
+      width: 290px;
+      height: 300px;
       border-radius: 12px;
       overflow: hidden;
       border: 1.5px solid rgba(245, 158, 11, 0.45);
@@ -907,8 +907,8 @@
 
     .mc-voice-ripple {
       position: absolute;
-      width: 338px;
-      height: 363px;
+      width: 308px;
+      height: 318px;
       border-radius: 16px;
       border: 1.5px solid #38bdf8;
       opacity: 0;
@@ -1069,6 +1069,15 @@
         <div class="indicator-pill" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(15, 23, 42, 0.95);">
           <div class="dot-green" style="width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></div>
           <span style="color:#34d399; font-weight:700; margin-left:4px;">SUB-SECOND TICK</span>
+        </div>
+        <div class="indicator-pill" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(15, 23, 42, 0.95);">
+          <span style="color:#38bdf8; font-weight:700;">📊 RSI(14):</span> <span id="overlay-rsi" class="mono" style="color:#f8fafc; font-weight:700; margin-left:4px;">50.0</span>
+        </div>
+        <div class="indicator-pill" id="overlay-trend-pill" style="border-color: rgba(245, 158, 11, 0.4); background: rgba(15, 23, 42, 0.95);">
+          <span style="color:#f59e0b; font-weight:700;">🌊 REGIME:</span> <span id="overlay-regime" class="mono" style="color:#f8fafc; font-weight:700; margin-left:4px;">CHOP EQUILIBRIUM</span>
+        </div>
+        <div class="indicator-pill" style="border-color: rgba(148, 163, 184, 0.3); background: rgba(15, 23, 42, 0.95);">
+          <span style="color:#94a3b8; font-weight:700;">🛡️ ATR(15M):</span> <span id="overlay-atr" class="mono" style="color:#cbd5e1; font-weight:700; margin-left:4px;">$4.50</span>
         </div>
       </div>
       <!-- ZERO SLIPPAGE TOAST NOTIFICATION -->
@@ -1387,6 +1396,15 @@
       wickDownColor: '#FF1744',
     });
 
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', // Overlay volume at bottom of candle chart
+      scaleMargins: {
+        top: 0.82,
+        bottom: 0,
+      },
+    });
+
     const ema20Series = chart.addLineSeries({
       color: '#facc15',
       lineWidth: 2,
@@ -1696,6 +1714,14 @@
 
       if (needsFullSet) {
         candleSeries.setData(candles);
+        if (volumeSeries && candles.length > 0) {
+          const volData = candles.map(c => ({
+            time: Math.floor(Number(c.time)),
+            value: Number(c.volume || 100),
+            color: Number(c.close) >= Number(c.open) ? 'rgba(0, 230, 118, 0.40)' : 'rgba(255, 23, 68, 0.40)'
+          }));
+          volumeSeries.setData(volData);
+        }
         updateEMAs(candles, backendEMAs || lastBackendEMAs);
         chart.timeScale().fitContent();
         chart.timeScale().scrollToRealTime();
@@ -1716,6 +1742,13 @@
         }
         lastCandle.time = lastTime;
         candleSeries.update(lastCandle);
+        if (volumeSeries) {
+          volumeSeries.update({
+            time: lastTime,
+            value: Number(lastCandle.volume || 100),
+            color: Number(lastCandle.close) >= Number(lastCandle.open) ? 'rgba(0, 230, 118, 0.40)' : 'rgba(255, 23, 68, 0.40)'
+          });
+        }
         updateEMAs(candles, backendEMAs || lastBackendEMAs);
         chart.timeScale().scrollToRealTime();
         lastRenderedPrice = lastPrice;
@@ -1782,6 +1815,45 @@
         if (ema200Series && ema200Data.length > 0) ema200Series.setData(ema200Data);
       } catch (err) {
         console.warn("EMA update note:", err);
+      }
+    }
+
+    function updateIndicatorOverlay(ind) {
+      if (!ind) return;
+      const rsiEl = document.getElementById('overlay-rsi');
+      if (rsiEl && ind.rsi_14 !== undefined) {
+        const val = Number(ind.rsi_14);
+        if (val <= 38.0) {
+          rsiEl.style.color = '#10b981';
+          rsiEl.innerText = `${val.toFixed(1)} (OVERSOLD)`;
+        } else if (val >= 68.0) {
+          rsiEl.style.color = '#ef4444';
+          rsiEl.innerText = `${val.toFixed(1)} (OVERBOUGHT)`;
+        } else {
+          rsiEl.style.color = '#38bdf8';
+          rsiEl.innerText = `${val.toFixed(1)} (NEUTRAL)`;
+        }
+      }
+
+      const regEl = document.getElementById('overlay-regime');
+      const regPill = document.getElementById('overlay-trend-pill');
+      if (regEl && ind.trend_regime) {
+        regEl.innerText = ind.trend_regime;
+        if (ind.trend_regime.includes('BULLISH')) {
+          regEl.style.color = '#10b981';
+          if (regPill) regPill.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+        } else if (ind.trend_regime.includes('BEARISH')) {
+          regEl.style.color = '#ef4444';
+          if (regPill) regPill.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+        } else {
+          regEl.style.color = '#f59e0b';
+          if (regPill) regPill.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        }
+      }
+
+      const atrEl = document.getElementById('overlay-atr');
+      if (atrEl && ind.atr_15m !== undefined) {
+        atrEl.innerText = `$${Number(ind.atr_15m).toFixed(2)}`;
       }
     }
 
@@ -1860,6 +1932,12 @@
       updatePriceLines(entry, sl, tp1, tp2, action);
       if (data.smc) {
         updateSMCLines(data.smc);
+      }
+      if (data.markers && candleSeries) {
+        candleSeries.setMarkers(data.markers);
+      }
+      if (data.indicators) {
+        updateIndicatorOverlay(data.indicators);
       }
 
       // Math Radar
@@ -1971,10 +2049,20 @@
                 const cTime = Math.floor(Number(data.candle.time));
                 data.candle.time = cTime;
                 candleSeries.update(data.candle);
+                if (volumeSeries) {
+                  volumeSeries.update({
+                    time: cTime,
+                    value: Number(data.candle.volume || 100),
+                    color: Number(data.candle.close) >= Number(data.candle.open) ? 'rgba(0, 230, 118, 0.40)' : 'rgba(255, 23, 68, 0.40)'
+                  });
+                }
                 if (data.ema20 && ema20Series) ema20Series.update({ time: cTime, value: Number(data.ema20) });
                 if (data.ema50 && ema50Series) ema50Series.update({ time: cTime, value: Number(data.ema50) });
                 if (data.ema200 && ema200Series) ema200Series.update({ time: cTime, value: Number(data.ema200) });
                 chart.timeScale().scrollToRealTime();
+              }
+              if (data.indicators) {
+                updateIndicatorOverlay(data.indicators);
               }
               updateLivePriceTick(Number(data.current_price), Number(data.prev_price), Number(data.spread));
 
