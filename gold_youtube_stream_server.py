@@ -864,6 +864,13 @@ def _fetch_gold_m1_data() -> Dict[str, Any]:
         },
         "smc": {
             "confluence_score": smc_score,
+            "range_high": round(float(d_high), 2),
+            "range_low": round(float(d_low), 2),
+            "range_mid": round(float((d_high + d_low) / 2.0), 2),
+            "bull_ob_price": round(float(bull_obs[-1].get("price_high", bull_obs[-1].get("top", current_price * 0.995))), 2) if bull_obs else round(float(d_low), 2),
+            "bear_ob_price": round(float(bear_obs[-1].get("price_low", bear_obs[-1].get("bottom", current_price * 1.005))), 2) if bear_obs else round(float(d_high), 2),
+            "fvg_top": round(float(active_fvgs[-1].get("top", current_price * 1.002)), 2) if active_fvgs else 0.0,
+            "fvg_bottom": round(float(active_fvgs[-1].get("bottom", current_price * 0.998)), 2) if active_fvgs else 0.0,
             "order_blocks_summary": ob_summary,
             "fvg_summary": fvg_summary,
             "sweep_summary": sweep_summary

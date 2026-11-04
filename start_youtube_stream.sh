@@ -132,6 +132,8 @@ echo "🌐 Starting Fresh Headless Chromium Kiosk on DISPLAY :99..."
 pkill -9 -f "chromium.*gold_live_view" 2>/dev/null || true
 pkill -9 -f "chrome.*gold_live_view" 2>/dev/null || true
 rm -rf /tmp/chromium-stream-profile/Singleton* /tmp/chromium-stream-profile/Default/Cache* /tmp/chromium-stream-profile/Default/Code\ Cache* 2>/dev/null || true
+mkdir -p /tmp/chromium-stream-profile/Default
+echo '{"profile":{"exit_type":"Normal","exited_cleanly":true}}' > /tmp/chromium-stream-profile/Default/Preferences 2>/dev/null || true
 sleep 1
 
 taskset -c 2,3 $CHROMIUM_BIN \
@@ -145,6 +147,9 @@ taskset -c 2,3 $CHROMIUM_BIN \
     --disable-infobars \
     --disable-notifications \
     --disable-session-crashed-bubble \
+    --noerrdialogs \
+    --disable-features=TranslateUI \
+    --test-type \
     --autoplay-policy=no-user-gesture-required \
     --disable-dev-shm-usage \
     --disable-gpu-sandbox \
@@ -171,7 +176,7 @@ fi
 if [ "$PULSE_AVAILABLE" = true ] && [ -n "$LOFI_FILE" ]; then
     echo "🎵 Mixed Audio Mode: PulseAudio alerts + ambient soundtrack ($LOFI_FILE)"
     AUDIO_INPUT="-f pulse -i sink_stream.monitor -stream_loop -1 -i $LOFI_FILE"
-    AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=1.0[a1];[2:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=0.35[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
+    AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=1.0[a1];[2:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=0.35[a2];[a1][a2]amix=inputs=2:duration=first:dropout_transition=2,asetpts=N/SR/TB,aresample=async=1000[aout] -map 0:v -map [aout]"
 elif [ "$PULSE_AVAILABLE" = true ]; then
     echo "🎵 PulseAudio Monitor Only Mode"
     AUDIO_INPUT="-f pulse -i sink_stream.monitor"
@@ -200,8 +205,8 @@ taskset -c 2,3 ffmpeg -hide_banner -loglevel info -stats \
     -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
     $AUDIO_INPUT \
     $AUDIO_MAP \
-    -c:v libx264 -preset veryfast \
-    -b:v 6800k -minrate 6800k -maxrate 6800k -bufsize 13600k \
+    -c:v libx264 -preset superfast -tune zerolatency \
+    -b:v 4800k -minrate 4000k -maxrate 5200k -bufsize 9600k \
     -x264-params "nal-hrd=cbr:force-cfr=1" \
     -g 60 -keyint_min 60 \
     -r 30 \

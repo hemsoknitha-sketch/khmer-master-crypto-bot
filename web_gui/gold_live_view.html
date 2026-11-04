@@ -1414,6 +1414,97 @@
     let tp1Line = null;
     let tp2Line = null;
 
+    // SMC Structural Price Lines (BSL, SSL, Equilibrium 50%, Order Blocks)
+    let rangeHighLine = null;
+    let rangeLowLine = null;
+    let rangeMidLine = null;
+    let bullObLine = null;
+    let bearObLine = null;
+
+    function updateSMCLines(smc) {
+      if (!smc || !candleSeries) return;
+      const rHigh = Number(smc.range_high || 0);
+      const rLow = Number(smc.range_low || 0);
+      const rMid = Number(smc.range_mid || 0);
+      const bullOb = Number(smc.bull_ob_price || 0);
+      const bearOb = Number(smc.bear_ob_price || 0);
+
+      if (rHigh > 0) {
+        if (!rangeHighLine) {
+          rangeHighLine = candleSeries.createPriceLine({
+            price: rHigh,
+            color: '#f43f5e',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `BSL HIGH: $${rHigh.toFixed(2)}`,
+          });
+        } else {
+          rangeHighLine.applyOptions({ price: rHigh, title: `BSL HIGH: $${rHigh.toFixed(2)}` });
+        }
+      }
+
+      if (rLow > 0) {
+        if (!rangeLowLine) {
+          rangeLowLine = candleSeries.createPriceLine({
+            price: rLow,
+            color: '#10b981',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `SSL LOW: $${rLow.toFixed(2)}`,
+          });
+        } else {
+          rangeLowLine.applyOptions({ price: rLow, title: `SSL LOW: $${rLow.toFixed(2)}` });
+        }
+      }
+
+      if (rMid > 0) {
+        if (!rangeMidLine) {
+          rangeMidLine = candleSeries.createPriceLine({
+            price: rMid,
+            color: '#06b6d4',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dotted,
+            axisLabelVisible: true,
+            title: `EQ 50%: $${rMid.toFixed(2)}`,
+          });
+        } else {
+          rangeMidLine.applyOptions({ price: rMid, title: `EQ 50%: $${rMid.toFixed(2)}` });
+        }
+      }
+
+      if (bullOb > 0 && Math.abs(bullOb - rLow) > 1.0) {
+        if (!bullObLine) {
+          bullObLine = candleSeries.createPriceLine({
+            price: bullOb,
+            color: '#22c55e',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Dotted,
+            axisLabelVisible: true,
+            title: `BULL OB SUPPORT: $${bullOb.toFixed(2)}`,
+          });
+        } else {
+          bullObLine.applyOptions({ price: bullOb, title: `BULL OB SUPPORT: $${bullOb.toFixed(2)}` });
+        }
+      }
+
+      if (bearOb > 0 && Math.abs(bearOb - rHigh) > 1.0) {
+        if (!bearObLine) {
+          bearObLine = candleSeries.createPriceLine({
+            price: bearOb,
+            color: '#f97316',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Dotted,
+            axisLabelVisible: true,
+            title: `BEAR OB RESIST: $${bearOb.toFixed(2)}`,
+          });
+        } else {
+          bearObLine.applyOptions({ price: bearOb, title: `BEAR OB RESIST: $${bearOb.toFixed(2)}` });
+        }
+      }
+    }
+
     function updatePriceLines(entry, sl, tp1, tp2, action) {
       if (entryLine) { candleSeries.removePriceLine(entryLine); entryLine = null; }
       if (slLine) { candleSeries.removePriceLine(slLine); slLine = null; }
@@ -1455,6 +1546,34 @@
           lineStyle: LightweightCharts.LineStyle.Solid,
           axisLabelVisible: true,
           title: `TP2 (+4.0R): $${tp2.toFixed(2)}`,
+        });
+      } else {
+        // In WAIT / Equilibrium: Display Pending Breakout Trigger & Invalidation floor
+        entryLine = candleSeries.createPriceLine({
+          price: entry,
+          color: '#94a3b8',
+          lineWidth: 1.5,
+          lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `PENDING TRIGGER: $${entry.toFixed(2)}`,
+        });
+
+        slLine = candleSeries.createPriceLine({
+          price: sl,
+          color: '#f87171',
+          lineWidth: 1.5,
+          lineStyle: LightweightCharts.LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: `DEFENSE FLOOR: $${sl.toFixed(2)}`,
+        });
+
+        tp1Line = candleSeries.createPriceLine({
+          price: tp1,
+          color: '#34d399',
+          lineWidth: 1.5,
+          lineStyle: LightweightCharts.LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: `PROJ TP1 (+2R): $${tp1.toFixed(2)}`,
         });
       }
     }
@@ -1732,13 +1851,16 @@
         document.getElementById('val-tp1').innerText = `$${tp1.toFixed(2)}`;
         document.getElementById('val-tp2').innerText = `$${tp2.toFixed(2)}`;
       } else {
-        document.getElementById('val-entry').innerText = `STANDBY`;
-        document.getElementById('val-sl').innerText = `FLAT CASH`;
-        document.getElementById('val-tp1').innerText = `--`;
-        document.getElementById('val-tp2').innerText = `--`;
+        document.getElementById('val-entry').innerText = `$${entry.toFixed(2)} (PENDING)`;
+        document.getElementById('val-sl').innerText = `$${sl.toFixed(2)} (FLOOR)`;
+        document.getElementById('val-tp1').innerText = `$${tp1.toFixed(2)} (+2.0R)`;
+        document.getElementById('val-tp2').innerText = `$${tp2.toFixed(2)} (+4.0R)`;
       }
 
       updatePriceLines(entry, sl, tp1, tp2, action);
+      if (data.smc) {
+        updateSMCLines(data.smc);
+      }
 
       // Math Radar
       const math = data.math || {};
