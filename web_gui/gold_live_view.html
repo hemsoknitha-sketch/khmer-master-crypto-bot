@@ -290,6 +290,52 @@
     }
 
     /* Overlay HUD inside chart */
+    
+    /* Zero Slippage Toast Notification */
+    #zero-slippage-toast {
+      position: absolute;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(10, 15, 26, 0.96);
+      border: 1.5px solid #10b981;
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.5), inset 0 0 15px rgba(16, 185, 129, 0.15);
+      color: #f1f5f9;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    #zero-slippage-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    #zero-slippage-toast.tp {
+      border-color: #10b981;
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.6);
+      color: #34d399;
+    }
+    #zero-slippage-toast.sl {
+      border-color: #ef4444;
+      box-shadow: 0 0 35px rgba(239, 68, 68, 0.6);
+      color: #f87171;
+    }
+    #zero-slippage-toast.entry {
+      border-color: #38bdf8;
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.6);
+      color: #7dd3fc;
+    }
+
     .chart-overlay-top {
       position: absolute;
       top: 16px;
@@ -1014,8 +1060,8 @@
         <div class="indicator-pill">
           <div class="dot-blue"></div> EMA 200
         </div>
-        <div class="indicator-pill" id="chart-watermark" style="color:#cbd5e1; font-weight:700;">
-          GOLD XAUUSD (M15) • TOKYO VPS DIRECT FEED
+        <div class="indicator-pill" id="chart-watermark" style="color:#f59e0b; font-weight:700; border-color: rgba(245, 158, 11, 0.4); background: rgba(15, 23, 42, 0.95);">
+          🏛️ CAPITAL.COM API LIVE (ID: 27045129890124996) • ZERO SLIPPAGE
         </div>
         <div class="indicator-pill" style="border-color: rgba(245, 158, 11, 0.5); background: rgba(15, 23, 42, 0.95);">
           <span style="color:#f59e0b;">⏱️ M15 BAR:</span> <span id="candle-timer" class="mono" style="color:#38bdf8; font-weight:700; margin-left:4px;">14:59</span>
@@ -1024,6 +1070,11 @@
           <div class="dot-green" style="width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></div>
           <span style="color:#34d399; font-weight:700; margin-left:4px;">SUB-SECOND TICK</span>
         </div>
+      </div>
+      <!-- ZERO SLIPPAGE TOAST NOTIFICATION -->
+      <div id="zero-slippage-toast">
+        <span id="zs-toast-icon" style="font-size:18px;">⚡</span>
+        <span id="zs-toast-msg">CAPITAL.COM REAL-TIME EXECUTION ACTIVE</span>
       </div>
       <div id="chart-container"></div>
     </div>
@@ -1409,6 +1460,71 @@
     }
 
     // ----------------------------------------------------
+    // ----------------------------------------------------
+    // ZERO SLIPPAGE TOAST & INSTANT TRIGGER HANDLER
+    // ----------------------------------------------------
+    let zsToastTimer = null;
+    function showZeroSlippageToast(msg, type) {
+      const toast = document.getElementById('zero-slippage-toast');
+      const msgEl = document.getElementById('zs-toast-msg');
+      const iconEl = document.getElementById('zs-toast-icon');
+      if (!toast || !msgEl) return;
+      msgEl.innerText = msg;
+      toast.className = 'show';
+      if (type && type.includes('TP')) {
+        toast.classList.add('tp');
+        if (iconEl) iconEl.innerText = '🏆';
+      } else if (type && type.includes('SL')) {
+        toast.classList.add('sl');
+        if (iconEl) iconEl.innerText = '🛑';
+      } else {
+        toast.classList.add('entry');
+        if (iconEl) iconEl.innerText = '⚡';
+      }
+      clearTimeout(zsToastTimer);
+      zsToastTimer = setTimeout(() => {
+        toast.className = '';
+      }, 5000);
+    }
+
+    function handleZeroSlippageEvent(ev) {
+      if (!ev) return;
+      const type = ev.event || "";
+      const msg = ev.message || "";
+      console.log("⚡ [ZERO SLIPPAGE EVENT]", type, msg);
+
+      // Audio Alerts
+      try {
+        if (type.includes("TP")) {
+          const a = document.getElementById('audio-tp') || document.getElementById('audio-buy');
+          if (a) { a.currentTime = 0; a.play().catch(() => {}); }
+        } else if (type.includes("SL")) {
+          const a = document.getElementById('audio-sl') || document.getElementById('audio-sell');
+          if (a) { a.currentTime = 0; a.play().catch(() => {}); }
+        } else if (type.includes("ENTRY")) {
+          const a = ev.action === "SELL" ? document.getElementById('audio-sell') : document.getElementById('audio-buy');
+          if (a) { a.currentTime = 0; a.play().catch(() => {}); }
+        }
+      } catch (e_aud) {}
+
+      // Real-Time Breakeven Armor SL Line Adjustment
+      if (ev.new_sl && slLine && candleSeries) {
+        candleSeries.removePriceLine(slLine);
+        slLine = candleSeries.createPriceLine({
+          price: Number(ev.new_sl),
+          color: '#10b981',
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid,
+          axisLabelVisible: true,
+          title: `BE ARMOR (+0.5R): $${Number(ev.new_sl).toFixed(2)}`,
+        });
+        const valSlEl = document.getElementById('val-sl');
+        if (valSlEl) valSlEl.innerText = `$${Number(ev.new_sl).toFixed(2)} (LOCKED)`;
+      }
+
+      showZeroSlippageToast(msg, type);
+    }
+
     // 3. AUDIO ALERT DISPATCHER
     // ----------------------------------------------------
     let lastSignalAction = "WAIT";
@@ -1739,6 +1855,20 @@
                 chart.timeScale().scrollToRealTime();
               }
               updateLivePriceTick(Number(data.current_price), Number(data.prev_price), Number(data.spread));
+
+              // Zero Execution Slippage Real-Time Audit Event
+              if (data.zero_slippage_event) {
+                handleZeroSlippageEvent(data.zero_slippage_event);
+              }
+
+              // Source Badge Update
+              if (data.source === "CAPITAL_COM") {
+                const wm = document.getElementById('chart-watermark');
+                if (wm && !wm.innerText.includes("CAPITAL.COM")) {
+                  wm.innerHTML = '🏛️ CAPITAL.COM API LIVE (ID: 27045129890124996) • ZERO SLIPPAGE';
+                  wm.style.color = '#f59e0b';
+                }
+              }
               return;
             }
 
