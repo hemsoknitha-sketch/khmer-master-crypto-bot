@@ -40,3 +40,6 @@ ico_silent_logs.txt
 # Scratch scripts & temporary tests
 scratch/
 catboost_info/
+
+# Dynamic Runtime State Files
+data/security_daily_training_state.json
