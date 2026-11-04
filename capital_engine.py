@@ -2672,6 +2672,18 @@ class CapitalComEngine:
                     is_rising_rocket = True
                     bearish_score = 0  # 100% Veto: Do NOT short into active green surge!
 
+        # Anti-Chasing Impulse Overextension Guard (Invariant 92 Pillar 1):
+        # When price is stretched > 1.85 * ATR away from 20 EMA, impulse is overextended.
+        # Chasing tops/bottoms leads to immediate mean-reversion stopouts before trend continuation.
+        if atr > 0:
+            dist_from_ema = mid_price - ema20
+            if dist_from_ema > (1.85 * atr):
+                bullish_score = 0  # 100% Veto: Do not chase overextended impulse top!
+                logger.debug(f"🛡️ [ANTI-CHASE OVEREXTENSION] {resolved_epic} BUY vetoed: Price stretched +{dist_from_ema/atr:.2f} ATR from EMA20.")
+            elif dist_from_ema < -(1.85 * atr):
+                bearish_score = 0  # 100% Veto: Do not short overextended impulse bottom!
+                logger.debug(f"🛡️ [ANTI-CHASE OVEREXTENSION] {resolved_epic} SELL vetoed: Price stretched -{abs(dist_from_ema)/atr:.2f} ATR from EMA20.")
+
         # Invariant 34: Spread Drag Elimination & Asymmetric Minimum 10x Hurdle Protocol
         spread_mgr = get_capital_spread_drag_manager()
         is_spread_ok, spread_err = spread_mgr.is_spread_acceptable(resolved_epic, spread, atr=atr)
@@ -2695,6 +2707,18 @@ class CapitalComEngine:
                 "fibonacci": fib_analysis
             }
 
+        # Dynamic R:R Hurdle: Equities have lower intraday beta than commodities;
+        # setting min_rr_ratio to 3.5 for equities enables realistic TP1 (+1.8R) & TP2 (+3.5R)
+        try:
+            import capital_tri_regional_universe as ctru
+            is_stock_hurdle = ctru.is_equity_asset(resolved_epic) or any(s in resolved_epic.upper() for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            is_index_hurdle = ctru.is_index_asset(resolved_epic) or any(idx in resolved_epic.upper() for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
+        except Exception:
+            is_stock_hurdle = any(s in resolved_epic.upper() for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            is_index_hurdle = any(idx in resolved_epic.upper() for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
+
+        target_rr = 3.5 if is_stock_hurdle else (4.0 if is_index_hurdle else 5.5)
+
         spread_audit = {}
         if bullish_score >= 75:
             signal = "STRONG_BUY" if bullish_score >= 85 else "BUY"
@@ -2705,7 +2729,7 @@ class CapitalComEngine:
                 entry_price=current_ask,
                 spread=spread,
                 atr=atr,
-                min_rr_ratio=6.0,
+                min_rr_ratio=target_rr,
                 min_target_spread_ratio=10.0,
                 swing_high=sw_high,
                 swing_low=sw_low,
@@ -2721,7 +2745,7 @@ class CapitalComEngine:
                 entry_price=current_bid,
                 spread=spread,
                 atr=atr,
-                min_rr_ratio=6.0,
+                min_rr_ratio=target_rr,
                 min_target_spread_ratio=10.0,
                 swing_high=sw_high,
                 swing_low=sw_low,
@@ -2980,8 +3004,15 @@ class CapitalComEngine:
         mid_px = (bid + ask) / 2.0 if (bid + ask) > 0 else float(analysis.get("entry_price") or analysis.get("price") or 1.0)
         spread = spread if spread > 0 else 0.0001
         prec = _get_tradfi_precision(resolved_epic, mid_px)
+        try:
+            import capital_tri_regional_universe as ctru
+            is_stock_exec = ctru.is_equity_asset(resolved_epic) or any(s in resolved_epic.upper() for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+        except Exception:
+            is_stock_exec = any(s in resolved_epic.upper() for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
         min_sl_dist = max(2.5 * atr, spread * 3.5, 0.0035 * mid_px)
-        min_tp_dist = max(3.5 * min_sl_dist, 6.0 * atr, 0.015 * mid_px)
+        if is_stock_exec:
+            min_sl_dist = max(min_sl_dist, 0.0180 * mid_px, spread * 4.0)
+        min_tp_dist = max((3.0 if is_stock_exec else 3.5) * min_sl_dist, (4.5 if is_stock_exec else 6.0) * atr, 0.015 * mid_px)
 
         if dir_u == "BUY":
             if not final_sl or final_sl <= 0 or (bid > 0 and final_sl >= bid):
@@ -4232,14 +4263,34 @@ class CapitalAutonomousEngine:
         if market_status != "TRADEABLE":
             return base_quant
 
-        # 1. Google Macro Satellite Integration
+        # Interbank Session Dynamic Asset Clearance (Invariant 77 & AQ89 Tri-Regional Universe):
+        # US Equities & Indices are only tradeable during New York Session (20:30 - 03:30 ICT).
+        # European Equities are only tradeable during London/Europe Session (14:00 - 20:30 ICT).
+        # Asian Equities are only tradeable during Tokyo/Asian Session (07:00 - 14:00 ICT).
+        # Commodities (GOLD, SILVER, OIL) trade globally 24/5.
+        try:
+            import capital_tri_regional_universe as ctru
+            is_sess_valid, sess_reason = ctru.TriRegionalSessionRouter.is_asset_session_valid(resolved_epic)
+            if not is_sess_valid:
+                base_quant["final_action"] = "HOLD"
+                base_quant["final_confidence"] = 0.0
+                base_quant["reason"] = sess_reason
+                logger.debug(f"⏳ [SESSION GATE] {resolved_epic} blocked: {sess_reason}")
+                return base_quant
+        except Exception as e_sess:
+            logger.debug(f"Session validity check note: {e_sess}")
+
+        # 1. Google Macro Satellite Integration (Expanded across all 900 Tri-Regional Assets)
         macro_boost = 0
         macro_bias = "NEUTRAL"
         try:
             import google_macro_satellite
+            import capital_tri_regional_universe as ctru
             macro_data = google_macro_satellite.fetch_google_macro_satellite_data()
             tradfi_sent = macro_data.get("tradfi_sentiment", "RISK_ON")
             dxy_sig = macro_data.get("dxy_signal", "BULLISH_LIQUIDITY")
+
+            is_eq_or_idx = ctru.is_equity_asset(resolved_epic) or ctru.is_index_asset(resolved_epic) or any(x in resolved_epic.upper() for x in ["SP500", "US500", "US100", "NASDAQ", "NVDA", "TSLA", "AAPL", "MSFT", "AMZN"])
 
             # Gold benefits from DXY weakness (BULLISH_LIQUIDITY) or RISK_OFF safe haven
             if resolved_epic == "GOLD":
@@ -4248,7 +4299,7 @@ class CapitalAutonomousEngine:
                     macro_bias = "BULLISH_MACRO"
                 if tradfi_sent == "RISK_OFF":
                     macro_boost += 10
-            elif resolved_epic in ["SP500", "US500", "US100", "NASDAQ", "NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
+            elif is_eq_or_idx:
                 if tradfi_sent == "RISK_ON":
                     macro_boost += 15
                     macro_bias = "BULLISH_MACRO"
@@ -4519,7 +4570,11 @@ class CapitalAutonomousEngine:
 
             # Dynamic margin rate based on actual broker leverage / asset class
             epic_u = epic.upper()
-            is_stock = any(s in epic_u for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            try:
+                import capital_tri_regional_universe as ctru
+                is_stock = ctru.is_equity_asset(epic_u) or any(s in epic_u for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            except Exception:
+                is_stock = any(s in epic_u for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
             is_crypto = any(c in epic_u for c in ["BTC", "ETH", "SOL", "XRP"])
             pos_leverage = float(pos.get("leverage") or 0.0)
             if pos_leverage > 0:
@@ -4542,7 +4597,7 @@ class CapitalAutonomousEngine:
             if any(g in epic_u for g in ["GOLD", "XAU"]):
                 safe_dist = max(spread * 3.5, current_price * 0.008, 15.0 * spread)
             elif is_stock:
-                safe_dist = max(spread * 3.5, current_price * 0.015)
+                safe_dist = max(spread * 3.5, current_price * 0.0180)
             elif is_crypto:
                 safe_dist = max(spread * 4.0, current_price * 0.018)
             else:
@@ -9726,8 +9781,13 @@ class CapitalSpreadDragManager:
             logger.debug(f"Dynamic structural stops in hurdle fallback: {e_dss}")
 
         # Fallback to baseline
+        try:
+            import capital_tri_regional_universe as ctru
+            is_stock_base = ctru.is_equity_asset(resolved_epic) or any(s in resolved_epic for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+        except Exception:
+            is_stock_base = any(s in resolved_epic for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
         # 1. Downside Risk (1R): Clamped strictly outside market noise (Pillar 2 TradFi Standard)
-        min_sl_dist = max(2.50 * atr, spread * 3.5, 0.0035 * entry_price)
+        min_sl_dist = max(2.50 * atr, spread * 3.5, (0.0180 if is_stock_base else 0.0040) * entry_price)
 
         # 2. Upside Target (6R): Clamped to >= 6.0x risk and >= 10.0x spread
         min_tp_dist = max(min_rr_ratio * min_sl_dist, min_target_spread_ratio * spread, 0.015 * entry_price)

@@ -1744,20 +1744,26 @@ class SuperSmartCapitalCitadel:
         prec = _get_tradfi_precision(resolved_epic, curr_price)
         s_epic = resolved_epic.upper()
         is_gold = any(g in s_epic for g in ["GOLD", "XAU"])
-        is_stock = any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+        try:
+            import capital_tri_regional_universe as ctru
+            is_stock = ctru.is_equity_asset(resolved_epic) or any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            is_index = ctru.is_index_asset(resolved_epic) or any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
+        except Exception:
+            is_stock = any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            is_index = any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
         is_crypto_cfd = any(cr in s_epic for cr in ["BTCUSD", "ETHUSD", "SOLUSD", "BTC", "ETH", "SOL"])
-        is_index = any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
 
         if is_gold:
             breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0040 * curr_price)
         elif is_stock:
-            breathing_sl_dist = max(2.20 * atr_15m, 0.0150 * curr_price, 3.5 * spread)
+            # Equities: 2.20x ATR15m or 1.8% min price distance + 4.0x spread buffer (eliminates 0.35% choking)
+            breathing_sl_dist = max(2.20 * atr_15m, 0.0180 * curr_price, 4.0 * spread)
         elif is_crypto_cfd:
             breathing_sl_dist = max(2.80 * atr_15m, 4.0 * spread, 0.0080 * curr_price)
         elif is_index:
-            breathing_sl_dist = max(2.20 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+            breathing_sl_dist = max(2.20 * atr_15m, 3.5 * spread, 0.0045 * curr_price)
         else:
-            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0050 * curr_price)
 
         preliminary_sl = round(curr_price - breathing_sl_dist if norm_side == "BUY" else curr_price + breathing_sl_dist, prec)
 
@@ -2740,30 +2746,35 @@ class SuperSmartCapitalCitadel:
         prec = _get_tradfi_precision(resolved_epic, curr_price)
         s_epic = resolved_epic.upper()
         is_gold = any(g in s_epic for g in ["GOLD", "XAU"])
-        is_stock = any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+        try:
+            import capital_tri_regional_universe as ctru
+            is_stock = ctru.is_equity_asset(resolved_epic) or any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            is_index = ctru.is_index_asset(resolved_epic) or any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
+        except Exception:
+            is_stock = any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            is_index = any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
         is_crypto_cfd = any(cr in s_epic for cr in ["BTCUSD", "ETHUSD", "SOLUSD", "BTC", "ETH", "SOL"])
-        is_index = any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
 
-        # Asset-Specific Volatility & Spread DNA Breathing Stop (Invariant 74):
+        # Asset-Specific Volatility & Spread DNA Breathing Stop (Invariant 74 & AQ89):
         if is_gold:
             # Gold DNA: High volatility wicks & liquidity spring sweep breathing stop
             breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0040 * curr_price)
             tp_spread_mult = 10.0
         elif is_stock:
-            # Stock DNA: Structural swing breathing stop + session opening gap buffer
-            breathing_sl_dist = max(2.20 * atr_15m, 0.0150 * curr_price, 3.5 * spread)
-            tp_spread_mult = 10.0
+            # Stock DNA: Structural swing breathing stop + session opening gap buffer (Expanded across all 900 Equities)
+            breathing_sl_dist = max(2.20 * atr_15m, 0.0180 * curr_price, 4.0 * spread)
+            tp_spread_mult = 8.0
         elif is_crypto_cfd:
             # Crypto CFD DNA: Wide broker spread drag elimination breathing stop
             breathing_sl_dist = max(2.80 * atr_15m, 4.0 * spread, 0.0080 * curr_price)
             tp_spread_mult = 12.0  # Extra hurdle to overcome wide CFD spreads
         elif is_index:
             # Index DNA: Contract point breathing stop
-            breathing_sl_dist = max(2.20 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
-            tp_spread_mult = 10.0
+            breathing_sl_dist = max(2.20 * atr_15m, 3.5 * spread, 0.0045 * curr_price)
+            tp_spread_mult = 8.0
         else:
-            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
-            tp_spread_mult = 10.0
+            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0050 * curr_price)
+            tp_spread_mult = 8.0
 
         # Volatility Delta Expansion breathing stop scaling (Invariant 99 / 4 Core Formulas):
         if report_confluence:
