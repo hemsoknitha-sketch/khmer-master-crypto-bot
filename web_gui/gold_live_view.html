@@ -233,6 +233,33 @@
       align-items: flex-end;
     }
 
+    .tick-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      transition: all 0.1s ease;
+      line-height: 1;
+    }
+
+    .tick-badge.tick-up {
+      color: #00E676 !important;
+      background: rgba(0, 230, 118, 0.18) !important;
+      border: 1px solid rgba(0, 230, 118, 0.45) !important;
+      box-shadow: 0 0 14px rgba(0, 230, 118, 0.4) !important;
+    }
+
+    .tick-badge.tick-down {
+      color: #FF1744 !important;
+      background: rgba(255, 23, 68, 0.18) !important;
+      border: 1px solid rgba(255, 23, 68, 0.45) !important;
+      box-shadow: 0 0 14px rgba(255, 23, 68, 0.4) !important;
+    }
+
     .live-price {
       font-size: 32px;
       font-weight: 800;
@@ -1038,7 +1065,10 @@
 
       <div class="header-right">
         <div class="price-box">
-          <div class="live-price mono" id="header-price">3,900.00</div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="live-price mono" id="header-price">4,023.30</div>
+            <span id="tick-badge" class="tick-badge tick-up mono">▲ +0.35</span>
+          </div>
           <div class="price-sub">
             <span class="spread-tag mono">SPREAD: <span id="header-spread">0.18</span></span>
             <span class="mono" id="header-change" style="color:#10b981; font-weight:700;">+0.42%</span>
@@ -1447,6 +1477,7 @@
       if (!candleSeries || isNaN(price) || price <= 0) return;
       const isUp = price >= prevPrice;
       const lineColor = isUp ? '#00E676' : '#FF1744';
+      const arrow = isUp ? '▲' : '▼';
       if (!livePriceLine) {
         livePriceLine = candleSeries.createPriceLine({
           price: price,
@@ -1454,13 +1485,13 @@
           lineWidth: 2,
           lineStyle: LightweightCharts.LineStyle.Dashed,
           axisLabelVisible: true,
-          title: `LIVE BID: $${price.toFixed(2)}`,
+          title: `${arrow} LIVE BID: $${price.toFixed(2)}`,
         });
       } else {
         livePriceLine.applyOptions({
           price: price,
           color: lineColor,
-          title: `LIVE BID: $${price.toFixed(2)}`,
+          title: `${arrow} LIVE BID: $${price.toFixed(2)}`,
         });
       }
     }
@@ -2020,6 +2051,19 @@
         if (spreadEl) spreadEl.innerText = Number(spread).toFixed(2);
       }
 
+      // Live Tick Delta Badge
+      const tickBadgeEl = document.getElementById('tick-badge');
+      const delta = price - prevPrice;
+      if (tickBadgeEl) {
+        if (delta > 0) {
+          tickBadgeEl.className = 'tick-badge tick-up mono';
+          tickBadgeEl.innerText = `▲ +${delta.toFixed(2)}`;
+        } else if (delta < 0) {
+          tickBadgeEl.className = 'tick-badge tick-down mono';
+          tickBadgeEl.innerText = `▼ ${delta.toFixed(2)}`;
+        }
+      }
+
       headerPriceEl.classList.remove('tick-up', 'tick-down');
       void headerPriceEl.offsetWidth; // Force CSS reflow to guarantee glowing pulse animation
       if (price > prevPrice) {
@@ -2031,7 +2075,7 @@
       clearTimeout(tickResetTimer);
       tickResetTimer = setTimeout(() => {
         headerPriceEl.classList.remove('tick-up', 'tick-down');
-      }, 250);
+      }, 350);
     }
 
     // 15m Candle Countdown Timer (Runs every second in client browser)
