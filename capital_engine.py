@@ -23,11 +23,13 @@ from collections import deque
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 from typing import Dict, Any, Optional, Tuple, List, Set
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    # Automatically load .env configuration
+    load_dotenv()
+except ImportError:
+    pass
 import database as db
-
-# Automatically load .env configuration
-load_dotenv()
 
 
 def _get_tradfi_precision(epic_str: str, price_val: float = 0.0) -> int:
