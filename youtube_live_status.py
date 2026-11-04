@@ -59,7 +59,7 @@ def audit_stream_server(port: int = 8000):
         pass
 
     # 2. Comprehensive data probe (M5 Preferred, M1 Fallback)
-    url = f"http://localhost:{port}/api/gold_m5_live"
+    url = f"http://localhost:{port}/api/gold_m15_live"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "AQ-Status-Check"})
         with urllib.request.urlopen(req, timeout=2.0) as resp:
