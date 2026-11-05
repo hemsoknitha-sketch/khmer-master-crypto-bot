@@ -2076,3 +2076,23 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
 4. **Two-Tier Real-Time VIP Signal Alert Standard:**
    - **Tier A (Pre-Arming Alert):** When 5-Pillar Consensus reaches $\ge 75.0\%$ confidence, system broadcasts Pre-Arming Radar Alert to VIP Telegram subscribers, detailing Direction, Awaiting Trigger Price, SL, TP1, and TP2, allowing users to prepare capital.
    - **Tier B (Instant Execution Sniper Alert):** At sub-millisecond latency (<0.05ms) upon boundary trigger piercing, broadcasts Real-Time Sniper Alert with 1-Tap Copyable command (`/capital buy/sell epic lot=... sl=... tp=...`), entry price, structural SL, and asymmetric TP targets.
+
+### 1.1.20 THE INSTITUTIONAL MICRO-LOT DYNAMIC R-MULTIPLE BREAKEVEN ARMOR & SPREAD-SCALED PROFIT FLOOR (AQ111 INVARIANT 111)
+**(គ្រឹះស្ថាបត្យកម្ម Breakeven Armor & កើបចំណេញតាម Dynamic R-Multiple លើគណនី Micro-Lots $100-$500 - Invariant 111)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+1. **The Static Dollar Floor Paradox Eradication (លុបបំបាត់អន្ទាក់ Dollar Floor ថេរ $2.50/$1.25 លើគណនី Micro Lot):**
+   - On micro accounts ($100 - $500), position sizes are clamped by Fractional Kelly and Capital Preservation Governors to 0.01 - 0.02 lots (e.g. 0.01 lot Gold, 0.02 contract US100, 0.1 share Mega-Cap Stocks).
+   - On a 0.01 lot of Gold with a 15-point Stop Loss, 1R Dollar Risk is exactly $0.15 USD ($0.01 * 15). A solid +2.0R winning expansion produces +$0.30 USD in open profit (+200% of risk).
+   - Under legacy static dollar rules requiring `upl >= $2.50` for Breakeven Armor and `upl >= $1.25` for Harvest, a micro trade would have to surge +16.67R to trigger Breakeven Armor. Consequently, all legitimate winning trades (+1.5R to +2.5R) were locked out of Breakeven protection and early harvest, causing profitable trades to retrace into full -1.0R Stop-Losses and artificially crushing Win Rate to 20.0% (the random walk baseline of an unprotected 1:4.0 R:R).
+2. **Dynamic Risk Metric & Micro-Lot Scaling Core:**
+   - Every active TradFi position calculates real-time unit risk metrics in memory:
+     $$\text{Dollar 1R Risk} = \max(0.01, \text{trade\_sl\_dist} \times \text{size} \times \text{contract\_multiplier})$$
+     $$\text{Spread Cost (USD)} = \max(0.005, \text{spread} \times \text{size} \times \text{contract\_multiplier})$$
+     $$\text{Minimum Net Profit Floor} = \max(0.05, \text{Spread Cost} \times 1.5)$$
+     $$\text{is\_micro\_lot} = (\text{Dollar 1R Risk} < \$1.00)$$
+3. **Institutional 4-Phase Dynamic Armor & Harvest Protocol:**
+   - **Phase 1 (Risk Reduction 60% at $+1.2R$):** When $R_{\text{gain}} \ge +1.20R$ and $\text{UPL} \ge \text{Minimum Net Floor}$ ($0.05$), tightens SL to $\text{Entry} - 0.5\times\text{ATR}$, cutting initial risk by 60%.
+   - **Phase 2 (Breakeven Armor & TP1 at $+1.8R$ to $+2.0R$):** When $R_{\text{gain}} \ge +1.80R$ and $\text{UPL} \ge \text{Minimum Net Floor}$ ($0.05$), instantly advances Stop-Loss to Breakeven Armor ($\text{Entry} \pm \max(\text{spread}\times 0.5, 0.01)$), guaranteeing $\text{Risk} = 0.00R$ Free Roll (100% loss-immune). The trade is permanently forbidden from turning into a loss!
+   - **Phase 3 (Guaranteed Cash Floor at $+3.5R$):** Ratchets SL to $+2.0R$ guaranteed cash profit floor.
+   - **Flash Shock Protective Early Harvest (50% Pullback Lock):** If peak expansion reaches $\ge +1.5R$ (or Peak $\text{UPL} \ge 1.5\times\text{1R Risk}$) and subsequently retraces $\ge 50\%$, market-harvests immediately to bank net gains.
+   - **Golden Ratchet & Retracement Harvest:** Scaled dynamically to preserve $80\%-85\%$ of peak R-multiple without waiting for static dollar thresholds.

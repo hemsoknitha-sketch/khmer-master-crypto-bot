@@ -4744,6 +4744,13 @@ class CapitalAutonomousEngine:
 
             r_gain = (current_price - entry_level) / trade_sl_dist if direction == "BUY" else (entry_level - current_price) / trade_sl_dist
 
+            # Invariant 111: Dynamic Micro-Lot Risk & Spread Floor Scaling (Prevents Dollar-Floor Freezing on Accounts < $500)
+            contract_mult = 100.0 if any(g in epic_u for g in ["NATURALGAS", "GAS"]) else 1.0
+            dollar_1r = max(0.01, trade_sl_dist * size * contract_mult)
+            spread_cost_usd = max(0.005, spread * size * contract_mult)
+            min_net_floor_usd = max(0.05, spread_cost_usd * 1.5)
+            is_micro_lot = (dollar_1r < 1.00)
+
             if scale_tier >= 2 or tranche_id == "RUNNER_20":
                 is_runner = True
                 ratchet_pct = 0.85
@@ -4757,7 +4764,7 @@ class CapitalAutonomousEngine:
             # Phase 4 (Parabolic & RSI > 80.0 Exhaustion): 85% Peak Profit Lock
             # =========================================================================
             eff_atr = float(cached_market.get("atr_15m") or cached_market.get("atr") or (trade_sl_dist / 2.2))
-            if r_gain >= 1.20 and scale_tier < 0.5 and upl >= max(0.30, spread * 1.0):
+            if r_gain >= 1.20 and scale_tier < 0.5 and (upl >= min_net_floor_usd or upl >= max(0.30, spread * 1.0)):
                 if direction == "BUY":
                     p1_raw = round(entry_level - (0.5 * eff_atr), prec)
                     p1_safe = min(p1_raw, round(current_price - (spread * 1.5), prec))
@@ -4776,7 +4783,7 @@ class CapitalAutonomousEngine:
                         logger.info(f"🛡️ [PHASE 1: RISK REDUCTION 60%] Tightened SL for {epic} ({direction}) to {p1_safe} (+{r_gain:.2f}R, Entry - 0.5x ATR)")
 
             # Phase 2: Dynamic Breakeven Armor & TP1 (+1.8R to +2.0R, >80% Win Guarantee)
-            is_tp1_ready = (r_gain >= 1.80 and upl >= max(0.50, spread * 1.5)) or (r_gain >= 2.00 and upl >= 0.40) or (upl >= 2.00 and r_gain >= 1.50)
+            is_tp1_ready = (r_gain >= 1.80 and upl >= min_net_floor_usd) or (r_gain >= 1.80 and upl >= max(0.50, spread * 1.5)) or (r_gain >= 2.00 and upl >= 0.40) or (upl >= 2.00 and r_gain >= 1.50)
             if is_tp1_ready and scale_tier < 1:
                 if tranche_id == "TP1_50":
                     logger.info(f"🎯 [MULTI-TARGET TP1 HARVEST] Banking 50% Tranche on {epic} ({direction}) @ +{r_gain:.2f}R (+${upl:+.2f})!")
@@ -4842,7 +4849,7 @@ class CapitalAutonomousEngine:
                                 except Exception:
                                     pass
 
-            elif ((r_gain >= 3.50 and upl >= max(1.50, spread * 2.0)) or (r_gain >= 4.00 and upl >= 1.00) or (upl >= 3.50 and r_gain >= 2.50)) and scale_tier < 2:
+            elif ((r_gain >= 3.50 and (upl >= min_net_floor_usd or upl >= max(1.50, spread * 2.0))) or (r_gain >= 4.00 and upl >= 1.00) or (upl >= 3.50 and r_gain >= 2.50)) and scale_tier < 2:
                 if tranche_id == "TP2_30":
                     logger.info(f"💎 [MULTI-TARGET TP2 HARVEST] Banking 30% Tranche on {epic} ({direction}) @ +{r_gain:.2f}R (+${upl:+.2f})!")
                     close_res = engine.close_position(deal_id=deal_id)
@@ -4935,7 +4942,7 @@ class CapitalAutonomousEngine:
             # Detect if current market price has reached or exceeded broker-side Take-Profit level
             tp_level = float(pos.get("profitLevel", 0.0) or 0.0)
             tp_target_reached = False
-            if tp_level > 0 and upl >= 2.50:
+            if tp_level > 0 and (upl >= min_net_floor_usd or upl >= 2.50):
                 if direction == "BUY" and tp_level > entry_level and current_price >= (tp_level - (spread * 0.75)):
                     if tranche_id == "SINGLE" and scale_tier < 2 and r_gain < 4.0:
                         pass
@@ -4948,16 +4955,16 @@ class CapitalAutonomousEngine:
                         tp_target_reached = True
 
             # Full Asymmetric Moonshot target (Requires minimum institutional dollar floor >= $4.50 / $10.00)
-            asymmetric_target_reached = ((roi_pct >= 60.0 and upl >= 12.0) or upl >= 25.0) if is_runner else ((roi_pct >= 25.0 and upl >= 4.50) or upl >= 10.0)
+            asymmetric_target_reached = ((roi_pct >= 60.0 and (upl >= 12.0 or (is_micro_lot and r_gain >= 5.0))) or upl >= 25.0) if is_runner else ((roi_pct >= 25.0 and (upl >= 4.50 or (is_micro_lot and r_gain >= 3.5))) or upl >= 10.0)
 
             # Volatility Shock & Flash Reversal Protective Early Harvest (Invariant 92 Pillar 5)
             # If position achieved Peak R >= +1.5R, Peak UPL >= max(1.50, spread * 2.0), or Peak ROI >= 6.0%
             # and then retraces >= 50% from peak, execute instant market harvest before trade turns into a loss!
             shock_early_harvest = (
-                (peak_upl >= max(1.50, spread * 2.0) or roi_pct >= 6.0 or r_gain >= 1.5) and
+                (peak_upl >= max(1.50, spread * 2.0) or roi_pct >= 6.0 or r_gain >= 1.5 or (is_micro_lot and peak_upl >= dollar_1r * 1.5)) and
                 peak_upl > 0 and
                 (upl <= peak_upl * 0.50) and
-                (upl >= max(0.50, spread * 1.2))
+                (upl >= min_net_floor_usd or upl >= max(0.50, spread * 1.2))
             )
 
             # Phase 4 Parabolic RSI Exhaustion 85% Harvest (AQ98):
@@ -4968,13 +4975,13 @@ class CapitalAutonomousEngine:
             rsi_cur = float(cached_market.get("rsi", 50.0) or 50.0)
             is_parabolic_exhaustion = (direction == "BUY" and rsi_cur >= 80.0) or (direction == "SELL" and rsi_cur <= 20.0)
             if is_parabolic_exhaustion and peak_upl >= max(2.50, spread * 2.5) and peak_upl > 0:
-                if upl <= (peak_upl * 0.85) and upl >= max(1.00, spread * 1.5):
+                if upl <= (peak_upl * 0.85) and (upl >= min_net_floor_usd or upl >= max(1.00, spread * 1.5)):
                     parabolic_85_harvest = True
                     logger.info(f"⚡ [PARABOLIC RSI EXHAUSTION HARVEST (AQ98)] {epic} RSI={rsi_cur:.1f} extreme peak pullback detected (UPL: ${upl:+.2f} vs Peak: ${peak_upl:+.2f}). Banking 85% cash floor!")
 
             # Reinforcement Learning (RL) Dynamic Exit Policy Harvest (Invariant 86)
             rl_exhaustion_harvest = False
-            if scale_tier >= 1 and r_gain >= 2.2 and upl >= 3.50:
+            if scale_tier >= 1 and r_gain >= 2.2 and (upl >= min_net_floor_usd or upl >= 3.50):
                 try:
                     from capital_10y_backtester import RLDynamicExitPolicy
                     adx_cur = float(cached_market.get("adx", 25.0) or 25.0)
@@ -5002,13 +5009,13 @@ class CapitalAutonomousEngine:
                     rsi_15m=rsi_cur,
                     spread_r=spread / max(1e-4, trade_sl_dist)
                 )
-                if bandit_rec.get("action") == "SHOCK_EARLY_HARVEST" and upl >= max(1.25, spread * 1.5):
+                if bandit_rec.get("action") == "SHOCK_EARLY_HARVEST" and (upl >= min_net_floor_usd or upl >= max(1.25, spread * 1.5)):
                     bandit_harvest = True
                     logger.info(f"🎯 [CONTEXTUAL BANDIT HARVEST (AQ100)] {epic}: {bandit_rec.get('reason')}")
             except Exception as e_bandit:
                 logger.debug(f"Contextual bandit evaluation note: {e_bandit}")
 
-            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached or shock_early_harvest or rl_exhaustion_harvest or parabolic_85_harvest or bandit_harvest) and (upl >= 1.25)
+            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached or shock_early_harvest or rl_exhaustion_harvest or parabolic_85_harvest or bandit_harvest) and (upl >= min_net_floor_usd or upl >= 1.25)
             if harvest_trigger:
                 tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else (
                     "🎯 [CONTEXTUAL BANDIT DYNAMIC HARVEST (AQ100)]" if bandit_harvest else (
@@ -5080,7 +5087,7 @@ class CapitalAutonomousEngine:
                 is_retrace_eligible
                 and peak_upl >= 3.50
                 and (upl <= (peak_upl * ratchet_pct))
-                and (upl >= max(2.50, spread * 2.0))
+                and (upl >= min_net_floor_usd or upl >= max(2.50, spread * 2.0))
                 and ((peak_upl >= 15.0 or peak_roi >= 30.0) or not broker_sl_protecting)
             )
 
@@ -5090,7 +5097,7 @@ class CapitalAutonomousEngine:
             shock_harvest_trigger = (
                 (peak_upl >= 3.50 or peak_roi >= 15.0)
                 and upl <= (peak_upl * 0.50)
-                and upl >= max(1.50, spread * 2.0)
+                and (upl >= min_net_floor_usd or upl >= max(1.50, spread * 2.0))
             )
 
             if retrace_trigger or shock_harvest_trigger:
@@ -5214,7 +5221,7 @@ class CapitalAutonomousEngine:
             # =========================================================================
             prec = _get_tradfi_precision(epic, current_price)
             is_ratchet_eligible = (roi_pct >= 12.0 or peak_upl >= 5.00 or upl >= 5.00) and peak_upl > 0
-            ratchet_broker_eligible = is_ratchet_eligible and (upl >= 3.50 or peak_upl >= 4.50)
+            ratchet_broker_eligible = is_ratchet_eligible and (upl >= min_net_floor_usd or upl >= 3.50 or peak_upl >= 4.50)
             if ratchet_broker_eligible:
                 target_protected_profit = peak_upl * ratchet_pct
                 if direction == "BUY":
@@ -5262,7 +5269,9 @@ class CapitalAutonomousEngine:
             # =========================================================================
             # Invariant 35: roi_pct >= 8.5 or upl >= 3.50 delayed Breakeven Armor with Absolute Dollar Floor
             is_be_eligible = (roi_pct >= 8.5 or upl >= 3.50) and deal_id not in self._be_locked_set
-            if is_be_eligible and upl >= 2.50:
+            # Micro-Lot Dynamic Upgrade (Invariant 111): On micro-lots ($0.01-$0.02, 1R < $1.00),
+            # dynamically unlocks Breakeven Armor at r_gain >= 1.50R once spread cost is cleared (upl >= min_net_floor_usd)
+            if is_be_eligible and (upl >= 2.50 or (is_micro_lot and upl >= min_net_floor_usd)):
                 breathing_cushion = max(spread * 2.5, 0.0015 * current_price)
                 if direction == "BUY":
                     target_be_sl = round(entry_level + max(spread * 0.5, 0.001 * entry_level), 2)
@@ -5330,7 +5339,7 @@ class CapitalAutonomousEngine:
                         r_gain = (current_price - entry_level) / sl_dist if direction == "BUY" else (entry_level - current_price) / sl_dist
 
                         # TIER 1: +1.2R Hit -> Breakeven Armor Lock (Requires Net UPL >= $2.00)
-                        if r_gain >= 1.20 and tier < 1 and upl >= 2.00:
+                        if r_gain >= 1.20 and tier < 1 and (upl >= 2.00 or (is_micro_lot and upl >= min_net_floor_usd)):
                             if direction == "BUY":
                                 be_sl = round(entry_level + max(spread * 0.6, entry_level * 0.0012), prec)
                                 safe_sl = min(be_sl, round(current_price - (spread * 1.5), prec))
@@ -5367,7 +5376,7 @@ class CapitalAutonomousEngine:
                                             pass
 
                         # TIER 2: +2.5R Hit -> Guaranteed +1.2R Profit Lock (Requires Net UPL >= $3.50)
-                        elif r_gain >= 2.50 and tier < 2 and upl >= 3.50:
+                        elif r_gain >= 2.50 and tier < 2 and (upl >= 3.50 or (is_micro_lot and upl >= min_net_floor_usd)):
                             if direction == "BUY":
                                 t2_sl = round(entry_level + (1.20 * sl_dist), prec)
                                 safe_sl = min(t2_sl, round(current_price - (spread * 1.5), prec))
