@@ -35,7 +35,7 @@
   * Moonshot Runner (20% uncapped): Trails behind 15m ATR / 3-EMA (20/50/200) confluence up to $+5R \dots +10R$.
   * Flash Shock Harvest: If Peak UPL $\ge +\$2.50$ (or Peak $\text{ROI} \ge +8.0\%$) retraces $\ge 50\%$, instant exit (`SHOCK_EARLY_HARVEST`).
   * 45-Minute Post-SL Quarantine prevents revenge trading across all engines.
-- **Super Admin Absolute Authority & Demo Fallback Mirror (Invariant 75):** Super Admin execution is unconditional. Live balance $< \$10.00$ engages Dynamic Demo Fallback Mirror ($10,000 balance).
+- **Super Admin Absolute Authority & Demo Fallback Mirror (Invariant 75):** Super Admin execution is unconditional. Live balance $< \$10.00$ engages Dynamic Demo Fallback Mirror ($10,000 balance). Fleet-wide master commands (`/admin_capital on all <budget> live <max_pos> <schedule>`, `/admin_capital all_on <budget> <max_pos> <schedule>`, `/admin_capital off all`, `/admin_capital limit global on/off`) dynamically configure all fleet users with zero friction and universally synchronize Daily Governor limits.
 - **In-Memory Dual-Directional Stealth Breakout Radar (Invariant 76):** Middle 30% Dealing Range (35% - 65%) is strictly blocked (`BLOCK_CHOP_ZONE_EQUILIBRIUM`). RAM Radars monitor boundaries: Path A (Breakout Thrust), Path B (Turtle Soup Reversal), Path C (Institutional 15M FVG & Golden Pocket Retest).
 
 ### 2.2 Institutional Risk Governance, Empirical Validation & Live Dashboard (Invariants 81–86)

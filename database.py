@@ -3556,8 +3556,8 @@ def set_capital_global_trading_switch(enabled: bool, engine: str = "ALL"):
     elif eng in ["SCALP", "CAPITAL_SCALP"]:
         update_system_setting("cap_global_scalp_enabled", s_val)
 
-def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None, max_positions: Optional[int] = None) -> int:
-    """Enables auto trade / trend scalp for all registered Capital.com users in batch with optional budget and max positions."""
+def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None, max_positions: Optional[int] = None, schedule_mode: Optional[str] = None) -> int:
+    """Enables auto trade / trend scalp for all registered Capital.com users in batch with optional budget, max positions, and schedule mode."""
     set_capital_global_trading_switch(True, engine)
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -3566,26 +3566,20 @@ def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None
         eng = engine.upper()
         if eng in ["ALL", "AUTO"]:
             # 1. Update existing records in capital_auto_config
-            if budget is not None and max_positions is not None:
-                cursor.execute("""
-                    UPDATE capital_auto_config 
-                    SET is_enabled = 1, is_demo = 0, budget = ?, max_positions = ? 
-                    WHERE chat_id != 859271875
-                """, (float(budget), int(max_positions)))
-            elif budget is not None:
-                cursor.execute("""
-                    UPDATE capital_auto_config 
-                    SET is_enabled = 1, is_demo = 0, budget = ? 
-                    WHERE chat_id != 859271875
-                """, (float(budget),))
-            elif max_positions is not None:
-                cursor.execute("""
-                    UPDATE capital_auto_config 
-                    SET is_enabled = 1, is_demo = 0, max_positions = ? 
-                    WHERE chat_id != 859271875
-                """, (int(max_positions),))
-            else:
-                cursor.execute("UPDATE capital_auto_config SET is_enabled = 1, is_demo = 0 WHERE chat_id != 859271875")
+            updates = ["is_enabled = 1", "is_demo = 0"]
+            params = []
+            if budget is not None:
+                updates.append("budget = ?")
+                params.append(float(budget))
+            if max_positions is not None:
+                updates.append("max_positions = ?")
+                params.append(int(max_positions))
+            if schedule_mode is not None:
+                updates.append("schedule_mode = ?")
+                params.append(str(schedule_mode))
+            
+            sql = f"UPDATE capital_auto_config SET {', '.join(updates)} WHERE chat_id != 859271875"
+            cursor.execute(sql, tuple(params))
             
             cursor.execute("UPDATE user_capital_credentials SET is_demo = 0 WHERE chat_id != 859271875")
             updated_count += max(0, cursor.rowcount)
@@ -3595,11 +3589,12 @@ def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None
             cred_users = [row[0] for row in cursor.fetchall()]
             set_b = float(budget) if budget is not None else 50.0
             set_m = int(max_positions) if max_positions is not None else 4
+            set_s = str(schedule_mode) if schedule_mode is not None else "SMART_SESSION_TIMED"
             for u_id in cred_users:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, is_demo)
-                    VALUES (?, 1, ?, ?, 0)
-                """, (u_id, set_b, set_m))
+                    INSERT OR IGNORE INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, is_demo, schedule_mode)
+                    VALUES (?, 1, ?, ?, 0, ?)
+                """, (u_id, set_b, set_m, set_s))
                 if cursor.rowcount > 0:
                     updated_count += 1
 

@@ -573,6 +573,15 @@ class CapitalDailyAGIGovernor:
         if is_global or chat_id == 0:
             db.update_system_setting("cap_daily_limits_disabled", val)
             db.update_system_setting("capital_daily_governor_disabled", val)
+            if not disabled:
+                try:
+                    conn = db.get_db_connection()
+                    cur = conn.cursor()
+                    cur.execute("UPDATE system_settings SET value = '0' WHERE key LIKE 'cap_daily_limits_disabled_%' OR key LIKE 'cap_daily_governor_disabled_%'")
+                    conn.commit()
+                    conn.close()
+                except Exception as e_gl:
+                    logger.warning(f"Error resetting user-level daily limit flags: {e_gl}")
             logger.info(f"🛡️ [CAPITAL GOVERNOR] GLOBAL Daily Limits Disabled: {disabled}")
         if chat_id and chat_id > 0:
             db.update_system_setting(f"cap_daily_limits_disabled_{chat_id}", val)

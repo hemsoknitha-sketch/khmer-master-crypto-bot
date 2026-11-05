@@ -26205,23 +26205,31 @@ class TelegramBotThread(BaseThread):
             if args and args[0].upper() in ["ALL_ON", "ALL_USERS_ON", "GLOBAL_ON"]:
                 custom_budget = None
                 custom_max_pos = None
+                custom_schedule = None
                 for a in args[1:]:
-                    val_str = str(a).strip()
-                    if val_str.replace('.', '', 1).isdigit():
+                    val_str = str(a).strip().upper()
+                    if val_str in ["SMART_SESSION_TIMED", "TIMED", "SMART"]:
+                        custom_schedule = "SMART_SESSION_TIMED"
+                    elif val_str in ["24/7", "247", "ALWAYS_ON", "CONTINUOUS"]:
+                        custom_schedule = "24/7"
+                    elif val_str in ["MON_FRI", "WEEKDAY", "SCHEDULE_MON_FRI"]:
+                        custom_schedule = "SCHEDULE_MON_FRI"
+                    elif val_str.replace('.', '', 1).isdigit():
                         if custom_budget is None:
                             custom_budget = float(val_str)
                         elif custom_max_pos is None:
                             custom_max_pos = int(float(val_str))
-                c_a = db.enable_all_capital_users("AUTO", budget=custom_budget, max_positions=custom_max_pos)
+                c_a = db.enable_all_capital_users("AUTO", budget=custom_budget, max_positions=custom_max_pos, schedule_mode=custom_schedule)
                 c_s = db.enable_all_capital_users("SCALP")
                 db.set_capital_global_trading_switch(True, "ALL")
                 budget_info = f"\n• Target Budget: `${custom_budget:,.0f}`" if custom_budget else ""
                 pos_info = f"\n• Max Positions: `{custom_max_pos}`" if custom_max_pos else ""
+                sched_info = f"\n• Schedule Mode: `{custom_schedule}`" if custom_schedule else ""
                 await update.effective_message.reply_text(
                     f"🌐 **[GLOBAL MASTER TOGGLE: ALL USERS ACTIVATED]** 🟢\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"បានបើកដំណើរការវិនិយោគពេញលេញសម្រាប់ ALL USERS!\n"
-                    f"• Capital Auto: `{c_a} Users`{budget_info}{pos_info}\n"
+                    f"• Capital Auto: `{c_a} Users`{budget_info}{pos_info}{sched_info}\n"
                     f"• Trend Scalp 24/7: `{c_s} Users`\n"
                     f"• Global Trading Switch: `🟢 ACTIVE`",
                     parse_mode="Markdown"
@@ -26353,6 +26361,37 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital on 1612591526 400 live 10 24/7` ``", parse_mode="Markdown")
                     return
 
+                # Universal Batch Handler for ALL users: /admin_capital on all 50 live 6 SMART_SESSION_TIMED
+                if str(args[1]).upper().strip() in ["ALL", "GLOBAL", "EVERYONE", "USERS"]:
+                    custom_budget = float(args[2]) if len(args) >= 3 and args[2].replace('.', '', 1).isdigit() else 50.0
+                    custom_max_pos = int(args[4]) if len(args) >= 5 and args[4].isdigit() else 6
+                    sched_mode = "SMART_SESSION_TIMED"
+                    if len(args) >= 6:
+                        raw_s = str(args[5]).upper().strip()
+                        if raw_s in ["24/7", "247", "ALWAYS_ON", "CONTINUOUS"]:
+                            sched_mode = "24/7"
+                        elif raw_s in ["MON_FRI", "WEEKDAY", "SCHEDULE_MON_FRI"]:
+                            sched_mode = "SCHEDULE_MON_FRI"
+                        elif raw_s in ["TIMED", "SMART", "SMART_SESSION_TIMED"]:
+                            sched_mode = "SMART_SESSION_TIMED"
+                    c_a = db.enable_all_capital_users("AUTO", budget=custom_budget, max_positions=custom_max_pos, schedule_mode=sched_mode)
+                    c_s = db.enable_all_capital_users("SCALP")
+                    db.set_capital_global_trading_switch(True, "ALL")
+                    await update.effective_message.reply_text(
+                        f"🌐 **[GLOBAL MASTER TOGGLE: ALL USERS ACTIVATED]** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"បានបើកដំណើរការវិនិយោគ Live Mainnet ជូន **Users ទាំងអស់ (ALL USERS)**!\n"
+                        f"• ចំនួន Users សកម្ម ៖ `{c_a} Users`\n"
+                        f"• ទុនវិនិយោគ (Budget) ៖ `${custom_budget:,.2f} USD / Trade`\n"
+                        f"• មុខតំណែងអតិបរមា (Max Positions) ៖ `{custom_max_pos}` គូ\n"
+                        f"• កាលវិភាគ (Schedule Mode) ៖ `{sched_mode}`\n"
+                        f"• បរិយាកាស ៖ `🟢 LIVE MAINNET (Real Funds)`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🚀 _Bot កំពុងការពារ និងជួញដូរតាមម៉ោង Golden Sessions សម្រាប់ Users ទាំងអស់!_",
+                        parse_mode="Markdown"
+                    )
+                    return
+
                 target_uid, u_record = _resolve_target(args[1])
                 if not target_uid:
                     await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!", parse_mode="Markdown")
@@ -26467,6 +26506,21 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital off 329979279335052484` ``", parse_mode="Markdown")
                     return
 
+                if str(args[1]).upper().strip() in ["ALL", "GLOBAL", "EVERYONE", "USERS"]:
+                    c_a = db.disable_all_capital_users("AUTO", preserve_super_admin=True)
+                    c_s = db.disable_all_capital_users("SCALP", preserve_super_admin=True)
+                    db.set_capital_global_trading_switch(False, "ALL")
+                    await update.effective_message.reply_text(
+                        f"🛑 **[GLOBAL MASTER TOGGLE: ALL USERS PAUSED]** ⏸️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"បានផ្អាកដំណើរការវិនិយោគសម្រាប់ ALL USERS (Super Admin preserved)!\n"
+                        f"• Capital Auto: `{c_a} Users`\n"
+                        f"• Trend Scalp 24/7: `{c_s} Users`\n"
+                        f"• Global Trading Switch: `🛑 PAUSED`",
+                        parse_mode="Markdown"
+                    )
+                    return
+
                 target_uid, _ = _resolve_target(args[1])
                 if not target_uid:
                     await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!", parse_mode="Markdown")
@@ -26521,7 +26575,7 @@ class TelegramBotThread(BaseThread):
                 dis = (sub_opt in ["OFF", "DISABLE", "DISABLED", "0", "FALSE", "REMOVE"])
                 import portfolio_circuit_breaker
                 if target_str.upper() in ["GLOBAL", "ALL"]:
-                    db.update_system_setting("cap_daily_limits_disabled", "1" if dis else "0")
+                    portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(0, dis, is_global=True)
                     status_kh = "🔓 បិទទាំងអស់ (GLOBAL DISABLED)" if dis else "🔒 បើកទាំងអស់ (GLOBAL ENABLED)"
                     await update.effective_message.reply_text(
                         f"✅ **[GLOBAL DAILY LIMITS UPDATED]** 🛡️\n"
