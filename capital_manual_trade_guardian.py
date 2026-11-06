@@ -592,3 +592,4 @@ def format_guardian_audit_report(
     ])
 
     return "\n".join(lines), InlineKeyboardMarkup(keyboard_buttons)
+

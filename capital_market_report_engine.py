@@ -736,7 +736,7 @@ class CapitalMarketReportEngine:
         """
         now = time.time()
         key = cls.normalize_epic_key(epic)
-        if key in _LIVE_SENTIMENT_CACHE:
+        if engine is not None and key in _LIVE_SENTIMENT_CACHE:
             ts, data = _LIVE_SENTIMENT_CACHE[key]
             if now - ts < _SENTIMENT_CACHE_TTL:
                 return data
@@ -748,22 +748,40 @@ class CapitalMarketReportEngine:
 
         if engine is not None and hasattr(engine, "session"):
             try:
-                # Capital.com API endpoint for client sentiment
-                url = f"{engine.base_url}/api/v1/clients/sentiment"
-                headers = engine._get_headers() if hasattr(engine, "_get_headers") else {}
+                # Capital.com official REST API endpoint: GET /api/v1/clientsentiment/{marketId}
+                base = engine.base_url.rstrip("/")
+                resolved_epic = engine.EPIC_MAP.get(epic, epic) if hasattr(engine, "EPIC_MAP") else epic
+                if base.endswith("/api/v1"):
+                    url = f"{base}/clientsentiment/{resolved_epic}"
+                else:
+                    url = f"{base}/api/v1/clientsentiment/{resolved_epic}"
+
+                if hasattr(engine, "get_auth_headers"):
+                    headers = engine.get_auth_headers()
+                elif hasattr(engine, "_get_headers"):
+                    headers = engine._get_headers()
+                else:
+                    headers = {}
+
                 resp = engine.session.get(url, headers=headers, timeout=3.5)
                 if resp.status_code == 200:
                     payload = resp.json()
-                    # Payload format: {"clientSentiments": [{"marketId": "...", "longPositionPercentage": 72.0, "shortPositionPercentage": 28.0}]}
-                    sentiments = payload.get("clientSentiments") or payload.get("sentiments", [])
-                    resolved_epic = engine.EPIC_MAP.get(epic, epic) if hasattr(engine, "EPIC_MAP") else epic
-                    for item in sentiments:
-                        m_id = str(item.get("marketId") or item.get("epic") or "").upper()
-                        if m_id == resolved_epic.upper() or m_id == key:
-                            client_long = float(item.get("longPositionPercentage", 50.0))
-                            client_short = float(item.get("shortPositionPercentage", 50.0))
-                            source = "LIVE_BROKER_API"
-                            break
+                    # Single-market response: {"marketId": "GOLD", "longPositionPercentage": 74.06, "shortPositionPercentage": 25.94}
+                    if "longPositionPercentage" in payload:
+                        client_long = float(payload.get("longPositionPercentage", 50.0))
+                        client_short = float(payload.get("shortPositionPercentage", 50.0))
+                        source = "LIVE_BROKER_API"
+                    else:
+                        sentiments = payload.get("clientSentiments") or payload.get("sentiments", [])
+                        for item in sentiments:
+                            m_id = str(item.get("marketId") or item.get("epic") or "").upper()
+                            if m_id == resolved_epic.upper() or m_id == key:
+                                client_long = float(item.get("longPositionPercentage", 50.0))
+                                client_short = float(item.get("shortPositionPercentage", 50.0))
+                                source = "LIVE_BROKER_API"
+                                break
+                elif resp.status_code != 200:
+                    logger.debug(f"Capital client sentiment fetch returned {resp.status_code}: {resp.text[:100]}")
             except Exception as e:
                 logger.debug(f"Capital client sentiment live fetch note: {e}")
 

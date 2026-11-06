@@ -178,7 +178,7 @@ fi
 
 if [ "$PULSE_AVAILABLE" = true ] && [ -n "$LOFI_FILE" ]; then
     echo "🎵 Mixed Audio Mode: Ambient soundtrack ($LOFI_FILE) + PulseAudio alerts"
-    AUDIO_INPUT="-stream_loop -1 -i $LOFI_FILE -f pulse -i sink_stream.monitor"
+    AUDIO_INPUT="-re -stream_loop -1 -i $LOFI_FILE -f pulse -i sink_stream.monitor"
     AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=0.35[a_bg];[2:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=1.0[a_alert];[a_bg][a_alert]amix=inputs=2:duration=first:dropout_transition=0,aresample=async=1000[aout] -map 0:v -map [aout]"
 elif [ "$PULSE_AVAILABLE" = true ]; then
     echo "🎵 PulseAudio Monitor Only Mode"
@@ -186,7 +186,7 @@ elif [ "$PULSE_AVAILABLE" = true ]; then
     AUDIO_MAP="-map 0:v -map 1:a"
 elif [ -n "$LOFI_FILE" ]; then
     echo "🎵 Ambient Soundtrack Only Mode ($LOFI_FILE)"
-    AUDIO_INPUT="-stream_loop -1 -i $LOFI_FILE"
+    AUDIO_INPUT="-re -stream_loop -1 -i $LOFI_FILE"
     AUDIO_MAP="-map 0:v -map 1:a"
 else
     echo "🔇 Fallback Silent Audio Mode"
