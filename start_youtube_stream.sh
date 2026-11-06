@@ -152,7 +152,10 @@ taskset -c 2,3 $CHROMIUM_BIN \
     --test-type \
     --autoplay-policy=no-user-gesture-required \
     --disable-dev-shm-usage \
-    --disable-gpu-sandbox \
+    --disable-gpu \
+    --disable-software-rasterizer \
+    --js-flags="--max-old-space-size=256" \
+    --renderer-process-limit=2 \
     --disk-cache-size=1 \
     --media-cache-size=1 \
     --hide-scrollbars \
@@ -202,14 +205,14 @@ pkill -9 -f "ffmpeg.*rtmp" 2>/dev/null || true
 sleep 1
 
 taskset -c 2,3 ffmpeg -hide_banner -loglevel info -stats \
-    -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
+    -f x11grab -draw_mouse 0 -framerate 25 -video_size 1920x1080 -i :99.0 \
     $AUDIO_INPUT \
     $AUDIO_MAP \
-    -c:v libx264 -preset superfast -tune zerolatency \
-    -b:v 4800k -minrate 4000k -maxrate 5200k -bufsize 9600k \
+    -c:v libx264 -preset ultrafast -tune zerolatency \
+    -b:v 3200k -minrate 2800k -maxrate 3600k -bufsize 6400k \
     -x264-params "nal-hrd=cbr:force-cfr=1" \
-    -g 60 -keyint_min 60 \
-    -r 30 \
+    -g 50 -keyint_min 50 \
+    -r 25 \
     -pix_fmt yuv420p -profile:v high -level 4.1 \
     -c:a aac -b:a 160k -ar 48000 \
     -flvflags no_duration_filesize \
