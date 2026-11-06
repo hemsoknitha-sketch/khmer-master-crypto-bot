@@ -1100,7 +1100,7 @@ def init_db():
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )
     ''')
-    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'"), ("is_demo", "INTEGER DEFAULT 0")]:
         try:
             cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
         except Exception:
@@ -2937,9 +2937,11 @@ def record_capital_auto_trade(
     if not deal_reference:
         deal_reference = str(deal_id)
 
+    is_demo = 1 if kwargs.get("is_demo") in [True, 1, "1", "True"] else 0
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'"), ("is_demo", "INTEGER DEFAULT 0")]:
         try:
             cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
         except Exception:
@@ -2947,19 +2949,34 @@ def record_capital_auto_trade(
 
     cursor.execute("""
         INSERT INTO capital_auto_trades
-        (chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?)
-    """, (chat_id, str(deal_id), str(deal_reference), str(epic), str(direction), float(size), float(entry_price), float(sl), float(tp), float(tp1), float(tp2), float(tp3), float(sl_dist), int(scale_tier), str(tranche_id)))
+        (chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id, is_demo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?, ?)
+    """, (chat_id, str(deal_id), str(deal_reference), str(epic), str(direction), float(size), float(entry_price), float(sl), float(tp), float(tp1), float(tp2), float(tp3), float(sl_dist), int(scale_tier), str(tranche_id), int(is_demo)))
     trade_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return trade_id
 
+def has_capital_auto_trade_record(deal_id: str) -> bool:
+    """Returns True if a trade with deal_id or deal_reference already exists in capital_auto_trades."""
+    if not deal_id:
+        return False
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*) FROM capital_auto_trades 
+        WHERE deal_id = ? OR deal_reference = ?
+    """, (str(deal_id), str(deal_id)))
+    row = cursor.fetchone()
+    count = row[0] if row else 0
+    conn.close()
+    return count > 0
+
 def update_capital_auto_trade_scale_tier(deal_id: str, scale_tier: int, status: Optional[str] = None, sl: Optional[float] = None):
     """Updates scale_tier, status, and optionally updated SL (Breakeven/Trailing) in capital_auto_trades."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'"), ("is_demo", "INTEGER DEFAULT 0")]:
         try:
             cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
         except Exception:
@@ -2996,7 +3013,7 @@ def get_active_capital_auto_trades(deal_id: Optional[str] = None) -> list:
     """Returns active positions from capital_auto_trades with scale_tier and targets."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'"), ("is_demo", "INTEGER DEFAULT 0")]:
         try:
             cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
         except Exception:

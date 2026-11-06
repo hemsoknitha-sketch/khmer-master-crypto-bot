@@ -2939,6 +2939,26 @@ class SuperSmartCapitalCitadel:
         # Gap 1 (ចន្លោះទី 1): Calibrate Raw Confluence Score to Genuine Win Probability
         # Deflates multicollinearity (FVG + Golden Pocket + Order Block + Sweep + OTE) via L2-regularized
         # Platt Scaling and Isotonic Calibration to guarantee Predicted ~70% ~= Realized ~70% on OOS data.
+        candlestick_pattern_wr = 0.0
+        try:
+            if any(g in str(resolved_epic).upper() for g in ["GOLD", "XAU", "PAXG"]):
+                import gold_candlestick_pattern_memory as gcpm
+                if gcpm._GOLD_ADAPTIVE_RE_STUDY_STATE.get("active") and gcpm._GOLD_ADAPTIVE_RE_STUDY_STATE.get("re_entry_approved"):
+                    candlestick_pattern_wr = float(gcpm._GOLD_ADAPTIVE_RE_STUDY_STATE.get("re_entry_confidence", 0.0))
+                elif candles_15m and len(candles_15m) >= 5:
+                    p_eval = gcpm.evaluate_gold_adaptive_re_entry(
+                        epic=resolved_epic,
+                        current_price=float(mid),
+                        candles=candles_15m
+                    )
+                    if p_eval.get("re_entry_approved") or p_eval.get("pattern_wr", 0.0) >= 80.0:
+                        candlestick_pattern_wr = float(p_eval.get("win_rate_10y_confluence") or p_eval.get("pattern_wr", 0.0))
+                if candlestick_pattern_wr >= 80.0:
+                    factors.append(f"GOLD_10Y_RAM_PATTERN_{candlestick_pattern_wr:.0f}WR")
+                    confluence_score = max(confluence_score, min(95.0, confluence_score + 8.0))
+        except Exception as e_cwr:
+            logger.debug(f"Gold pattern WR fetch note: {e_cwr}")
+
         try:
             import capital_probability_calibrator as cpc
             calib_res = cpc.CapitalProbabilityCalibrator.calibrate_probability(
@@ -2953,7 +2973,8 @@ class SuperSmartCapitalCitadel:
                 adx_15m=adx_15m,
                 rsi_15m=rsi_15m,
                 num_factors=len(factors),
-                orthogonal_groups=orthogonal_groups
+                orthogonal_groups=orthogonal_groups,
+                candlestick_pattern_wr=candlestick_pattern_wr
             )
             calibrated_win_prob = calib_res["calibrated_win_prob"]
             calibrated_win_prob_pct = calib_res["calibrated_win_prob_pct"]

@@ -959,19 +959,20 @@ class CapitalComEngine:
             
             all_open_trades = []
             # 1. capital_auto_trades
+            target_is_demo = 1 if getattr(self, "is_demo", False) else 0
             try:
                 if cid:
                     cur.execute("""
                         SELECT deal_id, epic, direction, size, entry_price, sl, tp, 'AUTO' as origin
                         FROM capital_auto_trades
-                        WHERE chat_id = ? AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
-                    """, (cid,))
+                        WHERE chat_id = ? AND (status = 'OPEN' OR status LIKE 'ACTIVE%') AND (is_demo = ? OR is_demo IS NULL)
+                    """, (cid, target_is_demo))
                 else:
                     cur.execute("""
                         SELECT deal_id, epic, direction, size, entry_price, sl, tp, 'AUTO' as origin
                         FROM capital_auto_trades
-                        WHERE (status = 'OPEN' OR status LIKE 'ACTIVE%')
-                    """)
+                        WHERE (status = 'OPEN' OR status LIKE 'ACTIVE%') AND (is_demo = ? OR is_demo IS NULL)
+                    """, (target_is_demo,))
                 all_open_trades.extend(cur.fetchall())
             except Exception:
                 pass
@@ -4610,7 +4611,16 @@ class CapitalAutonomousEngine:
             cached_market = get_fresh_cached_market(epic_u, max_age_seconds=5.0) or {}
             spread = cached_market.get("spread", 0.0)
             if spread <= 0:
-                spread = 0.60 if "GOLD" in epic_u else (0.05 if "OIL" in epic_u else 1.0)
+                if any(g in epic_u for g in ["GOLD", "XAU"]):
+                    spread = 0.60
+                elif any(o in epic_u for o in ["OIL"]):
+                    spread = 0.05
+                elif 0 < current_price < 5.0:
+                    spread = 0.00020
+                elif any(j in epic_u for j in ["JPY"]):
+                    spread = 0.020
+                else:
+                    spread = 1.0
 
             # EMERGENCY STOP-LOSS ATTACHMENT PATROL (Invariant 35 & 74 Zero No-SL Standard)
             # Also tightens suicidal / catastrophic manual stops (> 15% price distance) to breathing stops
@@ -4621,6 +4631,9 @@ class CapitalAutonomousEngine:
                 safe_dist = max(spread * 3.5, current_price * 0.0180)
             elif is_crypto:
                 safe_dist = max(spread * 4.0, current_price * 0.018)
+            elif 0 < current_price < 5.0:
+                safe_dist = max(spread * 3.5, current_price * 0.008)
+                safe_dist = min(safe_dist, current_price * 0.04)
             else:
                 safe_dist = max(spread * 3.5, current_price * 0.012)
 
@@ -4631,7 +4644,10 @@ class CapitalAutonomousEngine:
                 )
             )
             if ((sl <= 0 or sl is None) or is_suicidal_sl) and entry_level > 0 and current_price > 0:
-                emergency_sl = round(current_price - safe_dist if direction == "BUY" else current_price + safe_dist, prec)
+                if direction == "BUY":
+                    emergency_sl = round(max(0.0001, current_price - safe_dist), prec)
+                else:
+                    emergency_sl = round(current_price + safe_dist, prec)
                 upd_sl = engine.update_position_stops(deal_id=deal_id, stop_loss=emergency_sl)
                 if upd_sl.get("success"):
                     sl = emergency_sl
@@ -8717,7 +8733,16 @@ class CapitalOpeningRangeBreakoutEngine:
                 cached_mkt = mkt_fresh if (mkt_fresh and mkt_fresh.get("success")) else {}
             spread_val = cached_mkt.get("spread", 0.0)
             if spread_val <= 0:
-                spread_val = 0.60 if "GOLD" in resolved_epic.upper() else (0.05 if "OIL" in resolved_epic.upper() else 1.0)
+                if any(g in resolved_epic.upper() for g in ["GOLD", "XAU"]):
+                    spread_val = 0.60
+                elif any(o in resolved_epic.upper() for o in ["OIL"]):
+                    spread_val = 0.05
+                elif 0 < mid < 5.0:
+                    spread_val = 0.00020
+                elif any(j in resolved_epic.upper() for j in ["JPY"]):
+                    spread_val = 0.020
+                else:
+                    spread_val = 1.0
 
             prec = _get_tradfi_precision(resolved_epic, mid)
 

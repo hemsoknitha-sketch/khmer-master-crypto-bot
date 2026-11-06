@@ -178,19 +178,19 @@ fi
 
 if [ "$PULSE_AVAILABLE" = true ] && [ -n "$LOFI_FILE" ]; then
     echo "🎵 Mixed Audio Mode: Ambient soundtrack ($LOFI_FILE) + PulseAudio alerts"
-    AUDIO_INPUT="-re -stream_loop -1 -i $LOFI_FILE -f pulse -i sink_stream.monitor"
-    AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=0.35[a_bg];[2:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=1.0[a_alert];[a_bg][a_alert]amix=inputs=2:duration=first:dropout_transition=0,aresample=async=1000[aout] -map 0:v -map [aout]"
+    AUDIO_INPUT="-thread_queue_size 1024 -re -stream_loop -1 -i $LOFI_FILE -thread_queue_size 1024 -f pulse -i sink_stream.monitor"
+    AUDIO_MAP="-filter_complex [1:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=0.35,aresample=async=1000[a_bg];[2:a]aformat=channel_layouts=stereo:sample_rates=48000,volume=1.0,aresample=async=1000[a_alert];[a_bg][a_alert]amix=inputs=2:duration=first:dropout_transition=2[aout] -map 0:v -map [aout]"
 elif [ "$PULSE_AVAILABLE" = true ]; then
     echo "🎵 PulseAudio Monitor Only Mode"
-    AUDIO_INPUT="-f pulse -i sink_stream.monitor"
+    AUDIO_INPUT="-thread_queue_size 1024 -f pulse -i sink_stream.monitor"
     AUDIO_MAP="-map 0:v -map 1:a"
 elif [ -n "$LOFI_FILE" ]; then
     echo "🎵 Ambient Soundtrack Only Mode ($LOFI_FILE)"
-    AUDIO_INPUT="-re -stream_loop -1 -i $LOFI_FILE"
+    AUDIO_INPUT="-thread_queue_size 1024 -re -stream_loop -1 -i $LOFI_FILE"
     AUDIO_MAP="-map 0:v -map 1:a"
 else
     echo "🔇 Fallback Silent Audio Mode"
-    AUDIO_INPUT="-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000"
+    AUDIO_INPUT="-thread_queue_size 1024 -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000"
     AUDIO_MAP="-map 0:v -map 1:a"
 fi
 
@@ -205,15 +205,15 @@ pkill -9 -f "ffmpeg.*rtmp" 2>/dev/null || true
 sleep 1
 
 taskset -c 2,3 ffmpeg -hide_banner -loglevel info -stats \
-    -f x11grab -draw_mouse 0 -framerate 25 -video_size 1920x1080 -i :99.0 \
+    -thread_queue_size 1024 -f x11grab -draw_mouse 0 -framerate 25 -video_size 1920x1080 -i :99.0 \
     $AUDIO_INPUT \
     $AUDIO_MAP \
-    -c:v libx264 -preset ultrafast -tune zerolatency \
+    -c:v libx264 -preset veryfast \
     -b:v 3200k -minrate 2800k -maxrate 3600k -bufsize 6400k \
     -g 50 -keyint_min 50 -sc_threshold 0 \
     -r 25 \
     -pix_fmt yuv420p -profile:v high -level 4.1 \
-    -c:a aac -b:a 160k -ar 48000 \
+    -c:a aac -b:a 160k -ar 48000 -ac 2 \
     -flvflags no_duration_filesize \
     -f flv "${STREAM_URL}/${YOUTUBE_STREAM_KEY}" > "$SCRIPT_DIR/logs/ffmpeg.log" 2>&1
 

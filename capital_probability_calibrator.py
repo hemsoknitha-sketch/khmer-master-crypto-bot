@@ -111,7 +111,8 @@ class CapitalProbabilityCalibrator:
         adx_15m: float = 28.0,
         rsi_15m: float = 50.0,
         num_factors: int = 4,
-        orthogonal_groups: Optional[Dict[str, float]] = None
+        orthogonal_groups: Optional[Dict[str, float]] = None,
+        candlestick_pattern_wr: float = 0.0
     ) -> Dict[str, Any]:
         """
         Computes Calibrated Win Probability from Citadel setup inputs.
@@ -163,8 +164,16 @@ class CapitalProbabilityCalibrator:
         # Interpolates raw_prob into empirically verified out-of-sample win probability
         calibrated_p = cls._apply_isotonic_calibration(raw_prob)
 
-        # 6. Safety clamping between realistic financial boundaries [0.20, 0.75]
-        final_prob = round(max(0.20, min(0.75, calibrated_p)), 4)
+        # 6. Empirical Candlestick RAM Pattern Alpha Blending (Invariant 88)
+        # When 10-year backtest RAM pattern has high verified confluence (WR >= 80%):
+        if candlestick_pattern_wr >= 80.0:
+            pattern_p = min(0.95, max(0.50, candlestick_pattern_wr / 100.0))
+            # Blends empirical 10Y backtest alpha with regularized probability (prevents premature Platt shrinkage)
+            calibrated_p = max(calibrated_p, calibrated_p * 0.40 + pattern_p * 0.60)
+
+        # 7. Safety clamping between realistic financial boundaries [0.20, 0.85]
+        max_cap = 0.85 if candlestick_pattern_wr >= 80.0 else 0.75
+        final_prob = round(max(0.20, min(max_cap, calibrated_p)), 4)
         final_prob_pct = round(final_prob * 100.0, 1)
 
         # Calculate deflation gap from naive score (e.g. 95% naive -> 69% calibrated)

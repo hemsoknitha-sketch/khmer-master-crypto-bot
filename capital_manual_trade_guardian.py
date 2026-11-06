@@ -112,11 +112,22 @@ def audit_and_adopt_capital_positions(
         market_details = engine.get_market_details(epic) or {}
         spread = float(market_details.get("spread", 0.0) or 0.0)
         if spread <= 0:
-            spread = 0.60 if "GOLD" in epic else (0.05 if "OIL" in epic else 1.0)
+            if any(g in epic for g in ["GOLD", "XAU"]):
+                spread = 0.60
+            elif any(o in epic for o in ["OIL"]):
+                spread = 0.05
+            elif 0 < current_price < 5.0:
+                spread = 0.00020
+            elif any(j in epic for j in ["JPY"]):
+                spread = 0.020
+            else:
+                spread = 1.0
 
-        # Check if already tracked in database
+        # Check if already tracked in database (Live vs Demo segregated)
+        target_is_demo = 1 if getattr(engine, "is_demo", False) else 0
+        has_db_record = db.has_capital_auto_trade_record(str(deal_id)) if hasattr(db, "has_capital_auto_trade_record") else False
         db_trades = db.get_active_capital_auto_trades(deal_id=str(deal_id))
-        is_manual = (len(db_trades) == 0)
+        is_manual = (not has_db_record and len(db_trades) == 0)
         if is_manual:
             manual_count += 1
 
@@ -131,6 +142,9 @@ def audit_and_adopt_capital_positions(
             safe_dist = max(spread * 3.5, current_price * 0.0180)
         elif is_crypto:
             safe_dist = max(spread * 4.0, current_price * 0.018)
+        elif 0 < current_price < 5.0:
+            safe_dist = max(spread * 3.5, current_price * 0.008)
+            safe_dist = min(safe_dist, current_price * 0.04)
         else:
             safe_dist = max(spread * 3.5, current_price * 0.012)
 
@@ -145,7 +159,10 @@ def audit_and_adopt_capital_positions(
         attached_emergency_sl = False
 
         if (is_naked_sl or is_suicidal_sl) and current_price > 0:
-            emergency_sl = round(current_price - safe_dist if direction == "BUY" else current_price + safe_dist, prec)
+            if direction == "BUY":
+                emergency_sl = round(max(0.0001, current_price - safe_dist), prec)
+            else:
+                emergency_sl = round(current_price + safe_dist, prec)
             upd_sl = engine.update_position_stops(deal_id=deal_id, stop_loss=emergency_sl)
             if upd_sl.get("success"):
                 sl = emergency_sl
@@ -167,9 +184,10 @@ def audit_and_adopt_capital_positions(
                     deal_reference=deal_id,
                     sl_dist=safe_dist,
                     tranche_id="SINGLE",
-                    scale_tier=0
+                    scale_tier=0,
+                    is_demo=target_is_demo
                 )
-                logger.info(f"🏛️ [GUARDIAN ADOPTION] Adopted manual trade {deal_id} on {epic} into institutional ledger.")
+                logger.info(f"🏛️ [GUARDIAN ADOPTION] Adopted manual trade {deal_id} on {epic} into institutional ledger (demo={target_is_demo}).")
             except Exception as e_adopt:
                 logger.debug(f"Adoption record notice: {e_adopt}")
 
