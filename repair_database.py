@@ -89,6 +89,25 @@ def auto_repair_database(db_path: str = "bot_database.db") -> bool:
     except Exception as e:
         print(f"[DB REPAIR] Strategy A in-place reindex failed: {e}")
 
+    # 3.1 Strategy A.2: Clear stale -wal / -shm lock files if uncheckpointable
+    try:
+        for ext in ["-shm", "-wal"]:
+            lock_f = db_path + ext
+            if os.path.exists(lock_f):
+                try:
+                    os.remove(lock_f)
+                    print(f"[DB REPAIR] Cleared stale SQLite lock file: {lock_f}")
+                except Exception:
+                    pass
+        conn = sqlite3.connect(db_path, timeout=5.0)
+        res = conn.execute("PRAGMA integrity_check;").fetchall()
+        conn.close()
+        if res == [("ok",)]:
+            print("[DB REPAIR SUCCESS] Database healthy after clearing stale WAL/SHM locks!")
+            return True
+    except Exception as lock_err:
+        print(f"[DB REPAIR] Strategy A.2 lock clearing note: {lock_err}")
+
     # 4. Strategy B: Using sqlite3 CLI tool (.recover or .dump)
     repaired_temp = f"{db_path}.repaired_{timestamp}.tmp"
     if os.path.exists(repaired_temp):

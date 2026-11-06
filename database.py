@@ -37,11 +37,11 @@ def check_and_heal_malformed_db(error: Exception = None) -> bool:
     """
     global _LAST_DB_AUTO_REPAIR_TS
     err_str = str(error).lower() if error else ""
-    if not error or "malformed" in err_str or "disk image" in err_str or "corrupt" in err_str or "file is encrypted" in err_str:
+    if not error or "malformed" in err_str or "disk image" in err_str or "corrupt" in err_str or "file is encrypted" in err_str or "disk i/o error" in err_str or "disk io error" in err_str:
         now = time.time()
         if now - _LAST_DB_AUTO_REPAIR_TS > 20: # 20s throttle
             _LAST_DB_AUTO_REPAIR_TS = now
-            print(f"🛡️ [DATABASE AUTO-HEAL] Detected malformed database: {error}. Launching auto-repair...")
+            print(f"🛡️ [DATABASE AUTO-HEAL] Detected malformed database or I/O error: {error}. Launching auto-repair...")
             try:
                 import repair_database
                 success = repair_database.auto_repair_database(DB_FILE)
@@ -55,14 +55,30 @@ def check_and_heal_malformed_db(error: Exception = None) -> bool:
 def get_db_connection():
     try:
         conn = sqlite3.connect(DB_FILE, timeout=30.0) # Increased timeout
-        conn.execute('PRAGMA journal_mode=WAL;') # Enable Write-Ahead Logging (10x Speed)
+        try:
+            conn.execute('PRAGMA journal_mode=WAL;') # Enable Write-Ahead Logging (10x Speed)
+        except sqlite3.OperationalError as wal_err:
+            wal_msg = str(wal_err).lower()
+            if "disk i/o error" in wal_msg or "readonly" in wal_msg or "locked" in wal_msg:
+                try:
+                    conn.execute('PRAGMA journal_mode=DELETE;')
+                except Exception:
+                    pass
+            else:
+                raise wal_err
         conn.execute('PRAGMA synchronous=NORMAL;')
         conn.execute('PRAGMA busy_timeout=30000;') # Wait up to 30 seconds for lock
         return conn
     except sqlite3.DatabaseError as e:
         if check_and_heal_malformed_db(e):
             conn = sqlite3.connect(DB_FILE, timeout=30.0)
-            conn.execute('PRAGMA journal_mode=WAL;')
+            try:
+                conn.execute('PRAGMA journal_mode=WAL;')
+            except sqlite3.OperationalError:
+                try:
+                    conn.execute('PRAGMA journal_mode=DELETE;')
+                except Exception:
+                    pass
             conn.execute('PRAGMA synchronous=NORMAL;')
             conn.execute('PRAGMA busy_timeout=30000;')
             return conn
