@@ -1022,6 +1022,7 @@ def init_db():
             is_demo BOOLEAN DEFAULT 0,
             is_referral_verified BOOLEAN DEFAULT 0,
             referral_code TEXT DEFAULT '',
+            demo_account_id TEXT DEFAULT '',
             verified_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -4994,10 +4995,50 @@ def get_pending_capital_verification_users() -> List[Dict[str, Any]]:
             pass
         return []
 
+def update_user_capital_account_id(chat_id: int, account_id: str, is_demo: bool = False) -> bool:
+    """
+    Updates or links a user's verified Capital.com Live or Demo Account ID in SQLite.
+    Guarantees instant bidirectional lookup by chat_id or account_id.
+    """
+    clean_acc = str(account_id or "").strip()
+    if not clean_acc or not chat_id:
+        return False
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        try:
+            cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN demo_account_id TEXT DEFAULT ''")
+        except Exception:
+            pass
+
+        if is_demo:
+            cursor.execute("""
+                UPDATE user_capital_credentials 
+                SET demo_account_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = ?
+            """, (clean_acc, chat_id))
+        else:
+            cursor.execute("""
+                UPDATE user_capital_credentials 
+                SET account_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = ?
+            """, (clean_acc, chat_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error in update_user_capital_account_id: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
 def get_capital_user_by_account_id(account_id: str) -> Optional[Dict[str, Any]]:
     """
     Finds a user's credential and profile record by Capital.com Account ID.
-    Supports exact matching and substring matching for maximum resilience.
+    Supports exact matching and substring matching across both Live (account_id)
+    and Demo (demo_account_id) for maximum resilience.
     """
     clean_acc = str(account_id or "").strip()
     if not clean_acc:
@@ -5018,31 +5059,56 @@ def get_capital_user_by_account_id(account_id: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        try:
+            cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN demo_account_id TEXT DEFAULT ''")
+        except Exception:
+            pass
+
+        # 1. Exact match on Live account_id
         cursor.execute("""
-            SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username
+            SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username, c.demo_account_id
             FROM user_capital_credentials c
             LEFT JOIN users u ON c.chat_id = u.chat_id
             WHERE c.account_id = ?
         """, (clean_acc,))
         r = cursor.fetchone()
+
+        # 2. Exact match on Demo demo_account_id
+        is_demo_match = False
         if not r:
             cursor.execute("""
-                SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username
+                SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username, c.demo_account_id
                 FROM user_capital_credentials c
                 LEFT JOIN users u ON c.chat_id = u.chat_id
-                WHERE c.account_id LIKE ?
-            """, (f"%{clean_acc}%",))
+                WHERE c.demo_account_id = ?
+            """, (clean_acc,))
             r = cursor.fetchone()
+            if r:
+                is_demo_match = True
+
+        # 3. Substring match fallback
+        if not r:
+            cursor.execute("""
+                SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username, c.demo_account_id
+                FROM user_capital_credentials c
+                LEFT JOIN users u ON c.chat_id = u.chat_id
+                WHERE (c.account_id != '' AND c.account_id LIKE ?) 
+                   OR (c.demo_account_id != '' AND c.demo_account_id LIKE ?)
+            """, (f"%{clean_acc}%", f"%{clean_acc}%"))
+            r = cursor.fetchone()
+            if r and clean_acc in str(r[6] or ""):
+                is_demo_match = True
 
         conn.close()
         if r:
             return {
                 "chat_id": r[0],
-                "account_id": str(r[1] or ""),
+                "account_id": clean_acc,
                 "currency": str(r[2] or "USD"),
-                "is_demo": bool(r[3]),
+                "is_demo": True if is_demo_match else bool(r[3]),
                 "is_referral_verified": bool(r[4]) if r[4] is not None else False,
-                "username": str(r[5] or f"User_{r[0]}")
+                "username": str(r[5] or f"User_{r[0]}"),
+                "demo_account_id": str(r[6] or "")
             }
         return None
     except Exception as e:

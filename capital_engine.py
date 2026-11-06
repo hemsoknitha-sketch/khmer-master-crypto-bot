@@ -639,6 +639,12 @@ class CapitalComEngine:
                 
                 body = res.json()
                 self.active_account_id = body.get("currentAccountId")
+                if self.chat_id and self.active_account_id:
+                    try:
+                        import database as db
+                        db.update_user_capital_account_id(self.chat_id, self.active_account_id, is_demo=self.is_demo)
+                    except Exception:
+                        pass
                 
                 env_mode = "DEMO ($10,000 Virtual)" if self.is_demo else "LIVE MAINNET"
                 msg = f"Session established successfully [{env_mode}]! Account ID: {self.active_account_id}"
@@ -818,6 +824,12 @@ class CapitalComEngine:
                     if primary:
                         self.active_account_id = primary.get("accountId")
                         self.account_currency = primary.get("currency", "USD")
+                        if self.chat_id and self.active_account_id:
+                            try:
+                                import database as db
+                                db.update_user_capital_account_id(self.chat_id, self.active_account_id, is_demo=self.is_demo)
+                            except Exception:
+                                pass
 
                     res_acc = {
                         "success": True,

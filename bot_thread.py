@@ -25753,9 +25753,12 @@ class TelegramBotThread(BaseThread):
                     is_verified = db.is_capital_user_authorized(target_uid)
                 v_badge = "🟢 100% VERIFIED (az48cxia)" if is_verified else "🟡 UNVERIFIED"
             
-            is_demo = bool(creds.get("is_demo", False)) if creds else bool(auto_cfg.get("is_demo", False))
-            if is_sa:
+            if u_record and "is_demo" in u_record:
+                is_demo = bool(u_record["is_demo"])
+            elif is_sa:
                 is_demo = False
+            else:
+                is_demo = bool(creds.get("is_demo", False)) if creds else bool(auto_cfg.get("is_demo", False))
             mode_lbl = "🟡 DEMO ($10,000)" if is_demo else "🟢 LIVE MAINNET (Real Funds)"
             has_creds = bool((creds and (creds.get("api_key") or creds.get("account_id"))) or is_sa)
 
@@ -26226,20 +26229,57 @@ class TelegramBotThread(BaseThread):
                     }
                     return 859271875, sa_rec
 
-                # 1. Lookup by Account ID
+                # 1. Lookup by Account ID directly in SQLite (supports both Live and Demo accounts)
                 u_by_acc = db.get_capital_user_by_account_id(raw)
                 if u_by_acc:
                     return u_by_acc["chat_id"], u_by_acc
 
-                # 2. Lookup by direct numeric chat_id
+                # 2. Check if raw is a pure numeric string
                 try:
                     uid = int(raw)
-                    creds = db.get_user_capital_credentials(uid)
-                    if creds:
-                        return uid, creds
-                    return uid, None
                 except ValueError:
                     return None, None
+
+                # If raw is a Capital.com Account ID (12+ digits):
+                # NEVER treat it as a Telegram chat_id!
+                if len(raw) >= 12:
+                    # Deep Fleet Discovery: scan configured users to auto-discover who owns this Account ID
+                    try:
+                        overview_users = db.get_all_capital_users_overview()
+                        for u in overview_users:
+                            u_cid = u["chat_id"]
+                            for demo_flag in [False, True]:
+                                try:
+                                    u_eng = capital_engine.get_user_capital_engine(u_cid, is_demo=demo_flag)
+                                    cur_act = getattr(u_eng, "active_account_id", None)
+                                    if cur_act and str(cur_act).strip() == raw:
+                                        db.update_user_capital_account_id(u_cid, raw, is_demo=demo_flag)
+                                        u_rec = db.get_user_capital_credentials(u_cid) or u
+                                        u_rec["is_demo"] = demo_flag
+                                        u_rec["account_id"] = raw
+                                        return u_cid, u_rec
+                                    accs_res = u_eng.get_accounts()
+                                    for a in accs_res.get("accounts", []):
+                                        if str(a.get("accountId")).strip() == raw:
+                                            db.update_user_capital_account_id(u_cid, raw, is_demo=demo_flag)
+                                            u_rec = db.get_user_capital_credentials(u_cid) or u
+                                            u_rec["is_demo"] = demo_flag
+                                            u_rec["account_id"] = raw
+                                            return u_cid, u_rec
+                                except Exception:
+                                    continue
+                    except Exception as e_disc:
+                        logger.debug(f"Fleet account discovery note: {e_disc}")
+                    return None, None
+
+                # 3. Lookup by direct numeric Telegram chat_id (< 12 digits)
+                creds = db.get_user_capital_credentials(uid)
+                if creds:
+                    return uid, creds
+                prof = db.get_user_profile(uid)
+                if prof:
+                    return uid, None
+                return None, None
 
             if args and args[0].upper() in ["SPREAD", "TOTAL_SPREAD", "SPREAD_RADAR", "SPREAD_AUDIT"]:
                 context.args = ["ADMIN"]
@@ -26652,11 +26692,21 @@ class TelegramBotThread(BaseThread):
             # Command: /admin_capital INSPECT <chat_id_or_acc_id>
             elif sub in ["INSPECT", "USER", "REPORT", "PORTFOLIO", "CASHFLOW", "AUDIT", "DETAIL", "DETAILS", "CHECK"]:
                 if len(args) < 2:
-                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital inspect 330124951740830916` `` ឬ `` `/admin_capital inspect 1612591526` ``", parse_mode="Markdown")
+                    if sub in ["CASHFLOW", "PORTFOLIO", "REPORT"]:
+                        f_text, f_kb = await build_capital_fleet_balances_ui()
+                        await update.effective_message.reply_text(f_text, parse_mode="Markdown", reply_markup=f_kb)
+                        return
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital inspect 330124951740830916` `` ឬ `` `/admin_capital cashflow 331963468326458564` ``", parse_mode="Markdown")
                     return
                 target_uid, u_record = _resolve_target(args[1])
                 if not target_uid:
-                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!", parse_mode="Markdown")
+                    await update.effective_message.reply_text(
+                        f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!\n\n"
+                        f"💡 **ជំនួយ ៖**\n"
+                        f"• ពិនិត្យបញ្ជីគណនីទាំងអស់តាមរយៈ `` `/admin_capital` `` ឬ `` `/admin_capital balances` ``\n"
+                        f"• បញ្ចូល Chat ID ឧទាហរណ៍ ៖ `` `/admin_capital cashflow 643724109` ``",
+                        parse_mode="Markdown"
+                    )
                     return
                 i_text, i_kb = await build_capital_user_inspection_ui(target_uid, u_record)
                 await update.effective_message.reply_text(i_text, parse_mode="Markdown", reply_markup=i_kb)
