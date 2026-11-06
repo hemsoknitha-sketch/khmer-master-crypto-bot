@@ -5011,18 +5011,19 @@ def update_user_capital_account_id(chat_id: int, account_id: str, is_demo: bool 
         except Exception:
             pass
 
+        cid_int = int(chat_id)
         if is_demo:
             cursor.execute("""
                 UPDATE user_capital_credentials 
                 SET demo_account_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE chat_id = ?
-            """, (clean_acc, chat_id))
+            """, (clean_acc, cid_int))
         else:
             cursor.execute("""
                 UPDATE user_capital_credentials 
                 SET account_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE chat_id = ?
-            """, (clean_acc, chat_id))
+            """, (clean_acc, cid_int))
         conn.commit()
         conn.close()
         return True

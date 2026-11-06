@@ -530,6 +530,7 @@ class CapitalComEngine:
 
         self.base_url = CAPITAL_DEMO_URL if self.is_demo else CAPITAL_LIVE_URL
         self._custom_chat_id: Optional[int] = custom_chat_id
+        self.chat_id: Optional[int] = custom_chat_id
         self.last_auth_error: str = ""
 
         raw_key = (api_key or "").strip()
@@ -639,10 +640,11 @@ class CapitalComEngine:
                 
                 body = res.json()
                 self.active_account_id = body.get("currentAccountId")
-                if self.chat_id and self.active_account_id:
+                target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
+                if target_cid and self.active_account_id:
                     try:
                         import database as db
-                        db.update_user_capital_account_id(self.chat_id, self.active_account_id, is_demo=self.is_demo)
+                        db.update_user_capital_account_id(target_cid, self.active_account_id, is_demo=self.is_demo)
                     except Exception:
                         pass
                 
@@ -824,10 +826,11 @@ class CapitalComEngine:
                     if primary:
                         self.active_account_id = primary.get("accountId")
                         self.account_currency = primary.get("currency", "USD")
-                        if self.chat_id and self.active_account_id:
+                        target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
+                        if target_cid and self.active_account_id:
                             try:
                                 import database as db
-                                db.update_user_capital_account_id(self.chat_id, self.active_account_id, is_demo=self.is_demo)
+                                db.update_user_capital_account_id(target_cid, self.active_account_id, is_demo=self.is_demo)
                             except Exception:
                                 pass
 
