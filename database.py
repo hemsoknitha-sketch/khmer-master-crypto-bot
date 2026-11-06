@@ -2785,6 +2785,16 @@ def set_capital_crypto_enabled(enabled: bool) -> None:
     """Sets the global Capital.com Crypto CFD trading state in system_settings."""
     update_system_setting("capital_crypto_enabled", "1" if enabled else "0")
 
+def is_capital_auto_rescue_enabled(chat_id: int) -> bool:
+    """Returns whether Auto-Rescue & Guardian Armor is enabled for user (Default: True)."""
+    val = get_system_setting(f"capital_auto_rescue_{chat_id}", "1")
+    return str(val).strip().lower() in ("1", "true", "on", "yes")
+
+def set_capital_auto_rescue(chat_id: int, enabled: bool) -> None:
+    """Sets whether Auto-Rescue is enabled for user in system_settings."""
+    update_system_setting(f"capital_auto_rescue_{chat_id}", "1" if enabled else "0")
+
+
 def update_capital_auto_last_trade_time(chat_id: int, last_time: float):
     """Updates the last trade timestamp for cooldown calculations."""
     conn = get_db_connection()

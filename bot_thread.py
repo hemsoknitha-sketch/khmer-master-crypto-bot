@@ -6421,6 +6421,50 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_close_all":
                 context.args = ["CLOSEALL"]
                 await capital_command(update, context)
+            elif data in ["btn_cap_rescue", "cap_action:RESCUE"]:
+                context.args = ["RESCUE"]
+                await capital_command(update, context)
+            elif data.startswith("cap_flip:"):
+                deal_id_to_flip = data.split(":", 1)[1].strip()
+                context.args = ["FLIP", deal_id_to_flip]
+                await capital_command(update, context)
+            elif data.startswith("cap_close:"):
+                deal_id_to_close = data.split(":", 1)[1].strip()
+                auto_cfg = db.get_capital_auto_config(chat_id)
+                is_d = bool(auto_cfg.get("is_demo", False))
+                c_res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, deal_id_to_close, chat_id, is_d, context.application, "CLOSE_FLAT")
+                msg_cl = f"✅ {c_res.get('message', 'Position Closed')}" if c_res.get("success") else f"❌ {c_res.get('error')}"
+                try:
+                    await update.callback_query.answer(msg_cl, show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["RESCUE"]
+                await capital_command(update, context)
+            elif data.startswith("cap_protect:"):
+                deal_id_to_protect = data.split(":", 1)[1].strip()
+                auto_cfg = db.get_capital_auto_config(chat_id)
+                is_d = bool(auto_cfg.get("is_demo", False))
+                p_res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, deal_id_to_protect, chat_id, is_d, context.application, "PROTECT_ONLY")
+                msg_pr = f"🛡️ {p_res.get('message', 'Protected')}" if p_res.get("success") else f"❌ {p_res.get('error')}"
+                try:
+                    await update.callback_query.answer(msg_pr, show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["RESCUE"]
+                await capital_command(update, context)
+            elif data == "cap_rescue_toggle":
+                curr_resc = db.is_capital_auto_rescue_enabled(chat_id)
+                db.set_capital_auto_rescue(chat_id, not curr_resc)
+                try:
+                    await update.callback_query.answer(f"⚡ Auto-Rescue: {'បិទ' if curr_resc else 'បើក'}", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["RESCUE"]
+                await capital_command(update, context)
+            elif data == "cap_back_dashboard":
+                context.args = []
+                await capital_command(update, context)
+
             elif data == "btn_cap_auto_toggle":
                 curr_state = db.is_capital_auto_enabled(chat_id)
                 new_state = not curr_state
@@ -28210,6 +28254,9 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("📡 Lead-Lag Radar (HFT)", callback_data="btn_cap_leadlag_radar")
                 ],
                 [
+                    InlineKeyboardButton("🛡️ សង្គ្រោះ & ការពារ Manual Trade", callback_data="btn_cap_rescue")
+                ],
+                [
                     InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions"),
                     InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh")
                 ],
@@ -28547,6 +28594,38 @@ class TelegramBotThread(BaseThread):
                         p_msg = "\n".join(lines)
                     await update.effective_message.reply_text(p_msg, parse_mode="Markdown", reply_markup=keyboard)
                     return
+
+                elif action in ["RESCUE", "ADOPT", "GUARDIAN", "PROTECT"]:
+                    import capital_manual_trade_guardian as cmtg
+                    auto_cfg = db.get_capital_auto_config(chat_id)
+                    is_d = bool(auto_cfg.get("is_demo", False))
+                    audit = await asyncio.to_thread(capital_engine.audit_and_adopt_tradfi_positions, chat_id, is_d, context.application)
+                    msg_txt, kb = cmtg.format_guardian_audit_report(audit, chat_id, user_lang)
+                    await update.effective_message.reply_text(msg_txt, parse_mode="Markdown", reply_markup=kb)
+                    return
+
+                elif action in ["FLIP", "REVERSE"] and len(args) >= 2:
+                    target_deal_id = str(args[1]).strip()
+                    auto_cfg = db.get_capital_auto_config(chat_id)
+                    is_d = bool(auto_cfg.get("is_demo", False))
+                    flip_res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, target_deal_id, chat_id, is_d, context.application, "REVERSE_FLIP")
+                    if flip_res.get("success"):
+                        rep_msg = (
+                            f"🔄 **[REVERSE-FLIP RESCUE SUCCESS]** 🛡️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏛️ **ឧបករណ៍ ៖** `{flip_res.get('epic')}`\n"
+                            f"🚪 **Position ចាស់ ៖** បានបិទកាត់ខាតត្រឹម `{flip_res.get('old_upl', 0.0):+.2f} USD`\n"
+                            f"🚀 **ទិសដៅថ្មី (ស្របស្ថាប័ន) ៖** `{flip_res.get('new_direction')}` ទំហំ `{flip_res.get('new_size')}`\n"
+                            f"🛑 **Stop-Loss ៖** `${flip_res.get('new_sl', 0.0):,.2f}`\n"
+                            f"🎯 **Take-Profit (TP1) ៖** `${flip_res.get('new_tp', 0.0):,.2f}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ _បង្វែរពីការបរាជ័យមកជាជ័យជំនះជោគជ័យ!_"
+                        )
+                    else:
+                        rep_msg = f"❌ **កំហុស ៖** {flip_res.get('error', 'Reverse order failed')}"
+                    await update.effective_message.reply_text(rep_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
 
             # Default: Master Dashboard (Queries LIVE Mainnet Account by default)
             data = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id, False)

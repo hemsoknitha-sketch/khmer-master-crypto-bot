@@ -3476,6 +3476,25 @@ def evaluate_tradfi_signal(epic: str, is_demo: Optional[bool] = None) -> Dict[st
     engine = get_capital_engine(is_demo=is_demo)
     return engine.evaluate_tradfi_quant_signal(epic)
 
+def audit_and_adopt_tradfi_positions(chat_id: Optional[int] = None, is_demo: Optional[bool] = None, app: Optional[Any] = None) -> Dict[str, Any]:
+    """Audits open TradFi positions, detects manual trades, attaches breathing stops, and checks for adverse conflicts."""
+    import capital_manual_trade_guardian as cmtg
+    if chat_id:
+        engine = get_user_capital_engine(chat_id, is_demo=is_demo)
+    else:
+        engine = get_capital_engine(is_demo=is_demo)
+    return cmtg.audit_and_adopt_capital_positions(engine, chat_id=chat_id, app=app)
+
+def execute_tradfi_rescue(deal_id: str, chat_id: Optional[int] = None, is_demo: Optional[bool] = None, app: Optional[Any] = None, mode: str = "REVERSE_FLIP") -> Dict[str, Any]:
+    """Executes Institutional Rescue (REVERSE_FLIP, PROTECT_ONLY, CLOSE_FLAT) on an open position."""
+    import capital_manual_trade_guardian as cmtg
+    if chat_id:
+        engine = get_user_capital_engine(chat_id, is_demo=is_demo)
+    else:
+        engine = get_capital_engine(is_demo=is_demo)
+    return cmtg.execute_manual_position_rescue(deal_id=deal_id, engine=engine, chat_id=chat_id, app=app, mode=mode)
+
+
 
 # ------------------------------------------------------------------------------
 # ⚡ Pillar 3: Background RAM Pre-Cache Daemon Worker (< 0.05ms Instant Access)
@@ -5535,6 +5554,13 @@ class CapitalAutonomousEngine:
                 self.prop_manager.evaluate_prop_limits_and_milestones(cid, u_curr_eq, app=app)
         except Exception as e_prop_eval:
             logger.debug(f"Prop Firm evaluation note: {e_prop_eval}")
+
+        # AQ114: Institutional Manual Trade Guardian & Reverse-Turnaround Patrol
+        try:
+            import capital_manual_trade_guardian as cmtg
+            cmtg.autonomous_manual_trade_guardian_cycle(app=app)
+        except Exception as e_guardian_cycle:
+            logger.debug(f"Guardian autonomous cycle notice: {e_guardian_cycle}")
 
         return {
             "active_count": total_active,
