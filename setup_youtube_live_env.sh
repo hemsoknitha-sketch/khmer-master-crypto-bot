@@ -106,7 +106,7 @@ Environment=LANG=C.UTF-8
 ExecStart=/bin/bash $APP_DIR/start_youtube_stream.sh
 ExecStop=/bin/bash $APP_DIR/stop_youtube_stream.sh
 Restart=always
-RestartSec=10
+RestartSec=5
 
 # CPU Affinity: Strictly Pin to Core 2 and 3 (Leaves Core 0 & 1 for HFT Bot)
 CPUAffinity=2 3
@@ -114,8 +114,8 @@ CPUAffinity=2 3
 # Scheduling Priority: Low priority (Nice=10) so Trading Bot always takes precedence
 Nice=10
 
-# OOM Protection: Sacrifice Streamer first before touching Trading Bot
-OOMScoreAdjust=500
+# OOM Protection: Hardened with 4GB Swap + zRAM Shield
+OOMScoreAdjust=200
 
 [Install]
 WantedBy=multi-user.target
