@@ -297,11 +297,19 @@ def main():
         action="store_true",
         help="Run full automated environment & systemd setup on the VPS"
     )
+    parser.add_argument(
+        "--sync-env", "-e",
+        action="store_true",
+        help="Super Smart Auto Sync complete local .env to VPS (Zero nano editing)"
+    )
 
     args = parser.parse_args()
 
     if args.status:
         show_status()
+    elif args.sync_env:
+        import sync_env_to_vps
+        sync_env_to_vps.main()
     elif args.logs:
         view_logs()
     elif args.restart:
