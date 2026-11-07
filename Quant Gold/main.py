@@ -41,7 +41,27 @@ if _CURRENT_DIR not in sys.path:
 if _WORKSPACE_ROOT not in sys.path:
     sys.path.insert(0, _WORKSPACE_ROOT)
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Native zero-dependency fallback for loading .env
+    for candidate_env in [
+        os.path.join(_CURRENT_DIR, ".env"),
+        os.path.join(_WORKSPACE_ROOT, ".env"),
+        os.path.join(os.getcwd(), ".env")
+    ]:
+        if os.path.exists(candidate_env):
+            try:
+                with open(candidate_env, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            os.environ.setdefault(k.strip(), v.strip().strip("'").strip('"'))
+                break
+            except Exception:
+                pass
 
 # Configure clean institutional logging
 logging.basicConfig(
@@ -93,7 +113,21 @@ class QuantGoldSystem:
         ]
         for p in env_paths:
             if os.path.exists(p):
-                load_dotenv(p)
+                if "load_dotenv" in globals() and callable(globals()["load_dotenv"]):
+                    try:
+                        load_dotenv(p)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        with open(p, "r", encoding="utf-8") as f:
+                            for line in f:
+                                line = line.strip()
+                                if line and not line.startswith("#") and "=" in line:
+                                    k, v = line.split("=", 1)
+                                    os.environ.setdefault(k.strip(), v.strip().strip("'").strip('"'))
+                    except Exception:
+                        pass
                 break
 
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -213,3 +247,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

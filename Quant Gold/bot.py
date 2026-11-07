@@ -411,3 +411,4 @@ class QuantGoldBot:
             await self.handle_toggle_auto(update, context)
         elif "Status" in text:
             await self.handle_status(update, context)
+
