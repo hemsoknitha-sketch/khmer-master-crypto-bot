@@ -58,6 +58,7 @@ from capital_gold_bridge import get_quant_gold_capital_bridge
 from execution_engine import (
     get_quant_gold_execution_engine,
     format_gold_signal_card,
+    format_gold_tp_card,
     get_gold_signal_reply_markup
 )
 
@@ -507,6 +508,22 @@ class QuantGoldBot:
             tp2_val = p_sell.get("tp2", round(curr_p - 15.20, 2))
             tp3_val = p_sell.get("tp3", round(curr_p - 24.32, 2))
             dir_icon = "🔴"
+
+        # Check if admin requested TP simulation or broadcast: /signal tp1 [send], /signal tp2, /signal tp3
+        if context.args and str(context.args[0]).lower() in ["tp1", "tp2", "tp3"] and is_admin:
+            tp_stage = str(context.args[0]).upper()
+            pips_val = 73 if tp_stage == "TP1" else (152 if tp_stage == "TP2" else 243)
+            tp_card = format_gold_tp_card(
+                stage=tp_stage,
+                pips=pips_val,
+                direction=resolved_dir,
+                entry_price=curr_p
+            )
+            if len(context.args) > 1 and str(context.args[1]).lower() in ["send", "broadcast"]:
+                sent = await self.exec_engine.broadcast_to_vip_users(tp_card, app=self.app, reply_markup=get_gold_signal_reply_markup())
+                return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ {tp_stage} Alert ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
+            else:
+                return await self.safe_reply(update, tp_card, reply_markup=get_gold_signal_reply_markup())
 
         # Check if admin requested broadcast: /signal broadcast or /signal send
         is_admin = (update.effective_chat.id in [859271875, 537186806])

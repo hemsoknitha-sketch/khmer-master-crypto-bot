@@ -72,6 +72,48 @@ def format_gold_signal_card(direction: str, sl: float, tp1: float, tp2: float, t
     )
 
 
+def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: float) -> str:
+    """
+    Renders clean, compact institutional Gold Take Profit Card (Option 2).
+    Fits smartphone screens perfectly matching the Signal Card format.
+    """
+    dir_str = "BUY" if str(direction).upper() == "BUY" else "SELL"
+    st = str(stage).upper()
+
+    if "TP1" in st:
+        header_title = "✓ Take Profit Hit 🥇"
+        milestone = f"TP1 (+{max(73, pips)} pips)"
+        status_line = "   └ Status: Still running towards TP2 🚀"
+        armor_line = "   └ Breakeven: Locked (0.00R Free Roll)"
+    elif "TP2" in st:
+        header_title = "✓ Take Profit Hit 🥇"
+        milestone = f"TP2 (+{max(152, pips)} pips)"
+        status_line = "   └ Status: Still running towards TP3 🚀"
+        armor_line = "   └ Profit Floor: Locked (+73 pips Cash)"
+    elif "TP3" in st:
+        header_title = "✓ Moonshot Harvest 🥇"
+        milestone = f"TP3 (+{max(243, pips)} pips)"
+        status_line = "   └ Status: Position Closed in Profit"
+        armor_line = "   └ Net Profit: Full Target Harvested 💰"
+    else:
+        header_title = "✓ Profit Locked 🥇"
+        milestone = f"Closed in Profit (+{pips} pips)"
+        status_line = "   └ Status: Position Closed"
+        armor_line = "   └ Net Profit: Realized Gains Secured 💰"
+
+    return (
+        f"<b>Angkor Quant Gold</b>\n"
+        f"───────────────\n"
+        f"<b>{header_title}</b>\n"
+        f"🎯 <b>Milestone :</b> <code>{milestone}</code>\n"
+        f"   └ Position: <code>{dir_str} XAUUSD @ ${entry_price:.2f}</code>\n"
+        f"{armor_line}\n"
+        f"{status_line}\n"
+        f"───────────────\n"
+        f"💡 <i>Auto-Harvest for VIP Users active 24/7!</i>"
+    )
+
+
 def _check_network_online() -> bool:
     """Fast non-blocking pre-check for network reachability."""
     import os
@@ -660,11 +702,11 @@ class QuantGoldExecutionEngine:
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
                             db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1)
 
-                        card_tp1 = (
-                            f"✓ <b>Take profit</b> 🥇\n\n"
-                            f"<b>TP1 hit, +{max(73, pips)} pips</b>\n"
-                            f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Still running.</b>\n\n"
-                            f"<i>Angkor Quant Gold</i>"
+                        card_tp1 = format_gold_tp_card(
+                            stage="TP1",
+                            pips=pips,
+                            direction=dir_side,
+                            entry_price=entry_p
                         )
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp1, app=app, reply_markup=markup)
@@ -691,11 +733,11 @@ class QuantGoldExecutionEngine:
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
                             db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2)
 
-                        card_tp2 = (
-                            f"✓ <b>Take profit</b> 🥇\n\n"
-                            f"<b>TP2 hit, +{max(152, pips)} pips</b>\n"
-                            f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Still running.</b>\n\n"
-                            f"<i>Angkor Quant Gold</i>"
+                        card_tp2 = format_gold_tp_card(
+                            stage="TP2",
+                            pips=pips,
+                            direction=dir_side,
+                            entry_price=entry_p
                         )
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp2, app=app, reply_markup=markup)
@@ -720,11 +762,11 @@ class QuantGoldExecutionEngine:
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
                             db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3)
 
-                        card_tp3 = (
-                            f"✓ <b>Take profit</b> 🥇\n\n"
-                            f"<b>TP3 hit, +{max(243, pips)} pips</b>\n"
-                            f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Moonshot closed.</b>\n\n"
-                            f"<i>Angkor Quant Gold</i>"
+                        card_tp3 = format_gold_tp_card(
+                            stage="TP3",
+                            pips=pips,
+                            direction=dir_side,
+                            entry_price=entry_p
                         )
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp3, app=app, reply_markup=markup)
@@ -751,11 +793,11 @@ class QuantGoldExecutionEngine:
 
                         if upl > 0 or pips > 0:
                             # Closed in profit! (e.g. Breakeven Armor or trailing profit floor hit)
-                            card_close_win = (
-                                f"✓ <b>Take profit</b> 🥇\n\n"
-                                f"<b>Trade closed in profit, +{pips} pips</b>\n"
-                                f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Profit locked.</b>\n\n"
-                                f"<i>Angkor Quant Gold</i>"
+                            card_close_win = format_gold_tp_card(
+                                stage="CLOSE",
+                                pips=pips,
+                                direction=dir_side,
+                                entry_price=entry_p
                             )
                             markup = get_gold_signal_reply_markup()
                             await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
