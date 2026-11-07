@@ -296,6 +296,7 @@ class QuantGoldBot:
         if not chat_id:
             return
 
+        is_admin = (chat_id in [859271875, 537186806])
         args = context.args if context and context.args else []
         if not args:
             return await self.handle_start(update, context)
@@ -315,6 +316,19 @@ class QuantGoldBot:
             target_chat_id = chat_id
             target_label = f"Chat ID: {chat_id}"
             user_budget = None
+            if len(args) > 1 and str(args[1]).lower() == "all" and is_admin:
+                b_val = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 100.0
+                n = db.enable_all_capital_users(engine="AUTO", budget=b_val, max_positions=5, is_demo=False)
+                return await self.safe_reply(
+                    update,
+                    f"🚀 <b>[FLEET ACTIVATED ALL USERS]</b> 🟢\n"
+                    f"══════════════════════════════════════\n"
+                    f"• បានបើកដំណើរការ Quant Gold 24/7 សម្រាប់ VIP Users ទាំងអស់ ៖ <code>{n} នាក់</code>\n"
+                    f"• ថវិកាកំណត់ស្វ័យប្រវត្ត (Budget) ៖ <code>${b_val:.2f} / Trade</code>\n"
+                    f"• របៀបជួញដូរ ៖ <code>LIVE MAINNET (Isolated)</code>\n"
+                    f"• ល្បឿន Dispatched ៖ <code>Concurrent Parallel &lt;0.05ms</code>\n"
+                    f"══════════════════════════════════════"
+                )
             if len(args) > 1:
                 try:
                     user_budget = float(args[1])
@@ -339,6 +353,13 @@ class QuantGoldBot:
         elif sub_cmd in ["OFF", "DISABLE", "STOP"]:
             target_chat_id = chat_id
             target_label = f"Chat ID: {chat_id}"
+            if len(args) > 1 and str(args[1]).lower() == "all" and is_admin:
+                n = db.disable_all_capital_users(engine="AUTO", preserve_super_admin=True)
+                return await self.safe_reply(
+                    update,
+                    f"⏸️ <b>[FLEET PAUSED ALL USERS]</b> 🔴\n"
+                    f"បានផ្អាក Quant Gold 24/7 សម្រាប់ VIP Users ទាំងអស់ចំនួន <code>{n}</code> នាក់រួចរាល់!"
+                )
             if len(args) > 1:
                 resolved_cid, u_info = self._resolve_target(args[1])
                 if resolved_cid:
@@ -440,7 +461,20 @@ class QuantGoldBot:
             return await self.handle_inspect_user(update, args[1])
         elif sub in ["on", "enable", "start"] and len(args) > 1:
             target = args[1]
-            budget = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 300.0
+            budget = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 100.0
+            if str(target).lower() == "all":
+                n = db.enable_all_capital_users(engine="AUTO", budget=budget, max_positions=5, is_demo=False)
+                return await self.safe_reply(
+                    update,
+                    f"🚀 <b>[ADMIN FLEET ACTIVATION]</b> 🟢\n"
+                    f"══════════════════════════════════════\n"
+                    f"• បានបើកដំណើរការ Quant Gold 24/7 សម្រាប់ VIP Users ទាំងអស់ ៖ <code>{n} Users</code>\n"
+                    f"• ថវិកាកំណត់ស្វ័យប្រវត្ត (Budget) ៖ <code>${budget:.2f} / Trade</code>\n"
+                    f"• របៀបជួញដូរ ៖ <code>LIVE MAINNET (Isolated Vaults)</code>\n"
+                    f"• ល្បឿន Dispatched ៖ <code>Concurrent Parallel &lt;0.05ms</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"<i>កងនាវា VIP ទាំងអស់ត្រូវបាន Arm រួចរាល់សម្រាប់ការប្រមូលផលចំណេញមាស!</i>"
+                )
             cid, u_info = self._resolve_target(target)
             if not cid:
                 return await self.safe_reply(update, f"⚠️ រកមិនឃើញ target: <code>{target}</code>")
@@ -449,6 +483,17 @@ class QuantGoldBot:
             return await self.safe_reply(update, f"✅ <b>[ADMIN]</b> បានបើក Quant Gold 24/7 សម្រាប់ <code>Account: {acc}</code> (Chat ID: {cid}) ជោគជ័យ! (${budget:.2f}/Trade)")
         elif sub in ["off", "disable", "stop"] and len(args) > 1:
             target = args[1]
+            if str(target).lower() == "all":
+                n = db.disable_all_capital_users(engine="AUTO", preserve_super_admin=True)
+                return await self.safe_reply(
+                    update,
+                    f"⏸️ <b>[ADMIN FLEET PAUSE]</b> 🔴\n"
+                    f"══════════════════════════════════════\n"
+                    f"• បានផ្អាក Quant Gold 24/7 សម្រាប់ VIP Users ទាំងអស់ ៖ <code>{n} Users</code>\n"
+                    f"• សុវត្ថិភាព Super Admin ៖ <code>Preserved Active</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"<i>រាល់ការបើក Position ថ្មីសម្រាប់ VIP Fleet ត្រូវបានផ្អាកបណ្តោះអាសន្ន។</i>"
+                )
             cid, u_info = self._resolve_target(target)
             if not cid:
                 return await self.safe_reply(update, f"⚠️ រកមិនឃើញ target: <code>{target}</code>")

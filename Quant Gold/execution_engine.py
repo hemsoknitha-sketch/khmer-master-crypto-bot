@@ -432,68 +432,73 @@ class QuantGoldExecutionEngine:
             if action in ["BUY", "SELL"]:
                 logger.info(f"🥇 [QUANT GOLD EXECUTION] Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {signal_data['confidence']}%)")
                 
-                # Check user position capacity and dispatch
-                c_eng = capital_engine.get_capital_engine()
-                for user in active_users:
-                    cid = user.get("chat_id")
+                # High-Throughput Concurrent Fan-Out Dispatch (Semaphore 30)
+                # Dispatches orders for thousands of VIP users simultaneously in parallel
+                sem = asyncio.Semaphore(30)
+
+                async def _dispatch_single_user(user_dict: dict) -> int:
+                    cid = user_dict.get("chat_id")
                     if not cid:
-                        continue
+                        return 0
 
-                    # Check if user already holds an open Gold position
-                    open_trades = db.get_capital_auto_trades_for_user(cid)
-                    gold_held = any(str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN" for t in open_trades)
-                    if gold_held:
-                        logger.debug(f"User {cid} already holds open GOLD position. Skipping duplicate entry.")
-                        continue
+                    async with sem:
+                        try:
+                            # Check if user already holds an open Gold position
+                            open_trades = db.get_capital_auto_trades_for_user(cid)
+                            gold_held = any(str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN" for t in open_trades)
+                            if gold_held:
+                                logger.debug(f"User {cid} already holds open GOLD position. Skipping duplicate entry.")
+                                return 0
 
-                    # Sizing: Minimum 0.5 Troy Ounces ($4.07 margin @ 500:1), scaling up to 20% margin under supreme conviction
-                    budget = float(user.get("budget", 200.0) or 200.0)
-                    sl_dist = abs(signal_data["current_price"] - signal_data["sl"])
-                    curr_p = float(signal_data.get("current_price", 4071.78))
-                    conf = float(signal_data.get("confidence", 50.0))
-                    lot_size = calculate_capital_gold_lot_size(
-                        budget=budget,
-                        current_price=curr_p,
-                        confidence=conf,
-                        leverage=500.0
-                    )
+                            budget = float(user_dict.get("budget", 200.0) or 200.0)
+                            sl_dist = abs(signal_data["current_price"] - signal_data["sl"])
+                            curr_p = float(signal_data.get("current_price", 4071.78))
+                            conf = float(signal_data.get("confidence", 50.0))
+                            lot_size = calculate_capital_gold_lot_size(
+                                budget=budget,
+                                current_price=curr_p,
+                                confidence=conf,
+                                leverage=500.0
+                            )
 
-                    # Place Order via Capital Engine
-                    try:
-                        u_eng = capital_engine.get_user_capital_engine(cid)
-                        order_res = await asyncio.to_thread(
-                            u_eng.execute_smart_tradfi_order,
-                            epic="GOLD",
-                            direction=action,
-                            size=lot_size,
-                            sl=signal_data["sl"],
-                            tp=signal_data["tp1"],
-                            bypass_quant_eval=True,
-                            bypass_citadel=True,
-                            setup_type="QUANT_GOLD_19TF_VIP"
-                        )
-                        if order_res.get("success"):
-                            deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
-                            db.record_capital_auto_trade(
-                                chat_id=cid,
-                                deal_id=str(deal_id),
-                                deal_reference=str(deal_id),
+                            u_eng = capital_engine.get_user_capital_engine(cid)
+                            order_res = await asyncio.to_thread(
+                                u_eng.execute_smart_tradfi_order,
                                 epic="GOLD",
                                 direction=action,
                                 size=lot_size,
-                                entry_price=signal_data["current_price"],
                                 sl=signal_data["sl"],
                                 tp=signal_data["tp1"],
-                                scale_tier=0,
-                                sl_dist=sl_dist,
-                                tranche_id="SINGLE",
-                                tp1=signal_data["tp1"],
-                                tp2=signal_data["tp2"],
-                                tp3=signal_data["tp3"]
+                                bypass_quant_eval=True,
+                                bypass_citadel=True,
+                                setup_type="QUANT_GOLD_19TF_VIP"
                             )
-                            dispatched_count += 1
-                    except Exception as e_ord:
-                        logger.warning(f"Error placing Gold order for user {cid}: {e_ord}")
+                            if order_res.get("success"):
+                                deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
+                                db.record_capital_auto_trade(
+                                    chat_id=cid,
+                                    deal_id=str(deal_id),
+                                    deal_reference=str(deal_id),
+                                    epic="GOLD",
+                                    direction=action,
+                                    size=lot_size,
+                                    entry_price=signal_data["current_price"],
+                                    sl=signal_data["sl"],
+                                    tp=signal_data["tp1"],
+                                    scale_tier=0,
+                                    sl_dist=sl_dist,
+                                    tranche_id="SINGLE",
+                                    tp1=signal_data["tp1"],
+                                    tp2=signal_data["tp2"],
+                                    tp3=signal_data["tp3"]
+                                )
+                                return 1
+                        except Exception as e_ord:
+                            logger.warning(f"Error placing Gold order for user {cid}: {e_ord}")
+                        return 0
+
+                results = await asyncio.gather(*[_dispatch_single_user(u) for u in active_users], return_exceptions=True)
+                dispatched_count = sum(r for r in results if isinstance(r, int))
 
                 # Send broadcast alert to telegram if positions dispatched
                 if dispatched_count > 0:
