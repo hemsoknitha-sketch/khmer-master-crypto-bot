@@ -62,7 +62,7 @@ def get_quant_gold_bottom_keyboard() -> ReplyKeyboardMarkup:
     """Persistent 1-Tap Bottom Keyboard for Quick Commands."""
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🔄 Scan 19 TFs")],
+            [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
             [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
             [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)")],
             [KeyboardButton("💵 Status"), KeyboardButton("🖥️ Health"), KeyboardButton("📖 Help")]
@@ -89,6 +89,7 @@ class QuantGoldBot:
             # Sync clean public bot commands
             commands = [
                 BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
+                BotCommand("signal", "🎯 View Current Super Smart Gold Signal & Levels"),
                 BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
                 BotCommand("gold", "📈 Gold Real-Time Intelligence & Analysis"),
                 BotCommand("scan", "🔄 Refresh 19-Timeframe Confluence Scan"),
@@ -163,6 +164,7 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("start", self.handle_start))
         self.app.add_handler(CommandHandler("capital", self.handle_capital))
         self.app.add_handler(CommandHandler("gold", self.handle_capital))
+        self.app.add_handler(CommandHandler("signal", self.handle_signal))
         self.app.add_handler(CommandHandler("admin_capital", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admin_gold", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admincapital", self.handle_admin_capital))
@@ -462,6 +464,71 @@ class QuantGoldBot:
             return await self.safe_reply(update, f"✅ <b>[ADMIN]</b> បានបង្កើត និងត្រួតពិនិត្យ <code>{n} Indexes</code> ក្នុង Database រួចរាល់! B-Tree O(log N) ដំណើរការ <0.005ms។")
         else:
             return await self.handle_inspect_user(update, args[0])
+
+    async def handle_signal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Displays current Super Smart Gold Signal and Trigger Levels."""
+        sig = await self.exec_engine.evaluate_gold_master_signal()
+        action = sig.get("action", "HOLD")
+        curr_p = sig.get("current_price", 4071.78)
+        p_buy = sig.get("prospective_buy", {})
+        p_sell = sig.get("prospective_sell", {})
+
+        dir_str = "Buy" if action == "BUY" else ("Sell" if action == "SELL" else "Market Scan")
+        sl_val = sig.get("sl", p_buy.get("sl", curr_p - 6.08))
+        tp1_val = sig.get("tp1", p_buy.get("tp1", curr_p + 7.30))
+        tp2_val = sig.get("tp2", p_buy.get("tp2", curr_p + 15.20))
+        tp3_val = sig.get("tp3", p_buy.get("tp3", curr_p + 24.32))
+
+        # Check if admin requested broadcast: /signal broadcast or /signal send
+        is_admin = (update.effective_chat.id in [859271875, 537186806])
+        if context.args and str(context.args[0]).lower() in ["broadcast", "send", "alert"] and is_admin:
+            target_dir = str(context.args[1]).capitalize() if len(context.args) > 1 else ("Buy" if action == "BUY" else "Sell")
+            if target_dir.upper() == "SELL":
+                sl_val = p_sell.get("sl", curr_p + 6.08)
+                tp1_val = p_sell.get("tp1", curr_p - 7.30)
+                tp2_val = p_sell.get("tp2", curr_p - 15.20)
+                tp3_val = p_sell.get("tp3", curr_p - 24.32)
+            else:
+                sl_val = p_buy.get("sl", curr_p - 6.08)
+                tp1_val = p_buy.get("tp1", curr_p + 7.30)
+                tp2_val = p_buy.get("tp2", curr_p + 15.20)
+                tp3_val = p_buy.get("tp3", curr_p + 24.32)
+
+            vip_card = (
+                f"◆ <b>New signal</b> 🥇\n\n"
+                f"<b>{target_dir} XAUUSD now at {curr_p:.2f}</b>\n"
+                f"<b>SL</b> <code>{sl_val:.2f}</code>\n"
+                f"<b>TP</b> <code>{tp1_val:.2f}, {tp2_val:.2f}, {tp3_val:.2f}</code>\n\n"
+                f"<i>Angkor Quant Gold</i>"
+            )
+            from execution_engine import get_gold_signal_reply_markup
+            sent = await self.exec_engine.broadcast_to_vip_users(vip_card, app=self.app, reply_markup=get_gold_signal_reply_markup())
+            return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ Signal ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
+
+        # Otherwise display clean signal card with levels
+        msg = (
+            f"◆ <b>New signal</b> 🥇\n\n"
+            f"<b>{dir_str} XAUUSD now at {curr_p:.2f}</b>\n"
+            f"<b>SL</b> <code>{sl_val:.2f}</code>\n"
+            f"<b>TP</b> <code>{tp1_val:.2f}, {tp2_val:.2f}, {tp3_val:.2f}</code>\n\n"
+            f"<i>Angkor Quant Gold</i>\n"
+            f"────────────────────────\n"
+            f"🎯 <b>Super Smart Trigger Levels ៖</b>\n"
+            f"🟢 <b>LONG Trigger :</b> <code>${p_buy.get('entry', curr_p):.2f}</code>\n"
+            f"   └ Tight SL: <code>${p_buy.get('sl', curr_p - 6.08):.2f}</code> (-60.8 p)\n"
+            f"   └ TP1 (+73 pips): <code>${p_buy.get('tp1', curr_p + 7.30):.2f}</code> (Breakeven Armor)\n"
+            f"   └ TP2 (+152 pips): <code>${p_buy.get('tp2', curr_p + 15.20):.2f}</code>\n"
+            f"   └ TP3 (+243 pips): <code>${p_buy.get('tp3', curr_p + 24.32):.2f}</code>\n"
+            f"🔴 <b>SHORT Trigger :</b> <code>${p_sell.get('entry', curr_p):.2f}</code>\n"
+            f"   └ Tight SL: <code>${p_sell.get('sl', curr_p + 6.08):.2f}</code> (-60.8 p)\n"
+            f"   └ TP1 (+73 pips): <code>${p_sell.get('tp1', curr_p - 7.30):.2f}</code> (Breakeven Armor)\n"
+            f"   └ TP2 (+152 pips): <code>${p_sell.get('tp2', curr_p - 15.20):.2f}</code>\n"
+            f"   └ TP3 (+243 pips): <code>${p_sell.get('tp3', curr_p - 24.32):.2f}</code>\n"
+            f"────────────────────────\n"
+            f"💡 <i>ប្រព័ន្ធបញ្ជូន alert តែពេលមានប្រាក់ចំណេញ (Profit Alert Only) ជូន VIP Users!</i>"
+        )
+        from execution_engine import get_gold_signal_reply_markup
+        await self.safe_reply(update, msg, reply_markup=get_gold_signal_reply_markup())
 
     async def handle_buy(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Executes instant Gold Buy order. Default size: 0.5 Troy Ounce ($4.07 margin @ 500:1)."""
@@ -861,6 +928,9 @@ class QuantGoldBot:
         elif data == "btn_qgold_health":
             await self.handle_health(update, context)
 
+        elif data in ["btn_qgold_signal", "btn_qgold_levels"]:
+            await self.handle_signal(update, context)
+
         elif data == "btn_qgold_help":
             await self.handle_help(update, context)
 
@@ -880,6 +950,8 @@ class QuantGoldBot:
 
         if "Quant Gold Dashboard" in text or "Scan 19 TFs" in text:
             await self.handle_start(update, context)
+        elif "Signal" in text:
+            await self.handle_signal(update, context)
         elif "BUY GOLD" in text:
             await self.handle_buy(update, context)
         elif "SELL GOLD" in text:
@@ -894,6 +966,4 @@ class QuantGoldBot:
             await self.handle_health(update, context)
         elif "Help" in text:
             await self.handle_help(update, context)
-        elif "Status" in text:
-            await self.handle_status(update, context)
 

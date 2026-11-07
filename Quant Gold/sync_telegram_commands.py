@@ -80,6 +80,7 @@ async def sync_menu():
     # Define clean Quant Gold commands
     commands = [
         BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
+        BotCommand("signal", "🎯 View Current Super Smart Gold Signal & Levels"),
         BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
         BotCommand("gold", "📈 Gold Real-Time Intelligence & Analysis"),
         BotCommand("scan", "🔄 Refresh 19-Timeframe Confluence Scan"),

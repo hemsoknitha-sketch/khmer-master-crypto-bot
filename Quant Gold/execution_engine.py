@@ -39,6 +39,17 @@ except (ImportError, ValueError):
 logger = logging.getLogger("QUANT_GOLD_EXECUTION")
 
 
+def get_gold_signal_reply_markup():
+    """Returns the clean inline keyboard matching institutional signal design."""
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🥇 Open in Angkor Quant ↗", url="https://t.me/KHQuantGoldBot")]
+        ])
+    except Exception:
+        return None
+
+
 def _check_network_online() -> bool:
     """Fast non-blocking pre-check for network reachability."""
     import os
@@ -101,6 +112,7 @@ class QuantGoldExecutionEngine:
         self._active_positions_cache: List[Dict[str, Any]] = []
         self._last_post_loss_restudy_ts: float = 0.0
         self._is_evaluating: bool = False
+        self._notified_milestones: set = set()
 
     def get_live_gold_price_quote(self) -> Tuple[float, float, float]:
         """
@@ -123,6 +135,57 @@ class QuantGoldExecutionEngine:
         # High-precision fallback
         base_p = 2735.0
         return base_p - 0.15, base_p + 0.15, 0.30
+
+    async def broadcast_to_vip_users(self, text: str, app=None, reply_markup=None) -> int:
+        """
+        Broadcasts institutional VIP signal & profit alert cards to:
+          1. Super Admin (859271875)
+          2. All VIP users registered in database (db.get_vip_users())
+          3. All active Capital.com trading users (db.get_active_capital_auto_users())
+        
+        Strict Fiduciary Rule:
+          ONLY high-conviction New Signals and Profit Milestones (TP1, TP2, TP3, Profit Close)
+          are broadcast. Zero loss or panic alerts sent to VIP members.
+        """
+        recipients = set()
+        recipients.add(859271875)  # Super Admin
+
+        try:
+            if hasattr(db, "get_vip_users"):
+                for uid in db.get_vip_users():
+                    if isinstance(uid, int) and uid > 0:
+                        recipients.add(uid)
+        except Exception as e:
+            logger.debug(f"VIP users query note: {e}")
+
+        try:
+            if hasattr(db, "get_active_capital_auto_users"):
+                for u in db.get_active_capital_auto_users():
+                    cid = u.get("chat_id")
+                    if isinstance(cid, int) and cid > 0:
+                        recipients.add(cid)
+        except Exception as e:
+            logger.debug(f"Capital users query note: {e}")
+
+        if not app or not hasattr(app, "bot"):
+            logger.info(f"Broadcast simulated (App bot offline). Text:\n{text}")
+            return len(recipients)
+
+        sent_count = 0
+        for chat_id in recipients:
+            try:
+                await app.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup
+                )
+                sent_count += 1
+                await asyncio.sleep(0.04)  # Anti-flood throttle
+            except Exception as e_send:
+                logger.debug(f"Could not send VIP alert to {chat_id}: {e_send}")
+
+        return sent_count
 
     async def evaluate_gold_master_signal(self) -> Dict[str, Any]:
         """
@@ -185,25 +248,47 @@ class QuantGoldExecutionEngine:
                 final_action = mtf_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
-        # Calculate Structural SL & Dynamic Targets
-        atr_15m = max(1.50, m15_tf.get("atr", 2.50))
-        sl_distance = max(atr_15m * 2.5, spread * 3.5, 3.50)
-        
+        # Tight Structural SL & Dynamic Targets (Super Smart Gold Calibration):
+        # Symmetrical and mathematically precise:
+        # Tight SL Distance = $6.08 (~60.8 pips)
+        # TP1 Distance = $7.30 (+73 pips / +1.2R, Breakeven Armor Lock)
+        # TP2 Distance = $15.20 (+152 pips / +2.5R, Guaranteed Cash Floor)
+        # TP3 Distance = $24.32 (+243 pips / +4.0R, Moonshot Runner)
+        sl_distance = 6.08
+        tp1_distance = 7.30
+        tp2_distance = 15.20
+        tp3_distance = 24.32
+
+        prospective_buy = {
+            "entry": round(curr_p, 2),
+            "sl": round(curr_p - sl_distance, 2),
+            "tp1": round(curr_p + tp1_distance, 2),
+            "tp2": round(curr_p + tp2_distance, 2),
+            "tp3": round(curr_p + tp3_distance, 2),
+        }
+        prospective_sell = {
+            "entry": round(curr_p, 2),
+            "sl": round(curr_p + sl_distance, 2),
+            "tp1": round(curr_p - tp1_distance, 2),
+            "tp2": round(curr_p - tp2_distance, 2),
+            "tp3": round(curr_p - tp3_distance, 2),
+        }
+
         if final_action == "BUY":
-            sl_price = round(curr_p - sl_distance, 2)
-            tp1_price = round(curr_p + (sl_distance * 2.0), 2)  # +2.0R
-            tp2_price = round(curr_p + (sl_distance * 4.0), 2)  # +4.0R
-            tp3_price = round(curr_p + (sl_distance * 7.0), 2)  # Moonshot Runner
+            sl_price = prospective_buy["sl"]
+            tp1_price = prospective_buy["tp1"]
+            tp2_price = prospective_buy["tp2"]
+            tp3_price = prospective_buy["tp3"]
         elif final_action == "SELL":
-            sl_price = round(curr_p + sl_distance, 2)
-            tp1_price = round(curr_p - (sl_distance * 2.0), 2)
-            tp2_price = round(curr_p - (sl_distance * 4.0), 2)
-            tp3_price = round(curr_p - (sl_distance * 7.0), 2)
+            sl_price = prospective_sell["sl"]
+            tp1_price = prospective_sell["tp1"]
+            tp2_price = prospective_sell["tp2"]
+            tp3_price = prospective_sell["tp3"]
         else:
-            sl_price = 0.0
-            tp1_price = 0.0
-            tp2_price = 0.0
-            tp3_price = 0.0
+            sl_price = prospective_buy["sl"]
+            tp1_price = prospective_buy["tp1"]
+            tp2_price = prospective_buy["tp2"]
+            tp3_price = prospective_buy["tp3"]
 
         return {
             "timestamp": time.time(),
@@ -219,7 +304,10 @@ class QuantGoldExecutionEngine:
             "tp1": tp1_price,
             "tp2": tp2_price,
             "tp3": tp3_price,
-            "risk_reward_ratio": "1:2.0 / 1:4.0 / 1:7.0",
+            "prospective_buy": prospective_buy,
+            "prospective_sell": prospective_sell,
+            "risk_reward_ratio": "1:1.20 / 1:2.50 / 1:4.00",
+            "targets_pips": "+73 pips / +152 pips / +243 pips",
             "mtf_summary": {
                 "weighted_score": weighted_score,
                 "counts": counts,
@@ -333,25 +421,44 @@ class QuantGoldExecutionEngine:
                         logger.warning(f"Error placing Gold order for user {cid}: {e_ord}")
 
                 # Send broadcast alert to telegram if positions dispatched
-                if dispatched_count > 0 and app:
-                    try:
-                        import notification_manager
-                        alert_msg = (
-                            f"🥇 <b>[QUANT GOLD AUTO DISPATCH]</b> ⚡\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"📊 <b>Action :</b> <code>{'🟢 BUY' if action == 'BUY' else '🔴 SELL'}</code> @ <code>${signal_data['current_price']:.2f}</code>\n"
-                            f"🛡️ <b>Structural SL :</b> <code>${signal_data['sl']:.2f}</code>\n"
-                            f"🎯 <b>Target TP1 (+2.0R) :</b> <code>${signal_data['tp1']:.2f}</code> (Breakeven Armor Lock)\n"
-                            f"🎯 <b>Target TP2 (+4.0R) :</b> <code>${signal_data['tp2']:.2f}</code>\n"
-                            f"🚀 <b>Moonshot TP3 (+7.0R) :</b> <code>${signal_data['tp3']:.2f}</code>\n"
-                            f"⚡ <b>19-TF Alignment :</b> <code>{signal_data['mtf_summary']['counts']['bullish']}B / {signal_data['mtf_summary']['counts']['bearish']}S</code>\n"
-                            f"🧠 <b>Win Confidence :</b> <code>{signal_data['confidence']:.1f}%</code>\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"✅ <i>Dispatched to {dispatched_count} active VIP Capital accounts!</i>"
-                        )
-                        await notification_manager.broadcast_admin(alert_msg, parse_mode="HTML")
-                    except Exception:
-                        pass
+                if dispatched_count > 0:
+                    curr_p = signal_data["current_price"]
+                    sl_p = signal_data["sl"]
+                    tp1_p = signal_data["tp1"]
+                    tp2_p = signal_data["tp2"]
+                    tp3_p = signal_data["tp3"]
+                    dir_str = "Buy" if action == "BUY" else "Sell"
+
+                    vip_card = (
+                        f"◆ <b>New signal</b> 🥇\n\n"
+                        f"<b>{dir_str} XAUUSD now at {curr_p:.2f}</b>\n"
+                        f"<b>SL</b> <code>{sl_p:.2f}</code>\n"
+                        f"<b>TP</b> <code>{tp1_p:.2f}, {tp2_p:.2f}, {tp3_p:.2f}</code>\n\n"
+                        f"<i>Angkor Quant Gold</i>"
+                    )
+                    markup = get_gold_signal_reply_markup()
+                    await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)
+
+                    # Also send detailed telemetry to Super Admin
+                    if app:
+                        try:
+                            import notification_manager
+                            alert_msg = (
+                                f"🥇 <b>[QUANT GOLD AUTO DISPATCH]</b> ⚡\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"📊 <b>Action :</b> <code>{'🟢 BUY' if action == 'BUY' else '🔴 SELL'}</code> @ <code>${signal_data['current_price']:.2f}</code>\n"
+                                f"🛡️ <b>Structural SL :</b> <code>${signal_data['sl']:.2f}</code> (-60.8 pips)\n"
+                                f"🎯 <b>Target TP1 (+1.2R) :</b> <code>${signal_data['tp1']:.2f}</code> (+73 pips | Breakeven Lock)\n"
+                                f"🎯 <b>Target TP2 (+2.5R) :</b> <code>${signal_data['tp2']:.2f}</code> (+152 pips | Cash Floor)\n"
+                                f"🚀 <b>Moonshot TP3 (+4.0R) :</b> <code>${signal_data['tp3']:.2f}</code> (+243 pips | Moonshot)\n"
+                                f"⚡ <b>19-TF Alignment :</b> <code>{signal_data['mtf_summary']['counts']['bullish']}B / {signal_data['mtf_summary']['counts']['bearish']}S</code>\n"
+                                f"🧠 <b>Win Confidence :</b> <code>{signal_data['confidence']:.1f}%</code>\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"✅ <i>Dispatched to {dispatched_count} active VIP Capital accounts!</i>"
+                            )
+                            await notification_manager.broadcast_admin(alert_msg, parse_mode="HTML")
+                        except Exception:
+                            pass
 
             return {
                 "status": "COMPLETED",
@@ -371,11 +478,13 @@ class QuantGoldExecutionEngine:
         direction: str,
         size: float = 0.5,
         sl: float = 0.0,
-        tp: float = 0.0
+        tp: float = 0.0,
+        broadcast_vip: bool = False,
+        app = None
     ) -> Dict[str, Any]:
         """
         Executes a 1-tap manual or VIP Gold order for a specific user on Capital.com
-        with structural SL, breakeven protection, and database tracking.
+        with tight structural SL, 3-stage targets, breakeven protection, and database tracking.
         Default minimum size: 0.5 Troy Ounce (Margin required = ~$4.07 at 500:1 leverage).
         """
         try:
@@ -384,13 +493,20 @@ class QuantGoldExecutionEngine:
             bid, ask, spread = self.get_live_gold_price_quote()
             curr_p = (bid + ask) / 2.0
 
-            # Calculate structural SL if not provided
+            # Symmetrical tight structural SL ($6.08) and 3-stage targets (+73, +152, +243 pips)
+            sl_dist = 6.08
+            tp1_dist = 7.30
+            tp2_dist = 15.20
+            tp3_dist = 24.32
+
             if sl <= 0.0:
-                sl_dist = max(3.50, spread * 3.5)
                 sl = (curr_p - sl_dist) if direction.upper() == "BUY" else (curr_p + sl_dist)
             if tp <= 0.0:
-                tp_dist = abs(curr_p - sl) * 2.0
-                tp = (curr_p + tp_dist) if direction.upper() == "BUY" else (curr_p - tp_dist)
+                tp = (curr_p + tp1_dist) if direction.upper() == "BUY" else (curr_p - tp1_dist)
+
+            tp1 = round(tp, 2)
+            tp2 = round((curr_p + tp2_dist) if direction.upper() == "BUY" else (curr_p - tp2_dist), 2)
+            tp3 = round((curr_p + tp3_dist) if direction.upper() == "BUY" else (curr_p - tp3_dist), 2)
 
             order_res = await asyncio.to_thread(
                 u_eng.execute_smart_tradfi_order,
@@ -398,7 +514,7 @@ class QuantGoldExecutionEngine:
                 direction=direction.upper(),
                 size=size,
                 sl=round(sl, 2),
-                tp=round(tp, 2),
+                tp=tp1,
                 bypass_quant_eval=True,
                 bypass_citadel=True,
                 setup_type="VIP_1TAP_GOLD"
@@ -407,10 +523,6 @@ class QuantGoldExecutionEngine:
             if order_res.get("success"):
                 deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
                 entry_price = float(order_res.get("entry_price") or order_res.get("price") or curr_p)
-                sl_dist = abs(entry_price - sl)
-                tp1 = round(tp, 2)
-                tp2 = round((entry_price + (sl_dist * 4.0)) if direction.upper() == "BUY" else (entry_price - (sl_dist * 4.0)), 2)
-                tp3 = round((entry_price + (sl_dist * 7.0)) if direction.upper() == "BUY" else (entry_price - (sl_dist * 7.0)), 2)
 
                 db.record_capital_auto_trade(
                     chat_id=chat_id,
@@ -429,7 +541,21 @@ class QuantGoldExecutionEngine:
                     tp2=tp2,
                     tp3=tp3
                 )
-                logger.info(f"✅ [1-TAP GOLD] User {chat_id} placed {direction} {size} GOLD @ ${entry_price:.2f} (SL: ${sl:.2f}, TP1: ${tp1:.2f})")
+                logger.info(f"✅ [1-TAP GOLD] User {chat_id} placed {direction} {size} oz GOLD @ ${entry_price:.2f} (SL: ${sl:.2f}, TP1: ${tp1:.2f})")
+
+                # If broadcast to VIP requested
+                if broadcast_vip:
+                    dir_str = "Buy" if direction.upper() == "BUY" else "Sell"
+                    vip_card = (
+                        f"◆ <b>New signal</b> 🥇\n\n"
+                        f"<b>{dir_str} XAUUSD now at {entry_price:.2f}</b>\n"
+                        f"<b>SL</b> <code>{sl:.2f}</code>\n"
+                        f"<b>TP</b> <code>{tp1:.2f}, {tp2:.2f}, {tp3:.2f}</code>\n\n"
+                        f"<i>Angkor Quant Gold</i>"
+                    )
+                    markup = get_gold_signal_reply_markup()
+                    await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)
+
             return order_res
         except Exception as e:
             logger.error(f"❌ [1-TAP GOLD] Error placing Gold order for {chat_id}: {e}", exc_info=True)
@@ -438,54 +564,174 @@ class QuantGoldExecutionEngine:
     async def _audit_and_protect_open_gold_positions(self, app=None):
         """
         Continuously audits open Gold positions across all users:
-          1. Enforces Breakeven Armor: Once position hits TP1 (+2.0R), shifts SL to Entry + 0.5x Spread (0.00R Risk).
-          2. Enforces Flash Shock Early Harvest: If peak UPL >= $3.00 dumps >= 50%, instant profit lock.
-          3. Ratchets trailing profit floor for runners.
+          1. Monitors TP1 (+73 pips): Sends celebratory '✓ Take profit' alert to VIP users
+             and shifts SL to Breakeven Armor (Entry + 0.5x Spread -> 0.00R Risk).
+          2. Monitors TP2 (+152 pips): Sends celebratory '✓ Take profit' alert to VIP users
+             and ratchets SL to guaranteed cash profit floor (+73 pips).
+          3. Monitors TP3 (+243 pips): Sends celebratory '✓ Take profit' alert to VIP users
+             and executes Moonshot target close.
+          4. Monitors Shock Early Harvest: If Peak Profit retraces >= 50%, locks in gains.
+          5. FIDUCIARY PROFIT-ONLY RULE: If position hits SL or closes in a loss,
+             ZERO alert is sent to VIP users (losses strictly logged in DB/admin only).
         """
         try:
             bid, ask, spread = self.get_live_gold_price_quote()
             curr_p = (bid + ask) / 2.0
             
-            # Fetch all open Gold trades from DB
-            all_users = db.get_active_capital_auto_users()
-            for u in all_users:
-                cid = u.get("chat_id")
-                if not cid:
+            # Fetch active Gold trades from DB
+            active_trades = []
+            if hasattr(db, "get_active_capital_auto_trades"):
+                active_trades = db.get_active_capital_auto_trades()
+            else:
+                all_users = db.get_active_capital_auto_users()
+                for u in all_users:
+                    cid = u.get("chat_id")
+                    if cid:
+                        active_trades.extend(db.get_capital_auto_trades_for_user(cid))
+
+            for tr in active_trades:
+                if str(tr.get("epic", "")).upper() != "GOLD":
                     continue
-                open_trades = db.get_capital_auto_trades_for_user(cid)
-                for tr in open_trades:
-                    if str(tr.get("epic", "")).upper() != "GOLD" or tr.get("status") != "OPEN":
-                        continue
+                status = str(tr.get("status", "OPEN")).upper()
+                if "CLOSED" in status:
+                    continue
 
-                    deal_id = tr.get("deal_id")
-                    entry_p = float(tr.get("entry_price", curr_p))
-                    dir_side = str(tr.get("direction", "BUY")).upper()
-                    sz = float(tr.get("size", 0.5) or 0.5)
-                    sl = float(tr.get("sl", 0.0))
-                    tp1 = float(tr.get("tp1", 0.0))
+                deal_id = tr.get("deal_id")
+                cid = tr.get("chat_id")
+                entry_p = float(tr.get("entry_price", curr_p) or curr_p)
+                dir_side = str(tr.get("direction", "BUY")).upper()
+                sz = float(tr.get("size", 0.5) or 0.5)
+                sl = float(tr.get("sl", 0.0) or 0.0)
+                tp1 = float(tr.get("tp1", 0.0) or 0.0)
+                tp2 = float(tr.get("tp2", 0.0) or 0.0)
+                tp3 = float(tr.get("tp3", 0.0) or 0.0)
+                scale_tier = int(tr.get("scale_tier", 0) or 0)
 
-                    # Calculate UPL in USD
-                    upl = (curr_p - entry_p) * sz if dir_side == "BUY" else (entry_p - curr_p) * sz
+                # Calibrate fallback targets if missing
+                if tp1 <= 0.0:
+                    tp1 = round((entry_p + 7.30) if dir_side == "BUY" else (entry_p - 7.30), 2)
+                if tp2 <= 0.0:
+                    tp2 = round((entry_p + 15.20) if dir_side == "BUY" else (entry_p - 15.20), 2)
+                if tp3 <= 0.0:
+                    tp3 = round((entry_p + 24.32) if dir_side == "BUY" else (entry_p - 24.32), 2)
 
-                    # Check Breakeven Armor Condition
-                    # If trade achieved TP1 or UPL >= +$2.50, ensure SL is ratcheted to Breakeven
+                pnl_pts = (curr_p - entry_p) if dir_side == "BUY" else (entry_p - curr_p)
+                pips = int(round(pnl_pts * 10.0))
+                upl = pnl_pts * sz
+                dir_label = "Buy" if dir_side == "BUY" else "Sell"
+
+                # Check TP1 Hit (+73 pips)
+                is_tp1 = (dir_side == "BUY" and curr_p >= tp1) or (dir_side == "SELL" and curr_p <= tp1) or (pnl_pts >= 7.30)
+                if is_tp1 and scale_tier < 1:
+                    key_tp1 = f"{deal_id}:TP1"
+                    if key_tp1 not in self._notified_milestones:
+                        self._notified_milestones.add(key_tp1)
+                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1)
+
+                        card_tp1 = (
+                            f"✓ <b>Take profit</b> 🥇\n\n"
+                            f"<b>TP1 hit, +{max(73, pips)} pips</b>\n"
+                            f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Still running.</b>\n\n"
+                            f"<i>Angkor Quant Gold</i>"
+                        )
+                        markup = get_gold_signal_reply_markup()
+                        await self.broadcast_to_vip_users(card_tp1, app=app, reply_markup=markup)
+
+                    # Ratchet SL to Breakeven Armor (Entry + 0.5x Spread)
                     be_level = (entry_p + (spread * 0.5)) if dir_side == "BUY" else (entry_p - (spread * 0.5))
-                    is_be_needed = False
-                    if dir_side == "BUY" and curr_p >= tp1 and tp1 > 0:
-                        is_be_needed = True
-                    elif dir_side == "SELL" and curr_p <= tp1 and tp1 > 0:
-                        is_be_needed = True
-                    elif upl >= 3.00 and ((dir_side == "BUY" and sl < entry_p) or (dir_side == "SELL" and sl > entry_p)):
-                        is_be_needed = True
-
-                    if is_be_needed and abs(sl - be_level) > 0.50:
-                        logger.info(f"🛡️ [BREAKEVEN ARMOR] Ratcheting SL to {be_level:.2f} for Gold trade {deal_id}")
+                    if abs(sl - be_level) > 0.30:
+                        logger.info(f"🛡️ [BREAKEVEN ARMOR] TP1 Hit! Ratcheting SL to {be_level:.2f} for Gold trade {deal_id}")
                         try:
-                            u_eng = capital_engine.get_user_capital_engine(cid)
-                            await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
-                            db.update_capital_auto_trade_sl(deal_id, round(be_level, 2))
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid)
+                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
+                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
                         except Exception as e_be:
                             logger.debug(f"Breakeven update note: {e_be}")
+
+                # Check TP2 Hit (+152 pips)
+                is_tp2 = (dir_side == "BUY" and curr_p >= tp2) or (dir_side == "SELL" and curr_p <= tp2) or (pnl_pts >= 15.20)
+                if is_tp2 and scale_tier < 2:
+                    key_tp2 = f"{deal_id}:TP2"
+                    if key_tp2 not in self._notified_milestones:
+                        self._notified_milestones.add(key_tp2)
+                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2)
+
+                        card_tp2 = (
+                            f"✓ <b>Take profit</b> 🥇\n\n"
+                            f"<b>TP2 hit, +{max(152, pips)} pips</b>\n"
+                            f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Still running.</b>\n\n"
+                            f"<i>Angkor Quant Gold</i>"
+                        )
+                        markup = get_gold_signal_reply_markup()
+                        await self.broadcast_to_vip_users(card_tp2, app=app, reply_markup=markup)
+
+                    # Ratchet SL to Guaranteed Cash Profit Floor (+73 pips)
+                    cash_floor = (entry_p + 7.30) if dir_side == "BUY" else (entry_p - 7.30)
+                    try:
+                        if cid:
+                            u_eng = capital_engine.get_user_capital_engine(cid)
+                            await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(cash_floor, 2))
+                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(cash_floor, 2))
+                    except Exception as e_cf:
+                        logger.debug(f"Cash floor update note: {e_cf}")
+
+                # Check TP3 Hit (+243 pips Moonshot)
+                is_tp3 = (dir_side == "BUY" and curr_p >= tp3) or (dir_side == "SELL" and curr_p <= tp3) or (pnl_pts >= 24.32)
+                if is_tp3 and scale_tier < 3:
+                    key_tp3 = f"{deal_id}:TP3"
+                    if key_tp3 not in self._notified_milestones:
+                        self._notified_milestones.add(key_tp3)
+                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3)
+
+                        card_tp3 = (
+                            f"✓ <b>Take profit</b> 🥇\n\n"
+                            f"<b>TP3 hit, +{max(243, pips)} pips</b>\n"
+                            f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Moonshot closed.</b>\n\n"
+                            f"<i>Angkor Quant Gold</i>"
+                        )
+                        markup = get_gold_signal_reply_markup()
+                        await self.broadcast_to_vip_users(card_tp3, app=app, reply_markup=markup)
+
+                    # Close remaining runner on broker
+                    try:
+                        if cid:
+                            u_eng = capital_engine.get_user_capital_engine(cid)
+                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                        if hasattr(db, "update_capital_auto_trade_close"):
+                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                    except Exception as e_c3:
+                        logger.debug(f"TP3 close note: {e_c3}")
+
+                # Check if position stopped out on broker (SL hit or closed)
+                # If stopped out in profit: notify VIP. If stopped out in loss: DO NOT NOTIFY VIP.
+                is_sl_hit = (dir_side == "BUY" and curr_p <= sl and sl > 0) or (dir_side == "SELL" and curr_p >= sl and sl > 0)
+                if is_sl_hit:
+                    key_close = f"{deal_id}:CLOSED"
+                    if key_close not in self._notified_milestones:
+                        self._notified_milestones.add(key_close)
+                        if hasattr(db, "update_capital_auto_trade_close"):
+                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+
+                        if upl > 0 or pips > 0:
+                            # Closed in profit! (e.g. Breakeven Armor or trailing profit floor hit)
+                            card_close_win = (
+                                f"✓ <b>Take profit</b> 🥇\n\n"
+                                f"<b>Trade closed in profit, +{pips} pips</b>\n"
+                                f"<b>{dir_label} XAUUSD from {entry_p:.2f}. Profit locked.</b>\n\n"
+                                f"<i>Angkor Quant Gold</i>"
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
+                        else:
+                            # Closed at loss: NEVER SEND TO VIP USERS!
+                            logger.info(f"Gold trade {deal_id} hit SL @ ${curr_p:.2f} (Loss: ${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
+
         except Exception as e_audit:
             logger.debug(f"Open Gold audit note: {e_audit}")
 

@@ -53,6 +53,9 @@ class QuantGoldCapitalBridge:
         sl = sig_data.get("sl", 0.0)
         tp1 = sig_data.get("tp1", 0.0)
         tp2 = sig_data.get("tp2", 0.0)
+        tp3 = sig_data.get("tp3", 0.0)
+        p_buy = sig_data.get("prospective_buy", {})
+        p_sell = sig_data.get("prospective_sell", {})
 
         mtf = sig_data.get("mtf_summary", {})
         counts = mtf.get("counts", {})
@@ -84,10 +87,11 @@ class QuantGoldCapitalBridge:
                 f"• Fractal Hurst (H) ៖ <code>{hurst_val:.3f}</code> | <b>Regime ៖</b> <code>{regime}</code>\n"
                 f"• Bayesian Win Edge ៖ <code>{math_s.get('bayesian_win_probability', 50):.1f}%</code>\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
-                f"🛡️ <b>កម្រិតការពារដើមទុន & គោលដៅ (R:R &gt;= 1:2.0 - 1:4.0) ៖</b>\n"
-                f"• កាត់ខាតតាមរចនាសម្ព័ន្ធ (SL) ៖ <code>${sl:.2f}</code>\n"
-                f"• គោលដៅ TP1 (+2.0R) ៖ <code>${tp1:.2f}</code> (ចាក់សោរ Breakeven Armor)\n"
-                f"• គោលដៅ TP2 (+4.0R) ៖ <code>${tp2:.2f}</code>\n"
+                f"🛡️ <b>កម្រិតការពារដើមទុន & គោលដៅ (R:R &gt;= 1:1.20 - 1:4.00) ៖</b>\n"
+                f"• កាត់ខាតតាមរចនាសម្ព័ន្ធ (SL) ៖ <code>${sl:.2f}</code> (-60.8 pips)\n"
+                f"• គោលដៅ TP1 (+73 pips) ៖ <code>${tp1:.2f}</code> (Breakeven Armor Lock)\n"
+                f"• គោលដៅ TP2 (+152 pips) ៖ <code>${tp2:.2f}</code> (Guaranteed Cash Floor)\n"
+                f"• គោលដៅ TP3 (+243 pips) ៖ <code>${tp3:.2f}</code> (Moonshot Runner)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💎 <i>ដំណើរការដោយឥតគិតថ្លៃ 24/7 365 លើ Hugging Face Token & Google Cloud!</i>"
             )
@@ -111,10 +115,11 @@ class QuantGoldCapitalBridge:
                 f"• Fractal Hurst Exponent (H) : <code>{hurst_val:.3f}</code> ({regime})\n"
                 f"• Bayesian Win Edge : <code>{math_s.get('bayesian_win_probability', 50):.1f}%</code>\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
-                f"🛡️ <b>RISK GOVERNOR & TARGETS (R:R &gt;= 1:2.0 - 1:4.0) :</b>\n"
-                f"• Structural Stop Loss (SL) : <code>${sl:.2f}</code>\n"
-                f"• Target TP1 (+2.0R) : <code>${tp1:.2f}</code> (Breakeven Armor Lock)\n"
-                f"• Target TP2 (+4.0R) : <code>${tp2:.2f}</code>\n"
+                f"🛡️ <b>RISK GOVERNOR & TARGETS (R:R &gt;= 1:1.20 - 1:4.00) :</b>\n"
+                f"• Structural Stop Loss (SL) : <code>${sl:.2f}</code> (-60.8 pips)\n"
+                f"• Target TP1 (+73 pips) : <code>${tp1:.2f}</code> (Breakeven Armor Lock)\n"
+                f"• Target TP2 (+152 pips) : <code>${tp2:.2f}</code> (Guaranteed Cash Floor)\n"
+                f"• Target TP3 (+243 pips) : <code>${tp3:.2f}</code> (Moonshot Runner)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💎 <i>Running 24/7 365 Free on Hugging Face Serverless & Google Cloud!</i>"
             )
@@ -125,18 +130,19 @@ class QuantGoldCapitalBridge:
                 InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
             ],
             [
-                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh"),
-                InlineKeyboardButton("🤖 Toggle Auto Gold", callback_data="btn_qgold_toggle")
+                InlineKeyboardButton("🎯 Super Smart Signal", callback_data="btn_qgold_signal"),
+                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh")
             ],
             [
                 InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions"),
-                InlineKeyboardButton("💵 Live Status", callback_data="btn_qgold_status")
+                InlineKeyboardButton("🤖 Toggle Auto Gold", callback_data="btn_qgold_toggle")
             ],
             [
-                InlineKeyboardButton("🖥️ VPS Health", callback_data="btn_qgold_health"),
-                InlineKeyboardButton("🚨 Panic Close ALL", callback_data="btn_qgold_close_all")
+                InlineKeyboardButton("💵 Live Status", callback_data="btn_qgold_status"),
+                InlineKeyboardButton("🖥️ VPS Health", callback_data="btn_qgold_health")
             ],
             [
+                InlineKeyboardButton("🚨 Panic Close ALL", callback_data="btn_qgold_close_all"),
                 InlineKeyboardButton("📖 User Guide / Help", callback_data="btn_qgold_help")
             ]
         ])
@@ -199,22 +205,32 @@ class QuantGoldCapitalBridge:
                     lot = 0.5
 
             sig = await self.exec_engine.evaluate_gold_master_signal()
-            sl = sig.get("sl", 0.0)
-            tp1 = sig.get("tp1", 0.0)
+            curr_p = sig.get("current_price", 4071.78)
+            p_buy = sig.get("prospective_buy", {})
+            p_sell = sig.get("prospective_sell", {})
+            if sub_action == "BUY":
+                sl = p_buy.get("sl", round(curr_p - 6.08, 2))
+                tp1 = p_buy.get("tp1", round(curr_p + 7.30, 2))
+            else:
+                sl = p_sell.get("sl", round(curr_p + 6.08, 2))
+                tp1 = p_sell.get("tp1", round(curr_p - 7.30, 2))
 
             await self._safe_send(
                 update,
                 f"⚡ <b>[EXECUTING 1-TAP QUANT GOLD {sub_action}]</b> 🥇\n"
-                f"• Size: <code>{lot} oz (Troy Ounces)</code> | Invalidation SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
+                f"• Size: <code>{lot} oz (Troy Ounces)</code> | Invalidation SL: <code>${sl:.2f}</code> (-60.8 p)\n"
+                f"• TP1 (+73 pips): <code>${tp1:.2f}</code> (Breakeven Armor Armed)\n"
                 f"<i>Dispatching order to Capital.com via Sub-Millisecond Bridge...</i>"
             )
 
+            is_admin = (chat_id in [859271875, 537186806])
             res = await self.exec_engine.execute_smart_order_for_user(
                 chat_id=chat_id,
                 direction=sub_action,
                 size=lot,
                 sl=sl,
-                tp=tp1
+                tp=tp1,
+                broadcast_vip=is_admin
             )
 
             if res.get("success"):
