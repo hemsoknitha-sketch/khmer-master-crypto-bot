@@ -17,6 +17,7 @@ Purpose:
 import os
 import sys
 import time
+import asyncio
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 
@@ -313,14 +314,27 @@ class QuantGoldBot:
         elif sub_cmd in ["ON", "ENABLE", "START"]:
             target_chat_id = chat_id
             target_label = f"Chat ID: {chat_id}"
+            user_budget = None
             if len(args) > 1:
-                resolved_cid, u_info = self._resolve_target(args[1])
-                if resolved_cid:
-                    target_chat_id = resolved_cid
-                    acc = u_info.get("account_id") if u_info else args[1]
-                    target_label = f"Account: {acc} (Chat ID: {target_chat_id})"
-            db.set_capital_auto_config(chat_id=target_chat_id, enabled=True, budget=300.0, max_positions=5, is_demo=False)
-            await self.safe_reply(update, f"🥇 <b>[QUANT GOLD AUTO ACTIVATED]</b> 🟢\n• គោលដៅ ៖ <code>{target_label}</code>\n• ស្ថានភាព ៖ <code>ON (24/7 Gold Autonomous)</code>\n• Budget ៖ <code>$300.00 / Trade (Max 5 Pos)</code>")
+                try:
+                    user_budget = float(args[1])
+                except ValueError:
+                    resolved_cid, u_info = self._resolve_target(args[1])
+                    if resolved_cid:
+                        target_chat_id = resolved_cid
+                        acc = u_info.get("account_id") if u_info else args[1]
+                        target_label = f"Account: {acc} (Chat ID: {target_chat_id})"
+                    if len(args) > 2:
+                        try:
+                            user_budget = float(args[2])
+                        except ValueError:
+                            pass
+
+            auto_cfg = db.get_capital_auto_config(target_chat_id) or {}
+            cur_b = auto_cfg.get("budget", 50.0)
+            final_budget = user_budget if user_budget is not None else (cur_b if cur_b > 0 else 50.0)
+            db.set_capital_auto_config(chat_id=target_chat_id, enabled=True, budget=final_budget, max_positions=5, is_demo=False)
+            await self.safe_reply(update, f"🥇 <b>[QUANT GOLD AUTO ACTIVATED]</b> 🟢\n• គោលដៅ ៖ <code>{target_label}</code>\n• ស្ថានភាព ៖ <code>ON (24/7 Gold Autonomous)</code>\n• Budget ៖ <code>${final_budget:.2f} / Trade (Max 5 Pos)</code>")
             return
         elif sub_cmd in ["OFF", "DISABLE", "STOP"]:
             target_chat_id = chat_id
@@ -360,11 +374,11 @@ class QuantGoldBot:
         equity_str = "N/A"
         try:
             u_eng = capital_engine.get_user_capital_engine(target_cid)
-            acc_details = u_eng.get_account_details() if hasattr(u_eng, "get_account_details") else {}
+            acc_details = await asyncio.to_thread(u_eng.get_account_balance) if u_eng else {}
             if acc_details.get("success"):
-                bal = acc_details.get("balance", 0.0)
-                avail = acc_details.get("available", 0.0)
-                eq = acc_details.get("equity", 0.0)
+                bal = float(acc_details.get("balance", 0.0) or 0.0)
+                avail = float(acc_details.get("available", 0.0) or 0.0)
+                eq = float(acc_details.get("equity", 0.0) or 0.0)
                 balance_str = f"${bal:.2f} USD"
                 avail_str = f"${avail:.2f} USD"
                 equity_str = f"${eq:.2f} USD"
@@ -728,39 +742,117 @@ class QuantGoldBot:
         )
 
     async def handle_toggle_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Toggles 24/7 Autonomous Gold Trading."""
-        chat_id = update.effective_chat.id
-        auto_cfg = db.get_capital_auto_config(chat_id)
-        cur_st = bool(auto_cfg.get("enabled", False)) if auto_cfg else False
+        """Toggles 24/7 Autonomous Gold Trading with real isolated live account telemetry."""
+        chat_id = update.effective_chat.id if update.effective_chat else 859271875
+        auto_cfg = db.get_capital_auto_config(chat_id) or {}
+        cur_st = bool(auto_cfg.get("enabled", False))
         new_st = not cur_st
-        db.set_capital_auto_config(chat_id=chat_id, enabled=new_st, budget=300.0, max_positions=5, is_demo=False)
+
+        is_admin = (chat_id in [859271875, 537186806])
+        u_eng = capital_engine.get_user_capital_engine(chat_id)
+        bal_info = {}
+        try:
+            bal_info = await asyncio.to_thread(u_eng.get_account_balance) if u_eng else {}
+        except Exception as e_b:
+            logger.debug(f"Toggle auto balance check note: {e_b}")
+
+        live_bal = float(bal_info.get("balance", 0.0) or 0.0)
+        live_avail = float(bal_info.get("available", 0.0) or 0.0)
+        acc_id = bal_info.get("account_id") or os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
+        is_demo = bool(bal_info.get("is_demo", False))
+        is_guest = bool(bal_info.get("is_guest", False))
+
+        saved_budget = float(auto_cfg.get("budget", 0.0) or 0.0)
+        if saved_budget > 0.0:
+            active_budget = saved_budget
+        elif live_avail >= 50.0:
+            active_budget = round(min(live_avail * 0.20, 200.0), 2)
+        else:
+            active_budget = max(4.07, live_avail) if live_avail > 0 else 50.0
+
+        db.set_capital_auto_config(
+            chat_id=chat_id,
+            enabled=new_st,
+            budget=active_budget,
+            max_positions=auto_cfg.get("max_positions", 5) or 5,
+            is_demo=is_demo
+        )
 
         st_text = "🟢 <b>ដំណើរការ ២៤/៧ (ACTIVE)</b>" if new_st else "🔴 <b>ផ្អាកបណ្តោះអាសន្ន (PAUSED)</b>"
+
+        # Truthful, transparent account presentation:
+        if is_guest:
+            acct_info = "• គណនីវិនិយោគិន ៖ <code>VIP Guest (Awaiting API)</code>\n• សមតុល្យ Live ៖ <code>Awaiting API Credentials</code>\n"
+        elif is_admin and live_bal < 10.0:
+            acct_info = (
+                f"• គណនីវិនិយោគិន ៖ <code>{acc_id}</code> (🟢 LIVE MAINNET)\n"
+                f"• សមតុល្យ Live ជាក់ស្តែង ៖ <code>${live_bal:.2f} USD</code>\n"
+                f"• សាច់ប្រាក់ទំនេរ (Free Margin) ៖ <code>${live_avail:.2f} USD</code>\n"
+                f"• កញ្ចក់ការពារដើមទុន ៖ <code>🟡 DEMO FALLBACK $10,000 (Invariant 75)</code>\n"
+            )
+        else:
+            acct_type = "🟡 DEMO" if is_demo else "🟢 LIVE MAINNET"
+            acct_info = (
+                f"• គណនីវិនិយោគិន ៖ <code>{acc_id}</code> ({acct_type})\n"
+                f"• សមតុល្យ Live ជាក់ស្តែង ៖ <code>${live_bal:.2f} USD</code>\n"
+                f"• សាច់ប្រាក់ទំនេរ (Free Margin) ៖ <code>${live_avail:.2f} USD</code>\n"
+            )
+
+        warn_note = ""
+        if new_st and live_avail < 4.07 and not (is_admin and live_bal < 10.0):
+            warn_note = "\n⚠️ <i>ចំណាំ៖ Free Margin ទាបជាង $4.07 (ទំហំ Margin អប្បបរមា 0.5 oz Gold)។ ប្រព័ន្ធរង់ចាំការដាក់ប្រាក់បន្ថែម ឬប្តូរទៅ Demo!</i>\n"
+
         msg = (
             f"🤖 <b>[QUANT GOLD 24/7 AUTONOMOUS ENGINE]</b> 🥇\n"
             f"══════════════════════════════════════\n"
             f"• ស្ថានភាពបច្ចុប្បន្ន ៖ {st_text}\n"
-            f"• ថវិកាជួញដូរ (Budget) ៖ <code>$300.00</code>\n"
+            f"{acct_info}"
+            f"• ថវិកាជួញដូរ (Budget) ៖ <code>${active_budget:.2f}</code>\n"
             f"• វិសាលគមត្រួតពិនិត្យ ៖ <code>19 Timeframes (M1 ដល់ 1 Month)</code>\n"
             f"• ប្រព័ន្ធការពារដើមទុន ៖ <code>Breakeven Armor +2.0R & Flash Shock Harvest</code>\n"
-            f"══════════════════════════════════════\n"
+            f"══════════════════════════════════════{warn_note}\n"
             f"<i>{ 'ម៉ាស៊ីន AI នឹងជួញដូរមាសស្វ័យប្រវត្តនៅពេលមានឱកាសឈ្នះខ្ពស់!' if new_st else 'ម៉ាស៊ីន AI ត្រូវបានផ្អាកការបើក Position ថ្មី។' }</i>"
         )
         await self.safe_reply(update, msg)
 
     async def handle_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Shows clean real-time status of Gold price, Bid/Ask/Spread, and Capital.com session."""
+        chat_id = update.effective_chat.id if update.effective_chat else 859271875
         bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
         curr_p = (bid + ask) / 2.0
 
-        c_eng = capital_engine.get_capital_engine()
-        session_ok = c_eng.is_session_valid() if hasattr(c_eng, "is_session_valid") else True
+        u_eng = capital_engine.get_user_capital_engine(chat_id)
+        session_ok = u_eng.is_session_valid() if hasattr(u_eng, "is_session_valid") else True
         session_label = "ACTIVE (Connected)" if session_ok else "Standby (Connecting)"
 
+        bal_info = {}
+        try:
+            bal_info = await asyncio.to_thread(u_eng.get_account_balance) if u_eng else {}
+        except Exception as e_s:
+            logger.debug(f"Status balance query note: {e_s}")
+
+        live_bal = float(bal_info.get("balance", 0.0) or 0.0)
+        live_avail = float(bal_info.get("available", 0.0) or 0.0)
+        acc_id = bal_info.get("account_id") or os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
+        is_demo = bool(bal_info.get("is_demo", False))
+        is_admin = (chat_id in [859271875, 537186806])
+
+        # Active positions count for this user
+        open_trades = db.get_capital_auto_trades_for_user(chat_id)
+        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN"]
+
+        acct_mode = "🟡 DEMO" if is_demo else "🟢 LIVE MAINNET"
+        mirror_extra = " (Demo Fallback Mirror $10,000 Active)" if (is_admin and live_bal < 10.0) else ""
+
         msg = (
-            f"💵 <b>តម្លៃមាស (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
+            f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
             f"• Bid: <code>${bid:.2f}</code> | Ask: <code>${ask:.2f}</code> | Spread: <code>${spread:.2f}</code>\n"
-            f"🟢 <b>Capital.com Session ៖</b> <code>{session_label}</code>"
+            f"──────────────────────────────────────\n"
+            f"👤 <b>គណនី Capital.com ៖</b> <code>{acc_id}</code> ({acct_mode})\n"
+            f"• សមតុល្យសរុប (Balance) ៖ <code>${live_bal:.2f} USD</code>{mirror_extra}\n"
+            f"• សាច់ប្រាក់ទំនេរ (Available) ៖ <code>${live_avail:.2f} USD</code>\n"
+            f"• មុខតំណែង Gold កំពុងរត់ ៖ <code>{len(gold_trades)} Positions</code>\n"
+            f"🟢 <b>Broker Session ៖</b> <code>{session_label}</code>"
         )
         await self.safe_reply(update, msg)
 
