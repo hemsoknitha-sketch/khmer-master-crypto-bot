@@ -50,6 +50,28 @@ def get_gold_signal_reply_markup():
         return None
 
 
+def format_gold_signal_card(direction: str, sl: float, tp1: float, tp2: float, tp3: float) -> str:
+    """
+    Renders clean, compact institutional Gold Signal Card.
+    Fits smartphone screens perfectly without overflow or duplicate text.
+    """
+    is_buy = str(direction).upper() == "BUY"
+    dir_icon = "🟢" if is_buy else "🔴"
+    dir_text = "BUY" if is_buy else "SELL"
+    return (
+        f"<b>Angkor Quant Gold</b>\n"
+        f"───────────────\n"
+        f"{dir_icon} <b>Single Direction :</b> <code>{dir_text}</code>\n"
+        f"🎯 <b>Execution Levels ៖</b>\n"
+        f"   └ Tight SL: <code>${sl:.2f}</code> (-60.8 p)\n"
+        f"   └ TP1 (+73 pips): <code>${tp1:.2f}</code> (TP Lock)\n"
+        f"   └ TP2 (+152 pips): <code>${tp2:.2f}</code> (Guaranteed)\n"
+        f"   └ TP3 (+243 pips): <code>${tp3:.2f}</code> (Moonshot)\n"
+        f"───────────────\n"
+        f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
+    )
+
+
 def _check_network_online() -> bool:
     """Fast non-blocking pre-check for network reachability."""
     import os
@@ -438,14 +460,13 @@ class QuantGoldExecutionEngine:
                     tp1_p = signal_data["tp1"]
                     tp2_p = signal_data["tp2"]
                     tp3_p = signal_data["tp3"]
-                    dir_str = "Buy" if action == "BUY" else "Sell"
 
-                    vip_card = (
-                        f"◆ <b>New signal</b> 🥇\n\n"
-                        f"<b>{dir_str} XAUUSD now at {curr_p:.2f}</b>\n"
-                        f"<b>SL</b> <code>{sl_p:.2f}</code>\n"
-                        f"<b>TP</b> <code>{tp1_p:.2f}, {tp2_p:.2f}, {tp3_p:.2f}</code>\n\n"
-                        f"<i>Angkor Quant Gold</i>"
+                    vip_card = format_gold_signal_card(
+                        direction=action,
+                        sl=sl_p,
+                        tp1=tp1_p,
+                        tp2=tp2_p,
+                        tp3=tp3_p
                     )
                     markup = get_gold_signal_reply_markup()
                     await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)
@@ -556,13 +577,12 @@ class QuantGoldExecutionEngine:
 
                 # If broadcast to VIP requested
                 if broadcast_vip:
-                    dir_str = "Buy" if direction.upper() == "BUY" else "Sell"
-                    vip_card = (
-                        f"◆ <b>New signal</b> 🥇\n\n"
-                        f"<b>{dir_str} XAUUSD now at {entry_price:.2f}</b>\n"
-                        f"<b>SL</b> <code>{sl:.2f}</code>\n"
-                        f"<b>TP</b> <code>{tp1:.2f}, {tp2:.2f}, {tp3:.2f}</code>\n\n"
-                        f"<i>Angkor Quant Gold</i>"
+                    vip_card = format_gold_signal_card(
+                        direction=direction,
+                        sl=sl,
+                        tp1=tp1,
+                        tp2=tp2,
+                        tp3=tp3
                     )
                     markup = get_gold_signal_reply_markup()
                     await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)

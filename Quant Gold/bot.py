@@ -55,7 +55,11 @@ if _WORKSPACE_ROOT not in sys.path:
 import database as db
 import capital_engine
 from capital_gold_bridge import get_quant_gold_capital_bridge
-from execution_engine import get_quant_gold_execution_engine
+from execution_engine import (
+    get_quant_gold_execution_engine,
+    format_gold_signal_card,
+    get_gold_signal_reply_markup
+)
 
 
 def get_quant_gold_bottom_keyboard() -> ReplyKeyboardMarkup:
@@ -519,35 +523,24 @@ class QuantGoldBot:
                 tp2_val = p_buy.get("tp2", round(curr_p + 15.20, 2))
                 tp3_val = p_buy.get("tp3", round(curr_p + 24.32, 2))
 
-            vip_card = (
-                f"◆ <b>New signal</b> 🥇\n\n"
-                f"<b>{target_dir} XAUUSD now at {curr_p:.2f}</b>\n"
-                f"<b>SL</b> <code>{sl_val:.2f}</code>\n"
-                f"<b>TP</b> <code>{tp1_val:.2f}, {tp2_val:.2f}, {tp3_val:.2f}</code>\n\n"
-                f"<i>Angkor Quant Gold</i>"
+            vip_card = format_gold_signal_card(
+                direction=target_dir,
+                sl=sl_val,
+                tp1=tp1_val,
+                tp2=tp2_val,
+                tp3=tp3_val
             )
-            from execution_engine import get_gold_signal_reply_markup
             sent = await self.exec_engine.broadcast_to_vip_users(vip_card, app=self.app, reply_markup=get_gold_signal_reply_markup())
             return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ Signal ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
 
         # Clean Single-Directional Signal Card (100% Definitive, Zero Dual Confusion)
-        msg = (
-            f"◆ <b>New signal</b> 🥇\n\n"
-            f"<b>{dir_str} XAUUSD now at {curr_p:.2f}</b>\n"
-            f"<b>SL</b> <code>{sl_val:.2f}</code>\n"
-            f"<b>TP</b> <code>{tp1_val:.2f}, {tp2_val:.2f}, {tp3_val:.2f}</code>\n\n"
-            f"<i>Angkor Quant Gold</i>\n"
-            f"────────────────────────\n"
-            f"{dir_icon} <b>Single Direction :</b> <code>{dir_str.upper()} (100% Bias Confluence)</code>\n"
-            f"🎯 <b>Execution Levels ៖</b>\n"
-            f"   └ Tight SL: <code>${sl_val:.2f}</code> (-60.8 p)\n"
-            f"   └ TP1 (+73 pips): <code>${tp1_val:.2f}</code> (Breakeven Armor Lock)\n"
-            f"   └ TP2 (+152 pips): <code>${tp2_val:.2f}</code> (Guaranteed Cash Floor)\n"
-            f"   └ TP3 (+243 pips): <code>${tp3_val:.2f}</code> (Moonshot Runner)\n"
-            f"────────────────────────\n"
-            f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
+        msg = format_gold_signal_card(
+            direction=resolved_dir,
+            sl=sl_val,
+            tp1=tp1_val,
+            tp2=tp2_val,
+            tp3=tp3_val
         )
-        from execution_engine import get_gold_signal_reply_markup
         await self.safe_reply(update, msg, reply_markup=get_gold_signal_reply_markup())
 
     async def handle_buy(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
