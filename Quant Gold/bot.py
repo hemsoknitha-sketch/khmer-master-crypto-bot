@@ -87,10 +87,12 @@ class QuantGoldBot:
                 BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
                 BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
                 BotCommand("gold", "📈 Gold Real-Time Intelligence & Analysis"),
+                BotCommand("scan", "🔄 Refresh 19-Timeframe Confluence Scan"),
                 BotCommand("buy", "🟢 Execute Instant 1-Tap Market Buy on Gold"),
                 BotCommand("sell", "🔴 Execute Instant 1-Tap Market Sell on Gold"),
                 BotCommand("positions", "📊 View Active Gold Positions & Breakeven"),
                 BotCommand("close", "🛑 Close All Active Gold Positions"),
+                BotCommand("panic", "🚨 Emergency Close All Gold Positions"),
                 BotCommand("auto", "🤖 Toggle 24/7 Autonomous Gold Trading"),
                 BotCommand("status", "⚡ Check Live Price, Capital Session & VPS Health"),
                 BotCommand("help", "📖 User Guide & Risk Management Handbook")
@@ -124,10 +126,13 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("start", self.handle_start))
         self.app.add_handler(CommandHandler("capital", self.handle_start))
         self.app.add_handler(CommandHandler("gold", self.handle_start))
+        self.app.add_handler(CommandHandler("scan", self.handle_start))
         self.app.add_handler(CommandHandler("buy", self.handle_buy))
         self.app.add_handler(CommandHandler("sell", self.handle_sell))
         self.app.add_handler(CommandHandler("positions", self.handle_positions))
         self.app.add_handler(CommandHandler("close", self.handle_close_all))
+        self.app.add_handler(CommandHandler("close_all", self.handle_close_all))
+        self.app.add_handler(CommandHandler("panic", self.handle_close_all))
         self.app.add_handler(CommandHandler("auto", self.handle_toggle_auto))
         self.app.add_handler(CommandHandler("status", self.handle_status))
         self.app.add_handler(CommandHandler("help", self.handle_help))
@@ -230,10 +235,23 @@ class QuantGoldBot:
         open_trades = db.get_capital_auto_trades_for_user(chat_id)
         gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN"]
 
+        # Check broker live positions directly from Capital.com
+        u_eng = capital_engine.get_user_capital_engine(chat_id)
+        broker_gold = []
+        try:
+            broker_pos = u_eng.get_open_positions() if hasattr(u_eng, "get_open_positions") else []
+            broker_gold = [
+                p for p in broker_pos
+                if str(p.get("market", {}).get("epic", "")).upper() == "GOLD"
+                or str(p.get("epic", "")).upper() == "GOLD"
+            ]
+        except Exception as e_bp:
+            logger.debug(f"Broker open positions check note: {e_bp}")
+
         bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
         curr_p = (bid + ask) / 2.0
 
-        if not gold_trades:
+        if not gold_trades and not broker_gold:
             msg = (
                 f"📊 <b>[QUANT GOLD POSITIONS]</b> 🥇\n"
                 f"══════════════════════════════════════\n"
@@ -250,7 +268,11 @@ class QuantGoldBot:
             f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន ៖</b> <code>${curr_p:.2f}</code> (Spread: <code>${spread:.2f}</code>)\n"
         ]
         total_upl = 0.0
+        seen_deals = set()
+
         for i, t in enumerate(gold_trades, 1):
+            deal_id = str(t.get("deal_id", ""))
+            seen_deals.add(deal_id)
             direction = t.get("direction", "BUY")
             size = float(t.get("size", 0.05) or 0.05)
             entry = float(t.get("entry_price", curr_p) or curr_p)
@@ -267,6 +289,28 @@ class QuantGoldBot:
                 f"<b>#{i} {direction} {size} Lot GOLD</b>\n"
                 f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
                 f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | {be_str}\n"
+            )
+
+        # Append any live broker positions not tracked in local DB
+        for bp in broker_gold:
+            pos_info = bp.get("position", {}) if isinstance(bp.get("position"), dict) else bp
+            deal_id = str(pos_info.get("dealId", ""))
+            if deal_id and deal_id in seen_deals:
+                continue
+            direction = str(pos_info.get("direction", "BUY")).upper()
+            size = float(pos_info.get("size", 0.05) or 0.05)
+            entry = float(pos_info.get("level", curr_p) or curr_p)
+            sl = float(pos_info.get("stopLevel", 0.0) or 0.0)
+            upl = float(pos_info.get("upl", 0.0) or 0.0)
+            if upl == 0.0:
+                upl = (curr_p - entry) * size if direction == "BUY" else (entry - curr_p) * size
+            total_upl += upl
+            p_icon = "🟢" if upl >= 0 else "🔴"
+
+            lines.append(
+                f"<b>#Broker {direction} {size} Lot GOLD</b>\n"
+                f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code>\n"
+                f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | 🌐 Live Broker Sync\n"
             )
 
         t_icon = "🟢" if total_upl >= 0 else "🔴"
@@ -286,20 +330,45 @@ class QuantGoldBot:
         open_trades = db.get_capital_auto_trades_for_user(chat_id)
         gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN"]
 
-        if not gold_trades:
+        # Also fetch live broker positions
+        broker_gold = []
+        try:
+            broker_pos = u_eng.get_open_positions() if hasattr(u_eng, "get_open_positions") else []
+            broker_gold = [
+                p for p in broker_pos
+                if str(p.get("market", {}).get("epic", "")).upper() == "GOLD"
+                or str(p.get("epic", "")).upper() == "GOLD"
+            ]
+        except Exception:
+            broker_gold = []
+
+        if not gold_trades and not broker_gold:
             await self.safe_reply(update, "ℹ️ គ្មាន Position មាសណាមួយកំពុងបើកដើម្បីបិទឡើយ។")
             return
 
         closed_cnt = 0
+        seen_deals = set()
+
         for t in gold_trades:
             deal_id = t.get("deal_id")
             if deal_id:
+                seen_deals.add(str(deal_id))
                 try:
                     u_eng.close_position(deal_id)
                     db.close_capital_auto_trade(deal_id, exit_price=0.0, exit_reason="USER_MANUAL_CLOSE_ALL")
                     closed_cnt += 1
                 except Exception as e:
                     logger.warning(f"Error closing deal {deal_id}: {e}")
+
+        for bp in broker_gold:
+            pos_info = bp.get("position", {}) if isinstance(bp.get("position"), dict) else bp
+            pos_id = pos_info.get("dealId") or bp.get("dealId")
+            if pos_id and str(pos_id) not in seen_deals:
+                try:
+                    u_eng.close_position(pos_id)
+                    closed_cnt += 1
+                except Exception as e:
+                    logger.warning(f"Error closing broker deal {pos_id}: {e}")
 
         await self.safe_reply(
             update,
@@ -416,6 +485,12 @@ class QuantGoldBot:
 
         elif data == "btn_qgold_positions":
             await self.handle_positions(update, context)
+
+        elif data == "btn_qgold_status":
+            await self.handle_status(update, context)
+
+        elif data == "btn_qgold_help":
+            await self.handle_help(update, context)
 
         elif data == "btn_qgold_close_all":
             try:

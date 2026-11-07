@@ -301,19 +301,19 @@ class QuantGoldExecutionEngine:
                     try:
                         import notification_manager
                         alert_msg = (
-                            f"🥇 **[QUANT GOLD AUTO DISPATCH]** ⚡\n"
+                            f"🥇 <b>[QUANT GOLD AUTO DISPATCH]</b> ⚡\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"📊 **Action :** `{'🟢 BUY' if action == 'BUY' else '🔴 SELL'}` @ `${signal_data['current_price']:.2f}`\n"
-                            f"🛡️ **Structural SL :** `${signal_data['sl']:.2f}`\n"
-                            f"🎯 **Target TP1 (+2.0R) :** `${signal_data['tp1']:.2f}` (Breakeven Armor Lock)\n"
-                            f"🎯 **Target TP2 (+4.0R) :** `${signal_data['tp2']:.2f}`\n"
-                            f"🚀 **Moonshot TP3 (+7.0R) :** `${signal_data['tp3']:.2f}`\n"
-                            f"⚡ **19-TF Alignment :** `{signal_data['mtf_summary']['counts']['bullish']}B / {signal_data['mtf_summary']['counts']['bearish']}S`\n"
-                            f"🧠 **Win Confidence :** `{signal_data['confidence']:.1f}%`\n"
+                            f"📊 <b>Action :</b> <code>{'🟢 BUY' if action == 'BUY' else '🔴 SELL'}</code> @ <code>${signal_data['current_price']:.2f}</code>\n"
+                            f"🛡️ <b>Structural SL :</b> <code>${signal_data['sl']:.2f}</code>\n"
+                            f"🎯 <b>Target TP1 (+2.0R) :</b> <code>${signal_data['tp1']:.2f}</code> (Breakeven Armor Lock)\n"
+                            f"🎯 <b>Target TP2 (+4.0R) :</b> <code>${signal_data['tp2']:.2f}</code>\n"
+                            f"🚀 <b>Moonshot TP3 (+7.0R) :</b> <code>${signal_data['tp3']:.2f}</code>\n"
+                            f"⚡ <b>19-TF Alignment :</b> <code>{signal_data['mtf_summary']['counts']['bullish']}B / {signal_data['mtf_summary']['counts']['bearish']}S</code>\n"
+                            f"🧠 <b>Win Confidence :</b> <code>{signal_data['confidence']:.1f}%</code>\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"✅ _Dispatched to {dispatched_count} active VIP Capital accounts!_"
+                            f"✅ <i>Dispatched to {dispatched_count} active VIP Capital accounts!</i>"
                         )
-                        await notification_manager.broadcast_admin(alert_msg, parse_mode="Markdown")
+                        await notification_manager.broadcast_admin(alert_msg, parse_mode="HTML")
                     except Exception:
                         pass
 
@@ -328,6 +328,74 @@ class QuantGoldExecutionEngine:
             return {"status": "ERROR", "error": str(e)}
         finally:
             self._is_evaluating = False
+
+    async def execute_smart_order_for_user(
+        self,
+        chat_id: int,
+        direction: str,
+        size: float = 0.05,
+        sl: float = 0.0,
+        tp: float = 0.0
+    ) -> Dict[str, Any]:
+        """
+        Executes a 1-tap manual or VIP Gold order for a specific user on Capital.com
+        with structural SL, breakeven protection, and database tracking.
+        """
+        try:
+            u_eng = capital_engine.get_user_capital_engine(chat_id)
+            bid, ask, spread = self.get_live_gold_price_quote()
+            curr_p = (bid + ask) / 2.0
+
+            # Calculate structural SL if not provided
+            if sl <= 0.0:
+                sl_dist = max(3.50, spread * 3.5)
+                sl = (curr_p - sl_dist) if direction.upper() == "BUY" else (curr_p + sl_dist)
+            if tp <= 0.0:
+                tp_dist = abs(curr_p - sl) * 2.0
+                tp = (curr_p + tp_dist) if direction.upper() == "BUY" else (curr_p - tp_dist)
+
+            order_res = await asyncio.to_thread(
+                u_eng.execute_smart_tradfi_order,
+                epic="GOLD",
+                direction=direction.upper(),
+                size=size,
+                sl=round(sl, 2),
+                tp=round(tp, 2),
+                bypass_quant_eval=True,
+                bypass_citadel=True,
+                setup_type="VIP_1TAP_GOLD"
+            )
+
+            if order_res.get("success"):
+                deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
+                entry_price = float(order_res.get("entry_price") or order_res.get("price") or curr_p)
+                sl_dist = abs(entry_price - sl)
+                tp1 = round(tp, 2)
+                tp2 = round((entry_price + (sl_dist * 4.0)) if direction.upper() == "BUY" else (entry_price - (sl_dist * 4.0)), 2)
+                tp3 = round((entry_price + (sl_dist * 7.0)) if direction.upper() == "BUY" else (entry_price - (sl_dist * 7.0)), 2)
+
+                db.record_capital_auto_trade(
+                    chat_id=chat_id,
+                    deal_id=str(deal_id),
+                    deal_reference=str(deal_id),
+                    epic="GOLD",
+                    direction=direction.upper(),
+                    size=size,
+                    entry_price=entry_price,
+                    sl=round(sl, 2),
+                    tp=tp1,
+                    scale_tier=0,
+                    sl_dist=sl_dist,
+                    tranche_id="SINGLE",
+                    tp1=tp1,
+                    tp2=tp2,
+                    tp3=tp3
+                )
+                logger.info(f"✅ [1-TAP GOLD] User {chat_id} placed {direction} {size} GOLD @ ${entry_price:.2f} (SL: ${sl:.2f}, TP1: ${tp1:.2f})")
+            return order_res
+        except Exception as e:
+            logger.error(f"❌ [1-TAP GOLD] Error placing Gold order for {chat_id}: {e}", exc_info=True)
+            return {"success": False, "message": str(e)}
 
     async def _audit_and_protect_open_gold_positions(self, app=None):
         """

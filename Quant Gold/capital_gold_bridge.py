@@ -126,14 +126,37 @@ class QuantGoldCapitalBridge:
             ],
             [
                 InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh"),
-                InlineKeyboardButton("⚙️ Toggle Auto Gold", callback_data="btn_qgold_toggle")
+                InlineKeyboardButton("🤖 Toggle Auto Gold", callback_data="btn_qgold_toggle")
             ],
             [
-                InlineKeyboardButton("🏛️ Return to /capital Menu", callback_data="btn_capital_menu")
+                InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions"),
+                InlineKeyboardButton("⚡ VPS & Price Status", callback_data="btn_qgold_status")
+            ],
+            [
+                InlineKeyboardButton("🚨 Panic Close ALL", callback_data="btn_qgold_close_all"),
+                InlineKeyboardButton("📖 User Guide / Help", callback_data="btn_qgold_help")
             ]
         ])
 
         return text, kb
+
+    async def _safe_send(self, update: Update, text: str, reply_markup=None, parse_mode="HTML"):
+        """Sends a telegram message safely with HTML, falling back to plain text if needed."""
+        msg = update.effective_message
+        if not msg:
+            return None
+        try:
+            return await msg.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
+        except Exception as e:
+            logger.warning(f"Telegram {parse_mode} reply notice ({e}), falling back to plain text")
+            import re
+            clean = re.sub(r"<[^>]+>", "", text)
+            clean = clean.replace("**", "").replace("`", "")
+            try:
+                return await msg.reply_text(clean, reply_markup=reply_markup)
+            except Exception as e2:
+                logger.error(f"Plain text fallback also failed: {e2}")
+                return None
 
     async def handle_telegram_gold_subcommand(
         self,
@@ -161,7 +184,7 @@ class QuantGoldCapitalBridge:
 
         if sub_action in ["GOLD", "XAUUSD", "MENU"]:
             text, kb = await self.build_quant_gold_overview_ui(chat_id, user_lang)
-            await update.effective_message.reply_text(text, parse_mode="Markdown", reply_markup=kb)
+            await self._safe_send(update, text, reply_markup=kb)
             return True
 
         elif sub_action in ["BUY", "SELL"]:
@@ -176,12 +199,11 @@ class QuantGoldCapitalBridge:
             sl = sig.get("sl", 0.0)
             tp1 = sig.get("tp1", 0.0)
 
-            c_eng = capital_engine.get_user_capital_engine(chat_id)
-            wait_m = await update.effective_message.reply_text(
-                f"⚡ **[EXECUTING 1-TAP QUANT GOLD {sub_action}]** 🥇\n"
-                f"• Size: `{lot} Lot` | Invalidation SL: `${sl:.2f}` | TP1: `${tp1:.2f}`\n"
-                f"_Dispatching order to Capital.com via Sub-Millisecond Bridge..._",
-                parse_mode="Markdown"
+            await self._safe_send(
+                update,
+                f"⚡ <b>[EXECUTING 1-TAP QUANT GOLD {sub_action}]</b> 🥇\n"
+                f"• Size: <code>{lot} Lot</code> | Invalidation SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
+                f"<i>Dispatching order to Capital.com via Sub-Millisecond Bridge...</i>"
             )
 
             res = await self.exec_engine.execute_smart_order_for_user(
@@ -190,54 +212,55 @@ class QuantGoldCapitalBridge:
                 size=lot,
                 sl=sl,
                 tp=tp1
-            ) if hasattr(self.exec_engine, "execute_smart_order_for_user") else await self._execute_user_order_fallback(chat_id, sub_action, lot, sl, tp1)
+            )
 
             if res.get("success"):
-                await update.effective_message.reply_text(
-                    f"✅ **[QUANT GOLD ORDER FILLED]** 🟢\n"
+                await self._safe_send(
+                    update,
+                    f"✅ <b>[QUANT GOLD ORDER FILLED]</b> 🟢\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"• Instrument: `GOLD (XAUUSD)`\n"
-                    f"• Direction: `{sub_action}` | Size: `{lot} Lot`\n"
-                    f"• Invalidation SL: `${sl:.2f}`\n"
-                    f"• Target TP1: `${tp1:.2f}` (Breakeven Armor Armed)\n"
+                    f"• Instrument: <code>GOLD (XAUUSD)</code>\n"
+                    f"• Direction: <code>{sub_action}</code> | Size: <code>{lot} Lot</code>\n"
+                    f"• Invalidation SL: <code>${sl:.2f}</code>\n"
+                    f"• Target TP1: <code>${tp1:.2f}</code> (Breakeven Armor Armed)\n"
                     f"{ui_standards.DIVIDER_LIGHT}\n"
-                    f"🛡️ _Trade is protected by Dynamic Trailing Ratchet & Shock Early Harvest!_",
-                    parse_mode="Markdown"
+                    f"🛡️ <i>Trade is protected by Dynamic Trailing Ratchet & Shock Early Harvest!</i>"
                 )
             else:
-                await update.effective_message.reply_text(
-                    f"⚠️ **[ORDER REJECTED]** : `{res.get('message', 'Broker error')}`",
-                    parse_mode="Markdown"
+                await self._safe_send(
+                    update,
+                    f"⚠️ <b>[ORDER REJECTED]</b> : <code>{res.get('message', 'Broker error')}</code>"
                 )
             return True
 
         elif sub_action in ["ON", "ENABLE", "START"]:
             db.set_capital_auto_config(chat_id=chat_id, enabled=True, budget=300.0, max_positions=5, is_demo=False)
-            await update.effective_message.reply_text(
-                "🥇 **[QUANT GOLD AUTONOMOUS ENGINE ACTIVATED]** 🟢\n"
+            await self._safe_send(
+                update,
+                f"🥇 <b>[QUANT GOLD AUTONOMOUS ENGINE ACTIVATED]</b> 🟢\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                "• Target: `Spot Gold (XAUUSD)` 100% Exclusively\n"
-                "• 19-Timeframe Confluence & AI Swarm: `ACTIVE`\n"
-                "• Breakeven Armor & Zero Loss Risk Protocol: `ARMED`\n"
-                "• 24/7 Free Execution: `Google Cloud + Hugging Face Serverless`",
-                parse_mode="Markdown"
+                f"• Target: <code>Spot Gold (XAUUSD)</code> 100% Exclusively\n"
+                f"• 19-Timeframe Confluence & AI Swarm: <code>ACTIVE</code>\n"
+                f"• Breakeven Armor & Zero Loss Risk Protocol: <code>ARMED</code>\n"
+                f"• 24/7 Free Execution: <code>Google Cloud + Hugging Face Serverless</code>"
             )
             return True
 
         elif sub_action in ["OFF", "DISABLE", "STOP"]:
             db.set_capital_auto_config(chat_id=chat_id, enabled=False)
-            await update.effective_message.reply_text(
-                "⏸️ **[QUANT GOLD AUTONOMOUS ENGINE PAUSED]** 🔴\n"
+            await self._safe_send(
+                update,
+                f"⏸️ <b>[QUANT GOLD AUTONOMOUS ENGINE PAUSED]</b> 🔴\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                "Automated Gold order dispatch is now paused for your account.",
-                parse_mode="Markdown"
+                f"Automated Gold order dispatch is now paused for your account."
             )
             return True
 
         return False
 
     async def _execute_user_order_fallback(self, chat_id: int, direction: str, size: float, sl: float, tp: float) -> Dict[str, Any]:
-        """Fallback order executor."""
+        """Fallback order executor delegating directly to execution engine."""
+        return await self.exec_engine.execute_smart_order_for_user(chat_id, direction, size, sl, tp)
         try:
             import asyncio
             u_eng = capital_engine.get_user_capital_engine(chat_id)
