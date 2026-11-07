@@ -41,6 +41,9 @@ logger = logging.getLogger("QUANT_GOLD_EXECUTION")
 
 def _check_network_online() -> bool:
     """Fast non-blocking pre-check for network reachability."""
+    import os
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return False
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

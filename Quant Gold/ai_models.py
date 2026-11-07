@@ -39,6 +39,9 @@ except ImportError:
 
 def _check_network_online() -> bool:
     """Fast non-blocking pre-check for network reachability."""
+    import os
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return False
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -148,7 +151,8 @@ TASK: Provide JSON output only:
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=300,
-                    temperature=0.2
+                    temperature=0.2,
+                    timeout=2.0
                 )
                 text = response.choices[0].message.content.strip()
                 # Extract JSON if wrapped in markdown
@@ -159,12 +163,9 @@ TASK: Provide JSON output only:
                 parsed = json.loads(text)
                 return parsed
             except Exception as e:
-                err_s = str(e).lower()
                 logger.debug(f"DeepSeek R1 {model} query note: {e}")
-                if "connection" in err_s or "proxy" in err_s or "timeout" in err_s or "forbidden" in err_s or "10013" in err_s:
-                    self._network_offline_until = time.time() + 60.0
-                    break  # Unreachable network, avoid useless retries
-                continue
+                self._network_offline_until = time.time() + 60.0
+                break
         return None
 
     def _query_llama_70b_hf(self, prompt: str) -> Optional[Dict[str, Any]]:
@@ -184,7 +185,8 @@ TASK: Provide JSON output only:
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=250,
-                    temperature=0.2
+                    temperature=0.2,
+                    timeout=2.0
                 )
                 text = response.choices[0].message.content.strip()
                 if "```json" in text:
@@ -194,12 +196,9 @@ TASK: Provide JSON output only:
                 parsed = json.loads(text)
                 return parsed
             except Exception as e:
-                err_s = str(e).lower()
                 logger.debug(f"Llama HF {model} query note: {e}")
-                if "connection" in err_s or "proxy" in err_s or "timeout" in err_s or "forbidden" in err_s or "10013" in err_s:
-                    self._network_offline_until = time.time() + 60.0
-                    break
-                continue
+                self._network_offline_until = time.time() + 60.0
+                break
         return None
 
     def _query_gemini_flash(self, prompt: str) -> Optional[Dict[str, Any]]:
@@ -221,7 +220,8 @@ TASK: Provide JSON output only:
                     generation_config=genai.types.GenerationConfig(
                         temperature=0.2,
                         max_output_tokens=300
-                    )
+                    ),
+                    request_options={"timeout": 2.0}
                 )
                 text = resp.text.strip()
                 if "```json" in text:
@@ -231,12 +231,9 @@ TASK: Provide JSON output only:
                 parsed = json.loads(text)
                 return parsed
             except Exception as e:
-                err_s = str(e).lower()
                 logger.debug(f"Gemini {m_name} query note: {e}")
-                if "connection" in err_s or "proxy" in err_s or "timeout" in err_s or "forbidden" in err_s or "10013" in err_s:
-                    self._network_offline_until = time.time() + 60.0
-                    break
-                continue
+                self._network_offline_until = time.time() + 60.0
+                break
         return None
 
     def _vectorized_algorithmic_fallback(
@@ -305,7 +302,7 @@ TASK: Provide JSON output only:
         deepseek_res = None
         llama_res = None
 
-        is_online = _check_network_online()
+        is_online = _check_network_online() and os.getenv("OFFLINE_MODE", "0") != "1"
         if now >= self._network_offline_until and is_online:
             # Concurrently query AI models with bounded timeout
             async def _run_gemini():

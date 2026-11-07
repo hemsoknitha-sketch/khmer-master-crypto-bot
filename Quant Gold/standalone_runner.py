@@ -125,11 +125,15 @@ class QuantGoldDaemon:
 
 
 def main():
-    daemon = QuantGoldDaemon()
     try:
-        asyncio.run(daemon.run())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Process terminated by user or systemd.")
+        from main import main as quant_gold_main
+        quant_gold_main()
+    except ImportError:
+        daemon = QuantGoldDaemon()
+        try:
+            asyncio.run(daemon.run())
+        except (KeyboardInterrupt, SystemExit):
+            logger.info("Process terminated by user or systemd.")
 
 
 if __name__ == "__main__":

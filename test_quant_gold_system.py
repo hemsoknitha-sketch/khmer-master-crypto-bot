@@ -15,8 +15,9 @@ import sys
 import os
 import asyncio
 
-# Set unbuffered stdout
+# Set unbuffered stdout & deterministic test mode
 sys.stdout.reconfigure(line_buffering=True)
+os.environ["OFFLINE_MODE"] = "1"
 
 def run_tests():
     print("=" * 70, flush=True)
