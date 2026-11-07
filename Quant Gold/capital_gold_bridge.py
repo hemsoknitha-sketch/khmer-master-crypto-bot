@@ -191,12 +191,12 @@ class QuantGoldCapitalBridge:
             return True
 
         elif sub_action in ["BUY", "SELL"]:
-            lot = 0.05
+            lot = 0.5
             if len(args) > 1:
                 try:
-                    lot = float(args[1])
+                    lot = max(0.5, float(args[1]))
                 except ValueError:
-                    lot = 0.05
+                    lot = 0.5
 
             sig = await self.exec_engine.evaluate_gold_master_signal()
             sl = sig.get("sl", 0.0)
@@ -205,7 +205,7 @@ class QuantGoldCapitalBridge:
             await self._safe_send(
                 update,
                 f"⚡ <b>[EXECUTING 1-TAP QUANT GOLD {sub_action}]</b> 🥇\n"
-                f"• Size: <code>{lot} Lot</code> | Invalidation SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
+                f"• Size: <code>{lot} oz (Troy Ounces)</code> | Invalidation SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
                 f"<i>Dispatching order to Capital.com via Sub-Millisecond Bridge...</i>"
             )
 

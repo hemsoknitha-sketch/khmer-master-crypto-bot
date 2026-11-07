@@ -60,7 +60,7 @@ def get_quant_gold_bottom_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🔄 Scan 19 TFs")],
-            [KeyboardButton("🟢 BUY GOLD (0.05)"), KeyboardButton("🔴 SELL GOLD (0.05)")],
+            [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
             [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)")],
             [KeyboardButton("💵 Status"), KeyboardButton("🖥️ Health"), KeyboardButton("📖 Help")]
         ],
@@ -461,23 +461,23 @@ class QuantGoldBot:
             return await self.handle_inspect_user(update, args[0])
 
     async def handle_buy(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Executes instant Gold Buy order."""
-        lot = 0.05
+        """Executes instant Gold Buy order. Default size: 0.5 Troy Ounce ($4.07 margin @ 500:1)."""
+        lot = 0.5
         if context.args:
             try:
-                lot = float(context.args[0])
+                lot = max(0.5, float(context.args[0]))
             except ValueError:
-                lot = 0.05
+                lot = 0.5
         await self.bridge.handle_telegram_gold_subcommand(update, context, ["BUY", str(lot)])
 
     async def handle_sell(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Executes instant Gold Sell order."""
-        lot = 0.05
+        """Executes instant Gold Sell order. Default size: 0.5 Troy Ounce ($4.07 margin @ 500:1)."""
+        lot = 0.5
         if context.args:
             try:
-                lot = float(context.args[0])
+                lot = max(0.5, float(context.args[0]))
             except ValueError:
-                lot = 0.05
+                lot = 0.5
         await self.bridge.handle_telegram_gold_subcommand(update, context, ["SELL", str(lot)])
 
     async def handle_positions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -525,7 +525,7 @@ class QuantGoldBot:
             deal_id = str(t.get("deal_id", ""))
             seen_deals.add(deal_id)
             direction = t.get("direction", "BUY")
-            size = float(t.get("size", 0.05) or 0.05)
+            size = float(t.get("size", 0.5) or 0.5)
             entry = float(t.get("entry_price", curr_p) or curr_p)
             sl = float(t.get("sl", 0.0) or 0.0)
             tp1 = float(t.get("tp1", 0.0) or 0.0)
@@ -537,7 +537,7 @@ class QuantGoldBot:
             be_str = "🛡️ Breakeven Active (0.00R Risk)" if be_active else "⏳ Initial Structural SL"
 
             lines.append(
-                f"<b>#{i} {direction} {size} Lot GOLD</b>\n"
+                f"<b>#{i} {direction} {size} oz GOLD</b>\n"
                 f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
                 f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | {be_str}\n"
             )
@@ -549,7 +549,7 @@ class QuantGoldBot:
             if deal_id and deal_id in seen_deals:
                 continue
             direction = str(pos_info.get("direction", "BUY")).upper()
-            size = float(pos_info.get("size", 0.05) or 0.05)
+            size = float(pos_info.get("size", 0.5) or 0.5)
             entry = float(pos_info.get("level", curr_p) or curr_p)
             sl = float(pos_info.get("stopLevel", 0.0) or 0.0)
             upl = float(pos_info.get("upl", 0.0) or 0.0)
@@ -559,7 +559,7 @@ class QuantGoldBot:
             p_icon = "🟢" if upl >= 0 else "🔴"
 
             lines.append(
-                f"<b>#Broker {direction} {size} Lot GOLD</b>\n"
+                f"<b>#Broker {direction} {size} oz GOLD</b>\n"
                 f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code>\n"
                 f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | 🌐 Live Broker Sync\n"
             )

@@ -55,6 +55,36 @@ def _check_network_online() -> bool:
         return False
 
 
+def calculate_capital_gold_lot_size(
+    budget: float,
+    current_price: float = 4071.78,
+    confidence: float = 50.0,
+    leverage: float = 500.0
+) -> float:
+    """
+    Computes Capital.com Gold (XAUUSD) order size in Troy Ounces.
+    - Contract Unit: Troy Ounces (oz)
+    - Minimum Deal Size: 0.5 Troy Ounce (Margin required = ~$4.07 at 500:1 leverage)
+    - Maximum Margin Cap: Clamped at <= 20% of account budget under supreme conviction (>=90%)
+    """
+    margin_per_oz = max(1.0, current_price / max(1.0, leverage))  # ~$8.14 per oz at 500:1
+    max_margin_allowed = max(4.07, budget * 0.20)
+    max_size_allowed = max(0.5, round(max_margin_allowed / margin_per_oz, 1))
+
+    # Dynamic conviction scaling
+    if confidence >= 90.0:
+        # Supreme Conviction (90% - 99.99%): Scale up to 20% margin ceiling
+        calculated_size = max_size_allowed
+    elif confidence >= 80.0:
+        # High Conviction: Scale to ~10% margin (~50% of ceiling)
+        calculated_size = max(0.5, round(max_size_allowed * 0.5, 1))
+    else:
+        # Baseline / Standard: Pure minimum 0.5 Troy Ounces ($4.07 margin)
+        calculated_size = 0.5
+
+    return max(0.5, min(max_size_allowed, calculated_size))
+
+
 class QuantGoldExecutionEngine:
     """
     Dedicated High-Conviction, High Win-Rate Gold Execution Engine for Capital.com.
@@ -253,11 +283,17 @@ class QuantGoldExecutionEngine:
                         logger.debug(f"User {cid} already holds open GOLD position. Skipping duplicate entry.")
                         continue
 
-                    # Sizing: Clamped structural dollar risk <= $2.50 on micro accounts
+                    # Sizing: Minimum 0.5 Troy Ounces ($4.07 margin @ 500:1), scaling up to 20% margin under supreme conviction
                     budget = float(user.get("budget", 200.0) or 200.0)
                     sl_dist = abs(signal_data["current_price"] - signal_data["sl"])
-                    dollar_risk = min(5.0, budget * 0.02)  # 2% or $5 max
-                    lot_size = max(0.01, min(0.10, round(dollar_risk / max(1.0, sl_dist), 2)))
+                    curr_p = float(signal_data.get("current_price", 4071.78))
+                    conf = float(signal_data.get("confidence", 50.0))
+                    lot_size = calculate_capital_gold_lot_size(
+                        budget=budget,
+                        current_price=curr_p,
+                        confidence=conf,
+                        leverage=500.0
+                    )
 
                     # Place Order via Capital Engine
                     try:
@@ -333,15 +369,17 @@ class QuantGoldExecutionEngine:
         self,
         chat_id: int,
         direction: str,
-        size: float = 0.05,
+        size: float = 0.5,
         sl: float = 0.0,
         tp: float = 0.0
     ) -> Dict[str, Any]:
         """
         Executes a 1-tap manual or VIP Gold order for a specific user on Capital.com
         with structural SL, breakeven protection, and database tracking.
+        Default minimum size: 0.5 Troy Ounce (Margin required = ~$4.07 at 500:1 leverage).
         """
         try:
+            size = max(0.5, float(size or 0.5))
             u_eng = capital_engine.get_user_capital_engine(chat_id)
             bid, ask, spread = self.get_live_gold_price_quote()
             curr_p = (bid + ask) / 2.0
@@ -422,7 +460,7 @@ class QuantGoldExecutionEngine:
                     deal_id = tr.get("deal_id")
                     entry_p = float(tr.get("entry_price", curr_p))
                     dir_side = str(tr.get("direction", "BUY")).upper()
-                    sz = float(tr.get("size", 0.05))
+                    sz = float(tr.get("size", 0.5) or 0.5)
                     sl = float(tr.get("sl", 0.0))
                     tp1 = float(tr.get("tp1", 0.0))
 
