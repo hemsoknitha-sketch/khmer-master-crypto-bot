@@ -20,6 +20,11 @@ Purpose:
 import os
 import sys
 import signal
+import threading
+
+# Force headless CLI mode for VPS
+if "--cli" not in sys.argv:
+    sys.argv.append("--cli")
 
 # Set line-buffered UTF-8 output
 if hasattr(sys.stdout, "reconfigure"):
@@ -69,12 +74,31 @@ def main():
 
     from ai_engine import AIInvestmentEngine
     from bot_thread import TelegramBotThread
+    from standalone_runner import QuantGoldDaemon
 
+    # 1. Start Autonomous Quant Gold 19-TF Cycle in dedicated thread
+    gold_daemon = QuantGoldDaemon()
+
+    def run_gold_daemon():
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(gold_daemon.run())
+        except Exception as e_daemon:
+            print(f"⚠️ [QUANT GOLD DAEMON BACKGROUND EXCEPTION]: {e_daemon}")
+
+    daemon_thread = threading.Thread(target=run_gold_daemon, daemon=True, name="QuantGoldAutonomousThread")
+    daemon_thread.start()
+    print("🥇 [AUTONOMOUS ENGINE] Quant Gold 19-TF 24/7 autonomous daemon started in background thread.")
+
+    # 2. Initialize Telegram Bot Thread
     ai_engine = AIInvestmentEngine(api_key=gemini_key)
     bot_service = TelegramBotThread(bot_token, ai_engine)
 
     def sig_handler(signum, frame):
         print(f"\n🛑 Shutdown signal ({signum}) received. Stopping Bot gracefully...")
+        gold_daemon.is_running = False
         bot_service.stop()
         sys.exit(0)
 

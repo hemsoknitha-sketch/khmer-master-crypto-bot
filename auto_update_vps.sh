@@ -199,22 +199,26 @@ sudo sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216" 2>/dev/null || true
 sudo sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216" 2>/dev/null || true
 
 # 7. Start Systemd Service Cleanly
-echo "🔄 [SYSTEMD] Starting khmer-master-crypto-bot service on Google Cloud VPS..."
-if [ ! -f "/etc/systemd/system/khmer-master-crypto-bot.service" ]; then
-    echo "⚙️ [SYSTEMD] Service file not found. Auto-configuring via setup_vps_service.sh..."
-    bash setup_vps_service.sh || true
-else
+echo "🔄 [SYSTEMD] Starting services on Google Cloud VPS..."
+if [ -f "/etc/systemd/system/quant-gold.service" ]; then
+    echo "🥇 [SYSTEMD] Restarting quant-gold.service..."
+    sudo systemctl restart quant-gold.service 2>/dev/null || true
+fi
+
+if [ -f "/etc/systemd/system/khmer-master-crypto-bot.service" ]; then
     # Ensure aliases exist
     if [ ! -f "/etc/systemd/system/khmer-master-crypto.service" ]; then
         sudo ln -sf /etc/systemd/system/khmer-master-crypto-bot.service /etc/systemd/system/khmer-master-crypto.service 2>/dev/null || true
         sudo systemctl daemon-reload 2>/dev/null || true
     fi
-    sudo systemctl restart quant-gold.service 2>/dev/null || true
     sudo systemctl restart khmer-master-crypto-bot.service 2>/dev/null || \
     sudo systemctl restart khmer-master-crypto.service 2>/dev/null || \
     sudo systemctl restart khmer-crypto-bot.service 2>/dev/null || \
     sudo systemctl restart khmer-master-crypto-bot 2>/dev/null || true
     sudo systemctl restart angkor-gold-youtube-live.service 2>/dev/null || true
+elif [ ! -f "/etc/systemd/system/quant-gold.service" ]; then
+    echo "⚙️ [SYSTEMD] Service file not found. Auto-configuring via setup_vps_service.sh..."
+    bash setup_vps_service.sh || true
 fi
 
 # Reset terminal to pristine clean state
