@@ -11,8 +11,8 @@ Key Architecture:
   3. SMC Turtle Soup & FVG Retest Execution (Zero Top/Bottom Chasing)
   4. Equilibrium Chop Zone Gate (Strictly Blocks Middle 30% Range [35% - 65%])
   5. Structural Breathing Stop Loss (Anchored Behind Invalidation Wick)
-  6. Institutional 3-Stage Scale-Out (TP1 +2.0R, TP2 +4.0R, Moonshot Runner)
-  7. Breakeven Armor (Ratchets SL to Entry + 0.5x Spread upon TP1 Hit -> 0.00R Risk)
+  6. Institutional 3-Stage Scale-Out (TP1 +2.5R, TP2 +4.0R, Moonshot Runner)
+  7. Breakeven Armor (Ratchets SL to Entry + 0.5x Spread upon +2.5R TP1 Hit -> 0.00R Risk)
   8. Flash Shock Early Harvest (Locks Gains if Peak Profit Retraces >= 50%)
   9. Adaptive Post-Loss Re-Study Protocol (Catches True Reversal After Stop Hunts)
 =====================================================

@@ -7,7 +7,7 @@ Specialization: 100% Dedicated Institutional Spot Gold (XAUUSD / Gold) Engine
 Hierarchy: 19 Timeframes (M1, M2, M3, M4, M5, M10, M15, M20, M30, M45, H1, H2, H3, H4, H6, H8, D1, W1, MN)
 AI Infrastructure: Google Gemini Flash + Hugging Face Serverless (DeepSeek-R1, Llama-3-70B, Qwen-2.5) via HF_TOKEN
 Mathematical Disciplines: Multi-Scale Hurst, 2D Kalman Filter, Ornstein-Uhlenbeck, Hawkes Point Process, SGE-LBMA Arbitrage, Conformal Prediction
-Risk Management: Structural Invalidation SL, Breakeven Armor (+2.0R), 3-Stage Scale-Out, Shock Early Harvest, Adaptive Post-Loss Re-Study
+Risk Management: Structural Invalidation SL, Breakeven Armor (+2.5R), 3-Stage Scale-Out, Shock Early Harvest, Adaptive Post-Loss Re-Study
 ==================================================================
 """
 

@@ -802,14 +802,16 @@ class QuantGoldBot:
         if new_st and live_avail < 4.07 and not (is_admin and live_bal < 10.0):
             warn_note = "\n⚠️ <i>ចំណាំ៖ Free Margin ទាបជាង $4.07 (ទំហំ Margin អប្បបរមា 0.5 oz Gold)។ ប្រព័ន្ធរង់ចាំការដាក់ប្រាក់បន្ថែម ឬប្តូរទៅ Demo!</i>\n"
 
+        budget_suffix = " (Demo Mirror | កែប្រែតាម /capital on <budget>)" if (is_admin and live_bal < 10.0) else ""
+
         msg = (
             f"🤖 <b>[QUANT GOLD 24/7 AUTONOMOUS ENGINE]</b> 🥇\n"
             f"══════════════════════════════════════\n"
             f"• ស្ថានភាពបច្ចុប្បន្ន ៖ {st_text}\n"
             f"{acct_info}"
-            f"• ថវិកាជួញដូរ (Budget) ៖ <code>${active_budget:.2f}</code>\n"
+            f"• ថវិកាជួញដូរ (Budget) ៖ <code>${active_budget:.2f}</code>{budget_suffix}\n"
             f"• វិសាលគមត្រួតពិនិត្យ ៖ <code>19 Timeframes (M1 ដល់ 1 Month)</code>\n"
-            f"• ប្រព័ន្ធការពារដើមទុន ៖ <code>Breakeven Armor +2.0R & Flash Shock Harvest</code>\n"
+            f"• ប្រព័ន្ធការពារដើមទុន ៖ <code>Breakeven Armor +2.5R & Flash Shock Harvest</code>\n"
             f"══════════════════════════════════════{warn_note}\n"
             f"<i>{ 'ម៉ាស៊ីន AI នឹងជួញដូរមាសស្វ័យប្រវត្តនៅពេលមានឱកាសឈ្នះខ្ពស់!' if new_st else 'ម៉ាស៊ីន AI ត្រូវបានផ្អាកការបើក Position ថ្មី។' }</i>"
         )
@@ -998,7 +1000,7 @@ class QuantGoldBot:
             f"6. <b>/status ៖</b> ពិនិត្យមើលស្ថានភាព Server VPS និងតម្លៃមាស Real-Time\n\n"
             f"🛡️ <b>កាតព្វកិច្ចការពារដើមទុន (FIDUCIARY COVENANT) ៖</b>\n"
             f"• ប្រព័ន្ធបដិសេធដាច់ខាតការដេញតាមទីផ្សារកំពូល ឬបាត (Zero Chasing)\n"
-            f"• ពេលចំណេញដល់ +2.0R ប្រព័ន្ធនឹងចាក់សោរ Breakeven Armor ភ្លាម (0.00R Risk)\n"
+            f"• ពេលចំណេញដល់ +2.5R ប្រព័ន្ធនឹងចាក់សោរ Breakeven Armor ភ្លាម (0.00R Risk)\n"
             f"• គ្មានការជួញដូរដោយគ្មាន Stop Loss ដាច់ខាត (Zero No-SL Trading)!\n"
             f"══════════════════════════════════════\n"
         )
