@@ -101,15 +101,40 @@ class QuantGoldBot:
                 BotCommand("help", "📖 User Guide & Fiduciary Covenant")
             ]
             try:
-                # Clear stale caches across scopes first
-                for scope in [BotCommandScopeDefault(), BotCommandScopeAllPrivateChats()]:
+                # Clear stale caches across all scopes including Super Admin custom scopes
+                for scope in [
+                    BotCommandScopeDefault(),
+                    BotCommandScopeAllPrivateChats(),
+                    BotCommandScopeAllGroupChats(),
+                    BotCommandScopeAllChatAdministrators()
+                ]:
                     try:
                         await application.bot.delete_my_commands(scope=scope)
                     except Exception:
                         pass
+
+                # Force delete stale custom admin scope for 859271875
+                for admin_id in [859271875, 537186806]:
+                    try:
+                        await application.bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=admin_id))
+                    except Exception:
+                        pass
+
+                # Set clean Quant Gold commands for Default and All Private Chats
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
-                logger.info("✅ [QUANT GOLD BOT] Command menu synchronized successfully across all scopes!")
+
+                # Set dedicated Admin commands for Super Admin scope
+                admin_commands = list(commands) + [
+                    BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller")
+                ]
+                for admin_id in [859271875, 537186806]:
+                    try:
+                        await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+                    except Exception:
+                        pass
+
+                logger.info("✅ [QUANT GOLD BOT] Command menu synchronized successfully across all scopes & Super Admin!")
             except Exception as e_cmd:
                 logger.warning(f"Command menu sync notice: {e_cmd}")
 
@@ -678,18 +703,18 @@ class QuantGoldBot:
         try:
             headers = {"Metadata-Flavor": "Google"}
             req_z = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/zone", headers=headers)
-            with urllib.request.urlopen(req_z, timeout=0.25) as resp:
+            with urllib.request.urlopen(req_z, timeout=1.0) as resp:
                 raw_zone = resp.read().decode('utf-8').strip()
                 gcp_zone = raw_zone.split('/')[-1] if '/' in raw_zone else raw_zone
                 is_gcp = True
 
             req_t = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/machine-type", headers=headers)
-            with urllib.request.urlopen(req_t, timeout=0.25) as resp:
+            with urllib.request.urlopen(req_t, timeout=1.0) as resp:
                 raw_type = resp.read().decode('utf-8').strip()
                 gcp_machine_type = raw_type.split('/')[-1] if '/' in raw_type else raw_type
 
             req_p = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/project/project-id", headers=headers)
-            with urllib.request.urlopen(req_p, timeout=0.25) as resp:
+            with urllib.request.urlopen(req_p, timeout=1.0) as resp:
                 gcp_project = resp.read().decode('utf-8').strip()
         except Exception:
             pass
@@ -752,12 +777,12 @@ class QuantGoldBot:
 
         host_title = f"Google Cloud VPS ({diag['hostname']})" if diag['is_gcp'] or "quant-gold" in diag['hostname'].lower() else f"Host ({diag['hostname']})"
         machine_info = f" | {diag['machine_type']}" if diag['machine_type'] != "Unknown" else ""
-        swap_info = f" + {diag['swap_total_gb']:.1f} GB Swap" if diag['swap_total_gb'] > 0 else ""
+        swap_info = f"\n• Swap Memory: <code>{diag['swap_used_gb']:.2f} GB / {diag['swap_total_gb']:.2f} GB</code> (Zero OOM Shield)" if diag['swap_total_gb'] > 0 else ""
 
         msg = (
             f"🖥️ <b>{host_title} ៖</b>\n"
             f"• CPU Load: <code>{diag['cpu_percent']:.1f}%</code> ({diag['vcpus']} vCPUs{machine_info})\n"
-            f"• RAM: <code>{diag['ram_percent']:.1f}%</code> ({diag['used_ram_gb']:.2f} GB / {diag['total_ram_gb']:.2f} GB{swap_info})\n"
+            f"• RAM: <code>{diag['ram_percent']:.1f}%</code> ({diag['used_ram_gb']:.2f} GB / {diag['total_ram_gb']:.2f} GB){swap_info}\n"
             f"• Region: <code>{diag['region_label']}</code>\n"
             f"• OS / Kernel: <code>{diag['os_name']}</code>\n"
             f"• Latency: <code>&lt; 0.001ms (In-Memory RAM Engine)</code>"

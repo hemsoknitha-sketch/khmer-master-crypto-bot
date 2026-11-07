@@ -66,18 +66,18 @@ def get_real_vps_diagnostics() -> Dict[str, Any]:
         import urllib.request
         headers = {"Metadata-Flavor": "Google"}
         req_z = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/zone", headers=headers)
-        with urllib.request.urlopen(req_z, timeout=0.25) as resp:
+        with urllib.request.urlopen(req_z, timeout=1.0) as resp:
             raw_zone = resp.read().decode('utf-8').strip()
             gcp_zone = raw_zone.split('/')[-1] if '/' in raw_zone else raw_zone
             is_gcp = True
 
         req_t = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/machine-type", headers=headers)
-        with urllib.request.urlopen(req_t, timeout=0.25) as resp:
+        with urllib.request.urlopen(req_t, timeout=1.0) as resp:
             raw_type = resp.read().decode('utf-8').strip()
             gcp_machine_type = raw_type.split('/')[-1] if '/' in raw_type else raw_type
 
         req_p = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/project/project-id", headers=headers)
-        with urllib.request.urlopen(req_p, timeout=0.25) as resp:
+        with urllib.request.urlopen(req_p, timeout=1.0) as resp:
             gcp_project = resp.read().decode('utf-8').strip()
     except Exception:
         pass
