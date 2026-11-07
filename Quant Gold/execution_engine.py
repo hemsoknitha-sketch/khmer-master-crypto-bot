@@ -274,6 +274,9 @@ class QuantGoldExecutionEngine:
             "tp3": round(curr_p - tp3_distance, 2),
         }
 
+        # Resolve Dominant Trend Bias
+        dominant_bias = "BUY" if (weighted_score > 0 or kalman.get("latent_velocity", 0.0) >= 0 or counts.get("bullish", 0) >= counts.get("bearish", 0)) else "SELL"
+
         if final_action == "BUY":
             sl_price = prospective_buy["sl"]
             tp1_price = prospective_buy["tp1"]
@@ -285,10 +288,17 @@ class QuantGoldExecutionEngine:
             tp2_price = prospective_sell["tp2"]
             tp3_price = prospective_sell["tp3"]
         else:
-            sl_price = prospective_buy["sl"]
-            tp1_price = prospective_buy["tp1"]
-            tp2_price = prospective_buy["tp2"]
-            tp3_price = prospective_buy["tp3"]
+            # Lock single-direction prospective levels according to dominant bias
+            if dominant_bias == "BUY":
+                sl_price = prospective_buy["sl"]
+                tp1_price = prospective_buy["tp1"]
+                tp2_price = prospective_buy["tp2"]
+                tp3_price = prospective_buy["tp3"]
+            else:
+                sl_price = prospective_sell["sl"]
+                tp1_price = prospective_sell["tp1"]
+                tp2_price = prospective_sell["tp2"]
+                tp3_price = prospective_sell["tp3"]
 
         return {
             "timestamp": time.time(),
@@ -298,6 +308,7 @@ class QuantGoldExecutionEngine:
             "ask": round(ask, 2),
             "spread": round(spread, 2),
             "action": final_action,
+            "dominant_bias": dominant_bias,
             "confidence": round(win_prob, 1),
             "reason": reason,
             "sl": sl_price,

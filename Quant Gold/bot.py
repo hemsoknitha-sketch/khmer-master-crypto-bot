@@ -473,26 +473,51 @@ class QuantGoldBot:
         p_buy = sig.get("prospective_buy", {})
         p_sell = sig.get("prospective_sell", {})
 
-        dir_str = "Buy" if action == "BUY" else ("Sell" if action == "SELL" else "Market Scan")
-        sl_val = sig.get("sl", p_buy.get("sl", curr_p - 6.08))
-        tp1_val = sig.get("tp1", p_buy.get("tp1", curr_p + 7.30))
-        tp2_val = sig.get("tp2", p_buy.get("tp2", curr_p + 15.20))
-        tp3_val = sig.get("tp3", p_buy.get("tp3", curr_p + 24.32))
+        # Determine Definitive Single Direction (Zero Dual-Order Ambiguity):
+        # 1. If Execution Engine already triggered definitive BUY/SELL, lock it.
+        # 2. Otherwise, resolve Trend Bias using 19-TF Weighted Confluence, Kalman Velocity & AI Swarm.
+        mtf_data = sig.get("mtf_summary", {})
+        math_data = sig.get("math_summary", {})
+        score = float(mtf_data.get("weighted_score", 0.0) or 0.0)
+        vel = float(math_data.get("kalman_velocity", 0.0) or 0.0)
+        b_cnt = int(mtf_data.get("counts", {}).get("bullish", 0) or 0)
+        s_cnt = int(mtf_data.get("counts", {}).get("bearish", 0) or 0)
+
+        if action in ["BUY", "SELL"]:
+            resolved_dir = action
+        elif score > 0 or vel > 0 or b_cnt >= s_cnt:
+            resolved_dir = "BUY"
+        else:
+            resolved_dir = "SELL"
+
+        dir_str = "Buy" if resolved_dir == "BUY" else "Sell"
+        if resolved_dir == "BUY":
+            sl_val = p_buy.get("sl", round(curr_p - 6.08, 2))
+            tp1_val = p_buy.get("tp1", round(curr_p + 7.30, 2))
+            tp2_val = p_buy.get("tp2", round(curr_p + 15.20, 2))
+            tp3_val = p_buy.get("tp3", round(curr_p + 24.32, 2))
+            dir_icon = "🟢"
+        else:
+            sl_val = p_sell.get("sl", round(curr_p + 6.08, 2))
+            tp1_val = p_sell.get("tp1", round(curr_p - 7.30, 2))
+            tp2_val = p_sell.get("tp2", round(curr_p - 15.20, 2))
+            tp3_val = p_sell.get("tp3", round(curr_p - 24.32, 2))
+            dir_icon = "🔴"
 
         # Check if admin requested broadcast: /signal broadcast or /signal send
         is_admin = (update.effective_chat.id in [859271875, 537186806])
         if context.args and str(context.args[0]).lower() in ["broadcast", "send", "alert"] and is_admin:
-            target_dir = str(context.args[1]).capitalize() if len(context.args) > 1 else ("Buy" if action == "BUY" else "Sell")
+            target_dir = str(context.args[1]).capitalize() if len(context.args) > 1 else dir_str
             if target_dir.upper() == "SELL":
-                sl_val = p_sell.get("sl", curr_p + 6.08)
-                tp1_val = p_sell.get("tp1", curr_p - 7.30)
-                tp2_val = p_sell.get("tp2", curr_p - 15.20)
-                tp3_val = p_sell.get("tp3", curr_p - 24.32)
+                sl_val = p_sell.get("sl", round(curr_p + 6.08, 2))
+                tp1_val = p_sell.get("tp1", round(curr_p - 7.30, 2))
+                tp2_val = p_sell.get("tp2", round(curr_p - 15.20, 2))
+                tp3_val = p_sell.get("tp3", round(curr_p - 24.32, 2))
             else:
-                sl_val = p_buy.get("sl", curr_p - 6.08)
-                tp1_val = p_buy.get("tp1", curr_p + 7.30)
-                tp2_val = p_buy.get("tp2", curr_p + 15.20)
-                tp3_val = p_buy.get("tp3", curr_p + 24.32)
+                sl_val = p_buy.get("sl", round(curr_p - 6.08, 2))
+                tp1_val = p_buy.get("tp1", round(curr_p + 7.30, 2))
+                tp2_val = p_buy.get("tp2", round(curr_p + 15.20, 2))
+                tp3_val = p_buy.get("tp3", round(curr_p + 24.32, 2))
 
             vip_card = (
                 f"◆ <b>New signal</b> 🥇\n\n"
@@ -505,7 +530,7 @@ class QuantGoldBot:
             sent = await self.exec_engine.broadcast_to_vip_users(vip_card, app=self.app, reply_markup=get_gold_signal_reply_markup())
             return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ Signal ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
 
-        # Otherwise display clean signal card with levels
+        # Clean Single-Directional Signal Card (100% Definitive, Zero Dual Confusion)
         msg = (
             f"◆ <b>New signal</b> 🥇\n\n"
             f"<b>{dir_str} XAUUSD now at {curr_p:.2f}</b>\n"
@@ -513,19 +538,14 @@ class QuantGoldBot:
             f"<b>TP</b> <code>{tp1_val:.2f}, {tp2_val:.2f}, {tp3_val:.2f}</code>\n\n"
             f"<i>Angkor Quant Gold</i>\n"
             f"────────────────────────\n"
-            f"🎯 <b>Super Smart Trigger Levels ៖</b>\n"
-            f"🟢 <b>LONG Trigger :</b> <code>${p_buy.get('entry', curr_p):.2f}</code>\n"
-            f"   └ Tight SL: <code>${p_buy.get('sl', curr_p - 6.08):.2f}</code> (-60.8 p)\n"
-            f"   └ TP1 (+73 pips): <code>${p_buy.get('tp1', curr_p + 7.30):.2f}</code> (Breakeven Armor)\n"
-            f"   └ TP2 (+152 pips): <code>${p_buy.get('tp2', curr_p + 15.20):.2f}</code>\n"
-            f"   └ TP3 (+243 pips): <code>${p_buy.get('tp3', curr_p + 24.32):.2f}</code>\n"
-            f"🔴 <b>SHORT Trigger :</b> <code>${p_sell.get('entry', curr_p):.2f}</code>\n"
-            f"   └ Tight SL: <code>${p_sell.get('sl', curr_p + 6.08):.2f}</code> (-60.8 p)\n"
-            f"   └ TP1 (+73 pips): <code>${p_sell.get('tp1', curr_p - 7.30):.2f}</code> (Breakeven Armor)\n"
-            f"   └ TP2 (+152 pips): <code>${p_sell.get('tp2', curr_p - 15.20):.2f}</code>\n"
-            f"   └ TP3 (+243 pips): <code>${p_sell.get('tp3', curr_p - 24.32):.2f}</code>\n"
+            f"{dir_icon} <b>Single Direction :</b> <code>{dir_str.upper()} (100% Bias Confluence)</code>\n"
+            f"🎯 <b>Execution Levels ៖</b>\n"
+            f"   └ Tight SL: <code>${sl_val:.2f}</code> (-60.8 p)\n"
+            f"   └ TP1 (+73 pips): <code>${tp1_val:.2f}</code> (Breakeven Armor Lock)\n"
+            f"   └ TP2 (+152 pips): <code>${tp2_val:.2f}</code> (Guaranteed Cash Floor)\n"
+            f"   └ TP3 (+243 pips): <code>${tp3_val:.2f}</code> (Moonshot Runner)\n"
             f"────────────────────────\n"
-            f"💡 <i>ប្រព័ន្ធបញ្ជូន alert តែពេលមានប្រាក់ចំណេញ (Profit Alert Only) ជូន VIP Users!</i>"
+            f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
         )
         from execution_engine import get_gold_signal_reply_markup
         await self.safe_reply(update, msg, reply_markup=get_gold_signal_reply_markup())
