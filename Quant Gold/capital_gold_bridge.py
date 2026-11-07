@@ -130,10 +130,13 @@ class QuantGoldCapitalBridge:
             ],
             [
                 InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions"),
-                InlineKeyboardButton("⚡ VPS & Price Status", callback_data="btn_qgold_status")
+                InlineKeyboardButton("💵 Live Status", callback_data="btn_qgold_status")
             ],
             [
-                InlineKeyboardButton("🚨 Panic Close ALL", callback_data="btn_qgold_close_all"),
+                InlineKeyboardButton("🖥️ VPS Health", callback_data="btn_qgold_health"),
+                InlineKeyboardButton("🚨 Panic Close ALL", callback_data="btn_qgold_close_all")
+            ],
+            [
                 InlineKeyboardButton("📖 User Guide / Help", callback_data="btn_qgold_help")
             ]
         ])

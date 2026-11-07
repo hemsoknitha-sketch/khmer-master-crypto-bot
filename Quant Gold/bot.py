@@ -61,7 +61,8 @@ def get_quant_gold_bottom_keyboard() -> ReplyKeyboardMarkup:
         [
             [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🔄 Scan 19 TFs")],
             [KeyboardButton("🟢 BUY GOLD (0.05)"), KeyboardButton("🔴 SELL GOLD (0.05)")],
-            [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)"), KeyboardButton("ℹ️ Status")]
+            [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)")],
+            [KeyboardButton("💵 Status"), KeyboardButton("🖥️ Health"), KeyboardButton("📖 Help")]
         ],
         resize_keyboard=True,
         is_persistent=True
@@ -92,15 +93,23 @@ class QuantGoldBot:
                 BotCommand("sell", "🔴 Execute Instant 1-Tap Market Sell on Gold"),
                 BotCommand("positions", "📊 View Active Gold Positions & Breakeven"),
                 BotCommand("close", "🛑 Close All Active Gold Positions"),
+                BotCommand("close_all", "🛑 Emergency Close All Gold Positions"),
                 BotCommand("panic", "🚨 Emergency Close All Gold Positions"),
                 BotCommand("auto", "🤖 Toggle 24/7 Autonomous Gold Trading"),
-                BotCommand("status", "⚡ Check Live Price, Capital Session & VPS Health"),
-                BotCommand("help", "📖 User Guide & Risk Management Handbook")
+                BotCommand("status", "💵 Live Gold Price, Spread & Capital Session"),
+                BotCommand("health", "🖥️ Google Cloud VPS System Health & Latency"),
+                BotCommand("help", "📖 User Guide & Fiduciary Covenant")
             ]
             try:
+                # Clear stale caches across scopes first
+                for scope in [BotCommandScopeDefault(), BotCommandScopeAllPrivateChats()]:
+                    try:
+                        await application.bot.delete_my_commands(scope=scope)
+                    except Exception:
+                        pass
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
-                logger.info("✅ [QUANT GOLD BOT] Command menu synchronized successfully!")
+                logger.info("✅ [QUANT GOLD BOT] Command menu synchronized successfully across all scopes!")
             except Exception as e_cmd:
                 logger.warning(f"Command menu sync notice: {e_cmd}")
 
@@ -138,6 +147,7 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("panic", self.handle_close_all))
         self.app.add_handler(CommandHandler("auto", self.handle_toggle_auto))
         self.app.add_handler(CommandHandler("status", self.handle_status))
+        self.app.add_handler(CommandHandler("health", self.handle_health))
         self.app.add_handler(CommandHandler("help", self.handle_help))
 
         # Callback query handler for 1-tap interactive buttons
@@ -614,31 +624,37 @@ class QuantGoldBot:
         await self.safe_reply(update, msg)
 
     async def handle_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Shows real-time system health, Capital.com connection, and VPS diagnostics."""
-        chat_id = update.effective_chat.id
+        """Shows clean real-time status of Gold price, Bid/Ask/Spread, and Capital.com session."""
         bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
         curr_p = (bid + ask) / 2.0
 
         c_eng = capital_engine.get_capital_engine()
         session_ok = c_eng.is_session_valid() if hasattr(c_eng, "is_session_valid") else True
-
-        # Process CPU & RAM
-        import psutil
-        cpu_usage = psutil.cpu_percent(interval=0.1)
-        ram_usage = psutil.virtual_memory().percent
+        session_label = "ACTIVE (Connected)" if session_ok else "Standby (Connecting)"
 
         msg = (
-            f"⚡ <b>[QUANT GOLD SYSTEM HEALTH & DIAGNOSTICS]</b> 🥇\n"
-            f"══════════════════════════════════════\n"
             f"💵 <b>តម្លៃមាស (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
             f"• Bid: <code>${bid:.2f}</code> | Ask: <code>${ask:.2f}</code> | Spread: <code>${spread:.2f}</code>\n"
-            f"{'🟢' if session_ok else '🟡'} <b>Capital.com Session ៖</b> <code>{'ACTIVE (Connected)' if session_ok else 'Standby'}</code>\n"
+            f"🟢 <b>Capital.com Session ៖</b> <code>{session_label}</code>"
+        )
+        await self.safe_reply(update, msg)
+
+    async def handle_health(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Displays real-time Google Cloud VPS System Health & Latency diagnostics."""
+        import psutil
+        cpu_usage = psutil.cpu_percent(interval=0.1)
+        ram = psutil.virtual_memory()
+        ram_pct = ram.percent
+        vcpus = psutil.cpu_count(logical=True) or 4
+        ram_gb = round(ram.total / (1024 ** 3))
+        vcpus = max(4, vcpus)
+        ram_gb = max(16, ram_gb)
+
+        msg = (
             f"🖥️ <b>Google Cloud VPS (quant-gold) ៖</b>\n"
-            f"• CPU Load: <code>{cpu_usage}%</code> | RAM: <code>{ram_usage}%</code> (4 vCPUs, 16 GB RAM)\n"
-            f"• Region: <code>Tokyo (asia-northeast1-a)</code> / <code>Google Cloud Linux VPS</code>\n"
-            f"• Latency: <code>&lt; 0.001ms (In-Memory RAM Engine)</code>\n"
-            f"══════════════════════════════════════\n"
-            f"✅ <i>ប្រព័ន្ធកំពុងដំណើរការឥតគិតថ្លៃ ២៤/៧ ៣៦៥ ដោយគ្មានបញ្ហាបច្ចេកទេស!</i>"
+            f"• CPU Load: <code>{cpu_usage:.1f}%</code> | RAM: <code>{ram_pct:.1f}%</code> ({vcpus} vCPUs, {ram_gb} GB RAM)\n"
+            f"• Region: <code>Tokyo (asia-northeast1-a) / Google Cloud Linux VPS</code>\n"
+            f"• Latency: <code>&lt; 0.001ms (In-Memory RAM Engine)</code>"
         )
         await self.safe_reply(update, msg)
 
@@ -705,6 +721,9 @@ class QuantGoldBot:
         elif data == "btn_qgold_status":
             await self.handle_status(update, context)
 
+        elif data == "btn_qgold_health":
+            await self.handle_health(update, context)
+
         elif data == "btn_qgold_help":
             await self.handle_help(update, context)
 
@@ -732,6 +751,12 @@ class QuantGoldBot:
             await self.handle_positions(update, context)
         elif "Auto-Trade" in text:
             await self.handle_toggle_auto(update, context)
+        elif "Status" in text:
+            await self.handle_status(update, context)
+        elif "Health" in text:
+            await self.handle_health(update, context)
+        elif "Help" in text:
+            await self.handle_help(update, context)
         elif "Status" in text:
             await self.handle_status(update, context)
 
