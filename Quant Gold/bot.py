@@ -28,7 +28,10 @@ from telegram import (
     KeyboardButton,
     BotCommand,
     BotCommandScopeDefault,
-    BotCommandScopeAllPrivateChats
+    BotCommandScopeAllPrivateChats,
+    BotCommandScopeAllGroupChats,
+    BotCommandScopeAllChatAdministrators,
+    BotCommandScopeChat
 )
 from telegram.ext import (
     ApplicationBuilder,
