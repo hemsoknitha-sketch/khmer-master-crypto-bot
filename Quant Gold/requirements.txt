@@ -1,0 +1,34 @@
+# ==============================================================================
+# ANGKOR QUANT - QUANT GOLD DEDICATED REQUIREMENTS (AQ84)
+# ==============================================================================
+# Lightweight, institutional-grade dependencies for running Quant Gold 24/7/365
+# on Google Cloud Linux VPS (quant-gold) with sub-millisecond execution latency
+# and zero memory bloat.
+# ==============================================================================
+
+# 1. Telegram Bot & Async Event Core
+python-telegram-bot>=20.0
+APScheduler>=3.10.0
+aiohttp>=3.9.0
+requests>=2.31.0
+websockets>=11.0.3
+
+# 2. Cloud AI Super Models (Free 24/7/365 via Hugging Face & Google AI Studio)
+google-generativeai>=0.4.0
+google-genai>=0.1.0
+huggingface_hub>=0.19.0
+
+# 3. Quantitative Mathematical Core (Kalman Filter, Hurst Surface, Ornstein-Uhlenbeck)
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+
+# 4. System Security, Process Monitoring & Memory Stability
+python-dotenv>=1.0.0
+psutil>=5.9.0
+cryptography>=41.0.0
+
+# 5. Market Data Ingestion & Intermarket Correlations
+yfinance>=0.2.0
+

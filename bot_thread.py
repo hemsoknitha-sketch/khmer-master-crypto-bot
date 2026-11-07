@@ -6415,6 +6415,51 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
                 return
+            elif data in ["btn_capital_gold", "btn_qgold_refresh"]:
+                try:
+                    await update.callback_query.answer("🥇 Scanning 19 Timeframes for Gold...")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                return
+            elif data == "btn_qgold_buy":
+                try:
+                    await update.callback_query.answer("⚡ Executing 1-Tap Quant Gold BUY...")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                context.args = ["BUY", "0.05"]
+                await bridge.handle_telegram_gold_subcommand(update, context, ["BUY", "0.05"])
+                return
+            elif data == "btn_qgold_sell":
+                try:
+                    await update.callback_query.answer("⚡ Executing 1-Tap Quant Gold SELL...")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                context.args = ["SELL", "0.05"]
+                await bridge.handle_telegram_gold_subcommand(update, context, ["SELL", "0.05"])
+                return
+            elif data == "btn_qgold_toggle":
+                auto_cfg = db.get_capital_auto_config(chat_id)
+                cur_st = bool(auto_cfg.get("enabled", False)) if auto_cfg else False
+                new_st = not cur_st
+                db.set_capital_auto_config(chat_id=chat_id, enabled=new_st, budget=300.0, max_positions=5, is_demo=False)
+                st_msg = "🟢 Activated" if new_st else "🔴 Paused"
+                try:
+                    await update.callback_query.answer(f"Quant Gold Auto: {st_msg}!")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                return
             elif data == "btn_cap_positions":
                 context.args = ["POSITIONS"]
                 await capital_command(update, context)
@@ -27220,10 +27265,21 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_scalp", "capitalscalp"]:
                 await capital_scalp_command(update, context)
                 return
+            elif cmd_text in ["capital_gold", "capitalgold", "gold"]:
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, args if args else ["MENU"])
+                return
 
-            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
+            # Subcommands routing: /capital GOLD / /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
             if args:
                 first_tok = str(args[0]).strip().replace('$', '')
+                if first_tok.upper() in ["GOLD", "XAUUSD", "QUANT_GOLD", "QUANTGOLD"]:
+                    import quant_gold
+                    bridge = quant_gold.get_quant_gold_capital_bridge()
+                    handled = await bridge.handle_telegram_gold_subcommand(update, context, args[1:] if len(args) > 1 else ["MENU"])
+                    if handled:
+                        return
                 is_num_cap = False
                 try:
                     float(first_tok)
@@ -28263,6 +28319,9 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🌐 ALL USERS: ON", callback_data="btn_cap_all_users_on"),
                     InlineKeyboardButton("🛑 ALL USERS: OFF", callback_data="btn_cap_all_users_off")
                 ]] if is_super_admin else []),
+                [
+                    InlineKeyboardButton("🥇 QUANT GOLD (19-TF Spectrum & AI)", callback_data="btn_capital_gold")
+                ],
                 [
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle"),
                     InlineKeyboardButton(leadlag_btn_text, callback_data="btn_cap_leadlag_toggle")

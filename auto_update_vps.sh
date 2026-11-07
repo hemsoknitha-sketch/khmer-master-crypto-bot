@@ -59,12 +59,14 @@ echo "🚀 [GCP VPS AUTO-UPDATE] Initializing Zero-Downtime Safe Auto-Update..."
 
 # 1. Stop background bot service first to checkpoint SQLite WAL cleanly & release file locks
 echo "⏸️ [SAFEGUARD] Stopping service to release SQLite WAL locks..."
+sudo systemctl stop quant-gold.service 2>/dev/null || true
 sudo systemctl stop khmer-master-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto.service 2>/dev/null || \
 sudo systemctl stop khmer-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto-bot 2>/dev/null || true
 sudo systemctl stop angkor-gold-youtube-live.service 2>/dev/null || true
 { sudo pkill -9 -f "python.*main.py" >/dev/null 2>&1; } || true
+{ sudo pkill -9 -f "python.*run_quant_gold.py" >/dev/null 2>&1; } || true
 stty sane 2>/dev/null || true
 stty onlcr 2>/dev/null || true
 printf "\r"
@@ -148,6 +150,9 @@ elif [ -f "../venv/bin/activate" ]; then
     source ../venv/bin/activate
 fi
 
+if [ -f "Quant Gold/requirements.txt" ]; then
+    pip install --no-cache-dir -r "Quant Gold/requirements.txt" >/dev/null 2>&1 || true
+fi
 if [ -f "requirements.txt" ]; then
     pip install --no-cache-dir -r requirements.txt >/dev/null 2>&1 || true
 fi
@@ -204,6 +209,7 @@ else
         sudo ln -sf /etc/systemd/system/khmer-master-crypto-bot.service /etc/systemd/system/khmer-master-crypto.service 2>/dev/null || true
         sudo systemctl daemon-reload 2>/dev/null || true
     fi
+    sudo systemctl restart quant-gold.service 2>/dev/null || true
     sudo systemctl restart khmer-master-crypto-bot.service 2>/dev/null || \
     sudo systemctl restart khmer-master-crypto.service 2>/dev/null || \
     sudo systemctl restart khmer-crypto-bot.service 2>/dev/null || \

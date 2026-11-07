@@ -6828,6 +6828,17 @@ class CapitalAutonomousEngine:
         except Exception as e_rad:
             logger.debug(f"Radar consumer note: {e_rad}")
 
+        # Step 1.7: Flagship Quant Gold 19-Timeframe Autonomous Cycle (100% Dedicated Gold Engine)
+        # Evaluates 19-Timeframe Confluence, Kalman, Hurst, and AI Swarm with zero rotation delay
+        try:
+            import quant_gold
+            qg_engine = quant_gold.get_quant_gold_execution_engine()
+            qg_res = await qg_engine.execute_quant_gold_cycle(app=app)
+            if qg_res.get("dispatched_count", 0) > 0:
+                logger.info(f"🥇 [QUANT GOLD CYCLE] Dispatched {qg_res['dispatched_count']} Gold trades to active VIP accounts!")
+        except Exception as e_qg:
+            logger.debug(f"Quant Gold autonomous cycle note: {e_qg}")
+
         # Step 2: Rate limit market scans to once every 25 seconds
         if (now - self._last_scan_ts) < self._scan_interval:
             return
