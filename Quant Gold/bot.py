@@ -428,8 +428,10 @@ class QuantGoldBot:
             f"• មុខតំណែង Gold កំពុងរត់ ៖ <code>{len(gold_trades)} Positions</code>\n"
             f"══════════════════════════════════════\n"
             f"💡 <i>កូដបញ្ជា ១-Tap ៖</i>\n"
-            f"• <code>/capital on {acc_id}</code> (បើក Auto)\n"
-            f"• <code>/capital off {acc_id}</code> (បិទ Auto)\n"
+            f"• <code>/capital on {acc_id}</code> (បើក Auto គណនីនេះ)\n"
+            f"• <code>/capital off {acc_id}</code> (បិទ Auto គណនីនេះ)\n"
+            f"• <code>/capital on all 50</code> (បើក Auto Users ទាំងអស់ $50)\n"
+            f"• <code>/capital off all</code> (ផ្អាក Auto Users ទាំងអស់)\n"
             f"• <code>/capital close {acc_id}</code> (បិទ Positions)"
         )
         await self.safe_reply(update, msg)
@@ -447,12 +449,19 @@ class QuantGoldBot:
             msg = (
                 f"🏛️ <b>[SUPER ADMIN CAPITAL.COM FLEET CONTROLLER]</b> 👑\n"
                 f"══════════════════════════════════════\n"
+                f"🚀 <b>បញ្ជាកងនាវាស្វ័យប្រវត្ត (Master Fleet Commands) ៖</b>\n"
+                f"• <code>/capital on all 50</code> (ឬ <code>/admin_capital on all 50</code>) ➡️ បើក Auto Users ទាំងអស់ $50\n"
+                f"• <code>/capital off all</code> (ឬ <code>/admin_capital off all</code>) ➡️ ផ្អាក Auto Users ទាំងអស់\n"
+                f"──────────────────────────────────────\n"
+                f"👤 <b>បញ្ជាគណនីទោល (Single Account Commands) ៖</b>\n"
                 f"• <code>/admin_capital inspect &lt;Account_ID_or_Chat_ID&gt;</code>\n"
                 f"• <code>/admin_capital on &lt;Account_ID_or_Chat_ID&gt; [budget]</code>\n"
                 f"• <code>/admin_capital off &lt;Account_ID_or_Chat_ID&gt;</code>\n"
                 f"• <code>/admin_capital closeall &lt;Account_ID_or_Chat_ID&gt;</code>\n"
+                f"──────────────────────────────────────\n"
+                f"📊 <b>ត្រួតពិនិត្យ &amp; Sync ប្រព័ន្ធ ៖</b>\n"
                 f"• <code>/admin_capital fleet</code> (ពិនិត្យរបាយការណ៍ All Users)\n"
-                f"• <code>/admin_capital sync</code> (បង្កើត Indexes & Sync DB)"
+                f"• <code>/admin_capital sync</code> (បង្កើត Indexes &amp; Sync DB)"
             )
             return await self.safe_reply(update, msg)
 
@@ -604,7 +613,8 @@ class QuantGoldBot:
                 sl=sl_val,
                 tp1=tp1_val,
                 tp2=tp2_val,
-                tp3=tp3_val
+                tp3=tp3_val,
+                entry_price=curr_p
             )
             sent = await self.exec_engine.broadcast_to_vip_users(vip_card, app=self.app, reply_markup=get_gold_signal_reply_markup())
             return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ Signal ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
@@ -615,7 +625,8 @@ class QuantGoldBot:
             sl=sl_val,
             tp1=tp1_val,
             tp2=tp2_val,
-            tp3=tp3_val
+            tp3=tp3_val,
+            entry_price=curr_p
         )
         await self.safe_reply(update, msg, reply_markup=get_gold_signal_reply_markup())
 
@@ -1033,6 +1044,7 @@ class QuantGoldBot:
 
     async def handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays user guide and trading handbook."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
         help_text = (
             f"📖 <b>[ANGKOR QUANT - QUANT GOLD USER GUIDE]</b> 🥇\n"
             f"══════════════════════════════════════\n"
@@ -1049,6 +1061,17 @@ class QuantGoldBot:
             f"• គ្មានការជួញដូរដោយគ្មាន Stop Loss ដាច់ខាត (Zero No-SL Trading)!\n"
             f"══════════════════════════════════════\n"
         )
+        if chat_id in [859271875, 537186806]:
+            help_text += (
+                f"\n👑 <b>[SUPER ADMIN FLEET COMMANDS] ៖</b>\n"
+                f"• <code>/capital on all 50</code> (បើក Auto សម្រាប់ VIP Users ទាំងអស់)\n"
+                f"• <code>/capital off all</code> (ផ្អាក Auto សម្រាប់ VIP Users ទាំងអស់)\n"
+                f"• <code>/admin_capital on all 50</code> (ឬតាម admin_capital)\n"
+                f"• <code>/admin_capital off all</code>\n"
+                f"• <code>/admin_capital inspect &lt;acc_or_id&gt;</code> (ពិនិត្យ dossier)\n"
+                f"• <code>/admin_capital fleet</code> (ពិនិត្យ All Users)\n"
+                f"══════════════════════════════════════\n"
+            )
         await self.safe_reply(update, help_text)
 
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

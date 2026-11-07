@@ -50,67 +50,59 @@ def get_gold_signal_reply_markup():
         return None
 
 
-def format_gold_signal_card(direction: str, sl: float, tp1: float, tp2: float, tp3: float) -> str:
+def format_gold_signal_card(
+    direction: str,
+    sl: float,
+    tp1: float,
+    tp2: float,
+    tp3: float,
+    entry_price: float = 0.0
+) -> str:
     """
-    Renders clean, compact institutional Gold Signal Card.
-    Fits smartphone screens perfectly without overflow or duplicate text.
+    Renders ultra-clean, minimalist institutional Gold Signal Card
+    matching the Azikaa VIP standard.
     """
     is_buy = str(direction).upper() == "BUY"
-    dir_icon = "🟢" if is_buy else "🔴"
-    dir_text = "BUY" if is_buy else "SELL"
+    action = "Buy" if is_buy else "Sell"
+    if entry_price <= 0.0:
+        entry_price = round(sl + 6.08, 2) if is_buy else round(sl - 6.08, 2)
+
     return (
-        f"<b>Angkor Quant Gold</b>\n"
-        f"───────────────\n"
-        f"{dir_icon} <b>Single Direction :</b> <code>{dir_text}</code>\n"
-        f"🎯 <b>Execution Levels ៖</b>\n"
-        f"   └ Tight SL: <code>${sl:.2f}</code> (-60.8 p)\n"
-        f"   └ TP1 (+73 pips): <code>${tp1:.2f}</code> (TP Lock)\n"
-        f"   └ TP2 (+152 pips): <code>${tp2:.2f}</code> (Guaranteed)\n"
-        f"   └ TP3 (+243 pips): <code>${tp3:.2f}</code> (Moonshot)\n"
-        f"───────────────\n"
-        f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
+        f"◆ <b>New signal</b>\n\n"
+        f"{action} XAUUSD now at {entry_price:.2f}\n"
+        f"SL {sl:.2f}\n"
+        f"TP {tp1:.2f}, {tp2:.2f}, {tp3:.2f}\n\n"
+        f"<i>Angkor Quant Gold</i>"
     )
 
 
 def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: float) -> str:
     """
-    Renders clean, compact institutional Gold Take Profit Card (Option 2).
-    Fits smartphone screens perfectly matching the Signal Card format.
+    Renders ultra-clean, minimalist institutional Gold Take Profit Card
+    matching the Azikaa VIP standard.
     """
-    dir_str = "BUY" if str(direction).upper() == "BUY" else "SELL"
+    is_buy = str(direction).upper() == "BUY"
+    action = "Buy" if is_buy else "Sell"
     st = str(stage).upper()
 
     if "TP1" in st:
-        header_title = "✓ Take Profit Hit 🥇"
-        milestone = f"TP1 (+{max(73, pips)} pips)"
-        status_line = "   └ Status: Still running towards TP2 🚀"
-        armor_line = "   └ Breakeven: Locked (0.00R Free Roll)"
+        stage_title = f"TP1 hit, +{max(73, pips)} pips"
+        suffix = "Still running."
     elif "TP2" in st:
-        header_title = "✓ Take Profit Hit 🥇"
-        milestone = f"TP2 (+{max(152, pips)} pips)"
-        status_line = "   └ Status: Still running towards TP3 🚀"
-        armor_line = "   └ Profit Floor: Locked (+73 pips Cash)"
+        stage_title = f"TP2 hit, +{max(152, pips)} pips"
+        suffix = "Still running."
     elif "TP3" in st:
-        header_title = "✓ Moonshot Harvest 🥇"
-        milestone = f"TP3 (+{max(243, pips)} pips)"
-        status_line = "   └ Status: Position Closed in Profit"
-        armor_line = "   └ Net Profit: Full Target Harvested 💰"
+        stage_title = f"TP3 hit, +{max(243, pips)} pips"
+        suffix = "Full target closed."
     else:
-        header_title = "✓ Profit Locked 🥇"
-        milestone = f"Closed in Profit (+{pips} pips)"
-        status_line = "   └ Status: Position Closed"
-        armor_line = "   └ Net Profit: Realized Gains Secured 💰"
+        stage_title = f"Profit locked, +{pips} pips"
+        suffix = "Position closed."
 
     return (
-        f"<b>Angkor Quant Gold</b>\n"
-        f"───────────────\n"
-        f"<b>{header_title}</b>\n"
-        f"🎯 <b>Milestone :</b> <code>{milestone}</code>\n"
-        f"   └ Position: <code>{dir_str} XAUUSD @ ${entry_price:.2f}</code>\n"
-        f"{armor_line}\n"
-        f"{status_line}\n"
-        f"───────────────\n"
-        f"💡 <i>Auto-Harvest for VIP Users active 24/7!</i>"
+        f"✓ <b>Take profit</b>\n\n"
+        f"{stage_title}\n"
+        f"{action} XAUUSD from {entry_price:.2f}. {suffix}\n\n"
+        f"<i>Angkor Quant Gold</i>"
     )
 
 
@@ -513,7 +505,8 @@ class QuantGoldExecutionEngine:
                         sl=sl_p,
                         tp1=tp1_p,
                         tp2=tp2_p,
-                        tp3=tp3_p
+                        tp3=tp3_p,
+                        entry_price=curr_p
                     )
                     markup = get_gold_signal_reply_markup()
                     await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)
@@ -629,7 +622,8 @@ class QuantGoldExecutionEngine:
                         sl=sl,
                         tp1=tp1,
                         tp2=tp2,
-                        tp3=tp3
+                        tp3=tp3,
+                        entry_price=entry_price
                     )
                     markup = get_gold_signal_reply_markup()
                     await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)
