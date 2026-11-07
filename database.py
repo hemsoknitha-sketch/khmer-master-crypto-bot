@@ -1029,6 +1029,15 @@ def init_db():
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )
     ''')
+    try:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_capital_acc ON user_capital_credentials (account_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_capital_demo_acc ON user_capital_credentials (demo_account_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_capital_ref ON user_capital_credentials (referral_code)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_capital_auto_cfg_enabled ON capital_auto_config (is_enabled)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_capital_auto_trades_chat_status ON capital_auto_trades (chat_id, status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_capital_auto_trades_deal ON capital_auto_trades (deal_id)")
+    except Exception:
+        pass
 
     # Capital.com Introducing Broker (IB) & Spread Rebate Partner Registry
     cursor.execute('''
