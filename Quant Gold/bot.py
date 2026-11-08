@@ -388,14 +388,23 @@ class QuantGoldBot:
         if not allowed:
             return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
 
-        # 2. Strict VIP License & Capital.com Registration & Approval Gatekeeper (AQ84 & Invariant 36)
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+        args = context.args if context and context.args else []
+
+        # 2. Special Subcommand: API Vault & Credentials Configuration (/capital API ...)
+        if args and str(args[0]).upper() in ["API", "VAULT", "KEY", "CONNECT", "REGISTER", "SET"]:
+            # Gate 1 check: Active VIP License required
+            if not is_admin and not db.is_vip(chat_id):
+                card, kb = self.bridge.build_vip_license_required_card(chat_id)
+                return await self.safe_reply(update, card, reply_markup=kb)
+            return await self.handle_capital_api(update, context, args[1:])
+
+        # 3. Strict VIP License & Capital.com Registration & Approval Gatekeeper (AQ84 & Invariant 36)
         auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
         if not auth_ok:
             card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
             return await self.safe_reply(update, card, reply_markup=kb)
 
-        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
-        args = context.args if context and context.args else []
         if not args:
             card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
             return await self.safe_reply(update, card, reply_markup=kb)
@@ -480,6 +489,317 @@ class QuantGoldBot:
         else:
             card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
             return await self.safe_reply(update, card, reply_markup=kb)
+
+    async def handle_capital_api(self, update: Update, context: ContextTypes.DEFAULT_TYPE, params: List[str]):
+        """
+        Super Smart Capital.com API Vault & 1-Click Approval System (AQ84 & Invariant 36):
+        Handles:
+          /capital API <API_KEY> <ACCOUNT_ID> <EMAIL> <PASSWORD> live
+          /capital API <API_KEY> <EMAIL> <PASSWORD> live
+          /capital API <TARGET_USER_ID> <API_KEY> <ACCOUNT_ID> <EMAIL> <PASSWORD> live
+        """
+        chat_id = update.effective_chat.id if update.effective_chat else 859271875
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+        ref_url = os.getenv(
+            "CAPITAL_REFERRAL_URL",
+            "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+        )
+        support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+        support_url = f"https://t.me/{support_handle}"
+
+        # 1. If no credentials arguments provided -> Display API Vault Status & Syntax Guide
+        if not params:
+            creds = db.get_user_capital_credentials(chat_id) or {}
+            has_creds = bool(creds.get("api_key") and creds.get("account_id"))
+            is_auth = db.is_capital_user_authorized(chat_id)
+            acc_id = str(creds.get("account_id", "N/A"))
+            masked_acc = acc_id if is_admin else (acc_id[:4] + "***" + acc_id[-4:] if len(acc_id) >= 8 else acc_id)
+            status_txt = "🟢 LIVE CONNECTED (Approved)" if is_auth else ("🟡 PENDING APPROVAL (Waiting Super Admin)" if has_creds else "🔴 NOT CONNECTED")
+
+            card = (
+                f"🔑 <b>[ANGKOR QUANT - CAPITAL.COM API VAULT]</b> 🏛️\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👤 <b>Telegram ID ៖</b> <code>{chat_id}</code>\n"
+                f"🏦 <b>Account ID ៖</b> <code>{masked_acc}</code>\n"
+                f"🟢 <b>ស្ថានភាពតភ្ជាប់ ៖</b> <code>{status_txt}</code>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"📝 <b>របៀបភ្ជាប់ API Credentials (LIVE MAINNET) ៖</b>\n"
+                f"សូមវាយបញ្ជាតាមទម្រង់ផ្លូវការខាងក្រោម ៖\n"
+                f"• <b>ទម្រង់ពេញលេញ (Recommended) ៖</b>\n"
+                f"<code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n\n"
+                f"• <b>ទម្រង់កាត់ (Auto-Fetch ID) ៖</b>\n"
+                f"<code>/capital API &lt;API_KEY&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n\n"
+                f"👉 <b>ឧទាហរណ៍ជាក់ស្តែង (កុំដាក់សញ្ញា &lt; &gt;) ៖</b>\n"
+                f"<code>/capital API Vm6tyK0cHtqq6fPe 216890638652757188 client@gmail.com MyPass123! live</code>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 <i>ទិន្នន័យសម្ងាត់ត្រូវបាន Encrypt ដោយ AES-256 Military Encryption ១០០% "
+                f"និងតម្រូវឱ្យ Super Admin អនុម័ត 1-Click ដើម្បីការពារសុវត្ថិភាពដើមទុន។</i>"
+            )
+            buttons = [
+                [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com (Official Partner)", url=ref_url)],
+                [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
+                [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
+            ]
+            if has_creds and not is_admin:
+                buttons.append([InlineKeyboardButton("🗑️ លុប API ចេញ (Delete)", callback_data="cap_api_delete")])
+            buttons.append([InlineKeyboardButton("🔙 ត្រឡប់ទៅ Menu", callback_data="btn_capital_menu")])
+            return await self.safe_reply(update, card, reply_markup=InlineKeyboardMarkup(buttons))
+
+        # 2. Check if Super Admin is targeting another user ID
+        target_cid = chat_id
+        cred_args = list(params)
+        is_admin_override = False
+
+        if is_admin and len(cred_args) >= 4 and cred_args[0].isdigit():
+            target_cid = int(cred_args[0])
+            cred_args = cred_args[1:]
+            is_admin_override = True
+
+        if len(cred_args) < 3:
+            return await self.safe_reply(
+                update,
+                f"⚠️ <b>ទម្រង់មិនត្រឹមត្រូវ (Missing Arguments)!</b>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"សូមវាយបញ្ជាតាមទម្រង់ខាងក្រោម ៖\n"
+                f"• <code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n"
+                f"• ឬ <code>/capital API &lt;API_KEY&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n\n"
+                f"👉 <b>ឧទាហរណ៍ ៖</b>\n"
+                f"<code>/capital API 9a8b7c6d5e 216890638652757188 client@gmail.com Pass1234 live</code>"
+            )
+
+        # 3. Parse parameters
+        if len(cred_args) >= 5:
+            in_key = str(cred_args[0]).strip()
+            in_acc = str(cred_args[1]).strip()
+            in_email = str(cred_args[2]).strip()
+            in_pwd = str(cred_args[3]).strip()
+            in_mode = str(cred_args[4]).strip().lower()
+        elif len(cred_args) == 4:
+            if cred_args[3].lower() in ["live", "demo"]:
+                in_key = str(cred_args[0]).strip()
+                in_acc = ""
+                in_email = str(cred_args[1]).strip()
+                in_pwd = str(cred_args[2]).strip()
+                in_mode = str(cred_args[3]).strip().lower()
+            else:
+                in_key = str(cred_args[0]).strip()
+                in_acc = str(cred_args[1]).strip()
+                in_email = str(cred_args[2]).strip()
+                in_pwd = str(cred_args[3]).strip()
+                in_mode = "live"
+        else: # 3 args
+            in_key = str(cred_args[0]).strip()
+            in_acc = ""
+            in_email = str(cred_args[1]).strip()
+            in_pwd = str(cred_args[2]).strip()
+            in_mode = "live"
+
+        # 4. Placeholder checks
+        if any(x in in_key or x in in_email or x in in_pwd or x in in_acc for x in ["<", ">", "API_KEY", "EMAIL", "PASSWORD"]):
+            return await self.safe_reply(
+                update,
+                f"⚠️ <b>សូមបញ្ចូលព័ត៌មានជាក់ស្តែង!</b> 🔑\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"ប្រព័ន្ធរកឃើញថាលោកអ្នកបានវាយពាក្យគំរូ <code>&lt;...&gt;</code>។ សូមជំនួសដោយទិន្នន័យពិតប្រាកដ ដោយមិនបាច់ដាក់សញ្ញា &lt; &gt; ឡើយ ៖\n\n"
+                f"• គំរូ ៖ <code>/capital API 9a8b7c6d5e 216890638652757188 client@gmail.com Pass1234 live</code>"
+            )
+
+        # 5. Strictly LIVE MAINNET for VIP Users
+        if in_mode == "demo" and not is_admin:
+            return await self.safe_reply(
+                update,
+                f"❌ <b>គណនី DEMO មិនត្រូវបានអនុញ្ញាតសម្រាប់ VIP USERS ឡើយ!</b> ⚠️\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🏛️ ប្រព័ន្ធ Angkor Quant សម្រាប់ VIP ដំណើរការផ្តាច់មុខលើ <b>LIVE MAINNET (Real Funds)</b> ប៉ុណ្ណោះ ដើម្បីធានាបាននូវប្រាក់ចំណេញពិតប្រាកដ។\n\n"
+                f"👉 សូមភ្ជាប់គណនីពិតរបស់អ្នកដោយវាយពាក្យ <code>live</code> នៅចុងក្រោយ ៖\n"
+                f"• <code>/capital API {in_key} {in_acc if in_acc else ''} {in_email} {in_pwd} live</code>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"💡 <i>(មុខងារ Demo និង Prop Firm Challenge ត្រូវបានរក្សាទុកសម្រាប់ Super Admin តែប៉ុណ្ណោះ)</i>"
+            )
+
+        is_demo_mode = (in_mode == "demo") if is_admin else False
+
+        # 6. Validating credentials against Capital.com
+        wait_msg = await self.safe_reply(update, "⏳ <i>កំពុងផ្ទៀងផ្ទាត់ API Credentials ជាមួយ Capital.com Broker...</i>")
+
+        valid, vmsg, b_info = await asyncio.to_thread(
+            capital_engine.validate_capital_credentials,
+            in_key, in_email, in_pwd, is_demo_mode
+        )
+
+        if not valid:
+            fail_card = (
+                f"❌ <b>ការភ្ជាប់ CAPITAL.COM API មិនជោគជ័យ!</b> ⚠️\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"⚠️ <b>មូលហេតុ ៖</b> <code>{vmsg}</code>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"💡 <b>ការណែនាំផ្ទៀងផ្ទាត់ ៖</b>\n"
+                f"1. ពិនិត្យមើល <code>API_KEY</code> ដែលបានបង្កើតលើ Capital.com Web Platform\n"
+                f"2. ពិនិត្យ <code>Email/Identifier</code> និង <code>Password</code> ឱ្យបានត្រឹមត្រូវ\n"
+                f"3. សម្រាប់ VIP Users សូមបញ្ជាក់ <code>live</code> នៅចុងបញ្ចប់\n"
+                f"• គំរូ ៖ <code>/capital API &lt;KEY&gt; &lt;ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>"
+            )
+            fail_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
+                [InlineKeyboardButton("🔄 ព្យាយាមម្តងទៀត", callback_data="cap_api_help")]
+            ])
+            if wait_msg:
+                try:
+                    await wait_msg.edit_text(fail_card, parse_mode="HTML", reply_markup=fail_kb)
+                    return
+                except Exception:
+                    pass
+            return await self.safe_reply(update, fail_card, reply_markup=fail_kb)
+
+        # 7. Extract real account details
+        fetched_acc = str(b_info.get("account_id") or "").strip()
+        final_acc = in_acc if in_acc and in_acc not in ["None", "N/A", ""] else fetched_acc
+        curr = str(b_info.get("currency") or "USD").upper()
+        bal_val = float(b_info.get("balance", 0.0))
+        avail_val = float(b_info.get("available", bal_val))
+
+        # 8. Anti-Account Collision Shield
+        existing_user = db.get_user_by_capital_account(final_acc)
+        if existing_user and int(existing_user["chat_id"]) != int(target_cid):
+            if not is_admin:
+                col_card = (
+                    f"⚠️ <b>ការព្រមាន ៖ រកឃើញការជាន់ ACCOUNT ID គ្នា!</b> ⚠️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🏦 <b>Account ID ៖</b> <code>{final_acc}</code>\n"
+                    f"គណនី Capital.com នេះត្រូវបានចុះឈ្មោះដោយ User ផ្សេងរួចហើយ! ដើម្បីសុវត្ថិភាពមូលធន ប្រព័ន្ធមិនអនុញ្ញាតឱ្យប្រើជាន់គ្នាឡើយ។\n"
+                    f"💡 <i>សូមទាក់ទងមកកាន់ ជំនួយការ @{support_handle} ប្រសិនបើនេះជាគណនីរបស់អ្នក។</i>"
+                )
+                if wait_msg:
+                    try:
+                        await wait_msg.edit_text(col_card, parse_mode="HTML")
+                        return
+                    except Exception:
+                        pass
+                return await self.safe_reply(update, col_card)
+
+        # 9. Super Admin vs VIP User Submission Flow
+        if is_admin_override or target_cid == 859271875:
+            # Super Admin directly configuring -> Auto-Approve 100%!
+            db.set_user_capital_credentials(
+                target_cid, in_key, in_email, in_pwd,
+                account_id=final_acc, currency=curr, is_demo=is_demo_mode,
+                is_referral_verified=True, referral_code="az48cxia"
+            )
+            db.set_capital_user_referral_status(target_cid, is_verified=True, referral_code="az48cxia")
+            capital_engine.invalidate_user_capital_engine(target_cid)
+
+            admin_succ_card = (
+                f"✅ <b>[CAPITAL.COM API APPROVED &amp; CONNECTED]</b> 🟢\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👤 <b>Target User ៖</b> <code>{target_cid}</code>\n"
+                f"🏦 <b>Account ID ៖</b> <code>{final_acc}</code> (🟢 LIVE MAINNET)\n"
+                f"💵 <b>Balance ៖</b> <code>${bal_val:,.2f} {curr}</code> | <b>Available ៖</b> <code>${avail_val:,.2f}</code>\n"
+                f"👮‍♂️ <b>អនុម័តដោយ ៖</b> Super Admin\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"⚡ <i>User នេះត្រូវបានបើកសិទ្ធិជួញដូរ Live Trading ពេញលេញរួចរាល់!</i>"
+            )
+            if wait_msg:
+                try:
+                    await wait_msg.edit_text(admin_succ_card, parse_mode="HTML")
+                except Exception:
+                    await self.safe_reply(update, admin_succ_card)
+            else:
+                await self.safe_reply(update, admin_succ_card)
+
+            if target_cid != chat_id:
+                u_msg = (
+                    f"🎉 <b>[អបអរសាទរ! CAPITAL.COM LIVE TRADING ត្រូវបានអនុម័ត]</b> 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 គណនីរបស់អ្នកត្រូវបាន Super Admin អនុម័ត និងភ្ជាប់ប្រព័ន្ធជោគជ័យ ១០០%!\n"
+                    f"🏦 <b>Account ID ៖</b> <code>{final_acc}</code> (🟢 LIVE MAINNET)\n"
+                    f"💵 <b>សមតុល្យដើមទុន ៖</b> <code>${bal_val:,.2f} {curr}</code>\n"
+                    f"⚡ មុខងារ <b>1-Tap BUY/SELL</b> &amp; <b>24/7 Auto-Trade</b> ត្រូវបានបើកដំណើរការពេញលេញ!\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"👉 វាយបញ្ជា /capital ដើម្បីចាប់ផ្តើមជួញដូរភ្លាមៗ!"
+                )
+                u_kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏛️ បើក Capital Live Trading", callback_data="btn_capital_menu")],
+                    [InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal")]
+                ])
+                try:
+                    await context.bot.send_message(chat_id=target_cid, text=u_msg, parse_mode="HTML", reply_markup=u_kb)
+                except Exception:
+                    pass
+            return
+        else:
+            # VIP User submitted -> Save credentials with AES-256 and trigger Super Admin 1-Click Approval Request
+            db.set_user_capital_credentials(
+                target_cid, in_key, in_email, in_pwd,
+                account_id=final_acc, currency=curr, is_demo=is_demo_mode,
+                is_referral_verified=False, referral_code="az48cxia"
+            )
+            capital_engine.invalidate_user_capital_engine(target_cid)
+
+            # Send 1-Click Approval Request to Super Admin (859271875)
+            dossier = db.get_user_license_details(target_cid) or {}
+            tier_lbl = dossier.get("tier_label", "👑 VIP User")
+            u_obj = update.effective_user
+            username_str = f"@{u_obj.username}" if u_obj and u_obj.username else "គ្មាន Username"
+
+            admin_req_card = (
+                f"🏛️ <b>[ANGKOR QUANT - សំណើសុំអនុម័ត CAPITAL.COM API ថ្មី]</b> 👑\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👤 <b>User ID ៖</b> <code>{target_cid}</code> ({username_str})\n"
+                f"👑 <b>VIP License ៖</b> <code>{tier_lbl}</code>\n"
+                f"🆔 <b>Account ID ៖</b> <code>{final_acc}</code>\n"
+                f"📧 <b>Identifier ៖</b> <code>{in_email[:3]}***{in_email[-6:] if len(in_email)>=8 else ''}</code>\n"
+                f"💵 <b>សមតុល្យ ៖</b> <code>${bal_val:,.2f} {curr}</code> | <b>Available ៖</b> <code>${avail_val:,.2f}</code>\n"
+                f"🟢 <b>បរិស្ថាន ៖</b> <code>LIVE MAINNET (Real Funds)</code>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"💡 <i>ចុចប៊ូតុងខាងក្រោមដើម្បីអនុម័ត 1-Click ភ្លាមៗ ៖</i>"
+            )
+            admin_req_kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ អនុម័ត Live Trading (Approve)", callback_data=f"cap_app:approve:{target_cid}"),
+                    InlineKeyboardButton("❌ បដិសេធ (Reject)", callback_data=f"cap_app:reject:{target_cid}")
+                ],
+                [
+                    InlineKeyboardButton("🔍 ពិនិត្យ Dossier", callback_data=f"admin_users:insp:{target_cid}"),
+                    InlineKeyboardButton("👥 User Registry", callback_data="admin_users:list:0")
+                ]
+            ])
+            try:
+                await context.bot.send_message(
+                    chat_id=859271875,
+                    text=admin_req_card,
+                    parse_mode="HTML",
+                    reply_markup=admin_req_kb
+                )
+            except Exception as e_adm:
+                logger.warning(f"Could not deliver Capital API approval request to Super Admin: {e_adm}")
+
+            user_succ_card = (
+                f"✅ <b>[CAPITAL.COM API VAULT ភ្ជាប់ជោគជ័យ]</b> 🔐\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🏦 <b>បរិស្ថាន (Mode) ៖</b> <code>🟢 LIVE MAINNET</code>\n"
+                f"🆔 <b>Account ID ៖</b> <code>{final_acc}</code>\n"
+                f"💵 <b>សមតុល្យ (Balance) ៖</b> <code>${bal_val:,.2f} {curr}</code>\n"
+                f"📦 <b>ទុនទំនេរ (Available) ៖</b> <code>${avail_val:,.2f} {curr}</code>\n"
+                f"🛡️ <b>ការការពារទិន្នន័យ ៖</b> <code>AES-256 Military Encryption</code>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"⚠️ <b>ស្ថានភាពអនុម័ត ៖</b> 🟡 <b>កំពុងរង់ចាំ Super Admin អនុម័ត (Pending Approval)</b>\n\n"
+                f"ℹ️ <i>ព័ត៌មានគណនីរបស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ត្រឹមត្រូវ និងបានបញ្ជូនសំណើទៅកាន់ Super Admin រួចរាល់!</i>\n"
+                f"<i>នៅពេល Super Admin អនុម័ត ប្រព័ន្ធនឹងបើកដំណើរការ /capital Live Trading ពេញលេញជូនភ្លាមៗ។</i>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"📞 <i>សូមទាក់ទងមកកាន់ ជំនួយការ @{support_handle} ដើម្បីពន្លឿនការអនុម័ត 1-Click!</i>"
+            )
+            user_succ_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
+                [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")],
+                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ Menu", callback_data="btn_capital_menu")]
+            ])
+            if wait_msg:
+                try:
+                    await wait_msg.edit_text(user_succ_card, parse_mode="HTML", reply_markup=user_succ_kb)
+                    return
+                except Exception:
+                    pass
+            return await self.safe_reply(update, user_succ_card, reply_markup=user_succ_kb)
 
     async def handle_inspect_user(self, update: Update, target: str):
         """Displays real-time dossier for a Capital.com account or user."""
@@ -1034,8 +1354,11 @@ class QuantGoldBot:
                 u_name = f"@{d['username']}" if d['username'] else "គ្មាន Username"
                 badge = "👤 Trader"
 
-            acc_label = f"🟢 LIVE (<code>#{d['account_id']}</code>)" if d["has_capital"] and not d["is_demo"] else (
-                f"🟡 DEMO (<code>#{d['account_id']}</code>)" if d["has_capital"] else "🔴 Not Connected"
+            is_ref = bool(d.get("is_referral_verified"))
+            acc_label = f"🟢 LIVE (<code>#{d['account_id']}</code>)" if d["has_capital"] and not d["is_demo"] and is_ref else (
+                f"🟡 PENDING (<code>#{d['account_id']}</code>)" if d["has_capital"] and not d["is_demo"] and not is_ref else (
+                    f"🟡 DEMO (<code>#{d['account_id']}</code>)" if d["has_capital"] else "🔴 Not Connected"
+                )
             )
             auto_label = f"🟢 ON (<code>${d['auto_budget']:.2f}</code>)" if d["auto_enabled"] else "🔴 OFF"
 
@@ -1119,11 +1442,13 @@ class QuantGoldBot:
         else:
             u_name = f"@{target['username']}" if target.get('username') else "គ្មាន Username"
             role_label = "👤 Trader"
-        cap_status = "🟢 CONNECTED (LIVE MAINNET)" if target["has_capital"] and not target["is_demo"] else (
-            "🟡 CONNECTED (DEMO)" if target["has_capital"] else "🔴 NOT CONNECTED (Awaiting Registration)"
+        cap_status = "🟢 CONNECTED (LIVE MAINNET)" if target["has_capital"] and not target["is_demo"] and target["is_referral_verified"] else (
+            "🟡 PENDING APPROVAL (Waiting Super Admin)" if target["has_capital"] and not target["is_referral_verified"] else (
+                "🟡 CONNECTED (DEMO)" if target["has_capital"] else "🔴 NOT CONNECTED (Awaiting Registration)"
+            )
         )
         auto_status = f"🟢 ACTIVE (ON) - ${target['auto_budget']:.2f}/Trade" if target["auto_enabled"] else f"🔴 INACTIVE (OFF) - ${target['auto_budget']:.2f}"
-        ref_status = "🟢 100% VERIFIED (Partner az48cxia)" if target["is_referral_verified"] else "⚪ Standby / Unverified"
+        ref_status = "🟢 100% APPROVED (Partner az48cxia)" if target["is_referral_verified"] else "🟡 Pending Approval"
 
         card = (
             f"🔍 <b>[ANGKOR QUANT - ព័ត៌មានលម្អិត USER DOSSIER]</b> 🏛️\n"
@@ -1164,6 +1489,16 @@ class QuantGoldBot:
                 InlineKeyboardButton("❌ ដកហូត VIP", callback_data=f"admin_users:grant:rej:{chat_id}")
             ]
         ]
+        if target["has_capital"] and not target["is_admin"]:
+            if target["is_referral_verified"]:
+                buttons.append([
+                    InlineKeyboardButton("🔴 ដកសិទ្ធិ Capital Live (Revoke)", callback_data=f"admin_users:cap_rev:{chat_id}")
+                ])
+            else:
+                buttons.append([
+                    InlineKeyboardButton("✅ អនុម័ត Capital Live (1-Click Approve)", callback_data=f"admin_users:cap_app:{chat_id}")
+                ])
+
         if not target["is_admin"]:
             buttons.append([
                 InlineKeyboardButton("🗑️ លុប User នេះចេញ (Delete)", callback_data=f"admin_users:del:{chat_id}"),
@@ -2234,6 +2569,131 @@ class QuantGoldBot:
                 await query.answer(f"Pruned: {len(res['purged_unlicensed'])} | Restored: {len(res['restored_lifetime'])}", show_alert=True)
                 card, kb = self.build_admin_users_list_card(page=0)
                 await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "cap_app":
+                target_cid = int(parts[2]) if len(parts) > 2 else chat_id
+                db.set_capital_user_referral_status(target_cid, is_verified=True, referral_code="az48cxia")
+                capital_engine.invalidate_user_capital_engine(target_cid)
+                await query.answer("✅ បានអនុម័ត Capital Live Trading ជោគជ័យ!")
+                card, kb = self.build_admin_user_dossier_card(target_cid)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+                creds = db.get_user_capital_credentials(target_cid) or {}
+                acc_id = creds.get("account_id", "N/A")
+                u_msg = (
+                    f"🎉 <b>[អបអរសាទរ! CAPITAL.COM LIVE TRADING ត្រូវបានអនុម័ត]</b> 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 <b>គណនីរបស់អ្នកត្រូវបាន Super Admin អនុម័តឱ្យដំណើរការជួញដូរផ្ទាល់ ១០០%!</b>\n"
+                    f"🏦 <b>Account ID ៖</b> <code>{acc_id}</code> (🟢 LIVE MAINNET)\n"
+                    f"⚡ មុខងារ <b>1-Tap BUY/SELL</b> &amp; <b>24/7 Auto-Trade</b> ត្រូវបានបើកដំណើរការពេញលេញ!\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"👉 វាយបញ្ជា /capital ដើម្បីចាប់ផ្តើមជួញដូរភ្លាមៗ!"
+                )
+                u_kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏛️ បើក Capital Live Trading", callback_data="btn_capital_menu")],
+                    [InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal")]
+                ])
+                try:
+                    await context.bot.send_message(chat_id=target_cid, text=u_msg, parse_mode="HTML", reply_markup=u_kb)
+                except Exception:
+                    pass
+
+            elif sub_action == "cap_rev":
+                target_cid = int(parts[2]) if len(parts) > 2 else chat_id
+                db.set_capital_user_referral_status(target_cid, is_verified=False)
+                capital_engine.invalidate_user_capital_engine(target_cid)
+                await query.answer("🔴 បានដកសិទ្ធិ Capital Live Trading!")
+                card, kb = self.build_admin_user_dossier_card(target_cid)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+        elif data.startswith("cap_app:"):
+            parts = data.split(":")
+            if len(parts) >= 3:
+                act = parts[1]
+                target_cid = int(parts[2])
+
+                if not self.citadel.is_super_admin(chat_id):
+                    return await query.answer("⛔ Access Denied! Super Admin authority required.", show_alert=True)
+
+                if act == "approve":
+                    db.set_capital_user_referral_status(target_cid, is_verified=True, referral_code="az48cxia")
+                    capital_engine.invalidate_user_capital_engine(target_cid)
+                    await query.answer("✅ Approved Capital Live Trading!")
+
+                    admin_card = (
+                        f"✅ <b>[CAPITAL.COM API LIVE TRADING APPROVED]</b> 🟢\n"
+                        f"══════════════════════════════════════\n"
+                        f"👤 <b>Target User ID ៖</b> <code>{target_cid}</code>\n"
+                        f"🟢 <b>ស្ថានភាព ៖</b> <b>LIVE TRADING 100% APPROVED</b>\n"
+                        f"👮‍♂️ <b>អនុម័តដោយ ៖</b> Super Admin #{chat_id}\n"
+                        f"⏱️ <b>ពេលវេលា ៖</b> <code>{time.strftime('%Y-%m-%d %H:%M:%S')}</code>\n"
+                        f"══════════════════════════════════════\n"
+                        f"⚡ <i>ប្រព័ន្ធបានបើកសិទ្ធិជួញដូរ និងជូនដំណឹងទៅកាន់ User រួចរាល់ដោយស្វ័យប្រវត្ត!</i>"
+                    )
+                    await self.safe_edit(query, admin_card)
+
+                    creds = db.get_user_capital_credentials(target_cid) or {}
+                    acc_id = creds.get("account_id", "N/A")
+                    user_card = (
+                        f"🎉 <b>[អបអរសាទរ! CAPITAL.COM LIVE TRADING ត្រូវបានអនុម័ត]</b> 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"👑 <b>គណនីរបស់អ្នកត្រូវបាន Super Admin អនុម័តឱ្យដំណើរការជួញដូរផ្ទាល់ ១០០%!</b>\n"
+                        f"🏦 <b>Account ID ៖</b> <code>{acc_id}</code> (🟢 LIVE MAINNET)\n"
+                        f"⚡ មុខងារ <b>1-Tap BUY/SELL</b> &amp; <b>24/7 Auto-Trade</b> ត្រូវបានបើកដំណើរការពេញលេញ!\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"👉 វាយបញ្ជា /capital ដើម្បីចាប់ផ្តើមជួញដូរភ្លាមៗ!"
+                    )
+                    user_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🏛️ បើក Capital Live Trading", callback_data="btn_capital_menu")],
+                        [InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal")]
+                    ])
+                    try:
+                        await context.bot.send_message(chat_id=target_cid, text=user_card, parse_mode="HTML", reply_markup=user_kb)
+                    except Exception as e_notify:
+                        logger.warning(f"Could not notify user {target_cid} of Capital approval: {e_notify}")
+
+                elif act == "reject":
+                    db.set_capital_user_referral_status(target_cid, is_verified=False)
+                    capital_engine.invalidate_user_capital_engine(target_cid)
+                    await query.answer("❌ Rejected Capital Live Trading!")
+
+                    admin_card = (
+                        f"❌ <b>[CAPITAL.COM API LIVE TRADING REJECTED]</b> 🔴\n"
+                        f"══════════════════════════════════════\n"
+                        f"👤 <b>Target User ID ៖</b> <code>{target_cid}</code>\n"
+                        f"🔴 <b>ស្ថានភាព ៖</b> <b>REJECTED / SUSPENDED</b>\n"
+                        f"👮‍♂️ <b>បដិសេធដោយ ៖</b> Super Admin #{chat_id}\n"
+                        f"══════════════════════════════════════"
+                    )
+                    await self.safe_edit(query, admin_card)
+
+                    support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+                    support_url = f"https://t.me/{support_handle}"
+                    user_card = (
+                        f"❌ <b>[សេចក្តីជូនដំណឹង CAPITAL.COM API]</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"សំណើសុំភ្ជាប់ Capital.com API របស់អ្នកមិនត្រូវបានអនុម័តឡើយ។\n"
+                        f"សូមទាក់ទងមកកាន់ ជំនួយការ @{support_handle} សម្រាប់ព័ត៌មានបន្ថែម ឬផ្ទៀងផ្ទាត់ឡើងវិញ。"
+                    )
+                    user_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)]
+                    ])
+                    try:
+                        await context.bot.send_message(chat_id=target_cid, text=user_card, parse_mode="HTML", reply_markup=user_kb)
+                    except Exception:
+                        pass
+
+        elif data == "cap_api_help":
+            await self.handle_capital_api(update, context, [])
+
+        elif data == "cap_api_delete":
+            db.delete_user_capital_credentials(chat_id)
+            capital_engine.invalidate_user_capital_engine(chat_id)
+            try:
+                await query.answer("🗑️ បានលុប API Credentials ចេញដោយជោគជ័យ!", show_alert=True)
+            except Exception:
+                pass
+            await self.handle_capital_api(update, context, [])
 
     async def handle_text_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handles clicks from the bottom persistent keyboard."""

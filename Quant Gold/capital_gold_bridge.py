@@ -205,16 +205,20 @@ class QuantGoldCapitalBridge:
             f"ℹ️ <b>លក្ខខណ្ឌកាតព្វកិច្ចជួញដូរ ៖</b>\n"
             f"លោកអ្នកមាន VIP License រួចហើយ! ប៉ុន្តែដើម្បីដំណើរការជួញដូរផ្ទាល់ (Auto Trading) "
             f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី តាមរយៈ Partner Link ផ្លូវការ "
-            f"ដើម្បីឱ្យប្រព័ន្ធ AI អាចបញ្ជូន Order ទៅកាន់ Broker បាន។\n"
+            f"ដើម្បីឱ្យប្រព័ន្ធ AI អាចបញ្ជូន Order ទៅកាន់ Broker បាន។\n\n"
             f"📝 <b>ជំហានងាយៗទាំង ២ ៖</b>\n"
             f"1. បង្កើតគណនី តាម Link ផ្លូវការ ៖ <a href='{ref_link}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
-            f"2. ទាក់ទងទៅកាន់ ជំនួយការ @{support_handle} ដើម្បីភ្ជាប់ភ្លាមៗ!\n"
-            f"(ឬបញ្ចូល API Credentials ផ្ទាល់ខ្លួនតាមរយៈ Main Bot /capital)\n"
+            f"2. ភ្ជាប់ API Key ផ្ទាល់ខ្លួនតាមរយៈ ៖\n"
+            f"<code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n"
+            f"(ឬទាក់ទងមកកាន់ ជំនួយការ @{support_handle} ដើម្បីភ្ជាប់ និងអនុម័ត 1-Click!)\n"
             f"{ui_standards.DIVIDER_LIGHT}"
         )
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_link)],
-            [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
+            [
+                InlineKeyboardButton("🔑 របៀបភ្ជាប់ API (/capital API)", callback_data="cap_api_help"),
+                InlineKeyboardButton(f"📞 ជំនួយការ (@{support_handle})", url=support_url)
+            ],
             [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
         ])
         return card, kb
