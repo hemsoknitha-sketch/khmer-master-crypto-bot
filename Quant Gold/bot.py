@@ -663,10 +663,25 @@ class QuantGoldBot:
             else:
                 return await self.safe_reply(update, tp_card, reply_markup=get_gold_signal_reply_markup())
 
-        # Check if admin requested broadcast: /signal broadcast or /signal send
+        # Check if admin requested broadcast or fleet execution:
+        # Commands supported:
+        #   /signal send [BUY/SELL]          -> Broadcasts Telegram Signal card only
+        #   /signal broadcast [BUY/SELL]     -> Broadcasts Telegram Signal card only
+        #   /signal trade [BUY/SELL]         -> Dispatches Capital.com positions to ALL VIPs + broadcasts Signal card!
+        #   /signal execute [BUY/SELL]       -> Dispatches Capital.com positions to ALL VIPs + broadcasts Signal card!
+        #   /signal send trade [BUY/SELL]    -> Dispatches Capital.com positions to ALL VIPs + broadcasts Signal card!
         is_admin = (update.effective_chat.id in [859271875, 537186806])
-        if context.args and str(context.args[0]).lower() in ["broadcast", "send", "alert"] and is_admin:
-            target_dir = str(context.args[1]).capitalize() if len(context.args) > 1 else dir_str
+        if context.args and str(context.args[0]).lower() in ["broadcast", "send", "alert", "trade", "execute"] and is_admin:
+            sub = str(context.args[0]).lower()
+            raw_args = [str(a).lower() for a in context.args]
+            should_trade = sub in ["trade", "execute"] or ("trade" in raw_args) or ("exec" in raw_args) or ("auto" in raw_args)
+
+            target_dir = dir_str
+            for a in context.args[1:]:
+                if str(a).upper() in ["BUY", "SELL"]:
+                    target_dir = str(a).upper()
+                    break
+
             if target_dir.upper() == "SELL":
                 sl_val = p_sell.get("sl", round(curr_p + 6.08, 2))
                 tp1_val = p_sell.get("tp1", round(curr_p - 7.30, 2))
@@ -678,16 +693,41 @@ class QuantGoldBot:
                 tp2_val = p_buy.get("tp2", round(curr_p + 15.20, 2))
                 tp3_val = p_buy.get("tp3", round(curr_p + 24.32, 2))
 
-            vip_card = format_gold_signal_card(
-                direction=target_dir,
-                sl=sl_val,
-                tp1=tp1_val,
-                tp2=tp2_val,
-                tp3=tp3_val,
-                entry_price=curr_p
-            )
-            sent = await self.exec_engine.broadcast_to_vip_users(vip_card, app=self.app, reply_markup=get_gold_signal_reply_markup())
-            return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ Signal ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
+            if should_trade:
+                fleet_res = await self.exec_engine.dispatch_gold_signal_to_fleet(
+                    action=target_dir.upper(),
+                    current_price=curr_p,
+                    sl=sl_val,
+                    tp1=tp1_val,
+                    tp2=tp2_val,
+                    tp3=tp3_val,
+                    app=self.app,
+                    setup_type="QUANT_GOLD_ADMIN_FLEET",
+                    broadcast_telegram=True
+                )
+                d_cnt = fleet_res.get("dispatched_count", 0)
+                s_cnt = fleet_res.get("broadcast_sent", 0)
+                return await self.safe_reply(
+                    update,
+                    f"🚀 <b>[ADMIN FLEET TRADE &amp; SIGNAL DISPATCHED]</b> 🟢\n"
+                    f"══════════════════════════════════════\n"
+                    f"• បើក Position លើ Capital.com ៖ <code>{d_cnt} គណនី (Super Fast Parallel)</code>\n"
+                    f"• បាញ់ Signal Alert ទៅ Telegram ៖ <code>{s_cnt} VIP Users</code>\n"
+                    f"• ឧបករណ៍ ៖ <code>Spot Gold (XAUUSD) {target_dir.upper()} @ ${curr_p:.2f}</code>\n"
+                    f"• Structural SL ៖ <code>${sl_val:.2f}</code> | TP1 ៖ <code>${tp1_val:.2f}</code>\n"
+                    f"══════════════════════════════════════"
+                )
+            else:
+                vip_card = format_gold_signal_card(
+                    direction=target_dir,
+                    sl=sl_val,
+                    tp1=tp1_val,
+                    tp2=tp2_val,
+                    tp3=tp3_val,
+                    entry_price=curr_p
+                )
+                sent = await self.exec_engine.broadcast_to_vip_users(vip_card, app=self.app, reply_markup=get_gold_signal_reply_markup())
+                return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ Signal ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
 
         # Clean Single-Directional Signal Card (100% Definitive, Zero Dual Confusion)
         msg = format_gold_signal_card(
