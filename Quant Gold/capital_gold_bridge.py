@@ -137,28 +137,35 @@ class QuantGoldCapitalBridge:
                 f"💎 <i>Running 24/7 365 Free on Hugging Face Serverless &amp; Google Cloud!</i>"
             )
 
-        kb = InlineKeyboardMarkup([
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+        btn_rows = [
             [
                 InlineKeyboardButton("🟢 1-Tap BUY Gold", callback_data="btn_qgold_buy"),
                 InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
             ],
             [
-                InlineKeyboardButton("🎯 Super Smart Signal", callback_data="btn_qgold_signal"),
-                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh")
+                InlineKeyboardButton("🏛️ Capital.com Live (/capital)", callback_data="btn_capital_menu"),
+                InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal")
             ],
             [
-                InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions"),
-                InlineKeyboardButton("🤖 Toggle Auto Gold", callback_data="btn_qgold_toggle")
+                InlineKeyboardButton("📊 Positions (/positions)", callback_data="btn_qgold_positions"),
+                InlineKeyboardButton("👑 VIP License (/license)", callback_data="btn_qgold_license")
             ],
             [
-                InlineKeyboardButton("💵 Live Status", callback_data="btn_qgold_status"),
-                InlineKeyboardButton("🖥️ VPS Health", callback_data="btn_qgold_health")
+                InlineKeyboardButton("🤖 Toggle Auto Gold", callback_data="btn_qgold_toggle"),
+                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status")
             ],
             [
-                InlineKeyboardButton("🚨 Panic Close ALL", callback_data="btn_qgold_close_all"),
+                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh"),
                 InlineKeyboardButton("📖 User Guide / Help", callback_data="btn_qgold_help")
             ]
-        ])
+        ]
+        if is_admin:
+            btn_rows.append([
+                InlineKeyboardButton("🖥️ VPS Health (/health)", callback_data="btn_qgold_health"),
+                InlineKeyboardButton("🛡️ Security Citadel (/security)", callback_data="btn_qgold_security")
+            ])
+        kb = InlineKeyboardMarkup(btn_rows)
 
         return text, kb
 
@@ -342,16 +349,20 @@ class QuantGoldCapitalBridge:
                 InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
             ],
             [
-                InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions"),
-                InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle")
+                InlineKeyboardButton("📊 Positions (/positions)", callback_data="btn_qgold_positions"),
+                InlineKeyboardButton("👑 VIP License (/license)", callback_data="btn_qgold_license")
             ],
             [
-                InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all"),
-                InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_capital_menu")
+                InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle"),
+                InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close)", callback_data="btn_qgold_close_all")
             ],
             [
                 InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
                 InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status")
+            ],
+            [
+                InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_capital_menu"),
+                InlineKeyboardButton("📖 User Guide (/help)", callback_data="btn_qgold_help")
             ]
         ]
 
@@ -359,6 +370,10 @@ class QuantGoldCapitalBridge:
             buttons.append([
                 InlineKeyboardButton("👥 User Registry (/admin_users)", callback_data="admin_users:list:0"),
                 InlineKeyboardButton("👑 Fleet Controller (/admin_capital)", callback_data="btn_qgold_admin_capital")
+            ])
+            buttons.append([
+                InlineKeyboardButton("🖥️ VPS Health (/health)", callback_data="btn_qgold_health"),
+                InlineKeyboardButton("🛡️ Security Citadel (/security)", callback_data="btn_qgold_security")
             ])
 
         kb = InlineKeyboardMarkup(buttons)

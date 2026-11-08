@@ -77,27 +77,25 @@ async def sync_menu():
     me = await bot.get_me()
     print(f"🤖 Connected to Bot: @{me.username} (ID: {me.id})")
 
-    # Define clean Quant Gold commands
+    # Define clean Quant Gold public commands for all users
     commands = [
         BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
         BotCommand("signal", "🎯 View Current Super Smart Gold Signal & Levels"),
         BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
-        BotCommand("gold", "📈 Gold Real-Time Intelligence & Analysis"),
-        BotCommand("scan", "🔄 Refresh 19-Timeframe Confluence Scan"),
-        BotCommand("buy", "🟢 Execute Instant 1-Tap Market Buy on Gold"),
-        BotCommand("sell", "🔴 Execute Instant 1-Tap Market Sell on Gold"),
-        BotCommand("positions", "📊 View Active Gold Positions & Breakeven"),
-        BotCommand("close", "🛑 Close All Active Gold Positions"),
-        BotCommand("close_all", "🛑 Emergency Close All Gold Positions"),
-        BotCommand("panic", "🚨 Emergency Close All Gold Positions"),
         BotCommand("auto", "🤖 Toggle 24/7 Autonomous Gold Trading"),
         BotCommand("status", "💵 Live Gold Price, Spread & Capital Session"),
-        BotCommand("health", "🖥️ Google Cloud VPS System Health & Latency"),
         BotCommand("help", "📖 User Guide & Fiduciary Covenant")
     ]
 
+    # Dedicated Admin commands for Super Admin scope ONLY (859271875 @Soknitha)
     admin_commands = list(commands) + [
-        BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller")
+        BotCommand("health", "🖥️ Google Cloud VPS System Health & Latency"),
+        BotCommand("security", "🛡️ View Institutional Security Citadel Status"),
+        BotCommand("admin_users", "👥 Inspect & Manage All Users Dossiers"),
+        BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
+        BotCommand("admin_license", "👑 VIP License Approvals & Database Pruning"),
+        BotCommand("emergency_stop", "🚨 Super Admin Emergency Trading Freeze"),
+        BotCommand("unlock", "🟢 Super Admin Release Trading Freeze")
     ]
 
     print("🧹 [1/3] Deleting stale commands from all scopes & Admin chat scopes...")

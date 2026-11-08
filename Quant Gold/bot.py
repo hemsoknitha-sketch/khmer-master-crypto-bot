@@ -104,24 +104,13 @@ class QuantGoldBot:
     def build_application(self):
         """Builds and configures the pure Quant Gold telegram application."""
         async def post_init(application):
-            # Sync clean public bot commands
+            # Sync clean public bot commands for all users (Default and AllPrivateChats)
             commands = [
                 BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
                 BotCommand("signal", "🎯 View Current Super Smart Gold Signal & Levels"),
-                BotCommand("license", "👑 View VIP License & Capital.com Status"),
                 BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
-                BotCommand("gold", "📈 Gold Real-Time Intelligence & Analysis"),
-                BotCommand("scan", "🔄 Refresh 19-Timeframe Confluence Scan"),
-                BotCommand("buy", "🟢 Execute Instant 1-Tap Market Buy on Gold"),
-                BotCommand("sell", "🔴 Execute Instant 1-Tap Market Sell on Gold"),
-                BotCommand("positions", "📊 View Active Gold Positions & Breakeven"),
-                BotCommand("close", "🛑 Close All Active Gold Positions"),
-                BotCommand("close_all", "🛑 Emergency Close All Gold Positions"),
-                BotCommand("panic", "🚨 Emergency Close All Gold Positions"),
                 BotCommand("auto", "🤖 Toggle 24/7 Autonomous Gold Trading"),
                 BotCommand("status", "💵 Live Gold Price, Spread & Capital Session"),
-                BotCommand("health", "🖥️ Google Cloud VPS System Health & Latency"),
-                BotCommand("security", "🛡️ View Institutional Security Citadel Status"),
                 BotCommand("help", "📖 User Guide & Fiduciary Covenant")
             ]
             try:
@@ -137,7 +126,7 @@ class QuantGoldBot:
                     except Exception:
                         pass
 
-                # Force delete stale custom admin scope for 859271875
+                # Force delete stale custom admin scope for 859271875 & 537186806
                 for admin_id in [859271875, 537186806]:
                     try:
                         await application.bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=admin_id))
@@ -150,6 +139,8 @@ class QuantGoldBot:
 
                 # Set dedicated Admin commands for Super Admin scope ONLY (859271875 @Soknitha)
                 admin_commands = list(commands) + [
+                    BotCommand("health", "🖥️ Google Cloud VPS System Health & Latency"),
+                    BotCommand("security", "🛡️ View Institutional Security Citadel Status"),
                     BotCommand("admin_users", "👥 Inspect & Manage All Users Dossiers"),
                     BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
                     BotCommand("admin_license", "👑 VIP License Approvals & Database Pruning"),
@@ -268,12 +259,25 @@ class QuantGoldBot:
                 return None
 
     async def handle_security(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Displays real-time Institutional Security Citadel status & diagnostics."""
+        """Displays real-time Institutional Security Citadel status & diagnostics (Super Admin Only)."""
         chat_id = update.effective_chat.id if update.effective_chat else None
-        if chat_id:
-            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
-            if not allowed:
-                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+        if not chat_id:
+            return
+
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+        if not allowed:
+            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        # Super Admin Only Enforcement (AQ84)
+        if not self.citadel.is_super_admin(chat_id):
+            return await self.safe_reply(
+                update,
+                "⛔ <b>[ACCESS DENIED - SUPER ADMIN ONLY]</b> 🏛️\n"
+                "──────────────────────────────────────\n"
+                "<i>មុខងារ /security ត្រូវបានរក្សាទុកសម្រាប់តែ Super Admin (@Soknitha) ប៉ុណ្ណោះ។\n"
+                "VIP Users មិនត្រូវបានអនុញ្ញាតឱ្យមើល Security Citadel ឡើយ។</i>"
+            )
+
         card = self.citadel.build_security_status_card()
         await self.safe_reply(update, card)
 
@@ -416,6 +420,8 @@ class QuantGoldBot:
             return await self.handle_sell(update, context)
         elif sub_cmd in ["POS", "POSITIONS"]:
             return await self.handle_positions(update, context)
+        elif sub_cmd in ["LICENSE", "LIC", "VIP", "MEMBERSHIP"]:
+            return await self.handle_license(update, context)
         elif sub_cmd in ["CLOSE", "CLOSEALL", "PANIC"]:
             return await self.handle_close_all(update, context)
         elif sub_cmd in ["STATUS", "SCAN"]:
@@ -1150,8 +1156,11 @@ class QuantGoldBot:
         if not (dossier["has_capital_credentials"] or dossier["is_referral_verified"]):
             buttons.append([InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_link)])
 
+        buttons.append([
+            InlineKeyboardButton("🏛️ Capital.com Live (/capital)", callback_data="btn_capital_menu"),
+            InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_qgold_recheck_auth")
+        ])
         buttons.append([InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)])
-        buttons.append([InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_qgold_recheck_auth")])
         kb = InlineKeyboardMarkup(buttons)
         await self.safe_reply(update, card, reply_markup=kb)
 
@@ -1743,7 +1752,17 @@ class QuantGoldBot:
                 f"ℹ️ <b>ស្ថានភាព ៖</b> គ្មាន Position កំពុងបើកនៅឡើយទេ។\n\n"
                 f"💡 <i>ចុចប៊ូតុង <b>🟢 1-Tap BUY</b> ឬ <b>🔴 1-Tap SELL</b> ដើម្បីចាប់ផ្តើមជួញដូរ!</i>"
             )
-            await self.safe_reply(update, msg)
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🟢 1-Tap BUY Gold", callback_data="btn_qgold_buy"),
+                    InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Capital.com Live (/capital)", callback_data="btn_capital_menu"),
+                    InlineKeyboardButton("🔄 Refresh", callback_data="btn_qgold_positions")
+                ]
+            ])
+            await self.safe_reply(update, msg, reply_markup=kb)
             return
 
         lines = [
@@ -1803,7 +1822,10 @@ class QuantGoldBot:
 
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all")],
-            [InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions")]
+            [
+                InlineKeyboardButton("🏛️ Capital.com Live (/capital)", callback_data="btn_capital_menu"),
+                InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions")
+            ]
         ])
         await self.safe_reply(update, "\n".join(lines), reply_markup=kb)
 
@@ -2146,16 +2168,24 @@ class QuantGoldBot:
         }
 
     async def handle_health(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Displays real-time Google Cloud VPS System Health & Latency diagnostics."""
+        """Displays real-time Google Cloud VPS System Health & Latency diagnostics (Super Admin Only)."""
         chat_id = update.effective_chat.id if update.effective_chat else None
-        if chat_id:
-            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
-            if not allowed:
-                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+        if not chat_id:
+            return
 
-            if not self.citadel.is_super_admin(chat_id) and not db.is_vip(chat_id):
-                card, kb = self.bridge.build_vip_license_required_card(chat_id)
-                return await self.safe_reply(update, card, reply_markup=kb)
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+        if not allowed:
+            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        # Super Admin Only Enforcement (AQ84)
+        if not self.citadel.is_super_admin(chat_id):
+            return await self.safe_reply(
+                update,
+                "⛔ <b>[ACCESS DENIED - SUPER ADMIN ONLY]</b> 🏛️\n"
+                "──────────────────────────────────────\n"
+                "<i>មុខងារ /health ត្រូវបានរក្សាទុកសម្រាប់តែ Super Admin (@Soknitha) ប៉ុណ្ណោះ។\n"
+                "VIP Users មិនត្រូវបានអនុញ្ញាតឱ្យមើល System Telemetry / VPS Health ឡើយ។</i>"
+            )
 
         diag = self.get_vps_diagnostics()
 
@@ -2185,13 +2215,14 @@ class QuantGoldBot:
             f"📖 <b>[ANGKOR QUANT - QUANT GOLD USER GUIDE]</b> 🥇\n"
             f"══════════════════════════════════════\n"
             f"<b>របៀបប្រើប្រាស់ប្រព័ន្ធ Quant Gold ៖</b>\n\n"
-            f"1. <b>/start ឬ /capital ៖</b> បើកផ្ទាំងបញ្ជា Dashboard វិភាគ 19 Timeframes និងសញ្ញា AI\n"
-            f"2. <b>🟢 1-Tap BUY / 🔴 1-Tap SELL ៖</b> បើក Order មាសភ្លាមៗជាមួយ Structural SL & Breakeven Armor\n"
-            f"3. <b>🤖 Auto-Trade (ON/OFF) ៖</b> បើកដំណើរការជួញដូរស្វ័យប្រវត្ត ២៤/៧\n"
-            f"4. <b>/positions ៖</b> មើលបញ្ជី Position ដែលកំពុងរត់ និងប្រាក់ចំណេញបច្ចុប្បន្ន\n"
-            f"5. <b>/close ៖</b> បិទរាល់ Position មាសទាំងអស់ជាបន្ទាន់\n"
-            f"6. <b>/status ៖</b> ពិនិត្យមើលស្ថានភាព Server VPS និងតម្លៃមាស Real-Time\n"
-            f"7. <b>/license ៖</b> ពិនិត្យមើលព័ត៌មាន VIP License និងស្ថានភាព Capital.com\n\n"
+            f"1. <b>/start ៖</b> បើកផ្ទាំងបញ្ជា Dashboard វិភាគ 19 Timeframes និងសញ្ញា AI\n"
+            f"2. <b>/capital ៖</b> ផ្ទាំងបញ្ជាជួញដូរ Capital.com Live Trading Deck (រួមបញ្ចូល Positions & VIP License)\n"
+            f"3. <b>/signal ៖</b> មើលសញ្ញា AI Master Signal និងកម្រិត SL/TP1/TP2/TP3\n"
+            f"4. <b>/auto ៖</b> បើក/បិទដំណើរការជួញដូរស្វ័យប្រវត្ត ២៤/៧ (Toggle Auto-Trade)\n"
+            f"5. <b>/status ៖</b> ពិនិត្យមើលតម្លៃមាស Spread និងស្ថានភាពគណនី Real-Time\n"
+            f"6. <b>/help ៖</b> មើលសៀវភៅណែនាំអ្នកប្រើប្រាស់ និងច្បាប់ការពារដើមទុន\n\n"
+            f"💡 <i>លោកអ្នកអាចប្រើមុខងារ <b>Positions</b> និង <b>VIP License</b> ផ្ទាល់ក្នុង <code>/capital</code>\n"
+            f"ឬចុចប៊ូតុង <b>[📊 Positions]</b> និង <b>[👑 VIP License]</b> (ឬវាយបញ្ជា <code>/positions</code> និង <code>/license</code>) បានគ្រប់ពេល។</i>\n\n"
             f"🛡️ <b>កាតព្វកិច្ចការពារដើមទុន (FIDUCIARY COVENANT) ៖</b>\n"
             f"• ប្រព័ន្ធបដិសេធដាច់ខាតការដេញតាមទីផ្សារកំពូល ឬបាត (Zero Chasing)\n"
             f"• ពេលចំណេញដល់ +2.5R ប្រព័ន្ធនឹងចាក់សោរ Breakeven Armor ភ្លាម (0.00R Risk)\n"
@@ -2201,6 +2232,8 @@ class QuantGoldBot:
         if (chat_id == 859271875) or db.is_admin(chat_id):
             help_text += (
                 f"\n👑 <b>[SUPER ADMIN FLEET COMMANDS] ៖</b>\n"
+                f"• <code>/health</code> (ពិនិត្យសុខភាព Google Cloud VPS Telemetry & Latency)\n"
+                f"• <code>/security</code> (ពិនិត្យប្រព័ន្ធ Institutional Security Citadel & Diagnostics)\n"
                 f"• <code>/admin_users</code> (ពិនិត្យ & គ្រប់គ្រងព័ត៌មាន Users ពេញលេញ)\n"
                 f"• <code>/admin_users inspect &lt;target&gt;</code> (ពិនិត្យ Dossier និងប៊ូតុង 1-Click)\n"
                 f"• <code>/admin_users toggle &lt;target&gt;</code> (បើក/បិទ Auto-Trade)\n"
@@ -2213,6 +2246,8 @@ class QuantGoldBot:
                 f"• <code>/capital off all</code> (ផ្អាក Auto សម្រាប់ VIP Users ទាំងអស់)\n"
                 f"• <code>/admin_capital on all 50</code> (ឬតាម admin_capital)\n"
                 f"• <code>/admin_capital off all</code>\n"
+                f"• <code>/emergency_stop</code> (ផ្អាកការជួញដូរបន្ទាន់ - Circuit Breaker)\n"
+                f"• <code>/unlock</code> (ដោះសោដំណើរការជួញដូរឡើងវិញ)\n"
                 f"• <code>/admin_capital inspect &lt;acc_or_id&gt;</code> (ពិនិត្យ dossier)\n"
                 f"• <code>/admin_capital fleet</code> (ពិនិត្យ All Users)\n"
                 f"══════════════════════════════════════\n"
