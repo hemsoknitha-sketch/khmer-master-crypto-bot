@@ -330,8 +330,13 @@ class QuantGoldExecutionEngine:
             "tp3": round(curr_p - tp3_distance, 2),
         }
 
-        # Resolve Dominant Trend Bias
-        dominant_bias = "BUY" if (weighted_score > 0 or kalman.get("latent_velocity", 0.0) >= 0 or counts.get("bullish", 0) >= counts.get("bearish", 0)) else "SELL"
+        # Resolve Dominant Trend Bias with multi-factor confluence
+        if weighted_score < -5.0 or counts.get("bearish", 0) > counts.get("bullish", 0):
+            dominant_bias = "SELL"
+        elif weighted_score > 5.0 or counts.get("bullish", 0) > counts.get("bearish", 0):
+            dominant_bias = "BUY"
+        else:
+            dominant_bias = "BUY" if kalman.get("latent_velocity", 0.0) >= 0 else "SELL"
 
         if final_action == "BUY":
             sl_price = prospective_buy["sl"]

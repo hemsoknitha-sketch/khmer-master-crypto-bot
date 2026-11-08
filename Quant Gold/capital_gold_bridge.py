@@ -71,6 +71,12 @@ class QuantGoldCapitalBridge:
         hurst_val = math_s.get("composite_hurst", 0.50)
         regime = math_s.get("regime", "RANDOM_WALK")
 
+        bias_side = action if action in ["BUY", "SELL"] else sig_data.get("dominant_bias", "BUY")
+        pips_sl = abs(curr_p - sl) * 10
+        pips_tp1 = abs(tp1 - curr_p) * 10
+        pips_tp2 = abs(tp2 - curr_p) * 10
+        pips_tp3 = abs(tp3 - curr_p) * 10
+
         # Visual indicator icons
         action_icon = "🟢 BUY" if action == "BUY" else ("🔴 SELL" if action == "SELL" else "⚪ HOLD / CHOP FILTER")
 
@@ -94,13 +100,13 @@ class QuantGoldCapitalBridge:
                 f"• Fractal Hurst (H) ៖ <code>{hurst_val:.3f}</code> | <b>Regime ៖</b> <code>{regime}</code>\n"
                 f"• Bayesian Win Edge ៖ <code>{math_s.get('bayesian_win_probability', 50):.1f}%</code>\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
-                f"🛡️ <b>កម្រិតការពារដើមទុន & គោលដៅ (R:R &gt;= 1:1.20 - 1:4.00) ៖</b>\n"
-                f"• កាត់ខាតតាមរចនាសម្ព័ន្ធ (SL) ៖ <code>${sl:.2f}</code> (-60.8 pips)\n"
-                f"• គោលដៅ TP1 (+73 pips) ៖ <code>${tp1:.2f}</code> (Breakeven Armor Lock)\n"
-                f"• គោលដៅ TP2 (+152 pips) ៖ <code>${tp2:.2f}</code> (Guaranteed Cash Floor)\n"
-                f"• គោលដៅ TP3 (+243 pips) ៖ <code>${tp3:.2f}</code> (Moonshot Runner)\n"
+                f"🛡️ <b>កម្រិតការពារដើមទុន &amp; គោលដៅ ({'សកម្ម' if action in ['BUY','SELL'] else 'រង់ចាំ'} {bias_side} | R:R &gt;= 1:1.20 - 1:4.00) ៖</b>\n"
+                f"• កាត់ខាតតាមរចនាសម្ព័ន្ធ (SL) ៖ <code>${sl:.2f}</code> ({'-' if (sl < curr_p and bias_side == 'BUY') or (sl > curr_p and bias_side == 'SELL') else '+'}{pips_sl:.1f} pips)\n"
+                f"• គោលដៅ TP1 (+{pips_tp1:.0f} pips) ៖ <code>${tp1:.2f}</code> (Breakeven Armor Lock)\n"
+                f"• គោលដៅ TP2 (+{pips_tp2:.0f} pips) ៖ <code>${tp2:.2f}</code> (Guaranteed Cash Floor)\n"
+                f"• គោលដៅ TP3 (+{pips_tp3:.0f} pips) ៖ <code>${tp3:.2f}</code> (Moonshot Runner)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💎 <i>ដំណើរការដោយឥតគិតថ្លៃ 24/7 365 លើ Hugging Face Token & Google Cloud!</i>"
+                f"💎 <i>ដំណើរការដោយឥតគិតថ្លៃ 24/7 365 លើ Hugging Face Token &amp; Google Cloud!</i>"
             )
         else:
             text = (
@@ -122,13 +128,13 @@ class QuantGoldCapitalBridge:
                 f"• Fractal Hurst Exponent (H) : <code>{hurst_val:.3f}</code> ({regime})\n"
                 f"• Bayesian Win Edge : <code>{math_s.get('bayesian_win_probability', 50):.1f}%</code>\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
-                f"🛡️ <b>RISK GOVERNOR & TARGETS (R:R &gt;= 1:1.20 - 1:4.00) :</b>\n"
-                f"• Structural Stop Loss (SL) : <code>${sl:.2f}</code> (-60.8 pips)\n"
-                f"• Target TP1 (+73 pips) : <code>${tp1:.2f}</code> (Breakeven Armor Lock)\n"
-                f"• Target TP2 (+152 pips) : <code>${tp2:.2f}</code> (Guaranteed Cash Floor)\n"
-                f"• Target TP3 (+243 pips) : <code>${tp3:.2f}</code> (Moonshot Runner)\n"
+                f"🛡️ <b>RISK GOVERNOR &amp; TARGETS ({'ACTIVE' if action in ['BUY','SELL'] else 'PROSPECTIVE'} {bias_side} | R:R &gt;= 1:1.20 - 1:4.00) :</b>\n"
+                f"• Structural Stop Loss (SL) : <code>${sl:.2f}</code> ({'-' if (sl < curr_p and bias_side == 'BUY') or (sl > curr_p and bias_side == 'SELL') else '+'}{pips_sl:.1f} pips)\n"
+                f"• Target TP1 (+{pips_tp1:.0f} pips) : <code>${tp1:.2f}</code> (Breakeven Armor Lock)\n"
+                f"• Target TP2 (+{pips_tp2:.0f} pips) : <code>${tp2:.2f}</code> (Guaranteed Cash Floor)\n"
+                f"• Target TP3 (+{pips_tp3:.0f} pips) : <code>${tp3:.2f}</code> (Moonshot Runner)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💎 <i>Running 24/7 365 Free on Hugging Face Serverless & Google Cloud!</i>"
+                f"💎 <i>Running 24/7 365 Free on Hugging Face Serverless &amp; Google Cloud!</i>"
             )
 
         kb = InlineKeyboardMarkup([
