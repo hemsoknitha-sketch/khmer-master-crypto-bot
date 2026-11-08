@@ -383,10 +383,22 @@ class QuantGoldBot:
         if not chat_id:
             return
 
+        # 1. Anti-Spam Rate Limit Check
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+        if not allowed:
+            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        # 2. Strict VIP License & Capital.com Registration & Approval Gatekeeper (AQ84 & Invariant 36)
+        auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
+        if not auth_ok:
+            card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+            return await self.safe_reply(update, card, reply_markup=kb)
+
         is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
         args = context.args if context and context.args else []
         if not args:
-            return await self.handle_start(update, context)
+            card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
+            return await self.safe_reply(update, card, reply_markup=kb)
 
         sub_cmd = str(args[0]).upper()
         if sub_cmd in ["BUY", "LONG"]:
@@ -466,7 +478,8 @@ class QuantGoldBot:
             target = args[1] if len(args) > 1 else str(chat_id)
             return await self.handle_inspect_user(update, target)
         else:
-            return await self.handle_start(update, context)
+            card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
+            return await self.safe_reply(update, card, reply_markup=kb)
 
     async def handle_inspect_user(self, update: Update, target: str):
         """Displays real-time dossier for a Capital.com account or user."""
@@ -638,6 +651,10 @@ class QuantGoldBot:
             allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
             if not allowed:
                 return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+            if not self.citadel.is_super_admin(chat_id) and not db.is_vip(chat_id):
+                card, kb = self.bridge.build_vip_license_required_card(chat_id)
+                return await self.safe_reply(update, card, reply_markup=kb)
 
         sig = await self.exec_engine.evaluate_gold_master_signal()
         action = sig.get("action", "HOLD")
@@ -1348,6 +1365,11 @@ class QuantGoldBot:
             if not allowed:
                 return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
 
+            auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
+            if not auth_ok:
+                card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+                return await self.safe_reply(update, card, reply_markup=kb)
+
         open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
         gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
 
@@ -1442,6 +1464,15 @@ class QuantGoldBot:
     async def handle_close_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Closes all active Gold positions immediately."""
         chat_id = update.effective_chat.id
+        if not chat_id:
+            return
+
+        # Fiduciary VIP Referral & Authorization Check (Invariant 36)
+        auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
+        if not auth_ok:
+            card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+            return await self.safe_reply(update, card, reply_markup=kb)
+
         u_eng = capital_engine.get_user_capital_engine(chat_id)
         open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
         gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
@@ -1594,6 +1625,10 @@ class QuantGoldBot:
             allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
             if not allowed:
                 return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+            if not self.citadel.is_super_admin(chat_id) and not db.is_vip(chat_id):
+                card, kb = self.bridge.build_vip_license_required_card(chat_id)
+                return await self.safe_reply(update, card, reply_markup=kb)
 
         bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
         curr_p = (bid + ask) / 2.0
@@ -1771,6 +1806,10 @@ class QuantGoldBot:
             allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
             if not allowed:
                 return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+            if not self.citadel.is_super_admin(chat_id) and not db.is_vip(chat_id):
+                card, kb = self.bridge.build_vip_license_required_card(chat_id)
+                return await self.safe_reply(update, card, reply_markup=kb)
 
         diag = self.get_vps_diagnostics()
 
@@ -2067,7 +2106,18 @@ class QuantGoldBot:
                 await self.safe_edit(query, card, reply_markup=kb)
 
         elif data == "btn_capital_menu":
-            await self.handle_start(update, context)
+            auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
+            if not auth_ok:
+                card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+                await self.safe_edit(query, card, reply_markup=kb)
+            else:
+                card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+        elif data == "btn_qgold_admin_capital":
+            if not self.citadel.is_super_admin(chat_id):
+                return await query.answer("⛔ Access Denied! Super Admin authority required.", show_alert=True)
+            await self.handle_admin_capital(update, context)
 
         elif data.startswith("admin_users:"):
             parts = data.split(":")

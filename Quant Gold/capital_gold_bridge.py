@@ -212,12 +212,143 @@ class QuantGoldCapitalBridge:
         ])
         return card, kb
 
+    def build_awaiting_approval_card(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
+        """Renders an institutional card for users whose Capital.com credentials are registered but awaiting Super Admin approval."""
+        dossier = db.get_user_license_details(chat_id) or {}
+        tier_lbl = dossier.get("tier_label", "ACTIVE VIP")
+        creds = db.get_user_capital_credentials(chat_id) or {}
+        acc_id = str(creds.get("account_id", "N/A"))
+        masked_acc = acc_id[:4] + "***" + acc_id[-4:] if len(acc_id) >= 8 else acc_id
+
+        card = (
+            f"⏳ <b>[ANGKOR QUANT - CAPITAL.COM APPROVAL PENDING]</b> 🏛️\n"
+            f"{ui_standards.DIVIDER_HEAVY}\n"
+            f"👑 <b>ស្ថានភាព VIP License ៖</b> <code>{tier_lbl}</code>\n"
+            f"🏛️ <b>គណនី Capital.com ៖</b> <code>{masked_acc}</code>\n"
+            f"⚠️ <b>ស្ថានភាពអនុម័ត ៖</b> 🟡 <b>កំពុងរង់ចាំ Super Admin អនុម័ត (Pending Approval)</b>\n\n"
+            f"ℹ️ <b>សេចក្តីជូនដំណឹងការពារដើមទុន (Institutional Governance) ៖</b>\n"
+            f"ព័ត៌មានគណនី Capital.com របស់អ្នកត្រូវបានកត់ត្រាក្នុងប្រព័ន្ធរួចរាល់ហើយ។ "
+            f"ដើម្បីធានាសុវត្ថិភាពដើមទុន ១០០% ប្រព័ន្ធតម្រូវឱ្យ Super Admin ពិនិត្យ "
+            f"និងអនុម័តបើកសិទ្ធិជួញដូរពេញលេញ (Full /capital Services) ជាមុនសិន។\n\n"
+            f"📞 <i>សូមទាក់ទងមកកាន់ Admin @soknitha_support ដើម្បីពន្លឿនការអនុម័ត 1-Click!</i>\n"
+            f"{ui_standards.DIVIDER_LIGHT}\n"
+            f"💡 <i>លោកអ្នកនៅតែអាចមើល Signal 19 Timeframes (/signal) និងពិនិត្យតម្លៃមាស (/status) បានដោយសេរី!</i>"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📞 ទំនាក់ទំនង Admin (@soknitha_support)", url="https://t.me/soknitha_support")],
+            [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
+        ])
+        return card, kb
+
     def get_authorization_gate_card(self, chat_id: int, reason: str = "") -> Tuple[str, InlineKeyboardMarkup]:
-        """Routes to either VIP License Required Card or Capital.com Registration Card based on auth reason."""
+        """Routes to either VIP License Required Card, Awaiting Approval Card, or Capital.com Registration Card based on auth reason."""
         if reason == "UNLICENSED_ACCESS":
             return self.build_vip_license_required_card(chat_id)
+        elif reason == "AWAITING_SUPER_ADMIN_APPROVAL":
+            return self.build_awaiting_approval_card(chat_id)
         else:
             return self.build_vip_referral_required_card(chat_id)
+
+    async def build_capital_user_dashboard(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
+        """Renders the official Capital.com Live Trading Deck for verified/authorized users."""
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+        creds = db.get_user_capital_credentials(chat_id) or {}
+        acc_id = str(creds.get("account_id") or ("216890638652757188" if is_admin else "N/A"))
+        if is_admin and (not acc_id or acc_id == "N/A"):
+            acc_id = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
+        masked_acc = acc_id if is_admin else (acc_id[:4] + "***" + acc_id[-4:] if len(acc_id) >= 8 else acc_id)
+
+        is_demo = bool(creds.get("is_demo", False))
+        mode_str = "🟢 LIVE MAINNET" if not is_demo else "🟡 DEMO ($10,000)"
+
+        dossier = db.get_user_license_details(chat_id) or {}
+        tier_lbl = dossier.get("tier_label", "SUPER ADMIN" if is_admin else "ACTIVE VIP")
+
+        auto_cfg = db.get_capital_auto_config(chat_id) or {}
+        auto_on = bool(auto_cfg.get("enabled", False))
+        budget = float(auto_cfg.get("budget", 400.0 if is_admin else 50.0))
+        max_pos = int(auto_cfg.get("max_positions", 10 if is_admin else 5))
+        auto_status = f"🟢 <b>ON (${budget:.2f} / Trade | Max {max_pos} Pos)</b>" if auto_on else "🔴 <b>OFF (Paused)</b>"
+
+        open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
+        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
+        open_pos_count = len(gold_trades)
+
+        # Live Gold Price & Spread
+        bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
+        curr_p = (bid + ask) / 2.0
+
+        # Master Signal & Edge
+        sig = await self.exec_engine.evaluate_gold_master_signal()
+        action = sig.get("action", "HOLD")
+        conf = sig.get("confidence", 78.5)
+
+        action_icon = "🟢 STRONG BUY" if action == "BUY" else ("🔴 STRONG SELL" if action == "SELL" else "⚪ HOLD / CHOP FILTER")
+
+        # Query live balance from engine safely
+        balance = 0.0
+        equity = 0.0
+        currency = creds.get("currency", "USD") or "USD"
+        try:
+            import asyncio
+            u_eng = capital_engine.get_user_capital_engine(chat_id)
+            bal_res = await asyncio.to_thread(u_eng.get_account_balance)
+            if bal_res and bal_res.get("success"):
+                balance = float(bal_res.get("balance", 0.0))
+                equity = float(bal_res.get("equity", balance))
+                currency = bal_res.get("currency", currency)
+        except Exception:
+            pass
+
+        balance_str = f"<code>${balance:.2f} {currency}</code>" if balance > 0 else "<code>Protected / Connected</code>"
+        equity_str = f"<code>${equity:.2f} {currency}</code>" if equity > 0 else "<code>Real-Time Synced</code>"
+
+        card = (
+            f"🏛️ <b>[ANGKOR QUANT - CAPITAL.COM LIVE TRADING DECK]</b> 🥇\n"
+            f"{ui_standards.DIVIDER_HEAVY}\n"
+            f"👤 <b>គណនី Capital.com ៖</b> <code>{masked_acc}</code> ({mode_str})\n"
+            f"🟢 <b>ស្ថានភាពតភ្ជាប់ ៖</b> <code>LIVE CONNECTED (Super Admin Approved)</code>\n"
+            f"👑 <b>VIP License ៖</b> <code>{tier_lbl}</code>\n"
+            f"💰 <b>សមតុល្យគណនី (Balance) ៖</b> {balance_str}\n"
+            f"📈 <b>មូលធនសុទ្ធ (Equity) ៖</b> {equity_str}\n"
+            f"{ui_standards.DIVIDER_LIGHT}\n"
+            f"🤖 <b>ស្ថានភាព Auto-Trade 24/7 ៖</b> {auto_status}\n"
+            f"📊 <b>Positions មាសកំពុងដំណើរការ ៖</b> <code>{open_pos_count}</code> Active\n"
+            f"{ui_standards.DIVIDER_LIGHT}\n"
+            f"🥇 <b>Spot Gold (XAUUSD) Real-Time ៖</b>\n"
+            f"• តម្លៃបច្ចុប្បន្ន ៖ <code>${curr_p:.2f}</code> | Spread ៖ <code>${spread:.2f}</code>\n"
+            f"• សកម្មភាព AI ៖ <code>{action_icon}</code> (Edge: <code>{conf:.1f}%</code>)\n"
+            f"{ui_standards.DIVIDER_HEAVY}\n"
+            f"👇 <i>ជ្រើសរើសមុខងារបញ្ជាជួញដូររហ័ស 1-Tap ខាងក្រោម ៖</i>"
+        )
+
+        buttons = [
+            [
+                InlineKeyboardButton("🟢 1-Tap BUY Gold", callback_data="btn_qgold_buy"),
+                InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
+            ],
+            [
+                InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions"),
+                InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle")
+            ],
+            [
+                InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all"),
+                InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_capital_menu")
+            ],
+            [
+                InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
+                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status")
+            ]
+        ]
+
+        if is_admin:
+            buttons.append([
+                InlineKeyboardButton("👥 User Registry (/admin_users)", callback_data="admin_users:list:0"),
+                InlineKeyboardButton("👑 Fleet Controller (/admin_capital)", callback_data="btn_qgold_admin_capital")
+            ])
+
+        kb = InlineKeyboardMarkup(buttons)
+        return card, kb
 
     async def _safe_send(self, update: Update, text: str, reply_markup=None, parse_mode="HTML"):
         """Sends a telegram message safely with HTML, falling back to plain text if needed."""
@@ -263,8 +394,13 @@ class QuantGoldCapitalBridge:
         sub_action = str(args[0]).upper().strip() if args else "MENU"
 
         if sub_action in ["GOLD", "XAUUSD", "MENU"]:
-            text, kb = await self.build_quant_gold_overview_ui(chat_id, user_lang)
-            await self._safe_send(update, text, reply_markup=kb)
+            auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
+            if not auth_ok:
+                card, kb = self.get_authorization_gate_card(chat_id, reason)
+                await self._safe_send(update, card, reply_markup=kb)
+                return True
+            card, kb = await self.build_capital_user_dashboard(chat_id)
+            await self._safe_send(update, card, reply_markup=kb)
             return True
 
         elif sub_action in ["BUY", "SELL"]:

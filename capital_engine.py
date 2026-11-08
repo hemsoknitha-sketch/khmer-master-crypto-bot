@@ -3297,8 +3297,8 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
         creds = db.get_user_capital_credentials(chat_id)
         raw_key = (creds.get("api_key") or "").strip() if creds else ""
 
-        # Priority 1: Super Admin (859271875, 537186806) Dedicated Engine
-        if int(chat_id) in [SUPER_ADMIN_ID, 537186806]:
+        # Priority 1: Super Admin (859271875 @Soknitha) Dedicated Engine
+        if int(chat_id) == SUPER_ADMIN_ID:
             if raw_key and raw_key != "ENV_VAULT" and bool(creds.get("is_demo", False)) == is_demo:
                 engine = CapitalComEngine(
                     api_key=raw_key,
@@ -3422,7 +3422,7 @@ def get_tradfi_dashboard(chat_id: Optional[int] = None, is_demo: Optional[bool] 
     data = engine.get_tradfi_dashboard_data()
     if chat_id:
         import database as db
-        is_admin_user = (chat_id in [859271875, 537186806]) or db.is_admin(chat_id)
+        is_admin_user = (chat_id == 859271875) or db.is_admin(chat_id)
         creds = db.get_user_capital_credentials(chat_id)
         if creds:
             raw_key = creds.get("api_key", "")

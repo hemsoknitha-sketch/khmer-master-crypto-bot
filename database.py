@@ -1663,7 +1663,7 @@ def get_user_license_details(chat_id: int) -> Dict[str, Any]:
     """
     Returns full institutional VIP license & Capital.com registration dossier for a user.
     """
-    is_super_adm = (chat_id in [859271875, 537186806]) or is_admin(chat_id)
+    is_super_adm = (chat_id == 859271875) or is_admin(chat_id)
     
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -5334,8 +5334,8 @@ def set_user_capital_credentials(
     enc_id = security.encrypt_data(clean_id)
     enc_pwd = security.encrypt_data(clean_pwd)
 
-    # Master Admin is automatically verified
-    if chat_id in [859271875, 537186806]:
+    # Master Super Admin (859271875) is automatically verified
+    if chat_id == 859271875:
         eff_verified = 1
         eff_code = referral_code or "az48cxia"
     elif is_referral_verified is not None:
@@ -5437,7 +5437,7 @@ def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
             env_p = (os.getenv("CAPITAL_PASSWORD") or "").strip()
             if env_k and env_i and env_p:
                 dec_key, dec_id, dec_pwd = env_k, env_i, env_p
-            elif int(chat_id) in [859271875, 537186806]:
+            elif int(chat_id) == 859271875:
                 dec_key, dec_id, dec_pwd = "ENV_VAULT", "ENV_VAULT", "ENV_VAULT"
             else:
                 return None
@@ -5477,15 +5477,9 @@ def is_capital_user_authorized(chat_id: int) -> bool:
     3. User is linked in capital_user_referrals with partner_code containing 'az48cxia'
     4. User license_expiry is 'Administrator'
     """
-    if chat_id in [859271875, 537186806] or is_admin(chat_id):
+    # Super Admin 859271875 has permanent master authority
+    if chat_id == 859271875:
         return True
-
-    # Check administrator license
-    try:
-        if is_user_vip(chat_id) and get_user_license(chat_id) == 'Administrator':
-            return True
-    except Exception:
-        pass
 
     conn = get_db_connection()
     cursor = conn.cursor()

@@ -151,21 +151,23 @@ class QuantGoldSecurityCitadel:
             if not db.is_vip(user_id):
                 return False, "UNLICENSED_ACCESS"
 
-            # Gate 2: Check Capital.com Registration
+            # Gate 2: Check Capital.com Registration & Credentials
             creds = db.get_user_capital_credentials(user_id)
-            if creds:
-                raw_key = (creds.get("api_key") or "").strip()
-                acc_id = (creds.get("account_id") or "").strip()
-                if raw_key and raw_key != "ENV_VAULT" and acc_id and acc_id != "N/A":
-                    return True, "VIP_LICENSED_AND_REGISTERED"
+            if not creds:
+                return False, "AWAITING_CAPITAL_REGISTRATION"
 
-            if db.is_capital_user_authorized(user_id):
-                return True, "VIP_LICENSED_AND_REGISTERED"
+            acc_id = str(creds.get("account_id") or "").strip()
+            raw_key = str(creds.get("api_key") or "").strip()
+            if not acc_id or acc_id in ["None", "N/A", ""] or not raw_key:
+                return False, "AWAITING_CAPITAL_REGISTRATION"
 
-            if db.is_capital_user_referral_verified(user_id):
-                return True, "VIP_LICENSED_AND_REGISTERED"
+            # Gate 3: Check Super Admin Approval / Verification
+            is_verified = bool(creds.get("is_referral_verified"))
+            is_authorized = db.is_capital_user_authorized(user_id)
+            if not is_verified and not is_authorized:
+                return False, "AWAITING_SUPER_ADMIN_APPROVAL"
 
-            return False, "AWAITING_CAPITAL_REGISTRATION"
+            return True, "VIP_LICENSED_AND_REGISTERED"
         except Exception as e:
             logger.warning(f"Error checking user authorization for {user_id}: {e}")
             return False, "AWAITING_CAPITAL_REGISTRATION"
