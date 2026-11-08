@@ -812,8 +812,8 @@ class QuantGoldBot:
             if not allowed:
                 return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
 
-        open_trades = db.get_capital_auto_trades_for_user(chat_id)
-        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN"]
+        open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
+        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
 
         # Check broker live positions directly from Capital.com
         u_eng = capital_engine.get_user_capital_engine(chat_id)
@@ -907,8 +907,8 @@ class QuantGoldBot:
         """Closes all active Gold positions immediately."""
         chat_id = update.effective_chat.id
         u_eng = capital_engine.get_user_capital_engine(chat_id)
-        open_trades = db.get_capital_auto_trades_for_user(chat_id)
-        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN"]
+        open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
+        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
 
         # Also fetch live broker positions
         broker_gold = []
@@ -1062,14 +1062,15 @@ class QuantGoldBot:
         curr_p = (bid + ask) / 2.0
 
         u_eng = capital_engine.get_user_capital_engine(chat_id)
-        session_ok = u_eng.is_session_valid() if hasattr(u_eng, "is_session_valid") else True
+        session_ok = bool(getattr(u_eng, "is_authenticated", False) or getattr(u_eng, "session_token", None) or getattr(u_eng, "cst", None))
         session_label = "ACTIVE (Connected)" if session_ok else "Standby (Connecting)"
 
         bal_info = {}
         try:
-            bal_info = await asyncio.to_thread(u_eng.get_account_balance) if u_eng else {}
+            bal_info = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=2.5) if u_eng else {}
         except Exception as e_s:
             logger.debug(f"Status balance query note: {e_s}")
+            bal_info = {}
 
         live_bal = float(bal_info.get("balance", 0.0) or 0.0)
         live_avail = float(bal_info.get("available", 0.0) or 0.0)
@@ -1078,8 +1079,8 @@ class QuantGoldBot:
         is_admin = (chat_id in [859271875, 537186806])
 
         # Active positions count for this user
-        open_trades = db.get_capital_auto_trades_for_user(chat_id)
-        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN"]
+        open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
+        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
 
         acct_mode = "🟡 DEMO" if is_demo else "🟢 LIVE MAINNET"
         mirror_extra = " (Demo Fallback Mirror $10,000 Active)" if (is_admin and live_bal < 10.0) else ""
@@ -1325,21 +1326,45 @@ class QuantGoldBot:
                 pass
 
         elif data == "btn_qgold_positions":
+            try:
+                await query.answer("Fetching open positions...")
+            except Exception:
+                pass
             await self.handle_positions(update, context)
 
         elif data == "btn_qgold_status":
+            try:
+                await query.answer("Fetching live status...")
+            except Exception:
+                pass
             await self.handle_status(update, context)
 
         elif data == "btn_qgold_health":
+            try:
+                await query.answer("Auditing VPS health...")
+            except Exception:
+                pass
             await self.handle_health(update, context)
 
         elif data in ["btn_qgold_security", "btn_qgold_citadel"]:
+            try:
+                await query.answer("Checking Citadel security...")
+            except Exception:
+                pass
             await self.handle_security(update, context)
 
         elif data in ["btn_qgold_signal", "btn_qgold_levels"]:
+            try:
+                await query.answer("Analyzing 19-TF signal...")
+            except Exception:
+                pass
             await self.handle_signal(update, context)
 
         elif data == "btn_qgold_help":
+            try:
+                await query.answer("Loading User Guide...")
+            except Exception:
+                pass
             await self.handle_help(update, context)
 
         elif data == "btn_qgold_close_all":

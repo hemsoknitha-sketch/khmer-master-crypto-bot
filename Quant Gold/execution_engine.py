@@ -709,7 +709,7 @@ class QuantGoldExecutionEngine:
                 for u in all_users:
                     cid = u.get("chat_id")
                     if cid:
-                        active_trades.extend(db.get_capital_auto_trades_for_user(cid))
+                        active_trades.extend(db.get_capital_auto_trades(cid, status="OPEN"))
 
             for tr in active_trades:
                 if str(tr.get("epic", "")).upper() != "GOLD":

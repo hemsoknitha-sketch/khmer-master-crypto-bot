@@ -3463,6 +3463,10 @@ def get_capital_auto_trades(chat_id: Optional[int] = None, limit: int = 50, stat
         except Exception: pass
         return []
 
+def get_capital_auto_trades_for_user(chat_id: Optional[int] = None, limit: int = 50, status: Optional[str] = None) -> list:
+    """Canonical wrapper for retrieving user's active or historical Capital.com auto trades."""
+    return get_capital_auto_trades(chat_id=chat_id, limit=limit, status=status)
+
 
 # ==============================================================================
 # CAPITAL.COM MASTER LOCOMOTIVE SYNDICATE & AUTONOMOUS DUAL-TIER PERSISTENCE LAYER
