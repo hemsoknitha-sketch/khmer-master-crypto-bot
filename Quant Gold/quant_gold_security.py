@@ -301,3 +301,4 @@ def get_quant_gold_security_citadel() -> QuantGoldSecurityCitadel:
     if _citadel_singleton is None:
         _citadel_singleton = QuantGoldSecurityCitadel()
     return _citadel_singleton
+

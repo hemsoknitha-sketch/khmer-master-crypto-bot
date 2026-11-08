@@ -36,6 +36,20 @@ fi
 PROJECT_DIR="/opt/khmer-master-crypto-bot"
 QG_DIR="$PROJECT_DIR/Quant Gold"
 
+# Detect non-root operating user
+ACTUAL_USER="${SUDO_USER:-$(logname 2>/dev/null || whoami)}"
+if [ "$ACTUAL_USER" = "root" ] || [ -z "$ACTUAL_USER" ]; then
+    if id "hemsoknitha" >/dev/null 2>&1; then
+        ACTUAL_USER="hemsoknitha"
+    elif id "sokni" >/dev/null 2>&1; then
+        ACTUAL_USER="sokni"
+    else
+        ACTUAL_USER="hemsoknitha"
+    fi
+fi
+ACTUAL_GROUP=$(id -gn "$ACTUAL_USER" 2>/dev/null || echo "$ACTUAL_USER")
+echo -e "👤 Target Service User: ${GREEN}$ACTUAL_USER:$ACTUAL_GROUP${NC}"
+
 # ------------------------------------------------------------------------------
 # STEP 1: UFW Firewall Hardening
 # ------------------------------------------------------------------------------
@@ -68,8 +82,8 @@ echo -e "\n${YELLOW}[STEP 2/5] Securing .env secret file permissions (chmod 600)
 for env_file in "$PROJECT_DIR/.env" "$QG_DIR/.env"; do
     if [ -f "$env_file" ]; then
         chmod 600 "$env_file"
-        chown sokni:sokni "$env_file" 2>/dev/null || true
-        echo -e "${GREEN}✅ Secured $env_file (Permissions: -rw------- 600)${NC}"
+        chown "$ACTUAL_USER:$ACTUAL_GROUP" "$env_file" 2>/dev/null || true
+        echo -e "${GREEN}✅ Secured $env_file (Owner: $ACTUAL_USER, Permissions: -rw------- 600)${NC}"
     fi
 done
 
@@ -106,7 +120,7 @@ fi
 # ------------------------------------------------------------------------------
 echo -e "\n${YELLOW}[STEP 4/5] Deploying Hardened Systemd Service (quant-gold.service)...${NC}"
 SERVICE_DEST="/etc/systemd/system/quant-gold.service"
-cat << 'EOF' > "$SERVICE_DEST"
+cat << EOF > "$SERVICE_DEST"
 # ==============================================================================
 # ANGKOR QUANT - QUANT GOLD HARDENED SYSTEMD SERVICE (AQ84)
 # ==============================================================================
@@ -117,8 +131,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=sokni
-Group=sokni
+User=$ACTUAL_USER
+Group=$ACTUAL_GROUP
 WorkingDirectory=/opt/khmer-master-crypto-bot
 ExecStart=/opt/khmer-master-crypto-bot/venv/bin/python run_quant_gold.py
 Restart=always
@@ -166,3 +180,4 @@ echo -e "  sudo systemctl restart quant-gold"
 echo -e "To inspect live health & status:"
 echo -e "  sudo systemctl status quant-gold"
 echo -e "${BLUE}======================================================================${NC}"
+

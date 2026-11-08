@@ -12,8 +12,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=sokni
-Group=sokni
+User=hemsoknitha
+Group=hemsoknitha
 WorkingDirectory=/opt/khmer-master-crypto-bot
 ExecStart=/opt/khmer-master-crypto-bot/venv/bin/python run_quant_gold.py
 Restart=always
