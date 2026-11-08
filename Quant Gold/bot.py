@@ -148,7 +148,7 @@ class QuantGoldBot:
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
 
-                # Set dedicated Admin commands for Super Admin scope
+                # Set dedicated Admin commands for Super Admin scope ONLY (859271875 @Soknitha)
                 admin_commands = list(commands) + [
                     BotCommand("admin_users", "👥 Inspect & Manage All Users Dossiers"),
                     BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
@@ -156,11 +156,18 @@ class QuantGoldBot:
                     BotCommand("emergency_stop", "🚨 Super Admin Emergency Trading Freeze"),
                     BotCommand("unlock", "🟢 Super Admin Release Trading Freeze")
                 ]
-                for admin_id in [859271875, 537186806]:
+                for admin_id in [859271875]:
                     try:
                         await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
                     except Exception:
                         pass
+
+                # Synchronize and restore all VIP users into Quant Gold on startup
+                try:
+                    res_sync = db.sync_and_restore_all_vip_users_to_quant_gold()
+                    logger.info(f"✅ [QUANT GOLD BOT] VIP Users & Super Admin synchronized: {res_sync.get('restored_count', 0)} users restored.")
+                except Exception as e_vipsync:
+                    logger.warning(f"VIP auto-sync notice on startup: {e_vipsync}")
 
                 logger.info("✅ [QUANT GOLD BOT] Command menu synchronized successfully across all scopes & Super Admin!")
             except Exception as e_cmd:
@@ -376,7 +383,7 @@ class QuantGoldBot:
         if not chat_id:
             return
 
-        is_admin = (chat_id in [859271875, 537186806])
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
         args = context.args if context and context.args else []
         if not args:
             return await self.handle_start(update, context)
@@ -694,7 +701,7 @@ class QuantGoldBot:
         #   /signal trade [BUY/SELL]         -> Dispatches Capital.com positions to ALL VIPs + broadcasts Signal card!
         #   /signal execute [BUY/SELL]       -> Dispatches Capital.com positions to ALL VIPs + broadcasts Signal card!
         #   /signal send trade [BUY/SELL]    -> Dispatches Capital.com positions to ALL VIPs + broadcasts Signal card!
-        is_admin = (update.effective_chat.id in [859271875, 537186806])
+        is_admin = (update.effective_chat.id == 859271875) or db.is_admin(update.effective_chat.id)
         if context.args and str(context.args[0]).lower() in ["broadcast", "send", "alert", "trade", "execute"] and is_admin:
             sub = str(context.args[0]).lower()
             raw_args = [str(a).lower() for a in context.args]
@@ -983,8 +990,22 @@ class QuantGoldBot:
 
         inspect_buttons = []
         for i, d in enumerate(page_dossiers, start=start_idx + 1):
-            u_name = f"@{d['username']}" if d['username'] else "គ្មាន Username"
-            badge = "👑 Super Admin" if d["is_admin"] else "👤 Trader"
+            if d["chat_id"] == 859271875:
+                u_name = f"@{d['username']}" if d['username'] else "@Soknitha"
+                badge = "👑 Super Admin"
+            elif d["chat_id"] == 537186806:
+                u_name = f"@{d['username']}" if d['username'] else "@HemSinath"
+                badge = "👑 VIP User"
+            elif d["is_admin"]:
+                u_name = f"@{d['username']}" if d['username'] else "គ្មាន Username"
+                badge = "👑 Super Admin"
+            elif d["is_vip"]:
+                u_name = f"@{d['username']}" if d['username'] else "គ្មាន Username"
+                badge = "👑 VIP User"
+            else:
+                u_name = f"@{d['username']}" if d['username'] else "គ្មាន Username"
+                badge = "👤 Trader"
+
             acc_label = f"🟢 LIVE (<code>#{d['account_id']}</code>)" if d["has_capital"] and not d["is_demo"] else (
                 f"🟡 DEMO (<code>#{d['account_id']}</code>)" if d["has_capital"] else "🔴 Not Connected"
             )
@@ -1020,11 +1041,11 @@ class QuantGoldBot:
             kb_rows.append(nav_row)
 
         kb_rows.append([
-            InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="admin_users:refresh"),
+            InlineKeyboardButton("🔄 Sync VIP Users ទាំងអស់", callback_data="admin_users:sync"),
             InlineKeyboardButton("🧹 សម្អាត Database (Prune)", callback_data="admin_users:prune")
         ])
         kb_rows.append([
-            InlineKeyboardButton("👑 គ្រប់គ្រង License (/admin_license)", callback_data="btn_qgold_license"),
+            InlineKeyboardButton("🔄 Refresh List", callback_data="admin_users:refresh"),
             InlineKeyboardButton("🏛️ គ្រប់គ្រង Fleet (/admin_capital)", callback_data="btn_capital_menu")
         ])
 
@@ -1054,8 +1075,22 @@ class QuantGoldBot:
                 "schedule_mode": "SMART_SESSION_TIMED"
             }
 
-        u_name = f"@{target['username']}" if target.get('username') else "គ្មាន Username"
-        role_label = "👑 SUPER ADMIN (Master Authority)" if target["is_admin"] else "👤 VIP Trader"
+        cid = target["chat_id"]
+        if cid == 859271875:
+            u_name = f"@{target['username']}" if target.get('username') else "@Soknitha"
+            role_label = "👑 SUPER ADMIN (Master Authority)"
+        elif cid == 537186806:
+            u_name = f"@{target['username']}" if target.get('username') else "@HemSinath"
+            role_label = "👑 VIP User (Lifetime License)"
+        elif target["is_admin"]:
+            u_name = f"@{target['username']}" if target.get('username') else "គ្មាន Username"
+            role_label = "👑 SUPER ADMIN"
+        elif target["is_vip"]:
+            u_name = f"@{target['username']}" if target.get('username') else "គ្មាន Username"
+            role_label = "👤 VIP Trader"
+        else:
+            u_name = f"@{target['username']}" if target.get('username') else "គ្មាន Username"
+            role_label = "👤 Trader"
         cap_status = "🟢 CONNECTED (LIVE MAINNET)" if target["has_capital"] and not target["is_demo"] else (
             "🟡 CONNECTED (DEMO)" if target["has_capital"] else "🔴 NOT CONNECTED (Awaiting Registration)"
         )
@@ -1200,7 +1235,7 @@ class QuantGoldBot:
             t_cid = db.find_user_by_identifier(args[1])
             if not t_cid:
                 return await self.safe_reply(update, f"⚠️ <i>រកមិនឃើញ User <code>{args[1]}</code> ឡើយ!</i>")
-            if t_cid in [859271875, 537186806]:
+            if t_cid == 859271875:
                 return await self.safe_reply(update, "⛔ <i>មិនអាចលុប Super Admin បានទេ (Safety Shield)!</i>")
             ok = db.delete_complete_user_record(t_cid)
             if ok:
@@ -1210,6 +1245,19 @@ class QuantGoldBot:
                 )
             else:
                 return await self.safe_reply(update, "⚠️ <i>ការលុបមានបញ្ហាបច្ចេកទេស។</i>")
+
+        elif sub_cmd in ["sync", "pull", "restore"]:
+            res = db.sync_and_restore_all_vip_users_to_quant_gold()
+            card, kb = self.build_admin_users_list_card(page=0)
+            await self.safe_reply(
+                update,
+                f"🔄 <b>[VIP USERS SYNC COMPLETE]</b> 🏛️\n"
+                f"• Super Admin ៖ <code>#859271875 (@Soknitha)</code>\n"
+                f"• VIP Lifetime ៖ <code>#537186806 (@HemSinath)</code>\n"
+                f"• VIP Users ស្តារ និងនាំចូលសរុប ៖ <code>{res.get('restored_count', 0)} នាក់</code>\n"
+                f"<i>បានទាញ VIP Users Data ទាំងអស់ចូលក្នុងប្រព័ន្ធ Quant Gold រួចរាល់!</i>"
+            )
+            return await self.safe_reply(update, card, reply_markup=kb)
 
         elif sub_cmd in ["prune", "cleanup"]:
             res = db.restore_and_prune_vip_licenses()
@@ -1470,7 +1518,7 @@ class QuantGoldBot:
         cur_st = bool(auto_cfg.get("enabled", False))
         new_st = not cur_st
 
-        is_admin = (chat_id in [859271875, 537186806])
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
         u_eng = capital_engine.get_user_capital_engine(chat_id)
         bal_info = {}
         try:
@@ -1565,7 +1613,7 @@ class QuantGoldBot:
         live_avail = float(bal_info.get("available", 0.0) or 0.0)
         acc_id = bal_info.get("account_id") or os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
         is_demo = bool(bal_info.get("is_demo", False))
-        is_admin = (chat_id in [859271875, 537186806])
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
 
         # Active positions count for this user
         open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
@@ -1765,7 +1813,7 @@ class QuantGoldBot:
             f"• គ្មានការជួញដូរដោយគ្មាន Stop Loss ដាច់ខាត (Zero No-SL Trading)!\n"
             f"══════════════════════════════════════\n"
         )
-        if chat_id in [859271875, 537186806]:
+        if (chat_id == 859271875) or db.is_admin(chat_id):
             help_text += (
                 f"\n👑 <b>[SUPER ADMIN FLEET COMMANDS] ៖</b>\n"
                 f"• <code>/admin_users</code> (ពិនិត្យ & គ្រប់គ្រងព័ត៌មាន Users ពេញលេញ)\n"
@@ -2090,10 +2138,18 @@ class QuantGoldBot:
 
             elif sub_action == "del":
                 target_cid = int(parts[2]) if len(parts) > 2 else 0
-                if target_cid in [859271875, 537186806]:
+                if target_cid == 859271875:
                     return await query.answer("⛔ Cannot delete Super Admin!", show_alert=True)
                 db.delete_complete_user_record(target_cid)
                 await query.answer("✅ User deleted successfully!")
+                card, kb = self.build_admin_users_list_card(page=0)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "sync":
+                await query.answer("🔄 កំពុងទាញ VIP Users Data ទាំងអស់...")
+                res = db.sync_and_restore_all_vip_users_to_quant_gold()
+                cnt = res.get("restored_count", 0)
+                await query.answer(f"✅ បានទាញ និងធ្វើសមកាលកម្ម VIP Users ទាំងអស់ជោគជ័យ! (Restored: {cnt})", show_alert=True)
                 card, kb = self.build_admin_users_list_card(page=0)
                 await self.safe_edit(query, card, reply_markup=kb)
 

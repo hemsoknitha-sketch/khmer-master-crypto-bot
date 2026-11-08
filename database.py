@@ -1403,9 +1403,13 @@ def is_vip(chat_id: int) -> bool:
         return False
 
 def is_admin(chat_id: int) -> bool:
-    """Checks if a user is an Administrator (Super Admin or via License) with ultra-fast in-memory caching."""
-    if chat_id in [859271875, 537186806]:
+    """Checks if a user is an Administrator (Super Admin or via License) with ultra-fast in-memory caching.
+    Super Admin is strictly 859271875 (@Soknitha). 537186806 (@HemSinath) is a VIP User with Lifetime License.
+    """
+    if chat_id == 859271875:
         return True
+    if chat_id == 537186806:
+        return False
         
     cache_key = f"admin_{chat_id}"
     cached = cache_get(cache_key)
@@ -1418,17 +1422,17 @@ def is_admin(chat_id: int) -> bool:
     result = cursor.fetchone()
     conn.close()
     
-    is_adm = bool(result and result[0] == 'Administrator')
+    is_adm = bool(result and result[0] == 'Administrator' and chat_id != 537186806)
     cache_set(cache_key, is_adm, ttl_seconds=120)
     return is_adm
 
 def get_all_admins() -> list:
     """Returns a list of chat_ids for all Administrators, including Super Admin."""
-    admins = [859271875, 537186806]
+    admins = [859271875]
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT chat_id FROM users WHERE license_expiry = 'Administrator'")
+    cursor.execute("SELECT chat_id FROM users WHERE license_expiry = 'Administrator' AND chat_id != 537186806")
     rows = cursor.fetchall()
     conn.close()
     
@@ -1743,7 +1747,7 @@ def restore_and_prune_vip_licenses() -> Dict[str, Any]:
     retained_licensed = []
     
     try:
-        super_admins = [859271875, 537186806]
+        super_admins = [859271875]
         
         # B. Users with Capital credentials
         cursor.execute("SELECT DISTINCT chat_id FROM user_capital_credentials WHERE chat_id IS NOT NULL")
@@ -1753,8 +1757,8 @@ def restore_and_prune_vip_licenses() -> Dict[str, Any]:
         cursor.execute("SELECT DISTINCT chat_id FROM capital_auto_config WHERE chat_id IS NOT NULL")
         capital_auto_users = [row[0] for row in cursor.fetchall() if row[0]]
         
-        # Combine all protected Lifetime users
-        lifetime_candidates = set(super_admins + capital_cred_users + capital_auto_users)
+        # Combine all protected Lifetime users (including 537186806 as Lifetime VIP)
+        lifetime_candidates = set(super_admins + [537186806] + capital_cred_users + capital_auto_users)
         
         # Check existing VIP users in users table who had lifetime or Administrator or is_vip=1
         cursor.execute("SELECT chat_id, is_vip, license_expiry FROM users WHERE is_vip = 1")
@@ -1767,18 +1771,22 @@ def restore_and_prune_vip_licenses() -> Dict[str, Any]:
         for cid in lifetime_candidates:
             if not cid or cid <= 0:
                 continue
-            cursor.execute("SELECT chat_id, is_vip, license_expiry FROM users WHERE chat_id = ?", (cid,))
+            cursor.execute("SELECT chat_id, is_vip, license_expiry, username FROM users WHERE chat_id = ?", (cid,))
             row = cursor.fetchone()
             target_exp = 'Administrator' if cid in super_admins else 'lifetime'
+            target_uname = 'Soknitha' if cid == 859271875 else ('HemSinath' if cid == 537186806 else None)
             if not row:
                 cursor.execute(
-                    "INSERT INTO users (chat_id, is_vip, license_expiry, joined_at) VALUES (?, 1, ?, ?)",
-                    (cid, target_exp, now_str)
+                    "INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (?, ?, 1, ?, ?)",
+                    (cid, target_uname, target_exp, now_str)
                 )
                 restored_lifetime.append(cid)
             else:
                 curr_vip, curr_exp = row[1], row[2]
-                if curr_vip != 1 or (curr_exp != target_exp and curr_exp != 'Administrator'):
+                curr_uname = row[3] if len(row) > 3 else None
+                if target_uname and (not curr_uname or curr_uname != target_uname):
+                    cursor.execute("UPDATE users SET username = ? WHERE chat_id = ?", (target_uname, cid))
+                if curr_vip != 1 or (curr_exp != target_exp and (cid != 859271875 or curr_exp != 'Administrator')):
                     cursor.execute(
                         "UPDATE users SET is_vip = 1, license_expiry = ? WHERE chat_id = ?",
                         (target_exp, cid)
@@ -1868,7 +1876,7 @@ def find_user_by_identifier(query_str: str) -> Optional[int]:
 
 def delete_complete_user_record(chat_id: int) -> bool:
     """Completely purges a user and their configurations across all tables."""
-    if chat_id in [859271875, 537186806]:
+    if chat_id == 859271875:
         return False  # Protected Super Admin
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1942,15 +1950,18 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
 
         for r in rows:
             cid = r[0]
-            is_adm = (cid in [859271875, 537186806])
+            is_adm = (cid == 859271875)
             raw_exp = str(r[3] or "")
-            is_vip_flag = bool(r[2]) or is_adm
+            is_vip_flag = bool(r[2]) or is_adm or (cid == 537186806)
 
             # Determine tier label
             tier_label = "⚪ UNLICENSED"
             days_remaining = None
             if is_adm:
                 tier_label = "👑 SUPER ADMIN (LIFETIME)"
+                is_vip_flag = True
+            elif cid == 537186806:
+                tier_label = "👑 LIFETIME VIP"
                 is_vip_flag = True
             elif is_vip_flag:
                 if raw_exp in ["lifetime", "Administrator"]:
@@ -1975,9 +1986,15 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
             if cid == 859271875 and (not acc_id or acc_id == "330894176088577220"):
                 acc_id = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
 
+            u_name = str(r[1] or "")
+            if cid == 859271875 and not u_name:
+                u_name = "Soknitha"
+            elif cid == 537186806 and not u_name:
+                u_name = "HemSinath"
+
             results.append({
                 "chat_id": cid,
-                "username": str(r[1] or ""),
+                "username": u_name,
                 "is_admin": is_adm,
                 "is_vip": is_vip_flag,
                 "license_expiry": raw_exp,
@@ -2003,6 +2020,130 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
         except Exception:
             pass
         return []
+
+
+def sync_and_restore_all_vip_users_to_quant_gold() -> Dict[str, Any]:
+    """
+    Scans and synchronizes all VIP users across all tables and historical database backups into Quant Gold.
+    Enforces:
+    - Super Admin: chat_id 859271875 (@Soknitha) is permanently locked as the sole Super Admin with Administrator license.
+    - VIP Lifetime: chat_id 537186806 (@HemSinath) is permanently locked as VIP User with Lifetime license.
+    - Ingests and preserves all VIP users from users, user_capital_credentials, capital_auto_config, and backup DBs.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    restored = []
+    
+    try:
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 1. Guarantee Super Admin (859271875, @Soknitha)
+        cursor.execute("SELECT chat_id FROM users WHERE chat_id = 859271875")
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (859271875, 'Soknitha', 1, 'Administrator', ?)",
+                (now_str,)
+            )
+        else:
+            cursor.execute("UPDATE users SET username = 'Soknitha', is_vip = 1, license_expiry = 'Administrator' WHERE chat_id = 859271875")
+            
+        # 2. Guarantee VIP Lifetime Founder (537186806, @HemSinath)
+        cursor.execute("SELECT chat_id FROM users WHERE chat_id = 537186806")
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (537186806, 'HemSinath', 1, 'lifetime', ?)",
+                (now_str,)
+            )
+        else:
+            cursor.execute("UPDATE users SET username = 'HemSinath', is_vip = 1, license_expiry = 'lifetime' WHERE chat_id = 537186806")
+
+        # 3. Pull in all users who have Capital credentials or configurations in current DB
+        candidate_ids = set()
+        for tbl, col in [
+            ("user_capital_credentials", "chat_id"),
+            ("capital_auto_config", "chat_id"),
+            ("capital_user_referrals", "client_chat_id"),
+            ("capital_scalp_config", "chat_id"),
+            ("mt5_bridge_clients", "chat_id")
+        ]:
+            try:
+                cursor.execute(f"SELECT DISTINCT {col} FROM {tbl} WHERE {col} IS NOT NULL AND {col} > 0")
+                for r in cursor.fetchall():
+                    if r[0] and r[0] not in [859271875, 537186806]:
+                        candidate_ids.add(r[0])
+            except Exception:
+                pass
+                
+        for cid in candidate_ids:
+            cursor.execute("SELECT chat_id, is_vip, license_expiry, username FROM users WHERE chat_id = ?", (cid,))
+            u_row = cursor.fetchone()
+            if not u_row:
+                cursor.execute(
+                    "INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (?, ?, 1, 'lifetime', ?)",
+                    (cid, f"User_{cid}", now_str)
+                )
+                restored.append({"chat_id": cid, "username": f"User_{cid}", "source": "credentials/config"})
+            elif u_row[1] != 1 or u_row[2] not in ['lifetime', 'Administrator']:
+                cursor.execute("UPDATE users SET is_vip = 1, license_expiry = 'lifetime' WHERE chat_id = ?", (cid,))
+                restored.append({"chat_id": cid, "username": u_row[3] or f"User_{cid}", "source": "promoted_to_lifetime"})
+
+        # 4. Search and pull VIP users from all historical backup databases (*.db in workspace)
+        import glob
+        workspace_dbs = set(glob.glob("*.db") + glob.glob("backups/*.db") + glob.glob("data/*.db"))
+        for b_path in workspace_dbs:
+            b_norm = os.path.normpath(b_path)
+            if os.path.normpath(DB_FILE) == b_norm or os.path.basename(b_norm) == os.path.basename(DB_FILE):
+                continue
+            try:
+                b_conn = sqlite3.connect(b_path, timeout=5.0)
+                b_cur = b_conn.cursor()
+                b_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+                if b_cur.fetchone():
+                    b_cur.execute("SELECT chat_id, username, is_vip, license_expiry FROM users WHERE (is_vip = 1 OR license_expiry IS NOT NULL) AND chat_id > 0")
+                    for b_row in b_cur.fetchall():
+                        b_cid, b_uname, b_vip, b_exp = b_row
+                        if not b_cid or b_cid in [859271875, 537186806]:
+                            continue
+                        cursor.execute("SELECT chat_id, is_vip, license_expiry FROM users WHERE chat_id = ?", (b_cid,))
+                        curr = cursor.fetchone()
+                        if not curr:
+                            eff_exp = b_exp if (b_exp and b_exp not in ['Administrator']) else 'lifetime'
+                            cursor.execute(
+                                "INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (?, ?, 1, ?, ?)",
+                                (b_cid, b_uname, eff_exp, now_str)
+                            )
+                            restored.append({"chat_id": b_cid, "username": b_uname or f"User_{b_cid}", "source": f"backup:{os.path.basename(b_path)}"})
+                        elif curr[1] != 1:
+                            eff_exp = b_exp if (b_exp and b_exp not in ['Administrator']) else 'lifetime'
+                            cursor.execute("UPDATE users SET is_vip = 1, license_expiry = ? WHERE chat_id = ?", (eff_exp, b_cid))
+                            restored.append({"chat_id": b_cid, "username": b_uname or f"User_{b_cid}", "source": f"backup_activated:{os.path.basename(b_path)}"})
+                            
+                b_conn.close()
+            except Exception as e:
+                logger.debug(f"Notice reading backup db {b_path}: {e}")
+
+        conn.commit()
+        conn.close()
+
+        # Invalidate all caches
+        for cid in [859271875, 537186806] + [r["chat_id"] for r in restored]:
+            cache_delete(f"vip_{cid}")
+            cache_delete(f"admin_{cid}")
+
+        return {
+            "success": True,
+            "super_admin": {"chat_id": 859271875, "username": "Soknitha", "role": "SUPER_ADMIN"},
+            "vip_lifetime_founder": {"chat_id": 537186806, "username": "HemSinath", "role": "LIFETIME_VIP"},
+            "restored_users": restored,
+            "restored_count": len(restored)
+        }
+    except Exception as e:
+        logger.error(f"Error in sync_and_restore_all_vip_users_to_quant_gold: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return {"success": False, "error": str(e), "restored_count": 0}
 
 
 
@@ -4453,6 +4594,19 @@ def ensure_capital_super_admin_defaults():
                 referral_code = 'az48cxia',
                 updated_at = CURRENT_TIMESTAMP
         """, (sa_live_acc,))
+
+        # 6. Ensure Super Admin 859271875 (@Soknitha) and VIP Lifetime 537186806 (@HemSinath) in users table
+        cursor.execute("SELECT chat_id FROM users WHERE chat_id = 859271875")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (859271875, 'Soknitha', 1, 'Administrator', CURRENT_TIMESTAMP)")
+        else:
+            cursor.execute("UPDATE users SET username = 'Soknitha', is_vip = 1, license_expiry = 'Administrator' WHERE chat_id = 859271875")
+
+        cursor.execute("SELECT chat_id FROM users WHERE chat_id = 537186806")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (537186806, 'HemSinath', 1, 'lifetime', CURRENT_TIMESTAMP)")
+        else:
+            cursor.execute("UPDATE users SET username = 'HemSinath', is_vip = 1, license_expiry = 'lifetime' WHERE chat_id = 537186806")
 
         conn.commit()
         conn.close()

@@ -306,7 +306,7 @@ class QuantGoldCapitalBridge:
                 f"<i>Dispatching order to Capital.com via Sub-Millisecond Bridge...</i>"
             )
 
-            is_admin = (chat_id in [859271875, 537186806])
+            is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
             res = await self.exec_engine.execute_smart_order_for_user(
                 chat_id=chat_id,
                 direction=sub_action,

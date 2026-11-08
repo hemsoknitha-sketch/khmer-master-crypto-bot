@@ -25,7 +25,9 @@ from typing import Dict, Tuple, Optional, Any, List
 
 logger = logging.getLogger("QUANT_GOLD_SECURITY")
 
-SUPER_ADMIN_IDS = {859271875, 537186806}
+# Super Admin is exclusively 859271875 (@Soknitha).
+# 537186806 (@HemSinath) is a VIP User with Lifetime License.
+SUPER_ADMIN_IDS = {859271875}
 
 
 class QuantGoldSecurityCitadel:
