@@ -626,10 +626,12 @@ class QuantGoldBot:
 
         if action in ["BUY", "SELL"]:
             resolved_dir = action
-        elif score > 0 or vel > 0 or b_cnt >= s_cnt:
-            resolved_dir = "BUY"
-        else:
+        elif sig.get("dominant_bias"):
+            resolved_dir = sig["dominant_bias"]
+        elif score < -5.0 or s_cnt > b_cnt:
             resolved_dir = "SELL"
+        else:
+            resolved_dir = "BUY"
 
         dir_str = "Buy" if resolved_dir == "BUY" else "Sell"
         if resolved_dir == "BUY":

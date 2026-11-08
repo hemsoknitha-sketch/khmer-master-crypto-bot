@@ -59,50 +59,65 @@ def format_gold_signal_card(
     entry_price: float = 0.0
 ) -> str:
     """
-    Renders ultra-clean, minimalist institutional Gold Signal Card
-    matching the Azikaa VIP standard.
+    Renders institutional Angkor Quant Gold Signal Card
+    with single-direction execution levels and TP targets.
     """
     is_buy = str(direction).upper() == "BUY"
-    action = "Buy" if is_buy else "Sell"
+    dir_str = "BUY" if is_buy else "SELL"
+    dir_icon = "🟢" if is_buy else "🔴"
     if entry_price <= 0.0:
         entry_price = round(sl + 6.08, 2) if is_buy else round(sl - 6.08, 2)
 
+    sl_pips = abs(entry_price - sl) * 10
+    tp1_pips = int(round(abs(tp1 - entry_price) * 10))
+    tp2_pips = int(round(abs(tp2 - entry_price) * 10))
+    tp3_pips = int(round(abs(tp3 - entry_price) * 10))
+
+    divider = "───────────────"
+
     return (
-        f"◆ <b>New signal</b>\n\n"
-        f"{action} XAUUSD now at {entry_price:.2f}\n"
-        f"SL {sl:.2f}\n"
-        f"TP {tp1:.2f}, {tp2:.2f}, {tp3:.2f}\n\n"
-        f"<i>Angkor Quant Gold</i>"
+        f"<b>Angkor Quant Gold</b>\n"
+        f"{divider}\n"
+        f"{dir_icon} <b>Single Direction :</b> <code>{dir_str}</code>\n"
+        f"🎯 <b>Execution Levels ៖</b>\n"
+        f"   └ <b>Tight SL:</b> <code>${sl:.2f}</code> (-{sl_pips:.1f} p)\n"
+        f"   └ <b>TP1 (+{tp1_pips} pips):</b> <code>${tp1:.2f}</code> (TP Lock)\n"
+        f"   └ <b>TP2 (+{tp2_pips} pips):</b> <code>${tp2:.2f}</code> (Guaranteed)\n"
+        f"   └ <b>TP3 (+{tp3_pips} pips):</b> <code>${tp3:.2f}</code> (Moonshot)\n"
+        f"{divider}\n"
+        f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
     )
 
 
 def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: float) -> str:
     """
-    Renders ultra-clean, minimalist institutional Gold Take Profit Card
-    matching the Azikaa VIP standard.
+    Renders institutional Angkor Quant Gold Take Profit Card.
     """
     is_buy = str(direction).upper() == "BUY"
-    action = "Buy" if is_buy else "Sell"
+    dir_str = "BUY" if is_buy else "SELL"
+    dir_icon = "🟢" if is_buy else "🔴"
     st = str(stage).upper()
 
     if "TP1" in st:
-        stage_title = f"TP1 hit, +{max(73, pips)} pips"
-        suffix = "Still running."
+        stage_desc = f"TP1 Hit (+{max(73, pips)} pips) | TP Lock (Breakeven Armor 0.0R)!"
     elif "TP2" in st:
-        stage_title = f"TP2 hit, +{max(152, pips)} pips"
-        suffix = "Still running."
+        stage_desc = f"TP2 Hit (+{max(152, pips)} pips) | Guaranteed Cash Floor Locked!"
     elif "TP3" in st:
-        stage_title = f"TP3 hit, +{max(243, pips)} pips"
-        suffix = "Full target closed."
+        stage_desc = f"TP3 Hit (+{max(243, pips)} pips) | Moonshot Runner Harvested!"
     else:
-        stage_title = f"Profit locked, +{pips} pips"
-        suffix = "Position closed."
+        stage_desc = f"Profit Locked (+{pips} pips) | Position Harvested!"
+
+    divider = "───────────────"
 
     return (
-        f"✓ <b>Take profit</b>\n\n"
-        f"{stage_title}\n"
-        f"{action} XAUUSD from {entry_price:.2f}. {suffix}\n\n"
-        f"<i>Angkor Quant Gold</i>"
+        f"<b>Angkor Quant Gold</b>\n"
+        f"{divider}\n"
+        f"🎉 <b>TAKE PROFIT HARVESTED</b> ✅\n"
+        f"{dir_icon} <b>Single Direction :</b> <code>{dir_str}</code> (from ${entry_price:.2f})\n"
+        f"🎯 <b>Execution Milestone ៖</b>\n"
+        f"   └ <code>{stage_desc}</code>\n"
+        f"{divider}\n"
+        f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
     )
 
 
