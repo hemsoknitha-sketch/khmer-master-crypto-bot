@@ -272,13 +272,13 @@ class QuantGoldCapitalBridge:
         mode_str = "🟢 LIVE MAINNET" if not is_demo else "🟡 DEMO ($10,000)"
 
         dossier = db.get_user_license_details(chat_id) or {}
-        tier_lbl = dossier.get("tier_label", "SUPER ADMIN" if is_admin else "ACTIVE VIP")
+        tier_lbl = "👑 SUPER ADMIN" if is_admin else dossier.get("tier_label", "👑 LIFETIME VIP (គ្មានដែនកំណត់)")
 
         auto_cfg = db.get_capital_auto_config(chat_id) or {}
         auto_on = bool(auto_cfg.get("enabled", False))
         budget = float(auto_cfg.get("budget", 400.0 if is_admin else 50.0))
         max_pos = int(auto_cfg.get("max_positions", 10 if is_admin else 5))
-        auto_status = f"🟢 <b>ON (${budget:.2f} / Trade | Max {max_pos} Pos)</b>" if auto_on else "🔴 <b>OFF (Paused)</b>"
+        auto_status = f"🟢 ON (${budget:.2f} / Trade | Max {max_pos} Pos)" if auto_on else "🔴 OFF (Paused)"
 
         open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
         gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
@@ -302,7 +302,7 @@ class QuantGoldCapitalBridge:
         try:
             import asyncio
             u_eng = capital_engine.get_user_capital_engine(chat_id)
-            bal_res = await asyncio.to_thread(u_eng.get_account_balance)
+            bal_res = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=2.5)
             if bal_res and bal_res.get("success"):
                 balance = float(bal_res.get("balance", 0.0))
                 equity = float(bal_res.get("equity", balance))
@@ -310,20 +310,20 @@ class QuantGoldCapitalBridge:
         except Exception:
             pass
 
-        balance_str = f"<code>${balance:.2f} {currency}</code>" if balance > 0 else "<code>Protected / Connected</code>"
-        equity_str = f"<code>${equity:.2f} {currency}</code>" if equity > 0 else "<code>Real-Time Synced</code>"
+        balance_str = f"${balance:.2f}"
+        equity_str = f"${equity:.2f}" if equity > 0 else "Real-Time Synced"
 
         card = (
-            f"🏛️ <b>[ANGKOR QUANT - CAPITAL.COM LIVE TRADING DECK]</b> 🥇\n"
+            f"🏛️ <b>[ANGKOR QUANT - CAPITAL LIVE TRADING]</b> 🥇\n"
             f"{ui_standards.DIVIDER_HEAVY}\n"
-            f"👤 <b>គណនី Capital.com ៖</b> <code>{masked_acc}</code> ({mode_str})\n"
+            f"👤 <b>គណនី ID ៖</b> <code>{masked_acc}</code> ({mode_str})\n"
             f"🟢 <b>ស្ថានភាពតភ្ជាប់ ៖</b> <code>LIVE CONNECTED (Super Admin Approved)</code>\n"
             f"👑 <b>VIP License ៖</b> <code>{tier_lbl}</code>\n"
-            f"💰 <b>សមតុល្យគណនី (Balance) ៖</b> {balance_str}\n"
-            f"📈 <b>មូលធនសុទ្ធ (Equity) ៖</b> {equity_str}\n"
+            f"💰 <b>សមតុល្យគណនី (Balance) ៖</b> <code>{balance_str}</code>\n"
+            f"📈 <b>មូលធនសុទ្ធ (Equity) ៖</b> <code>{equity_str}</code>\n"
             f"{ui_standards.DIVIDER_LIGHT}\n"
             f"🤖 <b>ស្ថានភាព Auto-Trade 24/7 ៖</b> {auto_status}\n"
-            f"📊 <b>Positions មាសកំពុងដំណើរការ ៖</b> <code>{open_pos_count}</code> Active\n"
+            f"📊 <b>Positions មាសកំពុងដំណើរការ ៖</b> <code>{open_pos_count} Active</code>\n"
             f"{ui_standards.DIVIDER_LIGHT}\n"
             f"🥇 <b>Spot Gold (XAUUSD) Real-Time ៖</b>\n"
             f"• តម្លៃបច្ចុប្បន្ន ៖ <code>${curr_p:.2f}</code> | Spread ៖ <code>${spread:.2f}</code>\n"
