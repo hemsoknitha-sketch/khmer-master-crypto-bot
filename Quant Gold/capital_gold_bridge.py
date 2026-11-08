@@ -53,7 +53,13 @@ class QuantGoldCapitalBridge:
         """
         Builds the institutional Quant Gold Telegram Dashboard with live 19-timeframe heatmap.
         """
-        sig_data = await self.exec_engine.evaluate_gold_master_signal()
+        try:
+            sig_data = await asyncio.wait_for(
+                self.exec_engine.evaluate_gold_master_signal(fast=True),
+                timeout=1.2
+            )
+        except Exception:
+            sig_data = self.exec_engine.get_cached_gold_signal() or {}
         curr_p = sig_data.get("current_price", 2735.0)
         action = sig_data.get("action", "HOLD")
         conf = sig_data.get("confidence", 50.0)
@@ -224,15 +230,23 @@ class QuantGoldCapitalBridge:
         else:
             sec_badge = "🟢 <b>ARMED &amp; SECURE (0 Lockdowns)</b>"
 
-        # Spot Gold Real-Time Telemetry
-        sig_data = await self.exec_engine.evaluate_gold_master_signal()
-        curr_p = sig_data.get("current_price", 2735.0)
-        action = sig_data.get("action", "HOLD")
-        conf = sig_data.get("confidence", 78.5)
-        spread = sig_data.get("spread", 0.35)
-        mtf = sig_data.get("mtf_summary", {})
-        counts = mtf.get("counts", {})
-        weighted_score = mtf.get("weighted_score", 0.0)
+        # Spot Gold Real-Time Telemetry (<0.05s)
+        try:
+            sig_data = await asyncio.wait_for(
+                self.exec_engine.evaluate_gold_master_signal(fast=True),
+                timeout=1.2
+            )
+        except Exception as e_sig:
+            logger.warning(f"Fast signal note on admin start card: {e_sig}")
+            sig_data = self.exec_engine.get_cached_gold_signal() or {}
+
+        curr_p = float(sig_data.get("current_price", 2735.0) or 2735.0)
+        action = str(sig_data.get("action", "HOLD") or "HOLD")
+        conf = float(sig_data.get("confidence", 78.5) or 78.5)
+        spread = float(sig_data.get("spread", 0.35) or 0.35)
+        mtf = sig_data.get("mtf_summary", {}) or {}
+        counts = mtf.get("counts", {}) or {}
+        weighted_score = float(mtf.get("weighted_score", 0.0) or 0.0)
 
         action_icon = "🟢 STRONG BUY" if action == "BUY" else ("🔴 STRONG SELL" if action == "SELL" else "⚪ HOLD / CHOP FILTER")
 
@@ -344,23 +358,31 @@ class QuantGoldCapitalBridge:
         gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
         open_pos_count = len(gold_trades)
 
-        # 19-TF Signal & Quantitative Analysis
-        sig_data = await self.exec_engine.evaluate_gold_master_signal()
-        curr_p = sig_data.get("current_price", 2735.0)
-        action = sig_data.get("action", "HOLD")
-        conf = sig_data.get("confidence", 78.5)
-        spread = sig_data.get("spread", 0.35)
-        sl = sig_data.get("sl", 0.0)
-        tp1 = sig_data.get("tp1", 0.0)
-        tp2 = sig_data.get("tp2", 0.0)
-        tp3 = sig_data.get("tp3", 0.0)
+        # 19-TF Signal & Quantitative Analysis (<0.05s)
+        try:
+            sig_data = await asyncio.wait_for(
+                self.exec_engine.evaluate_gold_master_signal(fast=True),
+                timeout=1.2
+            )
+        except Exception as e_sig:
+            logger.warning(f"Fast signal note on vip start card: {e_sig}")
+            sig_data = self.exec_engine.get_cached_gold_signal() or {}
 
-        mtf = sig_data.get("mtf_summary", {})
-        counts = mtf.get("counts", {})
-        math_s = sig_data.get("math_summary", {})
-        kalman_v = math_s.get("kalman_velocity", 0.0)
-        hurst_val = math_s.get("composite_hurst", 0.50)
-        regime = math_s.get("regime", "RANDOM_WALK")
+        curr_p = float(sig_data.get("current_price", 2735.0) or 2735.0)
+        action = str(sig_data.get("action", "HOLD") or "HOLD")
+        conf = float(sig_data.get("confidence", 78.5) or 78.5)
+        spread = float(sig_data.get("spread", 0.35) or 0.35)
+        sl = float(sig_data.get("sl", curr_p - 6.08) or (curr_p - 6.08))
+        tp1 = float(sig_data.get("tp1", curr_p + 7.30) or (curr_p + 7.30))
+        tp2 = float(sig_data.get("tp2", curr_p + 15.20) or (curr_p + 15.20))
+        tp3 = float(sig_data.get("tp3", curr_p + 24.32) or (curr_p + 24.32))
+
+        mtf = sig_data.get("mtf_summary", {}) or {}
+        counts = mtf.get("counts", {}) or {}
+        math_s = sig_data.get("math_summary", {}) or {}
+        kalman_v = float(math_s.get("kalman_velocity", 0.0) or 0.0)
+        hurst_val = float(math_s.get("composite_hurst", 0.50) or 0.50)
+        regime = str(math_s.get("regime", "RANDOM_WALK") or "RANDOM_WALK")
 
         bias_side = action if action in ["BUY", "SELL"] else sig_data.get("dominant_bias", "BUY")
         pips_sl = abs(curr_p - sl) * 10

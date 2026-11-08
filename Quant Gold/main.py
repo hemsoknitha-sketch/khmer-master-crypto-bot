@@ -164,11 +164,6 @@ class QuantGoldSystem:
             self.bot = QuantGoldBot(bot_token)
             self.app = self.bot.build_application()
             await self.app.initialize()
-            if hasattr(self.app, 'post_init') and self.app.post_init:
-                try:
-                    await self.app.post_init(self.app)
-                except Exception as e_pi:
-                    logger.warning(f"Post-init notice: {e_pi}")
             await self.app.start()
             if self.app.updater:
                 await self.app.updater.start_polling(drop_pending_updates=True, timeout=20)

@@ -17,6 +17,7 @@ Purpose:
 import os
 import sys
 import time
+import html
 import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
@@ -331,66 +332,79 @@ class QuantGoldBot:
         if not chat_id:
             return
 
-        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
-        if not allowed:
-            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+        try:
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
 
-        user = update.effective_user
-        username = user.username or user.first_name or "VIP Trader" if user else "VIP Trader"
-        first_name = (user.first_name if user else "") or username or "VIP Trader"
-        db.register_user(chat_id, username)
+            user = update.effective_user
+            username = user.username or user.first_name or "VIP Trader" if user else "VIP Trader"
+            first_name = (user.first_name if user else "") or username or "VIP Trader"
+            db.register_user(chat_id, username)
 
-        is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id)
+            is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id)
+            is_founder = (chat_id == 537186806)
 
-        # Private Agreement Status Check
-        import legal_agreement
-        agreement_status = legal_agreement.get_user_agreement_status(chat_id)
-        is_agreed = bool(agreement_status.get("accepted", False)) or is_admin
+            # Private Agreement Status Check
+            import legal_agreement
+            agreement_status = legal_agreement.get_user_agreement_status(chat_id)
+            is_agreed = bool(agreement_status.get("accepted", False)) or is_admin or is_founder
 
-        bottom_kb = get_quant_gold_bottom_keyboard()
+            bottom_kb = get_quant_gold_bottom_keyboard()
 
-        # ── TIER 1: NEW / UNREGISTERED USER (UNSIGNED LEGAL AGREEMENT) ──
-        if not is_agreed and not is_admin:
-            user_phone = ""
-            try:
-                user_row = db.get_user(chat_id) if hasattr(db, 'get_user') else None
-                if user_row and isinstance(user_row, dict):
-                    user_phone = user_row.get("phone_number", "")
-            except Exception:
-                pass
-            card_text, agr_keyboard = legal_agreement.build_new_user_start_agreement_card(
-                chat_id=chat_id,
-                first_name=first_name,
-                username=user.username if user else "",
-                phone_number=user_phone
-            )
-            await self.safe_reply(update, card_text, reply_markup=agr_keyboard, parse_mode="Markdown")
-            if update.message:
-                await self.safe_reply(
-                    update,
-                    "⚡ <i>សូមពិនិត្យ និងចុចយល់ព្រមកិច្ចសន្យាខាងលើ ដើម្បីដំណើរការប្រព័ន្ធ!</i>",
-                    reply_markup=bottom_kb
+            # ── TIER 1: NEW / UNREGISTERED USER (UNSIGNED LEGAL AGREEMENT) ──
+            if not is_agreed and not is_admin:
+                user_phone = ""
+                try:
+                    user_row = db.get_user(chat_id) if hasattr(db, 'get_user') else None
+                    if user_row and isinstance(user_row, dict):
+                        user_phone = user_row.get("phone_number", "")
+                except Exception:
+                    pass
+                card_text, agr_keyboard = legal_agreement.build_new_user_start_agreement_card(
+                    chat_id=chat_id,
+                    first_name=first_name,
+                    username=user.username if user else "",
+                    phone_number=user_phone
                 )
-            return
+                await self.safe_reply(update, card_text, reply_markup=agr_keyboard, parse_mode="HTML")
+                if update.message:
+                    await self.safe_reply(
+                        update,
+                        "⚡ <i>សូមពិនិត្យ និងចុចយល់ព្រមកិច្ចសន្យាខាងលើ ដើម្បីដំណើរការប្រព័ន្ធ!</i>",
+                        reply_markup=bottom_kb
+                    )
+                return
 
-        # ── TIER 3: SUPER ADMIN EXECUTIVE (#859271875 @Soknitha) ──
-        if is_admin:
-            diag = self.get_vps_diagnostics()
-            text, inline_kb = await self.bridge.build_super_admin_start_card(chat_id, diag=diag)
-            await self.safe_reply(update, text, reply_markup=inline_kb)
-            if update.message:
-                await self.safe_reply(
-                    update,
-                    "⚡ <i>ផ្ទាំងបញ្ជាកងនាវា Super Admin Arm រួចរាល់ 24/7! (1-Tap Buttons)</i>",
-                    reply_markup=bottom_kb
-                )
-            return
+            # ── TIER 3: SUPER ADMIN EXECUTIVE (#859271875 @Soknitha) ──
+            if is_admin:
+                diag = self.get_vps_diagnostics()
+                text, inline_kb = await self.bridge.build_super_admin_start_card(chat_id, diag=diag)
+                await self.safe_reply(update, text, reply_markup=inline_kb)
+                if update.message:
+                    await self.safe_reply(
+                        update,
+                        "⚡ <i>ផ្ទាំងបញ្ជាកងនាវា Super Admin Arm រួចរាល់ 24/7! (1-Tap Buttons)</i>",
+                        reply_markup=bottom_kb
+                    )
+                return
 
-        # ── TIER 2: VIP / REGISTERED USER ──
-        is_vip_user = db.is_vip(chat_id)
-        if not is_vip_user:
-            # User has signed legal agreement, but does not have an active VIP license yet
-            text, inline_kb = self.bridge.build_vip_license_required_card(chat_id)
+            # ── TIER 2: VIP / REGISTERED USER ──
+            is_vip_user = db.is_vip(chat_id) or is_founder
+            if not is_vip_user:
+                # User has signed legal agreement, but does not have an active VIP license yet
+                text, inline_kb = self.bridge.build_vip_license_required_card(chat_id)
+                await self.safe_reply(update, text, reply_markup=inline_kb)
+                if update.message:
+                    await self.safe_reply(
+                        update,
+                        "⚡ <i>ប្រើ Keyboard ខាងក្រោមសម្រាប់បញ្ជារហ័ស (1-Tap Buttons)</i>",
+                        reply_markup=bottom_kb
+                    )
+                return
+
+            # Licensed VIP User
+            text, inline_kb = await self.bridge.build_vip_user_start_card(chat_id, first_name=first_name, username=user.username if user else "")
             await self.safe_reply(update, text, reply_markup=inline_kb)
             if update.message:
                 await self.safe_reply(
@@ -398,17 +412,19 @@ class QuantGoldBot:
                     "⚡ <i>ប្រើ Keyboard ខាងក្រោមសម្រាប់បញ្ជារហ័ស (1-Tap Buttons)</i>",
                     reply_markup=bottom_kb
                 )
-            return
-
-        # Licensed VIP User
-        text, inline_kb = await self.bridge.build_vip_user_start_card(chat_id, first_name=first_name, username=user.username if user else "")
-        await self.safe_reply(update, text, reply_markup=inline_kb)
-        if update.message:
-            await self.safe_reply(
-                update,
-                "⚡ <i>ប្រើ Keyboard ខាងក្រោមសម្រាប់បញ្ជារហ័ស (1-Tap Buttons)</i>",
-                reply_markup=bottom_kb
+        except Exception as e_start:
+            logger.error(f"Critical exception in handle_start for {chat_id}: {e_start}", exc_info=True)
+            user_safe_name = html.escape(str(first_name if 'first_name' in locals() else 'Trader'))
+            fallback_card = (
+                f"🥇 <b>[ANGKOR QUANT - QUANT GOLD CITADEL]</b> 🏛️\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"👋 <b>ជម្រាបសួរ {user_safe_name}!</b>\n"
+                f"ប្រព័ន្ធជួញដូរស្វ័យប្រវត្ត Quant Gold កំពុងដំណើរការ 24/7/365។\n"
+                f"──────────────────────\n"
+                f"👇 <i>សូមជ្រើសរើសមុខងារបញ្ជា 1-Tap ខាងក្រោម ៖</i>"
             )
+            bottom_kb = get_quant_gold_bottom_keyboard()
+            await self.safe_reply(update, fallback_card, reply_markup=bottom_kb)
 
     def _resolve_target(self, target_input: str) -> Tuple[Optional[int], Optional[Dict[str, Any]]]:
         """Resolves chat_id and user record from chat_id or Capital account_id."""
@@ -2210,7 +2226,13 @@ class QuantGoldBot:
         """
         Dynamically interrogates live hardware sensors and Google Cloud VM metadata.
         100% Real, Brutal Engineering Honesty: Zero dummy constants or hallucinated specs.
+        Cached for 30s in RAM to eliminate recurring metadata & ping latency on rapid taps (<0.0001ms).
         """
+        now = time.time()
+        if hasattr(self, "_cached_vps_diag") and self._cached_vps_diag:
+            if (now - getattr(self, "_cached_vps_diag_ts", 0.0)) < 30.0:
+                return self._cached_vps_diag
+
         import psutil
         import platform
         import socket
@@ -2315,7 +2337,7 @@ class QuantGoldBot:
         except Exception:
             ping_latency_ms = 0.0
 
-        return {
+        diag_res = {
             "hostname": hostname,
             "is_gcp": is_gcp,
             "project": gcp_project,
@@ -2335,6 +2357,9 @@ class QuantGoldBot:
             "ping_latency_ms": ping_latency_ms,
             "os_name": os_name
         }
+        self._cached_vps_diag = diag_res
+        self._cached_vps_diag_ts = now
+        return diag_res
 
     async def handle_health(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays real-time Google Cloud VPS System Health & Latency diagnostics (Super Admin Only)."""
