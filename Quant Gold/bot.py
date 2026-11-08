@@ -55,6 +55,7 @@ if _WORKSPACE_ROOT not in sys.path:
 
 import database as db
 import capital_engine
+from quant_gold_security import get_quant_gold_security_citadel
 from capital_gold_bridge import get_quant_gold_capital_bridge
 from execution_engine import (
     get_quant_gold_execution_engine,
@@ -87,6 +88,7 @@ class QuantGoldBot:
         self.token = token
         self.bridge = get_quant_gold_capital_bridge()
         self.exec_engine = get_quant_gold_execution_engine()
+        self.citadel = get_quant_gold_security_citadel()
         self.app = None
 
     def build_application(self):
@@ -108,6 +110,7 @@ class QuantGoldBot:
                 BotCommand("auto", "🤖 Toggle 24/7 Autonomous Gold Trading"),
                 BotCommand("status", "💵 Live Gold Price, Spread & Capital Session"),
                 BotCommand("health", "🖥️ Google Cloud VPS System Health & Latency"),
+                BotCommand("security", "🛡️ View Institutional Security Citadel Status"),
                 BotCommand("help", "📖 User Guide & Fiduciary Covenant")
             ]
             try:
@@ -136,7 +139,9 @@ class QuantGoldBot:
 
                 # Set dedicated Admin commands for Super Admin scope
                 admin_commands = list(commands) + [
-                    BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller")
+                    BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
+                    BotCommand("emergency_stop", "🚨 Super Admin Emergency Trading Freeze"),
+                    BotCommand("unlock", "🟢 Super Admin Release Trading Freeze")
                 ]
                 for admin_id in [859271875, 537186806]:
                     try:
@@ -184,6 +189,11 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("auto", self.handle_toggle_auto))
         self.app.add_handler(CommandHandler("status", self.handle_status))
         self.app.add_handler(CommandHandler("health", self.handle_health))
+        self.app.add_handler(CommandHandler("security", self.handle_security))
+        self.app.add_handler(CommandHandler("citadel", self.handle_security))
+        self.app.add_handler(CommandHandler("emergency_stop", self.handle_emergency_stop))
+        self.app.add_handler(CommandHandler("lockdown", self.handle_emergency_stop))
+        self.app.add_handler(CommandHandler("unlock", self.handle_unlock))
         self.app.add_handler(CommandHandler("help", self.handle_help))
 
         # Callback query handler for 1-tap interactive buttons
@@ -198,10 +208,11 @@ class QuantGoldBot:
         return self.app
 
     async def safe_reply(self, update: Update, text: str, reply_markup=None, parse_mode="HTML"):
-        """Sends a message safely with HTML, falling back to plain text if Telegram fails."""
+        """Sends a message safely with HTML, scrubbing sensitive tokens and falling back to plain text."""
         msg = update.effective_message
         if not msg:
             return None
+        text = self.citadel.scrub_sensitive_data(text)
         try:
             return await msg.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
         except Exception as e:
@@ -216,7 +227,8 @@ class QuantGoldBot:
                 return None
 
     async def safe_edit(self, query, text: str, reply_markup=None, parse_mode="HTML"):
-        """Edits a message safely with HTML, falling back to plain text if Telegram fails."""
+        """Edits a message safely with HTML, scrubbing sensitive tokens and falling back to plain text."""
+        text = self.citadel.scrub_sensitive_data(text)
         try:
             return await query.edit_message_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
         except Exception as e:
@@ -230,6 +242,51 @@ class QuantGoldBot:
                 logger.error(f"Telegram edit plain text fallback also failed: {e2}")
                 return None
 
+    async def handle_security(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Displays real-time Institutional Security Citadel status & diagnostics."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if chat_id:
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+        card = self.citadel.build_security_status_card()
+        await self.safe_reply(update, card)
+
+    async def handle_emergency_stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Super Admin 1-tap Emergency Trading Lockdown across Quant Gold (Invariant 41 & 75)."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not self.citadel.is_super_admin(chat_id):
+            return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
+
+        reason = " ".join(context.args) if context and context.args else "SUPER_ADMIN_MANUAL_LOCKDOWN"
+        self.citadel.trigger_emergency_lockdown(chat_id, reason)
+
+        msg = (
+            f"🚨 <b>[SUPER ADMIN EMERGENCY LOCKDOWN ENGAGED]</b> 🛑\n"
+            f"══════════════════════════════════════\n"
+            f"• បញ្ជាដោយ ៖ <code>Super Admin #{chat_id}</code>\n"
+            f"• មូលហេតុ ៖ <code>{reason}</code>\n"
+            f"• ស្ថានភាព ៖ <b>TRADING HALTED</b> (Position ថ្មីទាំងអស់ត្រូវបានផ្អាក)\n"
+            f"• ដោះសោរវិញ ៖ វាយពាក្យបញ្ជា <code>/unlock</code>"
+        )
+        await self.safe_reply(update, msg)
+
+    async def handle_unlock(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Super Admin 1-tap Release of Trading Lockdown (Invariant 41 & 75)."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not self.citadel.is_super_admin(chat_id):
+            return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
+
+        self.citadel.release_emergency_lockdown(chat_id)
+        msg = (
+            f"🟢 <b>[CIRCUIT BREAKER RELEASED]</b> ✅\n"
+            f"══════════════════════════════════════\n"
+            f"• ដោះសោរដោយ ៖ <code>Super Admin #{chat_id}</code>\n"
+            f"• ស្ថានភាព ៖ <b>ARMED & SECURE (Trading Active)</b>\n"
+            f"• ប្រព័ន្ធជួញដូរ Quant Gold ដំណើរការប្រក្រតីឡើងវិញ។"
+        )
+        await self.safe_reply(update, msg)
+
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Global error handler preventing crashes from unhandled update exceptions."""
         logger.warning(f"Handled exception during update processing: {context.error}")
@@ -238,6 +295,11 @@ class QuantGoldBot:
         """Displays the Flagship Quant Gold Dashboard."""
         chat_id = update.effective_chat.id if update.effective_chat else None
         if not chat_id:
+            return
+
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+        if not allowed:
+            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
             return
 
         user = update.effective_user
@@ -540,6 +602,12 @@ class QuantGoldBot:
 
     async def handle_signal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays current Super Smart Gold Signal and Trigger Levels."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if chat_id:
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
         sig = await self.exec_engine.evaluate_gold_master_signal()
         action = sig.get("action", "HOLD")
         curr_p = sig.get("current_price", 4071.78)
@@ -632,27 +700,76 @@ class QuantGoldBot:
 
     async def handle_buy(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Executes instant Gold Buy order. Default size: 0.5 Troy Ounce ($4.07 margin @ 500:1)."""
-        lot = 0.5
-        if context.args:
-            try:
-                lot = max(0.5, float(context.args[0]))
-            except ValueError:
-                lot = 0.5
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+
+        # 1. Circuit Breaker Lockdown Check
+        if self.citadel.is_locked():
+            return await self.safe_reply(
+                update,
+                "🚨 <b>[CIRCUIT BREAKER ARMED]</b> <i>ការជួញដូរត្រូវបានផ្អាកជាបន្ទាន់ដោយ Super Admin (Emergency Halt)។ មិនអនុញ្ញាតឱ្យបើក Position ថ្មីឡើយ!</i>"
+            )
+
+        # 2. Anti-Spam Rate Limit Check
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="TRADE")
+        if not allowed:
+            return await self.safe_reply(
+                update,
+                f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> មុននឹងបញ្ជា Order បន្ទាប់ (Anti-Spam Shield)</i>"
+            )
+
+        # 3. Fiduciary VIP Referral & Authorization Check (Invariant 36)
+        auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+        if not auth_ok:
+            return await self.safe_reply(update, self.bridge.build_vip_referral_required_card(chat_id))
+
+        # 4. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
+        raw_arg = context.args[0] if context.args else 0.5
+        lot = self.citadel.sanitize_lot_size(raw_arg, default_lot=0.5, min_lot=0.5, max_lot=50.0)
+
         await self.bridge.handle_telegram_gold_subcommand(update, context, ["BUY", str(lot)])
 
     async def handle_sell(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Executes instant Gold Sell order. Default size: 0.5 Troy Ounce ($4.07 margin @ 500:1)."""
-        lot = 0.5
-        if context.args:
-            try:
-                lot = max(0.5, float(context.args[0]))
-            except ValueError:
-                lot = 0.5
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+
+        # 1. Circuit Breaker Lockdown Check
+        if self.citadel.is_locked():
+            return await self.safe_reply(
+                update,
+                "🚨 <b>[CIRCUIT BREAKER ARMED]</b> <i>ការជួញដូរត្រូវបានផ្អាកជាបន្ទាន់ដោយ Super Admin (Emergency Halt)។ មិនអនុញ្ញាតឱ្យបើក Position ថ្មីឡើយ!</i>"
+            )
+
+        # 2. Anti-Spam Rate Limit Check
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="TRADE")
+        if not allowed:
+            return await self.safe_reply(
+                update,
+                f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> មុននឹងបញ្ជា Order បន្ទាប់ (Anti-Spam Shield)</i>"
+            )
+
+        # 3. Fiduciary VIP Referral & Authorization Check (Invariant 36)
+        auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+        if not auth_ok:
+            return await self.safe_reply(update, self.bridge.build_vip_referral_required_card(chat_id))
+
+        # 4. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
+        raw_arg = context.args[0] if context.args else 0.5
+        lot = self.citadel.sanitize_lot_size(raw_arg, default_lot=0.5, min_lot=0.5, max_lot=50.0)
+
         await self.bridge.handle_telegram_gold_subcommand(update, context, ["SELL", str(lot)])
 
     async def handle_positions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays current open Gold positions with real-time Breakeven status."""
         chat_id = update.effective_chat.id
+        if chat_id:
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
         open_trades = db.get_capital_auto_trades_for_user(chat_id)
         gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN"]
 
@@ -800,6 +917,24 @@ class QuantGoldBot:
     async def handle_toggle_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Toggles 24/7 Autonomous Gold Trading with real isolated live account telemetry."""
         chat_id = update.effective_chat.id if update.effective_chat else 859271875
+
+        # 1. Circuit Breaker Lockdown Check
+        if self.citadel.is_locked():
+            return await self.safe_reply(
+                update,
+                "🚨 <b>[CIRCUIT BREAKER ARMED]</b> <i>ការជួញដូរត្រូវបានផ្អាកជាបន្ទាន់ដោយ Super Admin (Emergency Halt)។</i>"
+            )
+
+        # 2. Anti-Spam Rate Limit Check
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+        if not allowed:
+            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        # 3. Fiduciary VIP Referral & Authorization Check (Invariant 36)
+        auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+        if not auth_ok:
+            return await self.safe_reply(update, self.bridge.build_vip_referral_required_card(chat_id))
+
         auto_cfg = db.get_capital_auto_config(chat_id) or {}
         cur_st = bool(auto_cfg.get("enabled", False))
         new_st = not cur_st
@@ -876,6 +1011,11 @@ class QuantGoldBot:
     async def handle_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Shows clean real-time status of Gold price, Bid/Ask/Spread, and Capital.com session."""
         chat_id = update.effective_chat.id if update.effective_chat else 859271875
+        if chat_id:
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
         bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
         curr_p = (bid + ask) / 2.0
 
@@ -1046,6 +1186,12 @@ class QuantGoldBot:
 
     async def handle_health(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays real-time Google Cloud VPS System Health & Latency diagnostics."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if chat_id:
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
         diag = self.get_vps_diagnostics()
 
         host_title = f"Google Cloud VPS ({diag['hostname']})" if diag['is_gcp'] or "quant-gold" in diag['hostname'].lower() else f"Host ({diag['hostname']})"
@@ -1145,6 +1291,9 @@ class QuantGoldBot:
         elif data == "btn_qgold_health":
             await self.handle_health(update, context)
 
+        elif data in ["btn_qgold_security", "btn_qgold_citadel"]:
+            await self.handle_security(update, context)
+
         elif data in ["btn_qgold_signal", "btn_qgold_levels"]:
             await self.handle_signal(update, context)
 
@@ -1181,6 +1330,8 @@ class QuantGoldBot:
             await self.handle_status(update, context)
         elif "Health" in text:
             await self.handle_health(update, context)
+        elif "Security" in text or "Citadel" in text:
+            await self.handle_security(update, context)
         elif "Help" in text:
             await self.handle_help(update, context)
 

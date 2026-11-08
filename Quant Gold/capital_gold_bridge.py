@@ -11,6 +11,7 @@ Integrates:
 ==============================================================
 """
 
+import os
 import time
 import logging
 from typing import Dict, List, Optional, Tuple, Any
@@ -19,6 +20,11 @@ from telegram.ext import ContextTypes
 
 import database as db
 import ui_standards
+
+try:
+    from .quant_gold_security import get_quant_gold_security_citadel
+except (ImportError, ValueError):
+    from quant_gold_security import get_quant_gold_security_citadel
 
 try:
     from .timeframes import get_gold_mtf_engine
@@ -41,6 +47,7 @@ class QuantGoldCapitalBridge:
         self.exec_engine = get_quant_gold_execution_engine()
         self.mtf_engine = get_gold_mtf_engine()
         self.math_core = get_gold_math_core()
+        self.citadel = get_quant_gold_security_citadel()
 
     async def build_quant_gold_overview_ui(self, chat_id: int, user_lang: str = "khmer") -> Tuple[str, InlineKeyboardMarkup]:
         """
@@ -149,11 +156,31 @@ class QuantGoldCapitalBridge:
 
         return text, kb
 
+    def build_vip_referral_required_card(self, chat_id: int) -> str:
+        """Renders an institutional VIP onboarding card for unverified users (Invariant 36)."""
+        ref_link = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+        card = (
+            f"🛡️ <b>[ANGKOR QUANT - VIP CAPITAL.COM ACCESS GATEWAY]</b> 🏛️\n"
+            f"{ui_standards.DIVIDER_HEAVY}\n"
+            f"ℹ️ <b>សេចក្តីជូនដំណឹងសុវត្ថិភាព (Invariant 36) ៖</b>\n"
+            f"ដើម្បីធានាសុវត្ថិភាពគណនី និងអនុលោមភាពស្ថាប័ន ការជួញដូរផ្ទាល់ (Live 1-Tap & Auto Trading) "
+            f"តម្រូវឱ្យមានការភ្ជាប់គណនី Capital.com ដែលបានផ្ទៀងផ្ទាត់ (Referral Verified) "
+            f"ឬមាន API Credentials ផ្ទាល់ខ្លួន។\n\n"
+            f"📝 <b>របៀបបើកដំណើរការ ៖</b>\n"
+            f"1. បង្កើតគណនី Capital.com តាម Link ផ្លូវការ ៖ <a href='{ref_link}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
+            f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin តាមរយៈ @soknitha_support ដើម្បីផ្ទៀងផ្ទាត់\n"
+            f"3. ឬបញ្ចូល API Credentials ផ្ទាល់ខ្លួនតាមរយៈ Main Bot (/capital)\n"
+            f"{ui_standards.DIVIDER_LIGHT}\n"
+            f"💡 <i>លោកអាចមើល Signal វិភាគ 19 Timeframes (/signal) និងពិនិត្យតម្លៃមាស Real-Time (/status) បានដោយសេរី!</i>"
+        )
+        return card
+
     async def _safe_send(self, update: Update, text: str, reply_markup=None, parse_mode="HTML"):
         """Sends a telegram message safely with HTML, falling back to plain text if needed."""
         msg = update.effective_message
         if not msg:
             return None
+        text = self.citadel.scrub_sensitive_data(text)
         try:
             return await msg.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
         except Exception as e:
@@ -197,12 +224,23 @@ class QuantGoldCapitalBridge:
             return True
 
         elif sub_action in ["BUY", "SELL"]:
-            lot = 0.5
-            if len(args) > 1:
-                try:
-                    lot = max(0.5, float(args[1]))
-                except ValueError:
-                    lot = 0.5
+            # 1. Circuit breaker lockdown check
+            if self.citadel.is_locked():
+                await self._safe_send(
+                    update,
+                    "🚨 <b>[CIRCUIT BREAKER ARMED]</b> <i>ការជួញដូរត្រូវបានផ្អាកជាបន្ទាន់ដោយ Super Admin (Emergency Halt)។</i>"
+                )
+                return True
+
+            # 2. VIP Authorization Gatekeeper check (Invariant 36)
+            auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+            if not auth_ok:
+                await self._safe_send(update, self.build_vip_referral_required_card(chat_id))
+                return True
+
+            # 3. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
+            raw_lot = args[1] if len(args) > 1 else 0.5
+            lot = self.citadel.sanitize_lot_size(raw_lot, default_lot=0.5, min_lot=0.5, max_lot=50.0)
 
             sig = await self.exec_engine.evaluate_gold_master_signal()
             curr_p = sig.get("current_price", 4071.78)
@@ -246,13 +284,28 @@ class QuantGoldCapitalBridge:
                     f"🛡️ <i>Trade is protected by Dynamic Trailing Ratchet & Shock Early Harvest!</i>"
                 )
             else:
+                raw_msg = str(res.get('message', 'Broker error'))
+                scrubbed_msg = self.citadel.scrub_sensitive_data(raw_msg)
                 await self._safe_send(
                     update,
-                    f"⚠️ <b>[ORDER REJECTED]</b> : <code>{res.get('message', 'Broker error')}</code>"
+                    f"⚠️ <b>[ORDER REJECTED]</b> : <code>{scrubbed_msg}</code>"
                 )
             return True
 
         elif sub_action in ["ON", "ENABLE", "START"]:
+            # 1. Circuit breaker lockdown check
+            if self.citadel.is_locked():
+                await self._safe_send(
+                    update,
+                    "🚨 <b>[CIRCUIT BREAKER ARMED]</b> <i>ការជួញដូរត្រូវបានផ្អាកជាបន្ទាន់ដោយ Super Admin!</i>"
+                )
+                return True
+
+            # 2. VIP Authorization Gatekeeper check (Invariant 36)
+            auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+            if not auth_ok:
+                await self._safe_send(update, self.build_vip_referral_required_card(chat_id))
+                return True
             db.set_capital_auto_config(chat_id=chat_id, enabled=True, budget=300.0, max_positions=5, is_demo=False)
             await self._safe_send(
                 update,

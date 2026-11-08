@@ -177,6 +177,18 @@ def main():
     print(f"• Internal RAM:    < 0.001ms (In-Memory RAM Engine Latency)")
     if diag['ping_latency_ms'] > 0:
         print(f"• Capital API RTT: {diag['ping_latency_ms']:.1f}ms (Live Broker Ping Latency)")
+    print("-" * 70)
+    try:
+        from quant_gold_security import get_quant_gold_security_citadel
+        citadel = get_quant_gold_security_citadel()
+        mem_shield = citadel.check_memory_shield()
+        cb_status = "LOCKED (Trading Halted)" if citadel.is_locked() else "ARMED & SECURE (Normal)"
+        print(f"• Security Citadel: [ACTIVE] Circuit Breaker: {cb_status}")
+        print(f"• Rate Limiter:    [ACTIVE] Token Bucket Sliding Window")
+        print(f"• Anti-Injection:  [ACTIVE] Strict Lot Clamping (0.5 to 50.0 oz)")
+        print(f"• Memory Shield:   Process RSS {mem_shield['proc_mem_mb']} MB (Action: {mem_shield['action']})")
+    except Exception as e_sec:
+        print(f"• Security Citadel: Note ({e_sec})")
     print("=" * 70)
 
 

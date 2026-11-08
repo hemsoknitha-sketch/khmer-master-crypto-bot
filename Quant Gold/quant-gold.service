@@ -1,5 +1,5 @@
 # ==============================================================================
-# ANGKOR QUANT - QUANT GOLD SYSTEMD SERVICE CONFIGURATION
+# ANGKOR QUANT - QUANT GOLD SYSTEMD SERVICE CONFIGURATION (AQ84 HARDENED)
 # ==============================================================================
 # Location on Linux VPS: /etc/systemd/system/quant-gold.service
 # Target: Google Cloud Linux VPS (quant-gold / quant-gold-514007)
@@ -24,11 +24,17 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=quant-gold
 
-# Resource protection & zero-leakage limits
+# Resource protection & zero-leakage limits (Zero OOM Shield)
 LimitNOFILE=65535
+MemoryMax=850M
+MemoryHigh=750M
 TimeoutStopSec=15
 KillMode=mixed
 
+# Institutional Linux Security Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
 [Install]
 WantedBy=multi-user.target
-
