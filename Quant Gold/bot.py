@@ -19,6 +19,7 @@ import sys
 import time
 import asyncio
 import logging
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 
 from telegram import (
@@ -144,6 +145,7 @@ class QuantGoldBot:
                     BotCommand("admin_users", "👥 Inspect & Manage All Users Dossiers"),
                     BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
                     BotCommand("admin_license", "👑 VIP License Approvals & Database Pruning"),
+                    BotCommand("admin_agreements", "📜 Super Admin Legal Agreements Audit Citadel"),
                     BotCommand("emergency_stop", "🚨 Super Admin Emergency Trading Freeze"),
                     BotCommand("unlock", "🟢 Super Admin Release Trading Freeze")
                 ]
@@ -210,6 +212,9 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("emergency_stop", self.handle_emergency_stop))
         self.app.add_handler(CommandHandler("lockdown", self.handle_emergency_stop))
         self.app.add_handler(CommandHandler("unlock", self.handle_unlock))
+        self.app.add_handler(CommandHandler("agreement", self.handle_agreement))
+        self.app.add_handler(CommandHandler("about", self.handle_agreement))
+        self.app.add_handler(CommandHandler("admin_agreements", self.handle_admin_agreements))
         self.app.add_handler(CommandHandler("help", self.handle_help))
 
         # Callback query handler for 1-tap interactive buttons
@@ -321,7 +326,7 @@ class QuantGoldBot:
         logger.warning(f"Handled exception during update processing: {context.error}")
 
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Displays the Flagship Quant Gold Dashboard."""
+        """Displays the Flagship Multi-Tier Super Smart Quant Gold Dashboard."""
         chat_id = update.effective_chat.id if update.effective_chat else None
         if not chat_id:
             return
@@ -329,18 +334,74 @@ class QuantGoldBot:
         allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
         if not allowed:
             return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
-            return
 
         user = update.effective_user
         username = user.username or user.first_name or "VIP Trader" if user else "VIP Trader"
+        first_name = (user.first_name if user else "") or username or "VIP Trader"
         db.register_user(chat_id, username)
 
-        raw_lang = db.get_user_language(chat_id)
-        user_lang = "khmer" if raw_lang in ["km", "khmer", "0", "1", "auto"] else "english"
+        is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id)
 
-        text, inline_kb = await self.bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+        # Private Agreement Status Check
+        import legal_agreement
+        agreement_status = legal_agreement.get_user_agreement_status(chat_id)
+        is_agreed = bool(agreement_status.get("accepted", False)) or is_admin
+
         bottom_kb = get_quant_gold_bottom_keyboard()
 
+        # ── TIER 1: NEW / UNREGISTERED USER (UNSIGNED LEGAL AGREEMENT) ──
+        if not is_agreed and not is_admin:
+            user_phone = ""
+            try:
+                user_row = db.get_user(chat_id) if hasattr(db, 'get_user') else None
+                if user_row and isinstance(user_row, dict):
+                    user_phone = user_row.get("phone_number", "")
+            except Exception:
+                pass
+            card_text, agr_keyboard = legal_agreement.build_new_user_start_agreement_card(
+                chat_id=chat_id,
+                first_name=first_name,
+                username=user.username if user else "",
+                phone_number=user_phone
+            )
+            await self.safe_reply(update, card_text, reply_markup=agr_keyboard, parse_mode="Markdown")
+            if update.message:
+                await self.safe_reply(
+                    update,
+                    "⚡ <i>សូមពិនិត្យ និងចុចយល់ព្រមកិច្ចសន្យាខាងលើ ដើម្បីដំណើរការប្រព័ន្ធ!</i>",
+                    reply_markup=bottom_kb
+                )
+            return
+
+        # ── TIER 3: SUPER ADMIN EXECUTIVE (#859271875 @Soknitha) ──
+        if is_admin:
+            diag = self.get_vps_diagnostics()
+            text, inline_kb = await self.bridge.build_super_admin_start_card(chat_id, diag=diag)
+            await self.safe_reply(update, text, reply_markup=inline_kb)
+            if update.message:
+                await self.safe_reply(
+                    update,
+                    "⚡ <i>ផ្ទាំងបញ្ជាកងនាវា Super Admin Arm រួចរាល់ 24/7! (1-Tap Buttons)</i>",
+                    reply_markup=bottom_kb
+                )
+            return
+
+        # ── TIER 2: VIP / REGISTERED USER ──
+        is_vip_user = db.is_vip(chat_id)
+        if not is_vip_user:
+            # User has signed legal agreement, but does not have an active VIP license yet
+            text, inline_kb = self.bridge.build_vip_license_required_card(chat_id)
+            await self.safe_reply(update, text, reply_markup=inline_kb)
+            if update.message:
+                await self.safe_reply(
+                    update,
+                    "⚡ <i>ប្រើ Keyboard ខាងក្រោមសម្រាប់បញ្ជារហ័ស (1-Tap Buttons)</i>",
+                    reply_markup=bottom_kb
+                )
+            return
+
+        # Licensed VIP User
+        text, inline_kb = await self.bridge.build_vip_user_start_card(chat_id, first_name=first_name, username=user.username if user else "")
         await self.safe_reply(update, text, reply_markup=inline_kb)
         if update.message:
             await self.safe_reply(
@@ -2362,6 +2423,75 @@ class QuantGoldBot:
             )
         await self.safe_reply(update, help_text)
 
+    async def handle_agreement(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Displays the full Angkor Quant Legal Agreement & Risk Waiver (/agreement, /about)."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+        import legal_agreement
+        text, kb = legal_agreement.build_about_main_card(chat_id)
+        await self.safe_reply(update, text, reply_markup=kb, parse_mode="Markdown")
+
+    async def handle_admin_agreements(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Super Admin Legal Agreements Audit Citadel (/admin_agreements)."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+        if not self.citadel.is_super_admin(chat_id):
+            return await self.safe_reply(update, "⛔ <i>មុខងារនេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
+        import legal_agreement
+        text, kb = legal_agreement.build_admin_agreements_card(page=1)
+        await self.safe_reply(update, text, reply_markup=kb, parse_mode="Markdown")
+
+    async def _trigger_vip_license_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        """Dispatches an instant 1-Click VIP License Request from user to all Super Admins."""
+        user_info = update.effective_user
+        u_name = f"@{user_info.username}" if user_info and user_info.username else "គ្មាន Username"
+        f_name = user_info.full_name if user_info else "VIP Trader"
+
+        await self.safe_reply(
+            update,
+            f"⏳ <b>[សំណើសុំ VIP LICENSE ត្រូវបានបញ្ជូន]</b> 👑\n"
+            f"══════════════════════════════════════\n"
+            f"• User ID ៖ <code>{chat_id}</code>\n"
+            f"• ឈ្មោះ ៖ <b>{f_name}</b> ({u_name})\n"
+            f"• ស្ថានភាព ៖ <b>កំពុងរង់ចាំការអនុម័តពី Admin (Pending Approval)</b>\n"
+            f"══════════════════════════════════════\n"
+            f"Admin នឹងពិនិត្យ និងអនុម័តជូនលោកអ្នកភ្លាមៗ 1-Click។ សូមរង់ចាំការជូនដំណឹង!"
+        )
+
+        admins = db.get_all_admins()
+        now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        admin_card = (
+            f"👑 <b>[ANGKOR QUANT - សំណើសុំ VIP LICENSE ថ្មី]</b> 🏛️\n"
+            f"══════════════════════════════════════\n"
+            f"👤 <b>អ្នកប្រើប្រាស់ (User) ៖</b> {u_name} ({f_name})\n"
+            f"🆔 <b>Telegram ID ៖</b> <code>{chat_id}</code>\n"
+            f"📅 <b>ពេលវេលាស្នើសុំ ៖</b> <code>{now_utc} UTC</code>\n"
+            f"══════════════════════════════════════\n"
+            f"👇 <i>សូមជ្រើសរើសកញ្ចប់ License (ចុច 1-Click ដើម្បីអនុម័តភ្លាមៗ) ៖</i>"
+        )
+        approval_kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🟢 Monthly (30 ថ្ងៃ)", callback_data=f"lic_app:month:{chat_id}"),
+                InlineKeyboardButton("💎 Yearly (365 ថ្ងៃ)", callback_data=f"lic_app:year:{chat_id}")
+            ],
+            [
+                InlineKeyboardButton("👑 Lifetime VIP", callback_data=f"lic_app:life:{chat_id}"),
+                InlineKeyboardButton("❌ បដិសេធ (Reject)", callback_data=f"lic_app:rej:{chat_id}")
+            ]
+        ])
+        for adm_id in admins:
+            try:
+                await context.bot.send_message(
+                    chat_id=adm_id,
+                    text=admin_card,
+                    parse_mode="HTML",
+                    reply_markup=approval_kb
+                )
+            except Exception as e_adm:
+                logger.warning(f"Could not deliver license request to admin {adm_id}: {e_adm}")
+
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handles all 1-tap interactive inline button clicks."""
         query = update.callback_query
@@ -2370,13 +2500,20 @@ class QuantGoldBot:
 
         if data in ["btn_qgold_refresh", "btn_qgold_scan"]:
             try:
-                await query.answer("🥇 Scanning 19 Timeframes for Gold...")
+                await query.answer("🥇 Refreshing Quant Gold Citadel...")
             except Exception:
                 pass
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = "khmer" if raw_lang in ["km", "khmer", "0", "1", "auto"] else "english"
-            text, kb = await self.bridge.build_quant_gold_overview_ui(chat_id, user_lang)
-            await self.safe_edit(query, text, reply_markup=kb)
+            is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id)
+            if is_admin:
+                diag = self.get_vps_diagnostics()
+                text, kb = await self.bridge.build_super_admin_start_card(chat_id, diag=diag)
+                await self.safe_edit(query, text, reply_markup=kb)
+            else:
+                user_info = update.effective_user
+                f_name = (user_info.first_name if user_info else "") or "VIP Trader"
+                u_name = user_info.username if user_info else ""
+                text, kb = await self.bridge.build_vip_user_start_card(chat_id, first_name=f_name, username=u_name)
+                await self.safe_edit(query, text, reply_markup=kb)
 
         elif data == "btn_qgold_buy":
             try:
@@ -2455,57 +2592,12 @@ class QuantGoldBot:
                 pass
             await self.handle_license(update, context)
 
-        elif data == "btn_qgold_req_license":
+        elif data in ["btn_qgold_req_license", "btn_menu_vip_req"]:
             try:
                 await query.answer("⏳ សំណើត្រូវបានបញ្ជូនទៅកាន់ Admin!")
             except Exception:
                 pass
-            user_info = update.effective_user
-            u_name = f"@{user_info.username}" if user_info and user_info.username else "គ្មាន Username"
-            f_name = user_info.full_name if user_info else "VIP Trader"
-
-            await self.safe_reply(
-                update,
-                f"⏳ <b>[សំណើសុំ VIP LICENSE ត្រូវបានបញ្ជូន]</b> 👑\n"
-                f"══════════════════════════════════════\n"
-                f"• User ID ៖ <code>{chat_id}</code>\n"
-                f"• ឈ្មោះ ៖ <b>{f_name}</b> ({u_name})\n"
-                f"• ស្ថានភាព ៖ <b>កំពុងរង់ចាំការអនុម័តពី Admin (Pending Approval)</b>\n"
-                f"══════════════════════════════════════\n"
-                f"Admin នឹងពិនិត្យ និងអនុម័តជូនលោកអ្នកភ្លាមៗ 1-Click។ សូមរង់ចាំការជូនដំណឹង!"
-            )
-
-            admins = db.get_all_admins()
-            now_utc = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            admin_card = (
-                f"👑 <b>[ANGKOR QUANT - សំណើសុំ VIP LICENSE ថ្មី]</b> 🏛️\n"
-                f"══════════════════════════════════════\n"
-                f"👤 <b>អ្នកប្រើប្រាស់ (User) ៖</b> {u_name} ({f_name})\n"
-                f"🆔 <b>Telegram ID ៖</b> <code>{chat_id}</code>\n"
-                f"📅 <b>ពេលវេលាស្នើសុំ ៖</b> <code>{now_utc} UTC</code>\n"
-                f"══════════════════════════════════════\n"
-                f"👇 <i>សូមជ្រើសរើសកញ្ចប់ License (ចុច 1-Click ដើម្បីអនុម័តភ្លាមៗ) ៖</i>"
-            )
-            approval_kb = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🟢 Monthly (30 ថ្ងៃ)", callback_data=f"lic_app:month:{chat_id}"),
-                    InlineKeyboardButton("💎 Yearly (365 ថ្ងៃ)", callback_data=f"lic_app:year:{chat_id}")
-                ],
-                [
-                    InlineKeyboardButton("👑 Lifetime VIP", callback_data=f"lic_app:life:{chat_id}"),
-                    InlineKeyboardButton("❌ បដិសេធ (Reject)", callback_data=f"lic_app:rej:{chat_id}")
-                ]
-            ])
-            for adm_id in admins:
-                try:
-                    await context.bot.send_message(
-                        chat_id=adm_id,
-                        text=admin_card,
-                        parse_mode="HTML",
-                        reply_markup=approval_kb
-                    )
-                except Exception as e_adm:
-                    logger.warning(f"Could not deliver license request to admin {adm_id}: {e_adm}")
+            await self._trigger_vip_license_request(update, context, chat_id)
 
         elif data.startswith("lic_app:"):
             parts = data.split(":")
@@ -2865,6 +2957,39 @@ class QuantGoldBot:
             except Exception:
                 pass
             await self.handle_capital_api(update, context, [])
+
+        elif data == "btn_qgold_lockdown":
+            if not self.citadel.is_super_admin(chat_id):
+                return await query.answer("⛔ Super Admin only!", show_alert=True)
+            self.citadel.trigger_emergency_lockdown(chat_id, "SUPER_ADMIN_MANUAL_LOCKDOWN")
+            await query.answer("🚨 EMERGENCY LOCKDOWN ENGAGED!", show_alert=True)
+            diag = self.get_vps_diagnostics()
+            text, kb = await self.bridge.build_super_admin_start_card(chat_id, diag=diag)
+            await self.safe_edit(query, text, reply_markup=kb)
+
+        elif data == "btn_qgold_unlock":
+            if not self.citadel.is_super_admin(chat_id):
+                return await query.answer("⛔ Super Admin only!", show_alert=True)
+            self.citadel.release_emergency_lockdown(chat_id)
+            await query.answer("🟢 TRADING UNLOCKED!", show_alert=True)
+            diag = self.get_vps_diagnostics()
+            text, kb = await self.bridge.build_super_admin_start_card(chat_id, diag=diag)
+            await self.safe_edit(query, text, reply_markup=kb)
+
+        elif data in [
+            "btn_agree_terms", "btn_about_accept", "btn_download_my_pdf", "btn_preview_terms_pdf",
+            "btn_admin_agreements", "btn_about_menu", "btn_about_terms", "btn_about_risk",
+            "btn_about_mt5", "btn_about_liability", "btn_about_privacy", "btn_about_en"
+        ] or data.startswith("btn_admin_agr_page_") or data.startswith("btn_admin_dl_pdf_"):
+            import legal_agreement
+            await legal_agreement.handle_agreement_callback(update, context, data, chat_id)
+
+        elif data in ["btn_menu_refresh", "btn_menu_home"]:
+            try:
+                await query.answer("🔄 Refreshing...")
+            except Exception:
+                pass
+            await self.handle_start(update, context)
 
     async def handle_text_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handles clicks from the bottom persistent keyboard."""
