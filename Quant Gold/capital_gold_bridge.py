@@ -162,24 +162,62 @@ class QuantGoldCapitalBridge:
 
         return text, kb
 
-    def build_vip_referral_required_card(self, chat_id: int) -> str:
-        """Renders an institutional VIP onboarding card for unverified users (Invariant 36)."""
-        ref_link = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+    def build_vip_license_required_card(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
+        """Renders an institutional VIP License onboarding card for unlicensed users."""
         card = (
-            f"🛡️ <b>[ANGKOR QUANT - VIP CAPITAL.COM ACCESS GATEWAY]</b> 🏛️\n"
+            f"👑 <b>[ANGKOR QUANT - VIP LICENSE REQUIRED]</b> 🏛️\n"
             f"{ui_standards.DIVIDER_HEAVY}\n"
-            f"ℹ️ <b>សេចក្តីជូនដំណឹងសុវត្ថិភាព (Invariant 36) ៖</b>\n"
-            f"ដើម្បីធានាសុវត្ថិភាពគណនី និងអនុលោមភាពស្ថាប័ន ការជួញដូរផ្ទាល់ (Live 1-Tap & Auto Trading) "
-            f"តម្រូវឱ្យមានការភ្ជាប់គណនី Capital.com ដែលបានផ្ទៀងផ្ទាត់ (Referral Verified) "
-            f"ឬមាន API Credentials ផ្ទាល់ខ្លួន។\n\n"
-            f"📝 <b>របៀបបើកដំណើរការ ៖</b>\n"
-            f"1. បង្កើតគណនី Capital.com តាម Link ផ្លូវការ ៖ <a href='{ref_link}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
-            f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin តាមរយៈ @soknitha_support ដើម្បីផ្ទៀងផ្ទាត់\n"
-            f"3. ឬបញ្ចូល API Credentials ផ្ទាល់ខ្លួនតាមរយៈ Main Bot (/capital)\n"
+            f"ℹ️ <b>សេចក្តីជូនដំណឹងសិទ្ធិប្រើប្រាស់ (VIP Governance) ៖</b>\n"
+            f"ប្រព័ន្ធជួញដូរស្វ័យប្រវត្ត Quant Gold 24/7 Apex Engine ដំណើរការសម្រាប់តែ VIP Users "
+            f"ដែលមាន License ត្រឹមត្រូវប៉ុណ្ណោះ។\n\n"
+            f"✨ <b>អត្ថប្រយោជន៍ VIP Member ៖</b>\n"
+            f"• 19-Timeframe Master Signal វិភាគតម្លៃមាស Real-Time\n"
+            f"• 1-Tap BUY / SELL ជាមួយ Breakeven Armor (0.00R Free-Roll Risk)\n"
+            f"• ដំណើរការជួញដូរស្វ័យប្រវត្ត 24/7/365 Auto-Trade លើ Capital.com\n"
+            f"• Fiduciary Protection Shields ការពារដើមទុន ១០០%\n"
             f"{ui_standards.DIVIDER_LIGHT}\n"
-            f"💡 <i>លោកអាចមើល Signal វិភាគ 19 Timeframes (/signal) និងពិនិត្យតម្លៃមាស Real-Time (/status) បានដោយសេរី!</i>"
+            f"👇 <i>សូមចុចប៊ូតុងខាងក្រោមដើម្បីស្នើសុំ VIP License 1-Click ទៅកាន់ Admin ៖</i>"
         )
-        return card
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👑 ស្នើសុំ VIP License (Request License)", callback_data="btn_qgold_req_license")],
+            [InlineKeyboardButton("📞 ទំនាក់ទំនង Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+        ])
+        return card, kb
+
+    def build_vip_referral_required_card(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
+        """Renders an institutional VIP onboarding card for unverified Capital.com users (Invariant 36)."""
+        ref_link = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+        dossier = db.get_user_license_details(chat_id)
+        tier_lbl = dossier.get("tier_label", "ACTIVE VIP")
+        card = (
+            f"🛡️ <b>[ANGKOR QUANT - CAPITAL.COM REGISTRATION REQUIRED]</b> 🏛️\n"
+            f"{ui_standards.DIVIDER_HEAVY}\n"
+            f"👑 <b>ស្ថានភាព VIP License ៖</b> <code>{tier_lbl}</code>\n"
+            f"⚠️ <b>ស្ថានភាព Capital.com ៖</b> 🔴 <b>មិនទាន់ភ្ជាប់ (Registration Required)</b>\n\n"
+            f"ℹ️ <b>លក្ខខណ្ឌកាតព្វកិច្ចជួញដូរ (Invariant 36) ៖</b>\n"
+            f"លោកអ្នកមាន VIP License រួចហើយ! ប៉ុន្តែដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap & Auto Trading) "
+            f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com តាមរយៈ Partner Link ផ្លូវការ "
+            f"ដើម្បីឱ្យប្រព័ន្ធ AI អាចបញ្ជូន Order ទៅកាន់ Broker បាន។\n\n"
+            f"📝 <b>ជំហានងាយៗទាំង ២ ៖</b>\n"
+            f"1. បង្កើតគណនី Capital.com តាម Link ផ្លូវការ ៖ <a href='{ref_link}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
+            f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីភ្ជាប់ភ្លាមៗ!\n"
+            f"   <i>(ឬបញ្ចូល API Credentials ផ្ទាល់ខ្លួនតាមរយៈ Main Bot /capital)</i>\n"
+            f"{ui_standards.DIVIDER_LIGHT}\n"
+            f"💡 <i>លោកអ្នកនៅតែអាចមើល Signal 19 Timeframes (/signal) និងពិនិត្យតម្លៃមាស (/status) បានដោយសេរី!</i>"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ (Register)", url=ref_link)],
+            [InlineKeyboardButton("📞 ផ្ញើ Account ID ទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")],
+            [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
+        ])
+        return card, kb
+
+    def get_authorization_gate_card(self, chat_id: int, reason: str = "") -> Tuple[str, InlineKeyboardMarkup]:
+        """Routes to either VIP License Required Card or Capital.com Registration Card based on auth reason."""
+        if reason == "UNLICENSED_ACCESS":
+            return self.build_vip_license_required_card(chat_id)
+        else:
+            return self.build_vip_referral_required_card(chat_id)
 
     async def _safe_send(self, update: Update, text: str, reply_markup=None, parse_mode="HTML"):
         """Sends a telegram message safely with HTML, falling back to plain text if needed."""
@@ -239,9 +277,10 @@ class QuantGoldCapitalBridge:
                 return True
 
             # 2. VIP Authorization Gatekeeper check (Invariant 36)
-            auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+            auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
             if not auth_ok:
-                await self._safe_send(update, self.build_vip_referral_required_card(chat_id))
+                card, kb = self.get_authorization_gate_card(chat_id, reason)
+                await self._safe_send(update, card, reply_markup=kb)
                 return True
 
             # 3. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
@@ -308,9 +347,10 @@ class QuantGoldCapitalBridge:
                 return True
 
             # 2. VIP Authorization Gatekeeper check (Invariant 36)
-            auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+            auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
             if not auth_ok:
-                await self._safe_send(update, self.build_vip_referral_required_card(chat_id))
+                card, kb = self.get_authorization_gate_card(chat_id, reason)
+                await self._safe_send(update, card, reply_markup=kb)
                 return True
             db.set_capital_auto_config(chat_id=chat_id, enabled=True, budget=300.0, max_positions=5, is_demo=False)
             await self._safe_send(

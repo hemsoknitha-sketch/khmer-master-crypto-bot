@@ -128,26 +128,45 @@ class QuantGoldSecurityCitadel:
 
     def is_user_authorized_for_trading(self, user_id: int) -> Tuple[bool, str]:
         """
-        Enforces Fiduciary VIP Referral & Access Gatekeeper (Invariant 36).
-        Returns: (is_authorized, reason)
+        Enforces Fiduciary VIP License & Capital.com Registration Gatekeeper (Invariant 36 & AQ84):
+        1. Super Admin is 100% exempt and permanently authorized (SUPER_ADMIN_AUTHORITY).
+        2. Gate 1: VIP License Gate:
+           User MUST have an active unexpired VIP license (Monthly, Yearly, or Lifetime).
+           If not VIP -> Returns (False, "UNLICENSED_ACCESS").
+        3. Gate 2: Capital.com Registration Gate:
+           User IS VIP licensed, but MUST have registered Capital.com via official partner link
+           or connected valid API credentials to execute live algorithmic orders.
+           If not registered -> Returns (False, "AWAITING_CAPITAL_REGISTRATION").
+        4. When both gates pass:
+           Returns (True, "VIP_LICENSED_AND_REGISTERED").
         """
         if self.is_super_admin(user_id):
             return True, "SUPER_ADMIN_AUTHORITY"
 
         import database as db
         try:
-            creds = db.get_user_capital_credentials(user_id)
-            raw_key = (creds.get("api_key") or "").strip() if creds else ""
-            if raw_key and raw_key != "ENV_VAULT":
-                return True, "VIP_API_CREDENTIALS"
+            # Gate 1: Check active VIP license
+            if not db.is_vip(user_id):
+                return False, "UNLICENSED_ACCESS"
 
-            is_verified = db.is_capital_user_referral_verified(user_id)
-            if is_verified:
-                return True, "VIP_REFERRAL_VERIFIED"
+            # Gate 2: Check Capital.com Registration
+            creds = db.get_user_capital_credentials(user_id)
+            if creds:
+                raw_key = (creds.get("api_key") or "").strip()
+                acc_id = (creds.get("account_id") or "").strip()
+                if raw_key and raw_key != "ENV_VAULT" and acc_id and acc_id != "N/A":
+                    return True, "VIP_LICENSED_AND_REGISTERED"
+
+            if db.is_capital_user_authorized(user_id):
+                return True, "VIP_LICENSED_AND_REGISTERED"
+
+            if db.is_capital_user_referral_verified(user_id):
+                return True, "VIP_LICENSED_AND_REGISTERED"
+
+            return False, "AWAITING_CAPITAL_REGISTRATION"
         except Exception as e:
             logger.warning(f"Error checking user authorization for {user_id}: {e}")
-
-        return False, "AWAITING_REFERRAL_VERIFICATION"
+            return False, "AWAITING_CAPITAL_REGISTRATION"
 
     # --------------------------------------------------------------------------
     # 3. Input Sanitization & Sizing Invalidation Guard

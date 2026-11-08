@@ -1548,6 +1548,15 @@ def set_user_license(chat_id: int, duration_str: str):
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # Ensure user exists in users table first
+    cursor.execute("SELECT chat_id FROM users WHERE chat_id = ?", (chat_id,))
+    if not cursor.fetchone():
+        now_init = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            "INSERT INTO users (chat_id, is_vip, joined_at) VALUES (?, 0, ?)",
+            (chat_id, now_init)
+        )
+    
     if duration_str == "Revoke VIP":
         cursor.execute("UPDATE users SET is_vip = 0, license_expiry = NULL WHERE chat_id = ?", (chat_id,))
     elif duration_str == "Lifetime":
@@ -1572,6 +1581,265 @@ def set_user_license(chat_id: int, duration_str: str):
         
     conn.commit()
     conn.close()
+
+
+def grant_vip_license(chat_id: int, tier: str, granted_by: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Super Smart VIP License Dispenser (AQ84):
+    Grants or revokes VIP license with instant 1-click execution.
+    Tiers supported:
+      - 'MONTH' / 'MONTHLY' / '30D': 30 days
+      - 'YEAR' / 'YEARLY' / '365D': 365 days
+      - 'LIFETIME' / 'LIFE': 'lifetime'
+      - 'REVOKE' / 'CANCEL': is_vip=0, license_expiry=NULL
+    """
+    cache_delete(f"vip_{chat_id}")
+    cache_delete(f"admin_{chat_id}")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    tier_upper = str(tier).strip().upper()
+    now = datetime.now()
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    
+    expiry_val = None
+    is_vip_val = 1
+    tier_title = "LIFETIME VIP"
+    
+    if tier_upper in ["MONTH", "MONTHLY", "30D", "30_DAYS"]:
+        expiry_dt = now + timedelta(days=30)
+        expiry_val = expiry_dt.strftime("%Y-%m-%d %H:%M:%S")
+        tier_title = "Monthly License (30 ថ្ងៃ)"
+    elif tier_upper in ["YEAR", "YEARLY", "365D", "1_YEAR"]:
+        expiry_dt = now + timedelta(days=365)
+        expiry_val = expiry_dt.strftime("%Y-%m-%d %H:%M:%S")
+        tier_title = "Yearly License (365 ថ្ងៃ)"
+    elif tier_upper in ["LIFETIME", "LIFE", "PERMANENT"]:
+        expiry_val = "lifetime"
+        tier_title = "Lifetime VIP License"
+    elif tier_upper in ["REVOKE", "CANCEL", "REJECT", "0"]:
+        is_vip_val = 0
+        expiry_val = None
+        tier_title = "REVOKED"
+    else:
+        expiry_dt = now + timedelta(days=30)
+        expiry_val = expiry_dt.strftime("%Y-%m-%d %H:%M:%S")
+        tier_title = "Monthly License (30 ថ្ងៃ)"
+        
+    cursor.execute("SELECT chat_id FROM users WHERE chat_id = ?", (chat_id,))
+    if cursor.fetchone():
+        cursor.execute(
+            "UPDATE users SET is_vip = ?, license_expiry = ? WHERE chat_id = ?",
+            (is_vip_val, expiry_val, chat_id)
+        )
+    else:
+        cursor.execute(
+            "INSERT INTO users (chat_id, is_vip, license_expiry, joined_at) VALUES (?, ?, ?, ?)",
+            (chat_id, is_vip_val, expiry_val, now_str)
+        )
+        
+    conn.commit()
+    conn.close()
+    
+    cache_delete(f"vip_{chat_id}")
+    cache_delete(f"admin_{chat_id}")
+    
+    return {
+        "chat_id": chat_id,
+        "is_vip": bool(is_vip_val),
+        "tier": tier_upper,
+        "tier_title": tier_title,
+        "expiry": expiry_val or "REVOKED",
+        "granted_by": granted_by,
+        "timestamp": now_str
+    }
+
+
+def get_user_license_details(chat_id: int) -> Dict[str, Any]:
+    """
+    Returns full institutional VIP license & Capital.com registration dossier for a user.
+    """
+    is_super_adm = (chat_id in [859271875, 537186806]) or is_admin(chat_id)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_vip, license_expiry, joined_at FROM users WHERE chat_id = ?", (chat_id,))
+    row = cursor.fetchone()
+    
+    # Capital credentials check
+    cursor.execute("SELECT account_id, is_referral_verified, is_demo FROM user_capital_credentials WHERE chat_id = ?", (chat_id,))
+    cred_row = cursor.fetchone()
+    conn.close()
+    
+    is_vip_flag = bool(row[0]) if row else is_super_adm
+    raw_exp = row[1] if row else ("Administrator" if is_super_adm else None)
+    joined_at = row[2] if row else "N/A"
+    
+    has_capital = bool(cred_row is not None)
+    capital_acc_id = cred_row[0] if cred_row else None
+    is_ref_verified = bool(cred_row[1]) if cred_row else False
+    is_demo = bool(cred_row[2]) if cred_row else False
+    
+    # Determine license status & validity
+    is_active = False
+    tier_label = "UNLICENSED (គ្មាន License)"
+    days_remaining = None
+    
+    if is_super_adm:
+        is_active = True
+        is_vip_flag = True
+        tier_label = "👑 SUPER ADMIN (LIFETIME)"
+    elif is_vip_flag:
+        if raw_exp in ["lifetime", "Administrator"]:
+            is_active = True
+            tier_label = "👑 LIFETIME VIP (គ្មានដែនកំណត់)"
+        elif raw_exp:
+            try:
+                exp_dt = datetime.strptime(raw_exp, "%Y-%m-%d %H:%M:%S")
+                now = datetime.now()
+                if exp_dt > now:
+                    is_active = True
+                    delta = exp_dt - now
+                    days_remaining = max(1, delta.days)
+                    tier_label = f"🟢 ACTIVE ({days_remaining} ថ្ងៃនៅសល់)"
+                else:
+                    is_active = False
+                    tier_label = "🔴 EXPIRED (ផុតកំណត់)"
+            except Exception:
+                is_active = False
+                tier_label = "🔴 EXPIRED"
+        else:
+            is_active = False
+            tier_label = "⚪ PENDING APPROVAL"
+            
+    return {
+        "chat_id": chat_id,
+        "is_admin": is_super_adm,
+        "is_vip": is_active,
+        "tier_label": tier_label,
+        "raw_expiry": raw_exp,
+        "days_remaining": days_remaining,
+        "has_capital_credentials": has_capital,
+        "capital_account_id": capital_acc_id,
+        "is_referral_verified": is_ref_verified,
+        "is_demo": is_demo,
+        "joined_at": joined_at
+    }
+
+
+def restore_and_prune_vip_licenses() -> Dict[str, Any]:
+    """
+    Institutional VIP License Governance & Database Pruning Standard (AQ84):
+    1. Restores and permanently locks all Super Admins, users with Capital.com credentials,
+       users with active Capital.com configurations, and existing lifetime VIP users to 'lifetime' license.
+    2. Completely purges/deletes all non-licensed, non-registered orphan test users from the database.
+    3. Flushes in-memory auth caches to guarantee immediate zero-friction execution.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    restored_lifetime = []
+    purged_unlicensed = []
+    retained_licensed = []
+    
+    try:
+        super_admins = [859271875, 537186806]
+        
+        # B. Users with Capital credentials
+        cursor.execute("SELECT DISTINCT chat_id FROM user_capital_credentials WHERE chat_id IS NOT NULL")
+        capital_cred_users = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        # C. Users with Capital auto configuration
+        cursor.execute("SELECT DISTINCT chat_id FROM capital_auto_config WHERE chat_id IS NOT NULL")
+        capital_auto_users = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        # Combine all protected Lifetime users
+        lifetime_candidates = set(super_admins + capital_cred_users + capital_auto_users)
+        
+        # Check existing VIP users in users table who had lifetime or Administrator or is_vip=1
+        cursor.execute("SELECT chat_id, is_vip, license_expiry FROM users WHERE is_vip = 1")
+        for cid, iv, lexp in cursor.fetchall():
+            if cid:
+                lifetime_candidates.add(cid)
+                
+        # Ensure every lifetime candidate exists in users and is locked to 'lifetime'
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for cid in lifetime_candidates:
+            if not cid or cid <= 0:
+                continue
+            cursor.execute("SELECT chat_id, is_vip, license_expiry FROM users WHERE chat_id = ?", (cid,))
+            row = cursor.fetchone()
+            target_exp = 'Administrator' if cid in super_admins else 'lifetime'
+            if not row:
+                cursor.execute(
+                    "INSERT INTO users (chat_id, is_vip, license_expiry, joined_at) VALUES (?, 1, ?, ?)",
+                    (cid, target_exp, now_str)
+                )
+                restored_lifetime.append(cid)
+            else:
+                curr_vip, curr_exp = row[1], row[2]
+                if curr_vip != 1 or (curr_exp != target_exp and curr_exp != 'Administrator'):
+                    cursor.execute(
+                        "UPDATE users SET is_vip = 1, license_expiry = ? WHERE chat_id = ?",
+                        (target_exp, cid)
+                    )
+                    restored_lifetime.append(cid)
+                else:
+                    retained_licensed.append(cid)
+                    
+            cache_delete(f"vip_{cid}")
+            cache_delete(f"admin_{cid}")
+            
+        # Step 3: Find users with valid unexpired time-limited licenses (Monthly / Yearly)
+        placeholders = ",".join("?" * len(lifetime_candidates)) if lifetime_candidates else "0"
+        cursor.execute(
+            f"SELECT chat_id, license_expiry FROM users WHERE is_vip = 1 AND chat_id NOT IN ({placeholders})",
+            list(lifetime_candidates)
+        )
+        
+        unexpired_timed_users = set()
+        for cid, lexp in cursor.fetchall():
+            if not lexp:
+                continue
+            try:
+                exp_dt = datetime.strptime(lexp, "%Y-%m-%d %H:%M:%S")
+                if exp_dt > datetime.now():
+                    unexpired_timed_users.add(cid)
+                    retained_licensed.append(cid)
+            except Exception:
+                pass
+                
+        all_protected_users = lifetime_candidates.union(unexpired_timed_users)
+        
+        # Step 4: Identify and prune all non-licensed, non-registered orphan users
+        cursor.execute("SELECT chat_id FROM users")
+        all_user_ids = [r[0] for r in cursor.fetchall()]
+        
+        for cid in all_user_ids:
+            if cid not in all_protected_users:
+                cursor.execute("DELETE FROM users WHERE chat_id = ?", (cid,))
+                purged_unlicensed.append(cid)
+                cache_delete(f"vip_{cid}")
+                cache_delete(f"admin_{cid}")
+                
+        conn.commit()
+    except Exception as e:
+        print(f"Error during restore_and_prune_vip_licenses: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        conn.close()
+        
+    return {
+        "restored_lifetime": restored_lifetime,
+        "retained_licensed": retained_licensed,
+        "purged_unlicensed": purged_unlicensed,
+        "total_licensed": len(retained_licensed) + len(restored_lifetime),
+        "total_purged": len(purged_unlicensed)
+    }
+
 
 def get_all_users_with_lang():
     """Returns a list of all users and their preferred language."""
@@ -4926,6 +5194,11 @@ def is_capital_user_authorized(chat_id: int) -> bool:
         except Exception:
             pass
         return False
+
+def is_capital_user_referral_verified(chat_id: int) -> bool:
+    """Institutional Capital.com Referral Verification Check (alias for is_capital_user_authorized)."""
+    return is_capital_user_authorized(chat_id)
+
 
 def set_capital_user_referral_status(
     chat_id: int,

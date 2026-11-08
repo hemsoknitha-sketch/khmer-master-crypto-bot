@@ -72,7 +72,7 @@ def get_quant_gold_bottom_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
             [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
             [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)")],
-            [KeyboardButton("💵 Status"), KeyboardButton("🖥️ Health"), KeyboardButton("📖 Help")]
+            [KeyboardButton("💵 Status"), KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")]
         ],
         resize_keyboard=True,
         is_persistent=True
@@ -91,6 +91,16 @@ class QuantGoldBot:
         self.citadel = get_quant_gold_security_citadel()
         self.app = None
 
+        # Institutional VIP License Governance & Database Pruning (AQ84)
+        try:
+            prune_res = db.restore_and_prune_vip_licenses()
+            logger.info(
+                f"🛡️ [VIP LICENSING] Database sync: {prune_res['total_licensed']} active licensed, "
+                f"{prune_res['total_purged']} unlicensed purged."
+            )
+        except Exception as e_prune:
+            logger.warning(f"VIP license auto-prune notice: {e_prune}")
+
     def build_application(self):
         """Builds and configures the pure Quant Gold telegram application."""
         async def post_init(application):
@@ -98,6 +108,7 @@ class QuantGoldBot:
             commands = [
                 BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
                 BotCommand("signal", "🎯 View Current Super Smart Gold Signal & Levels"),
+                BotCommand("license", "👑 View VIP License & Capital.com Status"),
                 BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
                 BotCommand("gold", "📈 Gold Real-Time Intelligence & Analysis"),
                 BotCommand("scan", "🔄 Refresh 19-Timeframe Confluence Scan"),
@@ -140,6 +151,7 @@ class QuantGoldBot:
                 # Set dedicated Admin commands for Super Admin scope
                 admin_commands = list(commands) + [
                     BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
+                    BotCommand("admin_license", "👑 VIP License Approvals & Database Pruning"),
                     BotCommand("emergency_stop", "🚨 Super Admin Emergency Trading Freeze"),
                     BotCommand("unlock", "🟢 Super Admin Release Trading Freeze")
                 ]
@@ -179,6 +191,9 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("admin_capital", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admin_gold", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admincapital", self.handle_admin_capital))
+        self.app.add_handler(CommandHandler("admin_license", self.handle_admin_license))
+        self.app.add_handler(CommandHandler("adminlicense", self.handle_admin_license))
+        self.app.add_handler(CommandHandler("license", self.handle_license))
         self.app.add_handler(CommandHandler("scan", self.handle_start))
         self.app.add_handler(CommandHandler("buy", self.handle_buy))
         self.app.add_handler(CommandHandler("sell", self.handle_sell))
@@ -405,6 +420,12 @@ class QuantGoldBot:
                             user_budget = float(args[2])
                         except ValueError:
                             pass
+
+            if not is_admin:
+                auth_ok, reason = self.citadel.is_user_authorized_for_trading(target_chat_id)
+                if not auth_ok:
+                    card, kb = self.bridge.get_authorization_gate_card(target_chat_id, reason)
+                    return await self.safe_reply(update, card, reply_markup=kb)
 
             auto_cfg = db.get_capital_auto_config(target_chat_id) or {}
             cur_b = auto_cfg.get("budget", 50.0)
@@ -740,6 +761,193 @@ class QuantGoldBot:
         )
         await self.safe_reply(update, msg, reply_markup=get_gold_signal_reply_markup())
 
+    async def handle_license(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Displays the user's personal VIP license status and Capital.com registration status."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+        if not allowed:
+            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        dossier = db.get_user_license_details(chat_id)
+        ref_link = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+
+        status_cap = "🟢 VERIFIED / CONNECTED" if dossier["has_capital_credentials"] or dossier["is_referral_verified"] else "🔴 NOT REGISTERED (Required)"
+
+        card = (
+            f"👑 <b>[ANGKOR QUANT - ព័ត៌មាន VIP LICENSE របស់អ្នក]</b> 🥇\n"
+            f"══════════════════════════════════════\n"
+            f"🆔 <b>Telegram ID ៖</b> <code>{chat_id}</code>\n"
+            f"👑 <b>ស្ថានភាព License ៖</b> <b>{dossier['tier_label']}</b>\n"
+            f"📅 <b>កាលបរិច្ឆេទផុតកំណត់ ៖</b> <code>{dossier['raw_expiry'] or 'គ្មាន (None)'}</code>\n"
+            f"🏛️ <b>គណនី Capital.com ៖</b> <code>{status_cap}</code>\n"
+        )
+        if dossier.get("capital_account_id"):
+            card += f"• Account ID ៖ <code>{dossier['capital_account_id']}</code>\n"
+
+        card += (
+            f"══════════════════════════════════════\n"
+            f"💡 <i>ប្រសិនបើមានចម្ងល់ ឬត្រូវការជំនួយ សូមទាក់ទងមកកាន់ @soknitha_support</i>"
+        )
+
+        buttons = []
+        if not dossier["is_vip"]:
+            buttons.append([InlineKeyboardButton("👑 ស្នើសុំ VIP License (Request License)", callback_data="btn_qgold_req_license")])
+        if not (dossier["has_capital_credentials"] or dossier["is_referral_verified"]):
+            buttons.append([InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_link)])
+
+        buttons.append([InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_qgold_recheck_auth")])
+        kb = InlineKeyboardMarkup(buttons)
+        await self.safe_reply(update, card, reply_markup=kb)
+
+    async def handle_admin_license(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Institutional Super Admin VIP License Manager & Database Pruning Standard (AQ84)."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not self.citadel.is_super_admin(chat_id):
+            return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
+
+        args = context.args if context and context.args else []
+        if not args:
+            users = db.get_all_users()
+            total_u = len(users)
+            vip_u = [u for u in users if u[2] == 1]
+            life_u = [u for u in vip_u if u[4] in ['lifetime', 'Administrator']]
+            timed_u = [u for u in vip_u if u[4] not in ['lifetime', 'Administrator']]
+
+            conn = db.get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT COUNT(DISTINCT chat_id) FROM user_capital_credentials WHERE chat_id IS NOT NULL")
+            cap_reg_count = c.fetchone()[0]
+            conn.close()
+
+            card = (
+                f"👑 <b>[ANGKOR QUANT - VIP LICENSING SYSTEM OVERVIEW]</b> 🏛️\n"
+                f"══════════════════════════════════════\n"
+                f"👥 <b>សរុបអ្នកប្រើប្រាស់ (Total Users) ៖</b> <code>{total_u} នាក់</code>\n"
+                f"👑 <b>VIP Licenses សកម្ម ៖</b> <code>{len(vip_u)} នាក់</code>\n"
+                f"💎 <b>Lifetime VIPs ៖</b> <code>{len(life_u)} នាក់</code>\n"
+                f"🟢 <b>Timed Licenses (Month/Year) ៖</b> <code>{len(timed_u)} នាក់</code>\n"
+                f"🏛️ <b>គណនី Capital.com ភ្ជាប់រួច ៖</b> <code>{cap_reg_count} នាក់</code>\n"
+                f"══════════════════════════════════════\n"
+                f"🛠️ <b>ពាក្យបញ្ជាបញ្ជាការ (Admin Commands) ៖</b>\n"
+                f"• <code>/admin_license &lt;chat_id&gt; month</code> (ផ្តល់ 30 ថ្ងៃ)\n"
+                f"• <code>/admin_license &lt;chat_id&gt; year</code> (ផ្តល់ 365 ថ្ងៃ)\n"
+                f"• <code>/admin_license &lt;chat_id&gt; lifetime</code> (ផ្តល់ Lifetime)\n"
+                f"• <code>/admin_license &lt;chat_id&gt; revoke</code> (ដកហូត VIP)\n"
+                f"• <code>/admin_license prune</code> (លុប User គ្មាន License ចោល)\n"
+                f"• <code>/admin_license restore</code> (ស្តារ Lifetime VIPs ទាំងអស់)\n"
+                f"• <code>/admin_license inspect &lt;chat_id&gt;</code> (ពិនិត្យព័ត៌មាន User)\n"
+                f"══════════════════════════════════════"
+            )
+            return await self.safe_reply(update, card)
+
+        action = str(args[0]).lower().strip()
+
+        if action in ["prune", "clean", "cleanup"]:
+            res = db.restore_and_prune_vip_licenses()
+            card = (
+                f"🧹 <b>[DATABASE PRUNING & RESTORATION COMPLETE]</b> ✅\n"
+                f"══════════════════════════════════════\n"
+                f"👑 <b>Lifetime VIPs បានស្តារឡើងវិញ ៖</b> <code>{len(res['restored_lifetime'])} នាក់</code>\n"
+                f"🟢 <b>VIP Licenses បានរក្សាទុក ៖</b> <code>{len(res['retained_licensed'])} នាក់</code>\n"
+                f"🗑️ <b>User គ្មាន License ត្រូវបានលុបចេញ ៖</b> <code>{len(res['purged_unlicensed'])} នាក់</code>\n"
+                f"📊 <b>សរុប VIP Users ដែលមានសុពលភាព ៖</b> <code>{res['total_licensed']} នាក់</code>\n"
+                f"══════════════════════════════════════\n"
+                f"🛡️ <i>ទិន្នន័យត្រូវបានសម្អាត និងធ្វើសមកាលកម្មរួចរាល់ 100%!</i>"
+            )
+            return await self.safe_reply(update, card)
+
+        elif action in ["restore", "sync"]:
+            res = db.restore_and_prune_vip_licenses()
+            card = (
+                f"💎 <b>[LIFETIME VIP RESTORATION COMPLETE]</b> ✅\n"
+                f"══════════════════════════════════════\n"
+                f"👑 រាល់ Administrator, គណនី Capital.com និង VIP Users ចាស់ៗ "
+                f"ត្រូវបានស្តារ និងចាក់សោរជា <b>Lifetime VIP</b> រួចរាល់ចំនួន <code>{res['total_licensed']} នាក់</code>!\n"
+                f"══════════════════════════════════════"
+            )
+            return await self.safe_reply(update, card)
+
+        elif action == "inspect" and len(args) > 1:
+            try:
+                t_cid = int(args[1])
+            except ValueError:
+                return await self.safe_reply(update, "⚠️ <i>សូមបញ្ចូល Chat ID ជាលេខត្រឹមត្រូវ។</i>")
+            dossier = db.get_user_license_details(t_cid)
+            card = (
+                f"🔍 <b>[USER DOSSIER INSPECTION]</b>\n"
+                f"══════════════════════════════════════\n"
+                f"• Chat ID ៖ <code>{dossier['chat_id']}</code>\n"
+                f"• VIP Status ៖ <b>{'🟢 ACTIVE' if dossier['is_vip'] else '🔴 INACTIVE'}</b>\n"
+                f"• License Tier ៖ <code>{dossier['tier_label']}</code>\n"
+                f"• Expiry ៖ <code>{dossier['raw_expiry'] or 'None'}</code>\n"
+                f"• Capital.com Credentials ៖ <code>{'YES' if dossier['has_capital_credentials'] else 'NO'}</code>\n"
+                f"• Referral Verified ៖ <code>{'YES' if dossier['is_referral_verified'] else 'NO'}</code>\n"
+                f"• Account ID ៖ <code>{dossier['capital_account_id'] or 'None'}</code>\n"
+                f"• Joined At ៖ <code>{dossier['joined_at']}</code>\n"
+                f"══════════════════════════════════════"
+            )
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🟢 Monthly (30d)", callback_data=f"lic_app:month:{t_cid}"),
+                    InlineKeyboardButton("💎 Yearly (365d)", callback_data=f"lic_app:year:{t_cid}")
+                ],
+                [
+                    InlineKeyboardButton("👑 Lifetime VIP", callback_data=f"lic_app:life:{t_cid}"),
+                    InlineKeyboardButton("❌ Revoke VIP", callback_data=f"lic_app:rej:{t_cid}")
+                ]
+            ])
+            return await self.safe_reply(update, card, reply_markup=kb)
+
+        # Direct assignment: /admin_license <chat_id> <tier>
+        try:
+            target_cid = int(args[0])
+            tier_arg = str(args[1]).lower() if len(args) > 1 else "lifetime"
+        except (ValueError, IndexError):
+            return await self.safe_reply(update, "⚠️ <i>ទម្រង់មិនត្រឹមត្រូវ ៖ <code>/admin_license &lt;chat_id&gt; [month|year|lifetime|revoke]</code></i>")
+
+        res = db.grant_vip_license(target_cid, tier_arg, granted_by=chat_id)
+        tier_title = res.get("tier_title", tier_arg)
+        expiry_str = res.get("expiry", "N/A")
+
+        card = (
+            f"✅ <b>[VIP LICENSE GRANTED SUCCESSFULLY]</b> 👑\n"
+            f"══════════════════════════════════════\n"
+            f"👤 <b>Target Chat ID ៖</b> <code>{target_cid}</code>\n"
+            f"👑 <b>កញ្ចប់ (Tier) ៖</b> <b>{tier_title}</b>\n"
+            f"📅 <b>សុពលភាព ៖</b> <code>{expiry_str}</code>\n"
+            f"👮‍♂️ <b>អនុម័តដោយ ៖</b> Super Admin #{chat_id}\n"
+            f"══════════════════════════════════════"
+        )
+        await self.safe_reply(update, card)
+
+        # Notify user as well
+        ref_url = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+        if tier_arg != "revoke":
+            user_card = (
+                f"🎉 <b>[សូមអបអរសាទរ! លោកអ្នកទទួលបាន VIP LICENSE ជោគជ័យ]</b> 👑\n"
+                f"══════════════════════════════════════\n"
+                f"👑 <b>កញ្ចប់ VIP (Tier) ៖</b> <b>{tier_title}</b>\n"
+                f"📅 <b>កាលបរិច្ឆេទផុតកំណត់ ៖</b> <code>{expiry_str}</code>\n\n"
+                f"⚠️ <b>លក្ខខណ្ឌកាតព្វកិច្ច (CAPITAL.COM REGISTRATION REQUIRED) ៖</b>\n"
+                f"ដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap BUY/SELL & 24/7 Auto-Trade) "
+                f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com ជាដាច់ខាត ៖\n"
+                f"1. ចុះឈ្មោះតាម Link ផ្លូវការ ៖ <a href='{ref_url}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
+                f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីបើកដំណើរការ!\n"
+                f"══════════════════════════════════════\n"
+                f"💡 <i>លោកអ្នកអាចពិនិត្យស្ថានភាព License គ្រប់ពេលតាមរយៈ /license</i>"
+            )
+            user_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_url)],
+                [InlineKeyboardButton("📞 ផ្ញើលេខគណនីទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+            ])
+            try:
+                await context.bot.send_message(chat_id=target_cid, text=user_card, parse_mode="HTML", reply_markup=user_kb)
+            except Exception:
+                pass
+
     async def handle_buy(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Executes instant Gold Buy order. Default size: 0.5 Troy Ounce ($4.07 margin @ 500:1)."""
         chat_id = update.effective_chat.id if update.effective_chat else None
@@ -762,9 +970,10 @@ class QuantGoldBot:
             )
 
         # 3. Fiduciary VIP Referral & Authorization Check (Invariant 36)
-        auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+        auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
         if not auth_ok:
-            return await self.safe_reply(update, self.bridge.build_vip_referral_required_card(chat_id))
+            card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+            return await self.safe_reply(update, card, reply_markup=kb)
 
         # 4. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
         raw_arg = context.args[0] if context.args else 0.5
@@ -794,9 +1003,10 @@ class QuantGoldBot:
             )
 
         # 3. Fiduciary VIP Referral & Authorization Check (Invariant 36)
-        auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+        auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
         if not auth_ok:
-            return await self.safe_reply(update, self.bridge.build_vip_referral_required_card(chat_id))
+            card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+            return await self.safe_reply(update, card, reply_markup=kb)
 
         # 4. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
         raw_arg = context.args[0] if context.args else 0.5
@@ -973,9 +1183,10 @@ class QuantGoldBot:
             return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
 
         # 3. Fiduciary VIP Referral & Authorization Check (Invariant 36)
-        auth_ok, _ = self.citadel.is_user_authorized_for_trading(chat_id)
+        auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
         if not auth_ok:
-            return await self.safe_reply(update, self.bridge.build_vip_referral_required_card(chat_id))
+            card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+            return await self.safe_reply(update, card, reply_markup=kb)
 
         auto_cfg = db.get_capital_auto_config(chat_id) or {}
         cur_st = bool(auto_cfg.get("enabled", False))
@@ -1268,7 +1479,8 @@ class QuantGoldBot:
             f"3. <b>🤖 Auto-Trade (ON/OFF) ៖</b> បើកដំណើរការជួញដូរស្វ័យប្រវត្ត ២៤/៧\n"
             f"4. <b>/positions ៖</b> មើលបញ្ជី Position ដែលកំពុងរត់ និងប្រាក់ចំណេញបច្ចុប្បន្ន\n"
             f"5. <b>/close ៖</b> បិទរាល់ Position មាសទាំងអស់ជាបន្ទាន់\n"
-            f"6. <b>/status ៖</b> ពិនិត្យមើលស្ថានភាព Server VPS និងតម្លៃមាស Real-Time\n\n"
+            f"6. <b>/status ៖</b> ពិនិត្យមើលស្ថានភាព Server VPS និងតម្លៃមាស Real-Time\n"
+            f"7. <b>/license ៖</b> ពិនិត្យមើលព័ត៌មាន VIP License និងស្ថានភាព Capital.com\n\n"
             f"🛡️ <b>កាតព្វកិច្ចការពារដើមទុន (FIDUCIARY COVENANT) ៖</b>\n"
             f"• ប្រព័ន្ធបដិសេធដាច់ខាតការដេញតាមទីផ្សារកំពូល ឬបាត (Zero Chasing)\n"
             f"• ពេលចំណេញដល់ +2.5R ប្រព័ន្ធនឹងចាក់សោរ Breakeven Armor ភ្លាម (0.00R Risk)\n"
@@ -1278,6 +1490,9 @@ class QuantGoldBot:
         if chat_id in [859271875, 537186806]:
             help_text += (
                 f"\n👑 <b>[SUPER ADMIN FLEET COMMANDS] ៖</b>\n"
+                f"• <code>/admin_license</code> (ពិនិត្យរបាយការណ៍ VIP Licensing System)\n"
+                f"• <code>/admin_license prune</code> (លុប User គ្មាន License & ស្តារ Lifetime)\n"
+                f"• <code>/admin_license &lt;chat_id&gt; [month|year|lifetime|revoke]</code>\n"
                 f"• <code>/capital on all 50</code> (បើក Auto សម្រាប់ VIP Users ទាំងអស់)\n"
                 f"• <code>/capital off all</code> (ផ្អាក Auto សម្រាប់ VIP Users ទាំងអស់)\n"
                 f"• <code>/admin_capital on all 50</code> (ឬតាម admin_capital)\n"
@@ -1374,6 +1589,152 @@ class QuantGoldBot:
                 pass
             await self.handle_close_all(update, context)
 
+        elif data == "btn_qgold_license":
+            try:
+                await query.answer("Loading VIP License...")
+            except Exception:
+                pass
+            await self.handle_license(update, context)
+
+        elif data == "btn_qgold_req_license":
+            try:
+                await query.answer("⏳ សំណើត្រូវបានបញ្ជូនទៅកាន់ Admin!")
+            except Exception:
+                pass
+            user_info = update.effective_user
+            u_name = f"@{user_info.username}" if user_info and user_info.username else "គ្មាន Username"
+            f_name = user_info.full_name if user_info else "VIP Trader"
+
+            await self.safe_reply(
+                update,
+                f"⏳ <b>[សំណើសុំ VIP LICENSE ត្រូវបានបញ្ជូន]</b> 👑\n"
+                f"══════════════════════════════════════\n"
+                f"• User ID ៖ <code>{chat_id}</code>\n"
+                f"• ឈ្មោះ ៖ <b>{f_name}</b> ({u_name})\n"
+                f"• ស្ថានភាព ៖ <b>កំពុងរង់ចាំការអនុម័តពី Admin (Pending Approval)</b>\n"
+                f"══════════════════════════════════════\n"
+                f"Admin នឹងពិនិត្យ និងអនុម័តជូនលោកអ្នកភ្លាមៗ 1-Click។ សូមរង់ចាំការជូនដំណឹង!"
+            )
+
+            admins = db.get_all_admins()
+            now_utc = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            admin_card = (
+                f"👑 <b>[ANGKOR QUANT - សំណើសុំ VIP LICENSE ថ្មី]</b> 🏛️\n"
+                f"══════════════════════════════════════\n"
+                f"👤 <b>អ្នកប្រើប្រាស់ (User) ៖</b> {u_name} ({f_name})\n"
+                f"🆔 <b>Telegram ID ៖</b> <code>{chat_id}</code>\n"
+                f"📅 <b>ពេលវេលាស្នើសុំ ៖</b> <code>{now_utc} UTC</code>\n"
+                f"══════════════════════════════════════\n"
+                f"👇 <i>សូមជ្រើសរើសកញ្ចប់ License (ចុច 1-Click ដើម្បីអនុម័តភ្លាមៗ) ៖</i>"
+            )
+            approval_kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🟢 Monthly (30 ថ្ងៃ)", callback_data=f"lic_app:month:{chat_id}"),
+                    InlineKeyboardButton("💎 Yearly (365 ថ្ងៃ)", callback_data=f"lic_app:year:{chat_id}")
+                ],
+                [
+                    InlineKeyboardButton("👑 Lifetime VIP", callback_data=f"lic_app:life:{chat_id}"),
+                    InlineKeyboardButton("❌ បដិសេធ (Reject)", callback_data=f"lic_app:rej:{chat_id}")
+                ]
+            ])
+            for adm_id in admins:
+                try:
+                    await context.bot.send_message(
+                        chat_id=adm_id,
+                        text=admin_card,
+                        parse_mode="HTML",
+                        reply_markup=approval_kb
+                    )
+                except Exception as e_adm:
+                    logger.warning(f"Could not deliver license request to admin {adm_id}: {e_adm}")
+
+        elif data.startswith("lic_app:"):
+            parts = data.split(":")
+            if len(parts) >= 3:
+                tier_code = parts[1]
+                target_cid = int(parts[2])
+
+                if not self.citadel.is_super_admin(chat_id):
+                    return await query.answer("⛔ Access Denied! Super Admin authority required.", show_alert=True)
+
+                res = db.grant_vip_license(target_cid, tier_code, granted_by=chat_id)
+                tier_title = res.get("tier_title", tier_code)
+                expiry_str = res.get("expiry", "N/A")
+
+                await query.answer(f"✅ Approved: {tier_title}")
+
+                admin_update_card = (
+                    f"✅ <b>[VIP LICENSE 1-CLICK ACTION COMPLETED]</b> 👑\n"
+                    f"══════════════════════════════════════\n"
+                    f"👤 <b>Target User ID ៖</b> <code>{target_cid}</code>\n"
+                    f"👑 <b>កញ្ចប់ដែលបានជ្រើសរើស ៖</b> <b>{tier_title}</b>\n"
+                    f"📅 <b>សុពលភាព (Expiry) ៖</b> <code>{expiry_str}</code>\n"
+                    f"👮‍♂️ <b>អនុម័តដោយ ៖</b> Super Admin #{chat_id}\n"
+                    f"⏱️ <b>កាលបរិច្ឆេទ ៖</b> <code>{res.get('timestamp')}</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"⚡ <i>ប្រព័ន្ធបានបញ្ជូនការជូនដំណឹងទៅកាន់ User រួចរាល់ដោយស្វ័យប្រវត្ត!</i>"
+                )
+                await self.safe_edit(query, admin_update_card)
+
+                ref_url = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+                if tier_code != "rej":
+                    user_card = (
+                        f"🎉 <b>[សូមអបអរសាទរ! លោកអ្នកទទួលបាន VIP LICENSE ជោគជ័យ]</b> 👑\n"
+                        f"══════════════════════════════════════\n"
+                        f"👑 <b>កញ្ចប់ VIP (Tier) ៖</b> <b>{tier_title}</b>\n"
+                        f"📅 <b>កាលបរិច្ឆេទផុតកំណត់ ៖</b> <code>{expiry_str}</code>\n\n"
+                        f"⚠️ <b>លក្ខខណ្ឌកាតព្វកិច្ច (CAPITAL.COM REGISTRATION REQUIRED) ៖</b>\n"
+                        f"ដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap BUY/SELL & 24/7 Auto-Trade) "
+                        f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com ជាដាច់ខាត ៖\n"
+                        f"1. ចុះឈ្មោះតាម Link ផ្លូវការ ៖ <a href='{ref_url}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
+                        f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីបើកដំណើរការ!\n"
+                        f"══════════════════════════════════════\n"
+                        f"💡 <i>លោកអ្នកអាចពិនិត្យស្ថានភាព License គ្រប់ពេលតាមរយៈ /license</i>"
+                    )
+                    user_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_url)],
+                        [InlineKeyboardButton("📞 ផ្ញើលេខគណនីទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+                    ])
+                else:
+                    user_card = (
+                        f"❌ <b>[សេចក្តីជូនដំណឹង VIP LICENSE]</b>\n"
+                        f"══════════════════════════════════════\n"
+                        f"សំណើសុំ VIP License របស់អ្នកត្រូវបានបដិសេធ ឬដកហូតដោយ Super Admin។\n"
+                        f"សូមទាក់ទងមកកាន់ @soknitha_support សម្រាប់ព័ត៌មានបន្ថែម។"
+                    )
+                    user_kb = None
+
+                try:
+                    await context.bot.send_message(
+                        chat_id=target_cid,
+                        text=user_card,
+                        parse_mode="HTML",
+                        reply_markup=user_kb
+                    )
+                except Exception as e_notify:
+                    logger.warning(f"Could not notify user {target_cid} about license: {e_notify}")
+
+        elif data == "btn_qgold_recheck_auth":
+            try:
+                await query.answer("🔄 Re-checking authorization...")
+            except Exception:
+                pass
+            auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
+            if auth_ok:
+                await self.safe_reply(
+                    update,
+                    "✅ <b>[AUTHORIZATION VERIFIED]</b> 🟢\n"
+                    "គណនីរបស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ និងបើកសិទ្ធិជួញដូរពេញលេញជោគជ័យ! "
+                    "លោកអ្នកអាចចាប់ផ្តើមជួញដូរ 1-Tap BUY / SELL ឬបើក Auto-Trade បានហើយ។"
+                )
+                raw_lang = db.get_user_language(chat_id)
+                user_lang = "khmer" if raw_lang in ["km", "khmer", "0", "1", "auto"] else "english"
+                text, kb = await self.bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await self.safe_edit(query, text, reply_markup=kb)
+            else:
+                card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+                await self.safe_edit(query, card, reply_markup=kb)
+
         elif data == "btn_capital_menu":
             await self.handle_start(update, context)
 
@@ -1395,6 +1756,8 @@ class QuantGoldBot:
             await self.handle_toggle_auto(update, context)
         elif "Status" in text:
             await self.handle_status(update, context)
+        elif "License" in text or "VIP" in text:
+            await self.handle_license(update, context)
         elif "Health" in text:
             await self.handle_health(update, context)
         elif "Security" in text or "Citadel" in text:
