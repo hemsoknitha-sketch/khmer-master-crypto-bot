@@ -1841,6 +1841,171 @@ def restore_and_prune_vip_licenses() -> Dict[str, Any]:
     }
 
 
+def find_user_by_identifier(query_str: str) -> Optional[int]:
+    """Resolves a user chat_id from Telegram ID, @username, or Capital.com Account ID."""
+    q = str(query_str or "").strip().lstrip('@')
+    if not q:
+        return None
+    if q.isdigit():
+        return int(q)
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        # Search username in users
+        c.execute("SELECT chat_id FROM users WHERE username LIKE ?", (f"%{q}%",))
+        row = c.fetchone()
+        if not row:
+            # Search account_id in user_capital_credentials
+            c.execute("SELECT chat_id FROM user_capital_credentials WHERE account_id = ?", (q,))
+            row = c.fetchone()
+        return row[0] if row else None
+    except Exception as e:
+        print(f"Error in find_user_by_identifier: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def delete_complete_user_record(chat_id: int) -> bool:
+    """Completely purges a user and their configurations across all tables."""
+    if chat_id in [859271875, 537186806]:
+        return False  # Protected Super Admin
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM users WHERE chat_id = ?", (chat_id,))
+        cursor.execute("DELETE FROM user_capital_credentials WHERE chat_id = ?", (chat_id,))
+        cursor.execute("DELETE FROM capital_auto_config WHERE chat_id = ?", (chat_id,))
+        cursor.execute("DELETE FROM capital_user_referrals WHERE client_chat_id = ?", (chat_id,))
+        conn.commit()
+    except Exception as e:
+        print(f"Error deleting user record {chat_id}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False
+    finally:
+        conn.close()
+
+    cache_delete(f"vip_{chat_id}")
+    cache_delete(f"admin_{chat_id}")
+    return True
+
+
+def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
+    """
+    Returns complete, multi-table management dossiers for all users in the system.
+    Unions users, user_capital_credentials, and capital_auto_config.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            WITH all_ids AS (
+                SELECT chat_id FROM users
+                UNION
+                SELECT chat_id FROM user_capital_credentials WHERE chat_id IS NOT NULL
+                UNION
+                SELECT chat_id FROM capital_auto_config WHERE chat_id IS NOT NULL
+            )
+            SELECT 
+                all_ids.chat_id,
+                COALESCE(u.username, ''),
+                COALESCE(u.is_vip, 0),
+                COALESCE(u.license_expiry, ''),
+                COALESCE(u.joined_at, ''),
+                COALESCE(c.account_id, ''),
+                COALESCE(c.is_demo, 0),
+                CASE 
+                    WHEN c.is_referral_verified = 1 THEN 1
+                    WHEN ref.client_chat_id IS NOT NULL THEN 1
+                    ELSE 0 
+                END as is_referral_verified,
+                COALESCE(a.is_enabled, 0) as auto_enabled,
+                COALESCE(a.budget, 50.0) as auto_budget,
+                COALESCE(a.max_positions, 5) as auto_max_pos,
+                COALESCE(a.schedule_mode, 'SMART_SESSION_TIMED') as schedule_mode,
+                COALESCE(u.phone_number, '') as phone_number
+            FROM all_ids
+            LEFT JOIN users u ON all_ids.chat_id = u.chat_id
+            LEFT JOIN user_capital_credentials c ON all_ids.chat_id = c.chat_id
+            LEFT JOIN capital_user_referrals ref ON all_ids.chat_id = ref.client_chat_id
+            LEFT JOIN capital_auto_config a ON all_ids.chat_id = a.chat_id
+            ORDER BY all_ids.chat_id ASC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        results = []
+        now = datetime.now()
+
+        for r in rows:
+            cid = r[0]
+            is_adm = (cid in [859271875, 537186806])
+            raw_exp = str(r[3] or "")
+            is_vip_flag = bool(r[2]) or is_adm
+
+            # Determine tier label
+            tier_label = "⚪ UNLICENSED"
+            days_remaining = None
+            if is_adm:
+                tier_label = "👑 SUPER ADMIN (LIFETIME)"
+                is_vip_flag = True
+            elif is_vip_flag:
+                if raw_exp in ["lifetime", "Administrator"]:
+                    tier_label = "👑 LIFETIME VIP"
+                elif raw_exp:
+                    try:
+                        exp_dt = datetime.strptime(raw_exp, "%Y-%m-%d %H:%M:%S")
+                        if exp_dt > now:
+                            delta = exp_dt - now
+                            days_remaining = max(1, delta.days)
+                            tier_label = f"🟢 ACTIVE ({days_remaining}d)"
+                        else:
+                            tier_label = "🔴 EXPIRED"
+                            is_vip_flag = False
+                    except Exception:
+                        tier_label = "🔴 EXPIRED"
+                        is_vip_flag = False
+                else:
+                    tier_label = "👑 LIFETIME VIP"
+
+            acc_id = str(r[5] or "")
+            if cid == 859271875 and (not acc_id or acc_id == "330894176088577220"):
+                acc_id = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
+
+            results.append({
+                "chat_id": cid,
+                "username": str(r[1] or ""),
+                "is_admin": is_adm,
+                "is_vip": is_vip_flag,
+                "license_expiry": raw_exp,
+                "tier_label": tier_label,
+                "days_remaining": days_remaining,
+                "joined_at": str(r[4] or "N/A"),
+                "account_id": acc_id if acc_id else "None",
+                "has_capital": bool(acc_id and acc_id != "None"),
+                "is_demo": bool(r[6]),
+                "is_referral_verified": bool(r[7]),
+                "auto_enabled": bool(r[8]),
+                "auto_budget": float(r[9]),
+                "auto_max_pos": int(r[10]),
+                "schedule_mode": str(r[11] or "SMART_SESSION_TIMED"),
+                "phone_number": str(r[12] or "")
+            })
+
+        return results
+    except Exception as e:
+        print(f"Error in get_full_users_management_dossiers: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
+
+
+
 def get_all_users_with_lang():
     """Returns a list of all users and their preferred language."""
     conn = sqlite3.connect(DB_FILE, timeout=15.0)

@@ -150,6 +150,7 @@ class QuantGoldBot:
 
                 # Set dedicated Admin commands for Super Admin scope
                 admin_commands = list(commands) + [
+                    BotCommand("admin_users", "👥 Inspect & Manage All Users Dossiers"),
                     BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
                     BotCommand("admin_license", "👑 VIP License Approvals & Database Pruning"),
                     BotCommand("emergency_stop", "🚨 Super Admin Emergency Trading Freeze"),
@@ -191,6 +192,8 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("admin_capital", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admin_gold", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admincapital", self.handle_admin_capital))
+        self.app.add_handler(CommandHandler("admin_users", self.handle_admin_users))
+        self.app.add_handler(CommandHandler("adminusers", self.handle_admin_users))
         self.app.add_handler(CommandHandler("admin_license", self.handle_admin_license))
         self.app.add_handler(CommandHandler("adminlicense", self.handle_admin_license))
         self.app.add_handler(CommandHandler("license", self.handle_license))
@@ -948,6 +951,281 @@ class QuantGoldBot:
             except Exception:
                 pass
 
+    def build_admin_users_list_card(self, page: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
+        """Builds an institutional users registry card with summary statistics and 1-tap inspect buttons."""
+        dossiers = db.get_full_users_management_dossiers()
+        total_u = len(dossiers)
+        vip_u = [d for d in dossiers if d["is_vip"]]
+        life_u = [d for d in vip_u if "LIFETIME" in d["tier_label"].upper() or "ADMIN" in d["tier_label"].upper()]
+        timed_u = [d for d in vip_u if d not in life_u]
+        cap_u = [d for d in dossiers if d["has_capital"]]
+        live_cap_u = [d for d in cap_u if not d["is_demo"]]
+        auto_u = [d for d in dossiers if d["auto_enabled"]]
+
+        card = (
+            f"👥 <b>[ANGKOR QUANT - មជ្ឈមណ្ឌលគ្រប់គ្រង USERS ពេញលេញ]</b> 🏛️\n"
+            f"══════════════════════════════════════\n"
+            f"📊 <b>ស្ថិតិប្រព័ន្ធសរុប (Fleet Statistics) ៖</b>\n"
+            f"• សរុបអ្នកប្រើប្រាស់ ៖ <code>{total_u} នាក់</code>\n"
+            f"• 👑 VIP Licenses សកម្ម ៖ <code>{len(vip_u)} នាក់</code> (Lifetime: {len(life_u)} | Timed: {len(timed_u)})\n"
+            f"• 🏛️ Capital.com ភ្ជាប់រួច ៖ <code>{len(cap_u)} នាក់</code> (Live: {len(live_cap_u)} | Demo: {len(cap_u) - len(live_cap_u)})\n"
+            f"• 🤖 Auto-Trade ដំណើរការ ៖ <code>{len(auto_u)} នាក់</code> (24/7 Gold Swarm)\n"
+            f"──────────────────────────────────────\n"
+            f"📋 <b>បញ្ជីឈ្មោះអ្នកប្រើប្រាស់ (User Registry) ៖</b>\n\n"
+        )
+
+        per_page = 5
+        max_pages = max(1, (total_u + per_page - 1) // per_page)
+        page = max(0, min(page, max_pages - 1))
+        start_idx = page * per_page
+        end_idx = min(start_idx + per_page, total_u)
+        page_dossiers = dossiers[start_idx:end_idx]
+
+        inspect_buttons = []
+        for i, d in enumerate(page_dossiers, start=start_idx + 1):
+            u_name = f"@{d['username']}" if d['username'] else "គ្មាន Username"
+            badge = "👑 Super Admin" if d["is_admin"] else "👤 Trader"
+            acc_label = f"🟢 LIVE (<code>#{d['account_id']}</code>)" if d["has_capital"] and not d["is_demo"] else (
+                f"🟡 DEMO (<code>#{d['account_id']}</code>)" if d["has_capital"] else "🔴 Not Connected"
+            )
+            auto_label = f"🟢 ON (<code>${d['auto_budget']:.2f}</code>)" if d["auto_enabled"] else "🔴 OFF"
+
+            card += (
+                f"<b>{i}. {badge} #{d['chat_id']}</b> ({u_name})\n"
+                f"   • License ៖ <code>{d['tier_label']}</code>\n"
+                f"   • Capital.com ៖ {acc_label}\n"
+                f"   • Auto-Trade ៖ {auto_label} | Pos: {d['auto_max_pos']}\n\n"
+            )
+            inspect_buttons.append(
+                InlineKeyboardButton(f"🔍 #{d['chat_id']}", callback_data=f"admin_users:insp:{d['chat_id']}")
+            )
+
+        card += (
+            f"══════════════════════════════════════\n"
+            f"📄 ទំព័រ ៖ <b>{page + 1} / {max_pages}</b>\n"
+            f"💡 <i>ចុចប៊ូតុង User ID ខាងក្រោមដើម្បីពិនិត្យ Dossier និងគ្រប់គ្រង 1-Click ៖</i>"
+        )
+
+        kb_rows = []
+        if inspect_buttons:
+            for j in range(0, len(inspect_buttons), 3):
+                kb_rows.append(inspect_buttons[j:j+3])
+
+        nav_row = []
+        if page > 0:
+            nav_row.append(InlineKeyboardButton("⬅️ មុន (Prev)", callback_data=f"admin_users:list:{page - 1}"))
+        if page < max_pages - 1:
+            nav_row.append(InlineKeyboardButton("បន្ទាប់ (Next) ➡️", callback_data=f"admin_users:list:{page + 1}"))
+        if nav_row:
+            kb_rows.append(nav_row)
+
+        kb_rows.append([
+            InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="admin_users:refresh"),
+            InlineKeyboardButton("🧹 សម្អាត Database (Prune)", callback_data="admin_users:prune")
+        ])
+        kb_rows.append([
+            InlineKeyboardButton("👑 គ្រប់គ្រង License (/admin_license)", callback_data="btn_qgold_license"),
+            InlineKeyboardButton("🏛️ គ្រប់គ្រង Fleet (/admin_capital)", callback_data="btn_capital_menu")
+        ])
+
+        return card, InlineKeyboardMarkup(kb_rows)
+
+    def build_admin_user_dossier_card(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
+        """Builds a full dossier inspection card for a single user with 1-click management controls."""
+        dossiers = db.get_full_users_management_dossiers()
+        target = next((d for d in dossiers if d["chat_id"] == chat_id), None)
+        if not target:
+            d_lic = db.get_user_license_details(chat_id)
+            target = {
+                "chat_id": chat_id,
+                "username": "",
+                "is_admin": d_lic.get("is_admin", False),
+                "is_vip": d_lic.get("is_vip", False),
+                "tier_label": d_lic.get("tier_label", "UNLICENSED"),
+                "license_expiry": d_lic.get("raw_expiry"),
+                "joined_at": d_lic.get("joined_at", "N/A"),
+                "has_capital": d_lic.get("has_capital_credentials", False),
+                "account_id": d_lic.get("capital_account_id") or "None",
+                "is_demo": d_lic.get("is_demo", False),
+                "is_referral_verified": d_lic.get("is_referral_verified", False),
+                "auto_enabled": False,
+                "auto_budget": 50.0,
+                "auto_max_pos": 5,
+                "schedule_mode": "SMART_SESSION_TIMED"
+            }
+
+        u_name = f"@{target['username']}" if target.get('username') else "គ្មាន Username"
+        role_label = "👑 SUPER ADMIN (Master Authority)" if target["is_admin"] else "👤 VIP Trader"
+        cap_status = "🟢 CONNECTED (LIVE MAINNET)" if target["has_capital"] and not target["is_demo"] else (
+            "🟡 CONNECTED (DEMO)" if target["has_capital"] else "🔴 NOT CONNECTED (Awaiting Registration)"
+        )
+        auto_status = f"🟢 ACTIVE (ON) - ${target['auto_budget']:.2f}/Trade" if target["auto_enabled"] else f"🔴 INACTIVE (OFF) - ${target['auto_budget']:.2f}"
+        ref_status = "🟢 100% VERIFIED (Partner az48cxia)" if target["is_referral_verified"] else "⚪ Standby / Unverified"
+
+        card = (
+            f"🔍 <b>[ANGKOR QUANT - ព័ត៌មានលម្អិត USER DOSSIER]</b> 🏛️\n"
+            f"══════════════════════════════════════\n"
+            f"👤 <b>អត្តសញ្ញាណ (Identity) ៖</b>\n"
+            f"• Telegram ID ៖ <code>{target['chat_id']}</code>\n"
+            f"• Username ៖ <b>{u_name}</b>\n"
+            f"• តួនាទី ៖ <b>{role_label}</b>\n"
+            f"• ថ្ងៃចុះឈ្មោះ ៖ <code>{target.get('joined_at', 'N/A')}</code>\n"
+            f"──────────────────────────────────────\n"
+            f"👑 <b>អាជ្ញាប័ណ្ណ (VIP License Status) ៖</b>\n"
+            f"• ស្ថានភាព VIP ៖ {'🟢 ACTIVE' if target['is_vip'] else '🔴 INACTIVE'}\n"
+            f"• កញ្ចប់ (Tier) ៖ <b>{target['tier_label']}</b>\n"
+            f"• សុពលភាព (Expiry) ៖ <code>{target.get('license_expiry') or 'None'}</code>\n"
+            f"──────────────────────────────────────\n"
+            f"🏛️ <b>គណនី CAPITAL.COM ៖</b>\n"
+            f"• ស្ថានភាព ៖ {cap_status}\n"
+            f"• Account ID ៖ <code>{target['account_id']}</code>\n"
+            f"• Referral Status ៖ {ref_status}\n"
+            f"──────────────────────────────────────\n"
+            f"🤖 <b>ការកំណត់ 24/7 AUTO-TRADE ៖</b>\n"
+            f"• ស្ថានភាព Auto ៖ {auto_status}\n"
+            f"• ថវិកាកំណត់ (Budget) ៖ <code>${target['auto_budget']:.2f} / Trade</code>\n"
+            f"• ចំនួន Max Positions ៖ <code>{target['auto_max_pos']} Positions</code>\n"
+            f"• របៀប Schedule ៖ <code>{target['schedule_mode']}</code>\n"
+            f"══════════════════════════════════════\n"
+            f"👇 <i>ចុចប៊ូតុងខាងក្រោមដើម្បីគ្រប់គ្រង User នេះភ្លាមៗ 1-Click ៖</i>"
+        )
+
+        buttons = [
+            [
+                InlineKeyboardButton("🟢 ផ្តល់ 1 ខែ (30d)", callback_data=f"admin_users:grant:month:{chat_id}"),
+                InlineKeyboardButton("💎 ផ្តល់ 1 ឆ្នាំ (365d)", callback_data=f"admin_users:grant:year:{chat_id}"),
+                InlineKeyboardButton("👑 ផ្តល់ Lifetime", callback_data=f"admin_users:grant:life:{chat_id}")
+            ],
+            [
+                InlineKeyboardButton("🤖 បើក/បិទ Auto-Trade", callback_data=f"admin_users:toggle:{chat_id}"),
+                InlineKeyboardButton("❌ ដកហូត VIP", callback_data=f"admin_users:grant:rej:{chat_id}")
+            ]
+        ]
+        if not target["is_admin"]:
+            buttons.append([
+                InlineKeyboardButton("🗑️ លុប User នេះចេញ (Delete)", callback_data=f"admin_users:del:{chat_id}"),
+                InlineKeyboardButton("🔙 ត្រឡប់ទៅបញ្ជី Users", callback_data="admin_users:list:0")
+            ])
+        else:
+            buttons.append([
+                InlineKeyboardButton("🔙 ត្រឡប់ទៅបញ្ជី Users", callback_data="admin_users:list:0")
+            ])
+
+        return card, InlineKeyboardMarkup(buttons)
+
+    async def handle_admin_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Unified institutional command to inspect and manage all users."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not self.citadel.is_super_admin(chat_id):
+            return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
+
+        args = context.args if context and context.args else []
+        if not args or args[0].lower() in ["list", "overview", "all"]:
+            page = int(args[1]) if len(args) > 1 and args[1].isdigit() else 0
+            card, kb = self.build_admin_users_list_card(page=page)
+            return await self.safe_reply(update, card, reply_markup=kb)
+
+        sub_cmd = args[0].lower().strip()
+
+        if sub_cmd == "inspect" and len(args) > 1:
+            t_cid = db.find_user_by_identifier(args[1])
+            if not t_cid:
+                return await self.safe_reply(update, f"⚠️ <i>រកមិនឃើញ User <code>{args[1]}</code> ឡើយ!</i>")
+            card, kb = self.build_admin_user_dossier_card(t_cid)
+            return await self.safe_reply(update, card, reply_markup=kb)
+
+        elif sub_cmd == "toggle" and len(args) > 1:
+            t_cid = db.find_user_by_identifier(args[1])
+            if not t_cid:
+                return await self.safe_reply(update, f"⚠️ <i>រកមិនឃើញ User <code>{args[1]}</code> ឡើយ!</i>")
+            auto_cfg = db.get_capital_auto_config(t_cid) or {}
+            cur_st = bool(auto_cfg.get("enabled", False))
+            new_st = not cur_st
+            db.set_capital_auto_config(
+                chat_id=t_cid,
+                enabled=new_st,
+                budget=float(auto_cfg.get("budget", 50.0)),
+                max_positions=int(auto_cfg.get("max_positions", 5)),
+                is_demo=bool(auto_cfg.get("is_demo", False))
+            )
+            st_text = "🟢 ON (Active)" if new_st else "🔴 OFF (Disabled)"
+            return await self.safe_reply(
+                update,
+                f"✅ <b>[AUTO-TRADE STATUS UPDATED]</b>\n• User ID ៖ <code>{t_cid}</code>\n• ស្ថានភាព ៖ <b>{st_text}</b>"
+            )
+
+        elif sub_cmd == "budget" and len(args) > 2:
+            t_cid = db.find_user_by_identifier(args[1])
+            if not t_cid:
+                return await self.safe_reply(update, f"⚠️ <i>រកមិនឃើញ User <code>{args[1]}</code> ឡើយ!</i>")
+            try:
+                b_val = float(args[2])
+            except ValueError:
+                return await self.safe_reply(update, "⚠️ <i>សូមបញ្ចូលចំនួន Budget ជាលេខត្រឹមត្រូវ (ឧ. 50.0)។</i>")
+            auto_cfg = db.get_capital_auto_config(t_cid) or {}
+            db.set_capital_auto_config(
+                chat_id=t_cid,
+                enabled=bool(auto_cfg.get("enabled", True)),
+                budget=b_val,
+                max_positions=int(auto_cfg.get("max_positions", 5)),
+                is_demo=bool(auto_cfg.get("is_demo", False))
+            )
+            return await self.safe_reply(
+                update,
+                f"✅ <b>[AUTO BUDGET UPDATED]</b>\n• User ID ៖ <code>{t_cid}</code>\n• Budget ថ្មី ៖ <code>${b_val:.2f} / Trade</code>"
+            )
+
+        elif sub_cmd == "grant" and len(args) > 2:
+            t_cid = db.find_user_by_identifier(args[1])
+            if not t_cid:
+                return await self.safe_reply(update, f"⚠️ <i>រកមិនឃើញ User <code>{args[1]}</code> ឡើយ!</i>")
+            tier_arg = args[2].lower()
+            res = db.grant_vip_license(t_cid, tier_arg, granted_by=chat_id)
+            return await self.safe_reply(
+                update,
+                f"✅ <b>[VIP LICENSE GRANTED]</b>\n• User ID ៖ <code>{t_cid}</code>\n• កញ្ចប់ ៖ <b>{res['tier_title']}</b>\n• សុពលភាព ៖ <code>{res['expiry']}</code>"
+            )
+
+        elif sub_cmd == "revoke" and len(args) > 1:
+            t_cid = db.find_user_by_identifier(args[1])
+            if not t_cid:
+                return await self.safe_reply(update, f"⚠️ <i>រកមិនឃើញ User <code>{args[1]}</code> ឡើយ!</i>")
+            db.grant_vip_license(t_cid, "REVOKE", granted_by=chat_id)
+            return await self.safe_reply(
+                update,
+                f"❌ <b>[VIP LICENSE REVOKED]</b>\n• User ID ៖ <code>{t_cid}</code>\n• សិទ្ធិ VIP ត្រូវបានដកហូតរួចរាល់!"
+            )
+
+        elif sub_cmd == "delete" and len(args) > 1:
+            t_cid = db.find_user_by_identifier(args[1])
+            if not t_cid:
+                return await self.safe_reply(update, f"⚠️ <i>រកមិនឃើញ User <code>{args[1]}</code> ឡើយ!</i>")
+            if t_cid in [859271875, 537186806]:
+                return await self.safe_reply(update, "⛔ <i>មិនអាចលុប Super Admin បានទេ (Safety Shield)!</i>")
+            ok = db.delete_complete_user_record(t_cid)
+            if ok:
+                return await self.safe_reply(
+                    update,
+                    f"🗑️ <b>[USER RECORD PURGED]</b>\n• User ID <code>{t_cid}</code> ត្រូវបានលុបចេញពីប្រព័ន្ធគ្រប់តារាងទាំងអស់រួចរាល់!"
+                )
+            else:
+                return await self.safe_reply(update, "⚠️ <i>ការលុបមានបញ្ហាបច្ចេកទេស។</i>")
+
+        elif sub_cmd in ["prune", "cleanup"]:
+            res = db.restore_and_prune_vip_licenses()
+            card, kb = self.build_admin_users_list_card(page=0)
+            await self.safe_reply(
+                update,
+                f"🧹 <b>[DATABASE PRUNING COMPLETE]</b>\n"
+                f"• ស្តារ Lifetime VIP ៖ <code>{len(res['restored_lifetime'])} នាក់</code>\n"
+                f"• លុប User អត់ License ៖ <code>{len(res['purged_unlicensed'])} នាក់</code>"
+            )
+            return await self.safe_reply(update, card, reply_markup=kb)
+
+        else:
+            card, kb = self.build_admin_users_list_card(page=0)
+            return await self.safe_reply(update, card, reply_markup=kb)
+
     async def handle_buy(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Executes instant Gold Buy order. Default size: 0.5 Troy Ounce ($4.07 margin @ 500:1)."""
         chat_id = update.effective_chat.id if update.effective_chat else None
@@ -1490,6 +1768,11 @@ class QuantGoldBot:
         if chat_id in [859271875, 537186806]:
             help_text += (
                 f"\n👑 <b>[SUPER ADMIN FLEET COMMANDS] ៖</b>\n"
+                f"• <code>/admin_users</code> (ពិនិត្យ & គ្រប់គ្រងព័ត៌មាន Users ពេញលេញ)\n"
+                f"• <code>/admin_users inspect &lt;target&gt;</code> (ពិនិត្យ Dossier និងប៊ូតុង 1-Click)\n"
+                f"• <code>/admin_users toggle &lt;target&gt;</code> (បើក/បិទ Auto-Trade)\n"
+                f"• <code>/admin_users budget &lt;target&gt; &lt;amount&gt;</code> (កំណត់ Budget)\n"
+                f"• <code>/admin_users delete &lt;target&gt;</code> (លុប User ចេញពីប្រព័ន្ធ)\n"
                 f"• <code>/admin_license</code> (ពិនិត្យរបាយការណ៍ VIP Licensing System)\n"
                 f"• <code>/admin_license prune</code> (លុប User គ្មាន License & ស្តារ Lifetime)\n"
                 f"• <code>/admin_license &lt;chat_id&gt; [month|year|lifetime|revoke]</code>\n"
@@ -1737,6 +2020,93 @@ class QuantGoldBot:
 
         elif data == "btn_capital_menu":
             await self.handle_start(update, context)
+
+        elif data.startswith("admin_users:"):
+            parts = data.split(":")
+            sub_action = parts[1] if len(parts) > 1 else "list"
+
+            if not self.citadel.is_super_admin(chat_id):
+                return await query.answer("⛔ Access Denied! Super Admin authority required.", show_alert=True)
+
+            if sub_action == "list":
+                page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+                card, kb = self.build_admin_users_list_card(page=page)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "insp":
+                target_cid = int(parts[2]) if len(parts) > 2 else chat_id
+                card, kb = self.build_admin_user_dossier_card(target_cid)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "toggle":
+                target_cid = int(parts[2]) if len(parts) > 2 else chat_id
+                auto_cfg = db.get_capital_auto_config(target_cid) or {}
+                cur_st = bool(auto_cfg.get("enabled", False))
+                new_st = not cur_st
+                db.set_capital_auto_config(
+                    chat_id=target_cid,
+                    enabled=new_st,
+                    budget=float(auto_cfg.get("budget", 50.0)),
+                    max_positions=int(auto_cfg.get("max_positions", 5)),
+                    is_demo=bool(auto_cfg.get("is_demo", False))
+                )
+                await query.answer(f"Auto-Trade: {'ON' if new_st else 'OFF'}")
+                card, kb = self.build_admin_user_dossier_card(target_cid)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "grant":
+                tier_code = parts[2] if len(parts) > 2 else "life"
+                target_cid = int(parts[3]) if len(parts) > 3 else chat_id
+                res = db.grant_vip_license(target_cid, tier_code, granted_by=chat_id)
+                await query.answer(f"License: {res.get('tier_title', tier_code)}")
+
+                # Send Telegram notification to user
+                ref_url = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+                if tier_code != "rej":
+                    user_card = (
+                        f"🎉 <b>[សូមអបអរសាទរ! លោកអ្នកទទួលបាន VIP LICENSE ជោគជ័យ]</b> 👑\n"
+                        f"══════════════════════════════════════\n"
+                        f"👑 <b>កញ្ចប់ VIP (Tier) ៖</b> <b>{res.get('tier_title')}</b>\n"
+                        f"📅 <b>កាលបរិច្ឆេទផុតកំណត់ ៖</b> <code>{res.get('expiry')}</code>\n\n"
+                        f"⚠️ <b>លក្ខខណ្ឌកាតព្វកិច្ច (CAPITAL.COM REGISTRATION REQUIRED) ៖</b>\n"
+                        f"ដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap BUY/SELL & 24/7 Auto-Trade) "
+                        f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com ជាដាច់ខាត ៖\n"
+                        f"1. ចុះឈ្មោះតាម Link ផ្លូវការ ៖ <a href='{ref_url}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
+                        f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីបើកដំណើរការ!\n"
+                        f"══════════════════════════════════════\n"
+                        f"💡 <i>លោកអ្នកអាចពិនិត្យស្ថានភាព License គ្រប់ពេលតាមរយៈ /license</i>"
+                    )
+                    user_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_url)],
+                        [InlineKeyboardButton("📞 ផ្ញើលេខគណនីទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+                    ])
+                    try:
+                        await context.bot.send_message(chat_id=target_cid, text=user_card, parse_mode="HTML", reply_markup=user_kb)
+                    except Exception:
+                        pass
+
+                card, kb = self.build_admin_user_dossier_card(target_cid)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "del":
+                target_cid = int(parts[2]) if len(parts) > 2 else 0
+                if target_cid in [859271875, 537186806]:
+                    return await query.answer("⛔ Cannot delete Super Admin!", show_alert=True)
+                db.delete_complete_user_record(target_cid)
+                await query.answer("✅ User deleted successfully!")
+                card, kb = self.build_admin_users_list_card(page=0)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "refresh":
+                await query.answer("Refreshing users list...")
+                card, kb = self.build_admin_users_list_card(page=0)
+                await self.safe_edit(query, card, reply_markup=kb)
+
+            elif sub_action == "prune":
+                res = db.restore_and_prune_vip_licenses()
+                await query.answer(f"Pruned: {len(res['purged_unlicensed'])} | Restored: {len(res['restored_lifetime'])}", show_alert=True)
+                card, kb = self.build_admin_users_list_card(page=0)
+                await self.safe_edit(query, card, reply_markup=kb)
 
     async def handle_text_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handles clicks from the bottom persistent keyboard."""
