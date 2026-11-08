@@ -799,7 +799,12 @@ class QuantGoldBot:
             return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
 
         dossier = db.get_user_license_details(chat_id)
-        ref_link = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+        ref_link = os.getenv(
+            "CAPITAL_REFERRAL_URL",
+            "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+        )
+        support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+        support_url = f"https://t.me/{support_handle}"
 
         status_cap = "🟢 VERIFIED / CONNECTED" if dossier["has_capital_credentials"] or dossier["is_referral_verified"] else "🔴 NOT REGISTERED (Required)"
 
@@ -816,15 +821,16 @@ class QuantGoldBot:
 
         card += (
             f"══════════════════════════════════════\n"
-            f"💡 <i>ប្រសិនបើមានចម្ងល់ ឬត្រូវការជំនួយ សូមទាក់ទងមកកាន់ @soknitha_support</i>"
+            f"💡 <i>ប្រសិនបើមានចម្ងល់ ឬត្រូវការជំនួយ សូមទាក់ទងមកកាន់ ជំនួយការ @{support_handle}</i>"
         )
 
         buttons = []
         if not dossier["is_vip"]:
             buttons.append([InlineKeyboardButton("👑 ស្នើសុំ VIP License (Request License)", callback_data="btn_qgold_req_license")])
         if not (dossier["has_capital_credentials"] or dossier["is_referral_verified"]):
-            buttons.append([InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_link)])
+            buttons.append([InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_link)])
 
+        buttons.append([InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)])
         buttons.append([InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_qgold_recheck_auth")])
         kb = InlineKeyboardMarkup(buttons)
         await self.safe_reply(update, card, reply_markup=kb)
@@ -951,7 +957,12 @@ class QuantGoldBot:
         await self.safe_reply(update, card)
 
         # Notify user as well
-        ref_url = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+        ref_url = os.getenv(
+            "CAPITAL_REFERRAL_URL",
+            "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+        )
+        support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+        support_url = f"https://t.me/{support_handle}"
         if tier_arg != "revoke":
             user_card = (
                 f"🎉 <b>[សូមអបអរសាទរ! លោកអ្នកទទួលបាន VIP LICENSE ជោគជ័យ]</b> 👑\n"
@@ -962,13 +973,13 @@ class QuantGoldBot:
                 f"ដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap BUY/SELL & 24/7 Auto-Trade) "
                 f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com ជាដាច់ខាត ៖\n"
                 f"1. ចុះឈ្មោះតាម Link ផ្លូវការ ៖ <a href='{ref_url}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
-                f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីបើកដំណើរការ!\n"
+                f"2. ទាក់ទងទៅកាន់ ជំនួយការ @{support_handle} ដើម្បីភ្ជាប់ភ្លាមៗ!\n"
                 f"══════════════════════════════════════\n"
                 f"💡 <i>លោកអ្នកអាចពិនិត្យស្ថានភាព License គ្រប់ពេលតាមរយៈ /license</i>"
             )
             user_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_url)],
-                [InlineKeyboardButton("📞 ផ្ញើលេខគណនីទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+                [InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_url)],
+                [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)]
             ])
             try:
                 await context.bot.send_message(chat_id=target_cid, text=user_card, parse_mode="HTML", reply_markup=user_kb)
@@ -2046,7 +2057,12 @@ class QuantGoldBot:
                 )
                 await self.safe_edit(query, admin_update_card)
 
-                ref_url = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+                ref_url = os.getenv(
+                    "CAPITAL_REFERRAL_URL",
+                    "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+                )
+                support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+                support_url = f"https://t.me/{support_handle}"
                 if tier_code != "rej":
                     user_card = (
                         f"🎉 <b>[សូមអបអរសាទរ! លោកអ្នកទទួលបាន VIP LICENSE ជោគជ័យ]</b> 👑\n"
@@ -2057,20 +2073,20 @@ class QuantGoldBot:
                         f"ដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap BUY/SELL & 24/7 Auto-Trade) "
                         f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com ជាដាច់ខាត ៖\n"
                         f"1. ចុះឈ្មោះតាម Link ផ្លូវការ ៖ <a href='{ref_url}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
-                        f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីបើកដំណើរការ!\n"
+                        f"2. ទាក់ទងទៅកាន់ ជំនួយការ @{support_handle} ដើម្បីភ្ជាប់ភ្លាមៗ!\n"
                         f"══════════════════════════════════════\n"
                         f"💡 <i>លោកអ្នកអាចពិនិត្យស្ថានភាព License គ្រប់ពេលតាមរយៈ /license</i>"
                     )
                     user_kb = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_url)],
-                        [InlineKeyboardButton("📞 ផ្ញើលេខគណនីទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+                        [InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_url)],
+                        [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)]
                     ])
                 else:
                     user_card = (
                         f"❌ <b>[សេចក្តីជូនដំណឹង VIP LICENSE]</b>\n"
                         f"══════════════════════════════════════\n"
                         f"សំណើសុំ VIP License របស់អ្នកត្រូវបានបដិសេធ ឬដកហូតដោយ Super Admin។\n"
-                        f"សូមទាក់ទងមកកាន់ @soknitha_support សម្រាប់ព័ត៌មានបន្ថែម។"
+                        f"សូមទាក់ទងមកកាន់ ជំនួយការ @{support_handle} សម្រាប់ព័ត៌មានបន្ថែម。"
                     )
                     user_kb = None
 
@@ -2159,7 +2175,12 @@ class QuantGoldBot:
                 await query.answer(f"License: {res.get('tier_title', tier_code)}")
 
                 # Send Telegram notification to user
-                ref_url = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
+                ref_url = os.getenv(
+                    "CAPITAL_REFERRAL_URL",
+                    "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+                )
+                support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+                support_url = f"https://t.me/{support_handle}"
                 if tier_code != "rej":
                     user_card = (
                         f"🎉 <b>[សូមអបអរសាទរ! លោកអ្នកទទួលបាន VIP LICENSE ជោគជ័យ]</b> 👑\n"
@@ -2170,13 +2191,13 @@ class QuantGoldBot:
                         f"ដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap BUY/SELL & 24/7 Auto-Trade) "
                         f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com ជាដាច់ខាត ៖\n"
                         f"1. ចុះឈ្មោះតាម Link ផ្លូវការ ៖ <a href='{ref_url}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
-                        f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីបើកដំណើរការ!\n"
+                        f"2. ទាក់ទងទៅកាន់ ជំនួយការ @{support_handle} ដើម្បីភ្ជាប់ភ្លាមៗ!\n"
                         f"══════════════════════════════════════\n"
                         f"💡 <i>លោកអ្នកអាចពិនិត្យស្ថានភាព License គ្រប់ពេលតាមរយៈ /license</i>"
                     )
                     user_kb = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ", url=ref_url)],
-                        [InlineKeyboardButton("📞 ផ្ញើលេខគណនីទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+                        [InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_url)],
+                        [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)]
                     ])
                     try:
                         await context.bot.send_message(chat_id=target_cid, text=user_card, parse_mode="HTML", reply_markup=user_kb)

@@ -164,6 +164,8 @@ class QuantGoldCapitalBridge:
 
     def build_vip_license_required_card(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
         """Renders an institutional VIP License onboarding card for unlicensed users."""
+        support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+        support_url = f"https://t.me/{support_handle}"
         card = (
             f"👑 <b>[ANGKOR QUANT - VIP LICENSE REQUIRED]</b> 🏛️\n"
             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -180,42 +182,50 @@ class QuantGoldCapitalBridge:
         )
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("👑 ស្នើសុំ VIP License (Request License)", callback_data="btn_qgold_req_license")],
-            [InlineKeyboardButton("📞 ទំនាក់ទំនង Admin (@soknitha_support)", url="https://t.me/soknitha_support")]
+            [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)]
         ])
         return card, kb
 
     def build_vip_referral_required_card(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
         """Renders an institutional VIP onboarding card for unverified Capital.com users (Invariant 36)."""
-        ref_link = os.getenv("CAPITAL_REFERRAL_URL", "https://capital.com")
-        dossier = db.get_user_license_details(chat_id)
-        tier_lbl = dossier.get("tier_label", "ACTIVE VIP")
+        ref_link = os.getenv(
+            "CAPITAL_REFERRAL_URL",
+            "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+        )
+        support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+        support_url = f"https://t.me/{support_handle}"
+
+        dossier = db.get_user_license_details(chat_id) or {}
+        tier_lbl = dossier.get("tier_label", "👑 LIFETIME VIP (គ្មានដែនកំណត់)")
         card = (
-            f"🛡️ <b>[ANGKOR QUANT - CAPITAL.COM REGISTRATION REQUIRED]</b> 🏛️\n"
+            f"🛡️ <b>[ANGKOR QUANT - REGISTRATION REQUIRED]</b> 🏛️\n"
             f"{ui_standards.DIVIDER_HEAVY}\n"
             f"👑 <b>ស្ថានភាព VIP License ៖</b> <code>{tier_lbl}</code>\n"
-            f"⚠️ <b>ស្ថានភាព Capital.com ៖</b> 🔴 <b>មិនទាន់ភ្ជាប់ (Registration Required)</b>\n\n"
-            f"ℹ️ <b>លក្ខខណ្ឌកាតព្វកិច្ចជួញដូរ (Invariant 36) ៖</b>\n"
-            f"លោកអ្នកមាន VIP License រួចហើយ! ប៉ុន្តែដើម្បីដំណើរការជួញដូរផ្ទាល់ (1-Tap & Auto Trading) "
-            f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី Capital.com តាមរយៈ Partner Link ផ្លូវការ "
-            f"ដើម្បីឱ្យប្រព័ន្ធ AI អាចបញ្ជូន Order ទៅកាន់ Broker បាន។\n\n"
+            f"⚠️ <b>ស្ថានភាព ៖</b> 🔴 <b>មិនទាន់ភ្ជាប់ (Registration Required)</b>\n"
+            f"ℹ️ <b>លក្ខខណ្ឌកាតព្វកិច្ចជួញដូរ ៖</b>\n"
+            f"លោកអ្នកមាន VIP License រួចហើយ! ប៉ុន្តែដើម្បីដំណើរការជួញដូរផ្ទាល់ (Auto Trading) "
+            f"ប្រព័ន្ធតម្រូវឱ្យភ្ជាប់គណនី តាមរយៈ Partner Link ផ្លូវការ "
+            f"ដើម្បីឱ្យប្រព័ន្ធ AI អាចបញ្ជូន Order ទៅកាន់ Broker បាន។\n"
             f"📝 <b>ជំហានងាយៗទាំង ២ ៖</b>\n"
-            f"1. បង្កើតគណនី Capital.com តាម Link ផ្លូវការ ៖ <a href='{ref_link}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
-            f"2. ផ្ញើលេខគណនី (Account ID) ទៅកាន់ Admin @soknitha_support ដើម្បីភ្ជាប់ភ្លាមៗ!\n"
-            f"   <i>(ឬបញ្ចូល API Credentials ផ្ទាល់ខ្លួនតាមរយៈ Main Bot /capital)</i>\n"
-            f"{ui_standards.DIVIDER_LIGHT}\n"
-            f"💡 <i>លោកអ្នកនៅតែអាចមើល Signal 19 Timeframes (/signal) និងពិនិត្យតម្លៃមាស (/status) បានដោយសេរី!</i>"
+            f"1. បង្កើតគណនី តាម Link ផ្លូវការ ៖ <a href='{ref_link}'>ចុចទីនេះដើម្បីចុះឈ្មោះ</a>\n"
+            f"2. ទាក់ទងទៅកាន់ ជំនួយការ @{support_handle} ដើម្បីភ្ជាប់ភ្លាមៗ!\n"
+            f"(ឬបញ្ចូល API Credentials ផ្ទាល់ខ្លួនតាមរយៈ Main Bot /capital)\n"
+            f"{ui_standards.DIVIDER_LIGHT}"
         )
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com ឥឡូវនេះ (Register)", url=ref_link)],
-            [InlineKeyboardButton("📞 ផ្ញើ Account ID ទៅ Admin (@soknitha_support)", url="https://t.me/soknitha_support")],
+            [InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_link)],
+            [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
             [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
         ])
         return card, kb
 
     def build_awaiting_approval_card(self, chat_id: int) -> Tuple[str, InlineKeyboardMarkup]:
         """Renders an institutional card for users whose Capital.com credentials are registered but awaiting Super Admin approval."""
+        support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+        support_url = f"https://t.me/{support_handle}"
+
         dossier = db.get_user_license_details(chat_id) or {}
-        tier_lbl = dossier.get("tier_label", "ACTIVE VIP")
+        tier_lbl = dossier.get("tier_label", "👑 LIFETIME VIP (គ្មានដែនកំណត់)")
         creds = db.get_user_capital_credentials(chat_id) or {}
         acc_id = str(creds.get("account_id", "N/A"))
         masked_acc = acc_id[:4] + "***" + acc_id[-4:] if len(acc_id) >= 8 else acc_id
@@ -230,12 +240,12 @@ class QuantGoldCapitalBridge:
             f"ព័ត៌មានគណនី Capital.com របស់អ្នកត្រូវបានកត់ត្រាក្នុងប្រព័ន្ធរួចរាល់ហើយ។ "
             f"ដើម្បីធានាសុវត្ថិភាពដើមទុន ១០០% ប្រព័ន្ធតម្រូវឱ្យ Super Admin ពិនិត្យ "
             f"និងអនុម័តបើកសិទ្ធិជួញដូរពេញលេញ (Full /capital Services) ជាមុនសិន។\n\n"
-            f"📞 <i>សូមទាក់ទងមកកាន់ Admin @soknitha_support ដើម្បីពន្លឿនការអនុម័ត 1-Click!</i>\n"
+            f"📞 <i>សូមទាក់ទងមកកាន់ ជំនួយការ @{support_handle} ដើម្បីពន្លឿនការអនុម័ត 1-Click!</i>\n"
             f"{ui_standards.DIVIDER_LIGHT}\n"
             f"💡 <i>លោកអ្នកនៅតែអាចមើល Signal 19 Timeframes (/signal) និងពិនិត្យតម្លៃមាស (/status) បានដោយសេរី!</i>"
         )
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 ទំនាក់ទំនង Admin (@soknitha_support)", url="https://t.me/soknitha_support")],
+            [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
             [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
         ])
         return card, kb
