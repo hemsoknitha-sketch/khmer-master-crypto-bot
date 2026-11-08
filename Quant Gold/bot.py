@@ -496,6 +496,100 @@ class QuantGoldBot:
             card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
             return await self.safe_reply(update, card, reply_markup=kb)
 
+    def _parse_capital_api_tokens(self, raw_tokens: List[str]) -> Tuple[bool, str, Dict[str, str]]:
+        """
+        Institutional Fault-Tolerant Capital.com API Argument Parser (AQ84):
+        Intelligently resolves:
+          /capital API <API_KEY> <ACCOUNT_ID> <EMAIL> <PASSWORD> live
+        Tolerates:
+          - Enclosure in angle brackets <...>
+          - Enclosure in double quotes "..." or single quotes '...'
+          - Swapped order between Account ID and Email
+          - Missing 'live' flag (defaults to 'live')
+          - Missing Account ID (3 or 4 params: auto-discovered from broker API)
+        """
+        if not raw_tokens:
+            return False, "EMPTY_INPUT", {}
+
+        cleaned = []
+        for t in raw_tokens:
+            s = str(t or "").strip().strip(",;").strip('"').strip("'")
+            if s.startswith("<") and s.endswith(">") and len(s) > 2:
+                s = s[1:-1].strip()
+            if s:
+                cleaned.append(s)
+
+        if len(cleaned) < 3:
+            return False, "TOO_FEW_ARGUMENTS", {}
+
+        # 1. Mode extraction
+        mode = "live"
+        if cleaned[-1].lower() in ["live", "demo", "real", "mainnet"]:
+            mode = "demo" if cleaned[-1].lower() == "demo" else "live"
+            cleaned = cleaned[:-1]
+        elif cleaned[0].lower() in ["live", "demo"]:
+            mode = "demo" if cleaned[0].lower() == "demo" else "live"
+            cleaned = cleaned[1:]
+
+        if len(cleaned) < 3:
+            return False, "TOO_FEW_ARGUMENTS", {}
+
+        # 2. Check for unreplaced template placeholder words
+        placeholder_keywords = {
+            "API_KEY", "APIKEY", "<API_KEY>",
+            "ACCOUNT_ID", "ACCOUNTID", "<ACCOUNT_ID>",
+            "EMAIL", "<EMAIL>", "YOUR_EMAIL",
+            "PASSWORD", "<PASSWORD>", "YOUR_PASSWORD", "PASS", "PWD"
+        }
+        for item in cleaned:
+            if item.upper() in placeholder_keywords:
+                return False, f"PLACEHOLDER:{item}", {}
+
+        # 3. Extract Email (contains '@')
+        email_idx = -1
+        for i, tok in enumerate(cleaned):
+            if "@" in tok and "." in tok:
+                email_idx = i
+                break
+        if email_idx == -1:
+            for i, tok in enumerate(cleaned):
+                if "@" in tok:
+                    email_idx = i
+                    break
+
+        if email_idx == -1:
+            return False, "MISSING_EMAIL", {}
+
+        email_val = cleaned[email_idx]
+        rem = [cleaned[i] for i in range(len(cleaned)) if i != email_idx]
+
+        # 4. Extract Account ID (numeric digits >= 6)
+        acc_idx = -1
+        for i, tok in enumerate(rem):
+            clean_digits = tok.replace("-", "").replace("_", "")
+            if clean_digits.isdigit() and len(clean_digits) >= 6:
+                acc_idx = i
+                break
+
+        acc_val = ""
+        if acc_idx != -1:
+            acc_val = rem[acc_idx]
+            rem = [rem[i] for i in range(len(rem)) if i != acc_idx]
+
+        if len(rem) < 2:
+            return False, "MISSING_KEY_OR_PASSWORD", {}
+
+        api_key_val = rem[0]
+        pwd_val = " ".join(rem[1:])
+
+        return True, "OK", {
+            "api_key": api_key_val,
+            "account_id": acc_val,
+            "email": email_val,
+            "password": pwd_val,
+            "mode": mode
+        }
+
     async def handle_capital_api(self, update: Update, context: ContextTypes.DEFAULT_TYPE, params: List[str]):
         """
         Super Smart Capital.com API Vault & 1-Click Approval System (AQ84 & Invariant 36):
@@ -530,10 +624,10 @@ class QuantGoldBot:
                 f"🟢 <b>ស្ថានភាពតភ្ជាប់ ៖</b> <code>{status_txt}</code>\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
                 f"📝 <b>របៀបភ្ជាប់ API Credentials (LIVE MAINNET) ៖</b>\n"
-                f"សូមវាយបញ្ជាតាមទម្រង់ផ្លូវការខាងក្រោម ៖\n"
+                f"សូមវាយបញ្ជាតាមទម្រង់ផ្លូវការខាងក្រោម (ចុចលើប្រអប់ដើម្បី Copy) ៖\n\n"
                 f"• <b>ទម្រង់ពេញលេញ (Recommended) ៖</b>\n"
                 f"<code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n\n"
-                f"• <b>ទម្រង់កាត់ (Auto-Fetch ID) ៖</b>\n"
+                f"• <b>ទម្រង់កាត់ (Auto-Fetch Account ID) ៖</b>\n"
                 f"<code>/capital API &lt;API_KEY&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n\n"
                 f"👉 <b>ឧទាហរណ៍ជាក់ស្តែង (កុំដាក់សញ្ញា &lt; &gt;) ៖</b>\n"
                 f"<code>/capital API Vm6tyK0cHtqq6fPe 216890638652757188 client@gmail.com MyPass123! live</code>\n"
@@ -542,6 +636,7 @@ class QuantGoldBot:
                 f"និងតម្រូវឱ្យ Super Admin អនុម័ត 1-Click ដើម្បីការពារសុវត្ថិភាពដើមទុន។</i>"
             )
             buttons = [
+                [InlineKeyboardButton("📖 របៀបស្វែងរក API Key & Account ID", callback_data="cap_api_instructions")],
                 [InlineKeyboardButton("🔗 ចុះឈ្មោះ Capital.com (Official Partner)", url=ref_url)],
                 [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
                 [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
@@ -556,61 +651,61 @@ class QuantGoldBot:
         cred_args = list(params)
         is_admin_override = False
 
-        if is_admin and len(cred_args) >= 4 and cred_args[0].isdigit():
+        if is_admin and len(cred_args) >= 4 and cred_args[0].isdigit() and len(cred_args[0]) <= 10:
             target_cid = int(cred_args[0])
             cred_args = cred_args[1:]
             is_admin_override = True
 
-        if len(cred_args) < 3:
-            return await self.safe_reply(
-                update,
-                f"⚠️ <b>ទម្រង់មិនត្រឹមត្រូវ (Missing Arguments)!</b>\n"
-                f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"សូមវាយបញ្ជាតាមទម្រង់ខាងក្រោម ៖\n"
-                f"• <code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n"
-                f"• ឬ <code>/capital API &lt;API_KEY&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n\n"
-                f"👉 <b>ឧទាហរណ៍ ៖</b>\n"
-                f"<code>/capital API 9a8b7c6d5e 216890638652757188 client@gmail.com Pass1234 live</code>"
-            )
-
-        # 3. Parse parameters
-        if len(cred_args) >= 5:
-            in_key = str(cred_args[0]).strip()
-            in_acc = str(cred_args[1]).strip()
-            in_email = str(cred_args[2]).strip()
-            in_pwd = str(cred_args[3]).strip()
-            in_mode = str(cred_args[4]).strip().lower()
-        elif len(cred_args) == 4:
-            if cred_args[3].lower() in ["live", "demo"]:
-                in_key = str(cred_args[0]).strip()
-                in_acc = ""
-                in_email = str(cred_args[1]).strip()
-                in_pwd = str(cred_args[2]).strip()
-                in_mode = str(cred_args[3]).strip().lower()
+        # 3. Fault-Tolerant Intelligent Argument Parsing
+        parse_ok, parse_err, parsed = self._parse_capital_api_tokens(cred_args)
+        if not parse_ok:
+            if parse_err.startswith("PLACEHOLDER:"):
+                kw = parse_err.split(":", 1)[1]
+                return await self.safe_reply(
+                    update,
+                    f"⚠️ <b>សូមជំនួសពាក្យគំរូ <code>{kw}</code> ដោយទិន្នន័យជាក់ស្តែង!</b> 🔑\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"ប្រព័ន្ធរកឃើញថាលោកអ្នកបានវាយពាក្យគំរូ <code>{kw}</code>។ សូមជំនួសដោយទិន្នន័យពិតប្រាកដរបស់អ្នក (កុំដាក់សញ្ញា &lt; &gt;) ៖\n\n"
+                    f"👉 <b>គំរូវាយបញ្ជាត្រឹមត្រូវ ៖</b>\n"
+                    f"<code>/capital API Vm6tyK0cHtqq6fPe 216890638652757188 client@gmail.com Pass1234 live</code>"
+                )
+            elif parse_err == "MISSING_EMAIL":
+                return await self.safe_reply(
+                    update,
+                    f"⚠️ <b>រកមិនឃើញ Email គណនី Capital.com!</b> 📧\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"សូមប្រាកដថាបានបញ្ចូល Email ដែលអ្នកបានចុះឈ្មោះជាមួយ Capital.com (ឧទាហរណ៍ ៖ <code>your_email@gmail.com</code>)។\n\n"
+                    f"👉 <b>ទម្រង់ត្រឹមត្រូវ ៖</b>\n"
+                    f"<code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>"
+                )
+            elif parse_err == "MISSING_KEY_OR_PASSWORD":
+                return await self.safe_reply(
+                    update,
+                    f"⚠️ <b>ខ្វះ API Key ឬ Password គណនី!</b> 🔐\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"សូមប្រាកដថាបានបញ្ចូលទាំង API Key និង Password គណនី Capital.com របស់អ្នក។\n\n"
+                    f"👉 <b>ទម្រង់ត្រឹមត្រូវ ៖</b>\n"
+                    f"<code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>"
+                )
             else:
-                in_key = str(cred_args[0]).strip()
-                in_acc = str(cred_args[1]).strip()
-                in_email = str(cred_args[2]).strip()
-                in_pwd = str(cred_args[3]).strip()
-                in_mode = "live"
-        else: # 3 args
-            in_key = str(cred_args[0]).strip()
-            in_acc = ""
-            in_email = str(cred_args[1]).strip()
-            in_pwd = str(cred_args[2]).strip()
-            in_mode = "live"
+                return await self.safe_reply(
+                    update,
+                    f"⚠️ <b>ទម្រង់មិនត្រឹមត្រូវ (Missing Arguments)!</b>\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"សូមវាយបញ្ជាតាមទម្រង់ផ្លូវការខាងក្រោម ៖\n"
+                    f"• <code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n"
+                    f"• ឬ <code>/capital API &lt;API_KEY&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n\n"
+                    f"👉 <b>ឧទាហរណ៍ជាក់ស្តែង ៖</b>\n"
+                    f"<code>/capital API Vm6tyK0cHtqq6fPe 216890638652757188 client@gmail.com Pass1234 live</code>"
+                )
 
-        # 4. Placeholder checks
-        if any(x in in_key or x in in_email or x in in_pwd or x in in_acc for x in ["<", ">", "API_KEY", "EMAIL", "PASSWORD"]):
-            return await self.safe_reply(
-                update,
-                f"⚠️ <b>សូមបញ្ចូលព័ត៌មានជាក់ស្តែង!</b> 🔑\n"
-                f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"ប្រព័ន្ធរកឃើញថាលោកអ្នកបានវាយពាក្យគំរូ <code>&lt;...&gt;</code>។ សូមជំនួសដោយទិន្នន័យពិតប្រាកដ ដោយមិនបាច់ដាក់សញ្ញា &lt; &gt; ឡើយ ៖\n\n"
-                f"• គំរូ ៖ <code>/capital API 9a8b7c6d5e 216890638652757188 client@gmail.com Pass1234 live</code>"
-            )
+        in_key = parsed["api_key"]
+        in_acc = parsed["account_id"]
+        in_email = parsed["email"]
+        in_pwd = parsed["password"]
+        in_mode = parsed["mode"]
 
-        # 5. Strictly LIVE MAINNET for VIP Users
+        # 4. Strictly LIVE MAINNET for VIP Users
         if in_mode == "demo" and not is_admin:
             return await self.safe_reply(
                 update,
@@ -625,7 +720,7 @@ class QuantGoldBot:
 
         is_demo_mode = (in_mode == "demo") if is_admin else False
 
-        # 6. Validating credentials against Capital.com
+        # 5. Validating credentials against Capital.com
         wait_msg = await self.safe_reply(update, "⏳ <i>កំពុងផ្ទៀងផ្ទាត់ API Credentials ជាមួយ Capital.com Broker...</i>")
 
         valid, vmsg, b_info = await asyncio.to_thread(
@@ -634,18 +729,31 @@ class QuantGoldBot:
         )
 
         if not valid:
+            err_lower = str(vmsg or "").lower()
+            if "invalid credentials" in err_lower or "authentication" in err_lower or "401" in err_lower:
+                diag_help = "Email ឬ Password មិនត្រឹមត្រូវ! សូមផ្ទៀងផ្ទាត់ Password ដែលអ្នកប្រើចូល Login លើ Web Capital.com។"
+            elif "api key" in err_lower or "x-cap-api-key" in err_lower:
+                diag_help = "API Key មិនត្រឹមត្រូវ ឬផុតកំណត់! សូមចូល Capital.com Settings -> API Integrations ដើម្បីបង្កើត Key ថ្មី។"
+            elif "connection" in err_lower or "timeout" in err_lower:
+                diag_help = "បញ្ហាតភ្ជាប់ Network ទៅកាន់ Broker! សូមរង់ចាំ ១០ វិនាទី រួចសាកល្បងម្តងទៀត។"
+            else:
+                diag_help = f"ការផ្ទៀងផ្ទាត់មិនជោគជ័យ ៖ {vmsg}"
+
             fail_card = (
                 f"❌ <b>ការភ្ជាប់ CAPITAL.COM API មិនជោគជ័យ!</b> ⚠️\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"⚠️ <b>មូលហេតុ ៖</b> <code>{vmsg}</code>\n"
+                f"⚠️ <b>ការវិនិច្ឆ័យ ៖</b> <code>{diag_help}</code>\n"
+                f"ℹ️ <b>សារបច្ចេកទេស ៖</b> <code>{vmsg}</code>\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
                 f"💡 <b>ការណែនាំផ្ទៀងផ្ទាត់ ៖</b>\n"
                 f"1. ពិនិត្យមើល <code>API_KEY</code> ដែលបានបង្កើតលើ Capital.com Web Platform\n"
                 f"2. ពិនិត្យ <code>Email/Identifier</code> និង <code>Password</code> ឱ្យបានត្រឹមត្រូវ\n"
-                f"3. សម្រាប់ VIP Users សូមបញ្ជាក់ <code>live</code> នៅចុងបញ្ចប់\n"
-                f"• គំរូ ៖ <code>/capital API &lt;KEY&gt; &lt;ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>"
+                f"3. សម្រាប់ VIP Users សូមបញ្ជាក់ <code>live</code> នៅចុងបញ្ចប់\n\n"
+                f"👉 <b>គំរូវាយបញ្ជា ៖</b>\n"
+                f"<code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>"
             )
             fail_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📖 របៀបស្វែងរក API Key & Account ID", callback_data="cap_api_instructions")],
                 [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
                 [InlineKeyboardButton("🔄 ព្យាយាមម្តងទៀត", callback_data="cap_api_help")]
             ])
@@ -2720,6 +2828,34 @@ class QuantGoldBot:
 
         elif data == "cap_api_help":
             await self.handle_capital_api(update, context, [])
+
+        elif data == "cap_api_instructions":
+            support_handle = os.getenv("SUPPORT_TELEGRAM_HANDLE", "AngkorQuantSupport").replace("@", "")
+            support_url = f"https://t.me/{support_handle}"
+            guide_card = (
+                f"📖 <b>[របៀបបង្កើត &amp; ស្វែងរក CAPITAL.COM API KEY]</b> 🏛️\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"📌 <b>ជំហានងាយៗទាំង ៤ ៖</b>\n\n"
+                f"1️⃣ <b>ចូលទៅកាន់ Web Platform ៖</b>\n"
+                f"បើក Browser ចូល <a href='https://capital.com'>Capital.com</a> ហើយ Login ចូលគណនីរបស់អ្នក។\n\n"
+                f"2️⃣ <b>បង្កើត API Key ៖</b>\n"
+                f"ចុចលើ <b>Settings</b> (រូបកង់ធ្មេញ) ➡️ ជ្រើសរើស <b>API Integrations</b> ➡️ ចុចប៊ូតុង <b>Generate New Key</b> ➡️ ដាក់ឈ្មោះ (ឧ. <code>AngkorQuant</code>) ➡️ ចម្លង API Key ទុក។\n\n"
+                f"3️⃣ <b>ស្វែងរក Account ID ៖</b>\n"
+                f"មើលនៅជ្រុងខាងឆ្វេងខាងលើនៃអេក្រង់ (ក្រោមកន្លែងឈ្មោះរបស់អ្នក) លោកអ្នកនឹងឃើញលេខគណនីវែង ឧទាហរណ៍ ៖ <code>216890638652757188</code>។\n\n"
+                f"4️⃣ <b>បញ្ចូលទិន្នន័យទៅកាន់ Bot ៖</b>\n"
+                f"ចម្លងទម្រង់ខាងក្រោម ហើយជំនួសដោយទិន្នន័យផ្ទាល់ខ្លួនរបស់អ្នក ៖\n"
+                f"<code>/capital API &lt;API_KEY&gt; &lt;ACCOUNT_ID&gt; &lt;EMAIL&gt; &lt;PASSWORD&gt; live</code>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"👉 <b>ឧទាហរណ៍ជាក់ស្តែង ៖</b>\n"
+                f"<code>/capital API Vm6tyK0cHtqq6fPe 216890638652757188 client@gmail.com MyPass123! live</code>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 <i>ប្រសិនបើត្រូវការជំនួយផ្ទាល់ សូមចុចប៊ូតុងទាក់ទងជំនួយការខាងក្រោម!</i>"
+            )
+            g_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
+                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ API Vault", callback_data="cap_api_help")]
+            ])
+            await self.safe_reply(update, guide_card, reply_markup=g_kb)
 
         elif data == "cap_api_delete":
             db.delete_user_capital_credentials(chat_id)

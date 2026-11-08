@@ -224,9 +224,12 @@ class QuantGoldCapitalBridge:
             [InlineKeyboardButton("🔗 ចុះឈ្មោះតាម Link ផ្លូវការ (Register)", url=ref_link)],
             [
                 InlineKeyboardButton("🔑 របៀបភ្ជាប់ API (/capital API)", callback_data="cap_api_help"),
-                InlineKeyboardButton(f"📞 ជំនួយការ (@{support_handle})", url=support_url)
+                InlineKeyboardButton("📖 ស្វែងរក API Key", callback_data="cap_api_instructions")
             ],
-            [InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")]
+            [
+                InlineKeyboardButton(f"📞 ជំនួយការ (@{support_handle})", url=support_url),
+                InlineKeyboardButton("🔄 ពិនិត្យការអនុញ្ញាតឡើងវិញ (Re-check)", callback_data="btn_qgold_recheck_auth")
+            ]
         ])
         return card, kb
 
