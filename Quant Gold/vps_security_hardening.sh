@@ -87,6 +87,10 @@ for env_file in "$PROJECT_DIR/.env" "$QG_DIR/.env"; do
     fi
 done
 
+# Ensure all files and databases in project are owned by service user
+chown -R "$ACTUAL_USER:$ACTUAL_GROUP" "$PROJECT_DIR" 2>/dev/null || true
+echo -e "${GREEN}✅ Workspace ownership verified for $ACTUAL_USER:$ACTUAL_GROUP.${NC}"
+
 # ------------------------------------------------------------------------------
 # STEP 3: Zero-OOM 2.0GB Swap Memory Verification
 # ------------------------------------------------------------------------------
