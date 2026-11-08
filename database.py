@@ -4187,7 +4187,7 @@ def set_capital_global_trading_switch(enabled: bool, engine: str = "ALL"):
     elif eng in ["SCALP", "CAPITAL_SCALP"]:
         update_system_setting("cap_global_scalp_enabled", s_val)
 
-def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None, max_positions: Optional[int] = None, schedule_mode: Optional[str] = None, is_demo: Optional[bool] = None, **kwargs) -> int:
+def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None, max_positions: Optional[int] = None, schedule_mode: Optional[str] = None, is_demo: Optional[bool] = None, preserve_super_admin: bool = False, **kwargs) -> int:
     """Enables auto trade / trend scalp for all registered Capital.com users in batch with optional budget, max positions, and schedule mode."""
     set_capital_global_trading_switch(True, engine)
     conn = get_db_connection()
@@ -4196,6 +4196,7 @@ def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None
     try:
         eng = engine.upper()
         demo_val = 1 if is_demo is True else 0
+        where_admin = " WHERE chat_id != 859271875" if preserve_super_admin else ""
         if eng in ["ALL", "AUTO"]:
             # 1. Update existing records in capital_auto_config
             updates = ["is_enabled = 1", f"is_demo = {demo_val}"]
@@ -4210,14 +4211,14 @@ def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None
                 updates.append("schedule_mode = ?")
                 params.append(str(schedule_mode))
             
-            sql = f"UPDATE capital_auto_config SET {', '.join(updates)} WHERE chat_id != 859271875"
+            sql = f"UPDATE capital_auto_config SET {', '.join(updates)}{where_admin}"
             cursor.execute(sql, tuple(params))
-            
-            cursor.execute(f"UPDATE user_capital_credentials SET is_demo = {demo_val} WHERE chat_id != 859271875")
             updated_count += max(0, cursor.rowcount)
+            
+            cursor.execute(f"UPDATE user_capital_credentials SET is_demo = {demo_val}{where_admin}")
 
             # 2. Insert any user who exists in user_capital_credentials but not in capital_auto_config yet
-            cursor.execute("SELECT DISTINCT chat_id FROM user_capital_credentials WHERE chat_id != 859271875")
+            cursor.execute(f"SELECT DISTINCT chat_id FROM user_capital_credentials{where_admin}")
             cred_users = [row[0] for row in cursor.fetchall()]
             set_b = float(budget) if budget is not None else 50.0
             set_m = int(max_positions) if max_positions is not None else 4
@@ -4231,7 +4232,7 @@ def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None
                     updated_count += 1
 
         if eng in ["ALL", "SCALP"]:
-            cursor.execute(f"UPDATE capital_scalp_config SET is_enabled = 1, is_demo = {demo_val} WHERE chat_id != 859271875")
+            cursor.execute(f"UPDATE capital_scalp_config SET is_enabled = 1, is_demo = {demo_val}{where_admin}")
             updated_count += max(0, cursor.rowcount)
         conn.commit()
     except Exception as e:

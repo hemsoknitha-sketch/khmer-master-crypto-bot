@@ -313,16 +313,16 @@ class QuantGoldCapitalBridge:
         try:
             import asyncio
             u_eng = capital_engine.get_user_capital_engine(chat_id)
-            bal_res = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=2.5)
+            bal_res = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=6.0)
             if bal_res and bal_res.get("success"):
                 balance = float(bal_res.get("balance", 0.0))
                 equity = float(bal_res.get("equity", balance))
                 currency = bal_res.get("currency", currency)
-        except Exception:
-            pass
+        except Exception as e_bal:
+            logger.debug(f"Live balance fetch note for {chat_id}: {e_bal}")
 
         balance_str = f"${balance:.2f}"
-        equity_str = f"${equity:.2f}" if equity > 0 else "Real-Time Synced"
+        equity_str = f"${equity:.2f}" if equity > 0 else (f"${balance:.2f}" if balance > 0 else "Real-Time Synced")
 
         card = (
             f"🏛️ <b>[ANGKOR QUANT - CAPITAL LIVE TRADING]</b> 🥇\n"
