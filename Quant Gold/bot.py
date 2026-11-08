@@ -941,6 +941,26 @@ class QuantGoldBot:
         except Exception:
             pass
 
+        # Disk Storage inspection (root '/' on Linux VPS, current drive on Windows)
+        disk_total_gb = 0.0
+        disk_used_gb = 0.0
+        disk_pct = 0.0
+        try:
+            disk_path = '/' if os.name != 'nt' else os.path.splitdrive(os.getcwd())[0] + '\\'
+            disk = psutil.disk_usage(disk_path)
+            disk_total_gb = disk.total / (1024 ** 3)
+            disk_used_gb = disk.used / (1024 ** 3)
+            disk_pct = disk.percent
+        except Exception:
+            try:
+                import shutil
+                total_d, used_d, free_d = shutil.disk_usage(os.getcwd())
+                disk_total_gb = total_d / (1024 ** 3)
+                disk_used_gb = used_d / (1024 ** 3)
+                disk_pct = (used_d / total_d) * 100.0 if total_d > 0 else 0.0
+            except Exception:
+                pass
+
         hostname = socket.gethostname()
         os_name = f"{platform.system()} {platform.release()}"
 
@@ -1017,6 +1037,9 @@ class QuantGoldBot:
             "ram_percent": ram_pct,
             "swap_total_gb": swap_total_gb,
             "swap_used_gb": swap_used_gb,
+            "disk_total_gb": disk_total_gb,
+            "disk_used_gb": disk_used_gb,
+            "disk_percent": disk_pct,
             "ping_latency_ms": ping_latency_ms,
             "os_name": os_name
         }
@@ -1028,11 +1051,13 @@ class QuantGoldBot:
         host_title = f"Google Cloud VPS ({diag['hostname']})" if diag['is_gcp'] or "quant-gold" in diag['hostname'].lower() else f"Host ({diag['hostname']})"
         machine_info = f" | {diag['machine_type']}" if diag['machine_type'] != "Unknown" else ""
         swap_info = f"\n• Swap Memory: <code>{diag['swap_used_gb']:.2f} GB / {diag['swap_total_gb']:.2f} GB</code> (Zero OOM Shield)" if diag['swap_total_gb'] > 0 else ""
+        disk_info = f"\n• Disk Storage: <code>{diag['disk_percent']:.1f}%</code> ({diag['disk_used_gb']:.2f} GB / {diag['disk_total_gb']:.2f} GB)" if diag.get('disk_total_gb', 0) > 0 else ""
 
         msg = (
             f"🖥️ <b>{host_title} ៖</b>\n"
             f"• CPU Load: <code>{diag['cpu_percent']:.1f}%</code> ({diag['vcpus']} vCPUs{machine_info})\n"
-            f"• RAM: <code>{diag['ram_percent']:.1f}%</code> ({diag['used_ram_gb']:.2f} GB / {diag['total_ram_gb']:.2f} GB){swap_info}\n"
+            f"• RAM: <code>{diag['ram_percent']:.1f}%</code> ({diag['used_ram_gb']:.2f} GB / {diag['total_ram_gb']:.2f} GB){swap_info}"
+            f"{disk_info}\n"
             f"• Region: <code>{diag['region_label']}</code>\n"
             f"• OS / Kernel: <code>{diag['os_name']}</code>\n"
             f"• Latency: <code>&lt; 0.001ms (In-Memory RAM Engine)</code>"
