@@ -596,7 +596,7 @@ class QuantGoldBot:
         elif sub in ["sync", "indexes"]:
             from sync_and_audit_capital_users import ensure_database_indexes
             n = ensure_database_indexes()
-            return await self.safe_reply(update, f"✅ <b>[ADMIN]</b> បានបង្កើត និងត្រួតពិនិត្យ <code>{n} Indexes</code> ក្នុង Database រួចរាល់! B-Tree O(log N) ដំណើរការ <0.005ms។")
+            return await self.safe_reply(update, f"✅ <b>[ADMIN]</b> បានបង្កើត និងត្រួតពិនិត្យ <code>{n} Indexes</code> ក្នុង Database រួចរាល់! B-Tree O(log N) ដំណើរការ &lt;0.005ms។")
         else:
             return await self.handle_inspect_user(update, args[0])
 
@@ -993,7 +993,7 @@ class QuantGoldBot:
         if new_st and live_avail < 4.07 and not (is_admin and live_bal < 10.0):
             warn_note = "\n⚠️ <i>ចំណាំ៖ Free Margin ទាបជាង $4.07 (ទំហំ Margin អប្បបរមា 0.5 oz Gold)។ ប្រព័ន្ធរង់ចាំការដាក់ប្រាក់បន្ថែម ឬប្តូរទៅ Demo!</i>\n"
 
-        budget_suffix = " (Demo Mirror | កែប្រែតាម /capital on <budget>)" if (is_admin and live_bal < 10.0) else ""
+        budget_suffix = " (Demo Mirror | កែប្រែតាម <code>/capital on &lt;budget&gt;</code>)" if (is_admin and live_bal < 10.0) else ""
 
         msg = (
             f"🤖 <b>[QUANT GOLD 24/7 AUTONOMOUS ENGINE]</b> 🥇\n"
