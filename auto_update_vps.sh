@@ -237,9 +237,14 @@ stty onlcr 2>/dev/null || true
 printf "\r\n"
 
 echo "======================================================================"
-echo "🎉 [SUCCESS] KHMER MASTER CRYPTO BOT UPDATED & RUNNING HEALTHY!"
+echo "🎉 [SUCCESS] ANGKOR QUANT BOT UPDATED & RUNNING HEALTHY!"
 echo "======================================================================"
-echo "👉 ដើម្បីមើល Live Logs សូមវាយ:"
-echo "   sudo journalctl -u khmer-master-crypto-bot -f"
+if [ -f "/etc/systemd/system/quant-gold.service" ]; then
+    echo "👉 ដើម្បីមើល Live Logs Quant Gold សូមវាយ:"
+    echo "   sudo journalctl -u quant-gold.service -n 50 -f"
+else
+    echo "👉 ដើម្បីមើល Live Logs សូមវាយ:"
+    echo "   sudo journalctl -u khmer-master-crypto-bot -n 50 -f"
+fi
 echo "======================================================================"
 echo ""
