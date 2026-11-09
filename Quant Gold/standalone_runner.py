@@ -111,7 +111,13 @@ class QuantGoldDaemon:
             if (now - self.last_heartbeat) >= self.heartbeat_interval:
                 self.last_heartbeat = now
                 bid, ask, spread = self.execution_engine.get_live_gold_price_quote()
-                logger.info(f"💓 [HEARTBEAT] Cycle #{self.cycle_count} | GOLD: Bid=${bid:.2f} Ask=${ask:.2f} (Spread: ${spread:.2f}) | Engine Healthy 24/7")
+                trade_status = "Standby (Scanning high-win setups)"
+                if self.execution_engine.has_active_gold_trade():
+                    d_id = self.execution_engine._active_gold_deal_id
+                    d_dir = self.execution_engine._active_gold_direction or "TRADE"
+                    d_stg = self.execution_engine._active_gold_stage or "ACTIVE"
+                    trade_status = f"Managing Active {d_dir} #{d_id} ({d_stg})"
+                logger.info(f"💓 [HEARTBEAT] Cycle #{self.cycle_count} | GOLD: Bid=${bid:.2f} Ask=${ask:.2f} (Spread: ${spread:.2f}) | {trade_status} | Engine Healthy 24/7")
 
             # Dynamic pacing (sleep remainder of 6 seconds)
             elapsed = time.time() - t0

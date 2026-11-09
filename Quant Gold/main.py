@@ -199,10 +199,16 @@ class QuantGoldSystem:
             if (now - self.last_heartbeat) >= self.heartbeat_interval:
                 self.last_heartbeat = now
                 bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
+                trade_status = "Standby (Scanning high-win setups)"
+                if self.exec_engine.has_active_gold_trade():
+                    d_id = self.exec_engine._active_gold_deal_id
+                    d_dir = self.exec_engine._active_gold_direction or "TRADE"
+                    d_stg = self.exec_engine._active_gold_stage or "ACTIVE"
+                    trade_status = f"Managing Active {d_dir} #{d_id} ({d_stg})"
                 logger.info(
                     f"💓 [HEARTBEAT] Cycle #{self.cycle_count} | "
                     f"GOLD: Bid=${bid:.2f} Ask=${ask:.2f} (Spread: ${spread:.2f}) | "
-                    f"19-TF AI Engine & Telegram Bot HEALTHY 24/7"
+                    f"{trade_status} | 19-TF AI Engine HEALTHY 24/7"
                 )
 
             # Auto-recovery for Telegram polling if disconnected

@@ -203,6 +203,10 @@ class QuantGoldExecutionEngine:
         self._trade_cooldown_seconds: float = 300.0  # 5 min after win, 15 min after loss
         self._signal_cooldown_seconds: float = 300.0  # Min 5 min between new signals
         self._peak_upl_map: Dict[str, float] = {}  # deal_id -> peak UPL for Flash Shock Harvest
+        self._last_broker_adopt_ts: float = 0.0
+        self._cached_broker_gold_count: int = 0
+        self._user_standby_log_ts: Dict[int, float] = {}
+        self._admin_demo_log_ts: float = 0.0
 
     def has_active_gold_trade(self) -> bool:
         """
@@ -227,7 +231,111 @@ class QuantGoldExecutionEngine:
                     return True
         except Exception:
             pass
+
+        if getattr(self, "_cached_broker_gold_count", 0) > 0:
+            return True
+
         return False
+
+    async def _sync_and_adopt_broker_positions(self) -> int:
+        """
+        Synchronizes live broker open positions on Gold into SQLite and in-memory lifecycle state:
+        1. Checks Super Admin (Live + Demo mirror) and all active VIP accounts.
+        2. If an open GOLD position exists on Capital.com that is not yet in capital_auto_trades,
+           it automatically adopts and records it so the lifecycle tracking engine manages it.
+        3. Sets self._active_gold_deal_id and active trade state so new signal spam is strictly muted.
+        """
+        now = time.time()
+        if (now - getattr(self, "_last_broker_adopt_ts", 0.0)) < 10.0:
+            return getattr(self, "_cached_broker_gold_count", 0)
+
+        self._last_broker_adopt_ts = now
+        active_users = db.get_active_capital_auto_users() or []
+        targets = [
+            {"chat_id": 859271875, "is_demo": False},
+            {"chat_id": 859271875, "is_demo": True}
+        ]
+        for u in active_users:
+            cid = u.get("chat_id")
+            if cid and cid != 859271875:
+                targets.append({"chat_id": cid, "is_demo": bool(u.get("is_demo", False))})
+
+        total_gold_found = 0
+        for t in targets:
+            cid = t["chat_id"]
+            is_demo = t["is_demo"]
+            try:
+                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                if not u_eng:
+                    continue
+                positions = await asyncio.wait_for(asyncio.to_thread(u_eng.get_open_positions), timeout=3.5)
+                if not positions:
+                    continue
+
+                for p_item in positions:
+                    pos = p_item.get("position", p_item)
+                    market = p_item.get("market", {})
+                    epic = str(market.get("epic") or pos.get("epic") or "").upper()
+                    if epic != "GOLD":
+                        continue
+
+                    total_gold_found += 1
+                    deal_id = str(pos.get("dealId") or pos.get("deal_id") or "")
+                    if not deal_id:
+                        continue
+
+                    direction = str(pos.get("direction", "BUY")).upper()
+                    size = float(pos.get("size", 0.5) or 0.5)
+                    level = float(pos.get("level", 0.0) or pos.get("openLevel", 0.0) or 0.0)
+                    sl = float(pos.get("stopLevel", 0.0) or pos.get("sl", 0.0) or 0.0)
+                    tp = float(pos.get("profitLevel", 0.0) or pos.get("tp", 0.0) or 0.0)
+
+                    if level <= 0.0:
+                        bid, ask, _ = self.get_live_gold_price_quote()
+                        level = (bid + ask) / 2.0
+
+                    tp1 = round((level + 7.30) if direction == "BUY" else (level - 7.30), 2)
+                    tp2 = round((level + 15.20) if direction == "BUY" else (level - 15.20), 2)
+                    tp3 = round((level + 24.32) if direction == "BUY" else (level - 24.32), 2)
+                    sl_dist = abs(level - sl) if sl > 0 else 6.08
+
+                    if not db.has_capital_auto_trade_record(deal_id):
+                        db.record_capital_auto_trade(
+                            chat_id=cid,
+                            deal_id=deal_id,
+                            deal_reference=deal_id,
+                            epic="GOLD",
+                            direction=direction,
+                            size=size,
+                            entry_price=level,
+                            sl=sl,
+                            tp=tp if tp > 0 else tp1,
+                            tp1=tp1,
+                            tp2=tp2,
+                            tp3=tp3,
+                            sl_dist=sl_dist,
+                            scale_tier=0,
+                            is_demo=int(is_demo)
+                        )
+                        logger.info(
+                            f"🏛️ [BROKER SYNC] Auto-adopted active GOLD position from broker: "
+                            f"Deal #{deal_id} {direction} {size} lot @ ${level:.2f} (User {cid}, Demo={is_demo})"
+                        )
+
+                    # Bind active state in RAM memory
+                    self._active_gold_deal_id = deal_id
+                    self._active_gold_direction = direction
+                    self._active_gold_entry_price = level
+                    self._active_gold_sl = sl
+                    self._active_gold_tp1 = tp1
+                    self._active_gold_tp2 = tp2
+                    self._active_gold_tp3 = tp3
+                    self._active_gold_stage = "ACTIVE"
+            except Exception as e_adopt:
+                logger.debug(f"Broker adopt note for {cid} (demo={is_demo}): {e_adopt}")
+
+        self._cached_broker_gold_count = total_gold_found
+        return total_gold_found
 
     def _clear_active_trade(self, deal_id: Optional[str] = None, cooldown: float = 300.0):
         """Clears active trade state and activates post-trade cooldown."""
@@ -238,6 +346,7 @@ class QuantGoldExecutionEngine:
             self._active_gold_stage = "IDLE"
         self._last_trade_closed_ts = time.time()
         self._trade_cooldown_seconds = cooldown
+        self._cached_broker_gold_count = max(0, getattr(self, "_cached_broker_gold_count", 1) - 1)
         if deal_id:
             self._peak_upl_map.pop(str(deal_id), None)
 
@@ -804,11 +913,19 @@ class QuantGoldExecutionEngine:
                             
                             # Min margin for 0.5 oz Gold is ~$4.12 at 500:1 leverage
                             if live_avail < 4.07:
+                                now_ts = time.time()
                                 if is_admin:
-                                    logger.info(f"🚂 [SUPER ADMIN DEMO FALLBACK] Live Available (${live_avail:.2f}) < $4.07. Auto-engaging Demo Account (329832717876539678) $10,000 mirror.")
+                                    if (now_ts - getattr(self, "_admin_demo_log_ts", 0.0)) >= 600.0:
+                                        self._admin_demo_log_ts = now_ts
+                                        logger.info(f"🚂 [SUPER ADMIN DEMO FALLBACK] Live Available (${live_avail:.2f}) < $4.07. Auto-engaging Demo Account (329832717876539678) $10,000 mirror.")
                                     effective_is_demo = True
                                 else:
-                                    logger.info(f"⚠️ User {cid} Live Available (${live_avail:.2f}) < $4.07. Standby until live capital is deposited.")
+                                    last_sb = self._user_standby_log_ts.get(cid, 0.0) if hasattr(self, "_user_standby_log_ts") else 0.0
+                                    if (now_ts - last_sb) >= 600.0:
+                                        if not hasattr(self, "_user_standby_log_ts"):
+                                            self._user_standby_log_ts = {}
+                                        self._user_standby_log_ts[cid] = now_ts
+                                        logger.info(f"⚠️ User {cid} Live Available (${live_avail:.2f}) < $4.07. Standby until live capital is deposited.")
                                     return 0
                             else:
                                 effective_is_demo = False
@@ -820,6 +937,41 @@ class QuantGoldExecutionEngine:
                             else:
                                 return 0
 
+                    u_eng = capital_engine.get_user_capital_engine(cid, is_demo=effective_is_demo)
+
+                    # Pre-flight check: ensure broker does not already hold an active GOLD position for this user
+                    try:
+                        b_pos = await asyncio.wait_for(asyncio.to_thread(u_eng.get_open_positions), timeout=3.0) if u_eng else []
+                        for p_item in (b_pos or []):
+                            p_sub = p_item.get("position", p_item)
+                            p_epic = str(p_item.get("market", {}).get("epic") or p_sub.get("epic") or "").upper()
+                            if p_epic == "GOLD":
+                                d_id = str(p_sub.get("dealId") or p_sub.get("deal_id") or "")
+                                logger.debug(f"User {cid} already has active GOLD position {d_id} on broker. Skipping duplicate order placement.")
+                                if d_id and not db.has_capital_auto_trade_record(d_id):
+                                    p_lvl = float(p_sub.get("level") or p_sub.get("openLevel") or current_price)
+                                    p_dir = str(p_sub.get("direction", action)).upper()
+                                    p_sz = float(p_sub.get("size", 0.5) or 0.5)
+                                    db.record_capital_auto_trade(
+                                        chat_id=cid,
+                                        deal_id=d_id,
+                                        deal_reference=d_id,
+                                        epic="GOLD",
+                                        direction=p_dir,
+                                        size=p_sz,
+                                        entry_price=p_lvl,
+                                        sl=float(p_sub.get("stopLevel", sl) or sl),
+                                        tp=float(p_sub.get("profitLevel", tp1) or tp1),
+                                        tp1=tp1, tp2=tp2, tp3=tp3,
+                                        sl_dist=sl_dist, scale_tier=0,
+                                        is_demo=int(effective_is_demo)
+                                    )
+                                self._active_gold_deal_id = d_id
+                                self._active_gold_stage = "ACTIVE"
+                                return 0
+                    except Exception as e_chk_pos:
+                        logger.debug(f"Pre-flight broker check note for {cid}: {e_chk_pos}")
+
                     lot_size = calculate_capital_gold_lot_size(
                         budget=budget,
                         current_price=current_price,
@@ -827,7 +979,6 @@ class QuantGoldExecutionEngine:
                         leverage=500.0
                     )
 
-                    u_eng = capital_engine.get_user_capital_engine(cid, is_demo=effective_is_demo)
                     order_res = await asyncio.to_thread(
                         u_eng.execute_smart_tradfi_order,
                         epic="GOLD",
@@ -865,7 +1016,8 @@ class QuantGoldExecutionEngine:
                             tranche_id="SINGLE",
                             tp1=tp1,
                             tp2=tp2,
-                            tp3=tp3
+                            tp3=tp3,
+                            is_demo=int(effective_is_demo)
                         )
                         return 1
                 except Exception as e_ord:
@@ -1004,6 +1156,9 @@ class QuantGoldExecutionEngine:
             bid, ask, spread = self.get_live_gold_price_quote()
             curr_p = (bid + ask) / 2.0
             
+            # Step 0: Sync and adopt any untracked open positions from broker
+            await self._sync_and_adopt_broker_positions()
+
             # Fetch active Gold trades from DB
             active_trades = []
             if hasattr(db, "get_active_capital_auto_trades"):
@@ -1015,17 +1170,30 @@ class QuantGoldExecutionEngine:
                     if cid:
                         active_trades.extend(db.get_capital_auto_trades(cid, status="OPEN"))
 
-            # Broker reconciliation: interrogate broker open positions
+            # Broker reconciliation: interrogate broker open positions per user & mode
             broker_open_deal_ids = set()
             try:
-                c_eng = capital_engine.get_capital_engine()
-                positions = await asyncio.to_thread(c_eng.get_open_positions)
-                if positions is not None:
-                    for p_item in positions:
-                        pos = p_item.get("position", {})
-                        d_id = str(pos.get("dealId", ""))
-                        if d_id and str(pos.get("epic", "")).upper() == "GOLD":
-                            broker_open_deal_ids.add(d_id)
+                checked_engs = set()
+                for tr in active_trades:
+                    c_id = tr.get("chat_id") or 859271875
+                    t_demo = bool(tr.get("is_demo", False))
+                    eng_k = (c_id, t_demo)
+                    if eng_k in checked_engs:
+                        continue
+                    checked_engs.add(eng_k)
+                    try:
+                        u_eng = capital_engine.get_user_capital_engine(c_id, is_demo=t_demo)
+                        if u_eng:
+                            pos_list = await asyncio.to_thread(u_eng.get_open_positions)
+                            if pos_list:
+                                for p_item in pos_list:
+                                    pos = p_item.get("position", p_item)
+                                    d_id = str(pos.get("dealId") or pos.get("deal_id") or "")
+                                    epic = str(p_item.get("market", {}).get("epic") or pos.get("epic") or "").upper()
+                                    if d_id and epic == "GOLD":
+                                        broker_open_deal_ids.add(d_id)
+                    except Exception as e_b_usr:
+                        logger.debug(f"User broker position audit note for {c_id}: {e_b_usr}")
             except Exception as e_bpos:
                 logger.debug(f"Broker open positions check note: {e_bpos}")
 
@@ -1038,6 +1206,7 @@ class QuantGoldExecutionEngine:
 
                 deal_id = tr.get("deal_id")
                 cid = tr.get("chat_id")
+                is_demo = bool(tr.get("is_demo", False))
                 entry_p = float(tr.get("entry_price", curr_p) or curr_p)
                 dir_side = str(tr.get("direction", "BUY")).upper()
                 sz = float(tr.get("size", 0.5) or 0.5)
@@ -1097,7 +1266,7 @@ class QuantGoldExecutionEngine:
                     logger.info(f"⚡ [FLASH SHOCK HARVEST] Gold trade {deal_id} peak ${current_peak:.2f} retraced >= 50% to ${upl:.2f}. Executing protective early harvest!")
                     try:
                         if cid:
-                            u_eng = capital_engine.get_user_capital_engine(cid)
+                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
                             await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
@@ -1141,7 +1310,7 @@ class QuantGoldExecutionEngine:
                         logger.info(f"🛡️ [BREAKEVEN ARMOR] TP1 Hit! Ratcheting SL to {be_level:.2f} for Gold trade {deal_id}")
                         try:
                             if cid:
-                                u_eng = capital_engine.get_user_capital_engine(cid)
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
                                 await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
                             if hasattr(db, "update_capital_auto_trade_scale_tier"):
                                 db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
@@ -1172,7 +1341,7 @@ class QuantGoldExecutionEngine:
                     cash_floor = (entry_p + 7.30) if dir_side == "BUY" else (entry_p - 7.30)
                     try:
                         if cid:
-                            u_eng = capital_engine.get_user_capital_engine(cid)
+                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
                             await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(cash_floor, 2))
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
                             db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(cash_floor, 2))
@@ -1200,7 +1369,7 @@ class QuantGoldExecutionEngine:
                     # Close remaining runner on broker
                     try:
                         if cid:
-                            u_eng = capital_engine.get_user_capital_engine(cid)
+                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
                             await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)

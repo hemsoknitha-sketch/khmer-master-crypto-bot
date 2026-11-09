@@ -33,6 +33,7 @@ HIGH_BETA_GROUPS = [
 
 _CIRCUIT_BREAKER_LOCKED_UNTIL: float = 0.0
 _LAST_ALERT_SENT_TS: float = 0.0
+_LAST_RISK_WARN_LOG: Dict[str, float] = {}
 
 
 def calculate_rolling_24h_drawdown(capital_baseline: float = 10000.0) -> Dict[str, Any]:
@@ -231,16 +232,25 @@ def validate_cross_asset_portfolio_exposure(proposed_epic: str, open_epics: List
     }
 
     # 1. Total TradFi position cap
+    now_ts = time.time()
     if len(existing_u) >= MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS:
         reason = f"Global TradFi position limit reached ({len(existing_u)}/{MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS} active). Cannot add {prop_u}."
-        logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+        if (now_ts - _LAST_RISK_WARN_LOG.get("total_limit", 0.0)) >= 300.0:
+            _LAST_RISK_WARN_LOG["total_limit"] = now_ts
+            logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+        else:
+            logger.debug(f"🛑 [PORTFOLIO RISK] {reason}")
         return False, reason, diag
 
     # 2. Duplicate Asset Lock (Universal deduplication)
     for held in existing_u:
         if prop_u == held or (prop_u in held and len(prop_u) >= 4) or (held in prop_u and len(held) >= 4):
             reason = f"Duplicate asset protection: Already holding open position on {held}."
-            logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+            if (now_ts - _LAST_RISK_WARN_LOG.get(f"dup:{held}", 0.0)) >= 300.0:
+                _LAST_RISK_WARN_LOG[f"dup:{held}"] = now_ts
+                logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+            else:
+                logger.debug(f"🛑 [PORTFOLIO RISK] {reason}")
             return False, reason, diag
 
     # 3. Correlated Group Exposure Limits
@@ -271,7 +281,11 @@ def validate_cross_asset_portfolio_exposure(proposed_epic: str, open_epics: List
                 f"{grp_name} correlation exposure cap reached ({len(held_in_group)}/{max_allowed} active: "
                 f"{', '.join(held_in_group)}). Entry on {prop_u} blocked to prevent systemic liquidation contagion."
             )
-            logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+            if (now_ts - _LAST_RISK_WARN_LOG.get(f"grp:{grp_key}", 0.0)) >= 300.0:
+                _LAST_RISK_WARN_LOG[f"grp:{grp_key}"] = now_ts
+                logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+            else:
+                logger.debug(f"🛑 [PORTFOLIO RISK] {reason}")
             return False, reason, diag
 
     return True, "Portfolio correlation exposure limits cleared.", diag

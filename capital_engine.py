@@ -1553,7 +1553,13 @@ class CapitalComEngine:
                 open_epics=current_open_epics
             )
             if not is_corr_ok:
-                logger.warning(f"🛑 [PORTFOLIO RISK GUARD] {resolved_epic} blocked: {corr_reason}")
+                now_ts = time.time()
+                last_log = getattr(self, "_last_corr_warn_ts", 0.0)
+                if (now_ts - last_log) >= 300.0:
+                    self._last_corr_warn_ts = now_ts
+                    logger.warning(f"🛑 [PORTFOLIO RISK GUARD] {resolved_epic} blocked: {corr_reason}")
+                else:
+                    logger.debug(f"🛑 [PORTFOLIO RISK GUARD] {resolved_epic} blocked: {corr_reason}")
                 return {
                     "success": False,
                     "error": f"PORTFOLIO_EXPOSURE_BLOCKED: {corr_reason}",
