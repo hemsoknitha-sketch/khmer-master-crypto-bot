@@ -165,6 +165,12 @@ def init_legal_agreement_table():
         except sqlite3.OperationalError:
             pass  # Already exists
 
+    # Unconditionally purge erroneous ghost ID 331963468
+    try:
+        cursor.execute("DELETE FROM user_legal_agreements WHERE chat_id = 331963468")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 

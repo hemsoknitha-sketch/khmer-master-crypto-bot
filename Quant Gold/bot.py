@@ -461,9 +461,9 @@ class QuantGoldBot:
 
         # 0.1 Check Specific Known VIP Users (@chengphol & @ansaravy)
         raw_clean = raw.lstrip('@').strip().lower()
-        if raw_clean in ["chengphol"] or raw in ["643724109", "331963468", "331963468326458564"]:
-            cid = db.find_user_by_identifier("chengphol") or 643724109
-            creds = db.get_user_capital_credentials(cid) or db.get_user_capital_credentials(643724109) or db.get_user_capital_credentials(331963468) or {
+        if raw_clean in ["chengphol"] or raw in ["643724109", "331963468326458564"]:
+            cid = 643724109
+            creds = db.get_user_capital_credentials(cid) or {
                 "chat_id": cid, "account_id": "331963468326458564", "currency": "USD", "is_demo": False, "is_referral_verified": True, "username": "chengphol"
             }
             return cid, creds
@@ -2350,14 +2350,15 @@ class QuantGoldBot:
         Unified real-time account status fetcher for Quant Gold status and monitoring:
         Queries live balance, available cash, open Gold positions, and broker session connectivity.
         """
-        # Collect all linked chat IDs for this user/account
+        # Collect all valid linked chat IDs for this user/account
         all_cids = {chat_id}
         if account_id:
             u_acc = db.get_capital_user_by_account_id(account_id)
-            if u_acc and u_acc.get("chat_id"):
+            if u_acc and u_acc.get("chat_id") and int(u_acc["chat_id"]) != 331963468:
                 all_cids.add(int(u_acc["chat_id"]))
-        if chat_id in [643724109, 331963468] or account_id == "331963468326458564":
-            all_cids.update([643724109, 331963468])
+        if chat_id == 643724109 or account_id == "331963468326458564":
+            all_cids.add(643724109)
+        all_cids.discard(331963468)
 
         # Find working engine across linked IDs if needed
         u_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=is_demo)
@@ -2563,10 +2564,11 @@ class QuantGoldBot:
                 all_target_cids = {target_cid}
                 if t.get("account_id"):
                     u_acc_rec = db.get_capital_user_by_account_id(t["account_id"])
-                    if u_acc_rec and u_acc_rec.get("chat_id"):
+                    if u_acc_rec and u_acc_rec.get("chat_id") and int(u_acc_rec["chat_id"]) != 331963468:
                         all_target_cids.add(int(u_acc_rec["chat_id"]))
-                if target_cid in [643724109, 331963468] or t.get("account_id") == "331963468326458564":
-                    all_target_cids.update([643724109, 331963468])
+                if target_cid == 643724109 or t.get("account_id") == "331963468326458564":
+                    all_target_cids.add(643724109)
+                all_target_cids.discard(331963468)
 
                 u_cfg = db.get_capital_auto_config(target_cid)
                 u_auto_on = bool(u_cfg.get("enabled", False) or u_cfg.get("is_enabled", False))

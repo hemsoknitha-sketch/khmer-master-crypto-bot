@@ -664,7 +664,6 @@ class QuantGoldExecutionEngine:
         audit_cids = set()
         audit_cids.add(859271875)   # Super Admin
         audit_cids.add(643724109)   # @chengphol VIP Live
-        audit_cids.add(331963468)   # @chengphol VIP Live alias
         audit_cids.add(1744387717)  # @ansaravy VIP Live
 
         try:
