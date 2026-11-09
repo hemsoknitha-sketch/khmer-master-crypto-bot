@@ -453,6 +453,21 @@ class QuantGoldBot:
             }
             return 859271875, sa_rec
 
+        # 0.1 Check Specific Known VIP Users (@chengphol & @ansaravy)
+        raw_clean = raw.lstrip('@').strip().lower()
+        if raw_clean in ["chengphol"] or raw == "331963468326458564":
+            cid = db.find_user_by_identifier("chengphol") or 331963468
+            creds = db.get_user_capital_credentials(cid) or {
+                "chat_id": cid, "account_id": "331963468326458564", "currency": "USD", "is_demo": False, "is_referral_verified": True, "username": "chengphol"
+            }
+            return cid, creds
+        if raw_clean in ["ansaravy"] or raw == "332192407263204548":
+            cid = 1744387717
+            creds = db.get_user_capital_credentials(cid) or {
+                "chat_id": cid, "account_id": "332192407263204548", "currency": "USD", "is_demo": False, "is_referral_verified": True, "username": "ansaravy"
+            }
+            return cid, creds
+
         # 1. Lookup by Account ID directly in SQLite (supports Live and Demo accounts)
         u_by_acc = db.get_capital_user_by_account_id(raw)
         if u_by_acc:
@@ -1127,9 +1142,12 @@ class QuantGoldBot:
                 f"🚀 <b>បញ្ជាកងនាវាស្វ័យប្រវត្ត (Master Fleet Commands) ៖</b>\n"
                 f"• <code>/capital on all 50</code> (ឬ <code>/admin_capital on all 50</code>) ➡️ បើក Auto Users ទាំងអស់ $50\n"
                 f"• <code>/capital off all</code> (ឬ <code>/admin_capital off all</code>) ➡️ ផ្អាក Auto Users ទាំងអស់\n"
+                f"• <code>/admin_capital approve all</code> ➡️ អនុម័ត Pending VIPs ទាំងអស់ 1-Click (🟢 LIVE)\n"
                 f"──────────────────────────────────────\n"
                 f"👤 <b>បញ្ជាគណនីទោល (Single Account Commands) ៖</b>\n"
                 f"• <code>/admin_capital inspect &lt;Account_ID_or_Chat_ID&gt;</code>\n"
+                f"• <code>/admin_capital approve &lt;@user_or_acc_id&gt;</code> (អនុម័ត Live Trading)\n"
+                f"• <code>/admin_capital add &lt;@username&gt; &lt;account_id&gt; [budget]</code> (ចុះឈ្មោះ VIP ថ្មី)\n"
                 f"• <code>/admin_capital on &lt;Account_ID_or_Chat_ID&gt; [budget]</code>\n"
                 f"• <code>/admin_capital off &lt;Account_ID_or_Chat_ID&gt;</code>\n"
                 f"• <code>/admin_capital closeall &lt;Account_ID_or_Chat_ID&gt;</code>\n"
@@ -1141,7 +1159,88 @@ class QuantGoldBot:
             return await self.safe_reply(update, msg)
 
         sub = args[0].lower()
-        if sub in ["inspect", "check", "dossier"] and len(args) > 1:
+        if sub in ["approve", "app", "verify"] and len(args) > 1:
+            target = args[1]
+            if str(target).lower() == "all":
+                approved = db.approve_all_pending_capital_users()
+                for app_u in approved:
+                    capital_engine.invalidate_user_capital_engine(app_u["chat_id"])
+                    try:
+                        u_msg = (
+                            f"🎉 <b>[អបអរសាទរ! CAPITAL.COM LIVE TRADING ត្រូវបានអនុម័ត]</b> 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👑 <b>គណនីរបស់អ្នកត្រូវបាន Super Admin អនុម័តឱ្យដំណើរការជួញដូរផ្ទាល់ ១០០%!</b>\n"
+                            f"🏦 <b>Account ID ៖</b> <code>{app_u.get('account_id')}</code> (🟢 LIVE MAINNET)\n"
+                            f"⚡ មុខងារ <b>1-Tap BUY/SELL</b> &amp; <b>24/7 Auto-Trade</b> ត្រូវបានបើកដំណើរការពេញលេញ!\n"
+                            f"{ui_standards.DIVIDER_LIGHT}\n"
+                            f"👉 វាយបញ្ជា /capital ដើម្បីចាប់ផ្តើមជួញដូរភ្លាមៗ!"
+                        )
+                        await context.bot.send_message(chat_id=app_u["chat_id"], text=u_msg, parse_mode="HTML")
+                    except Exception:
+                        pass
+
+                names_str = ", ".join([f"@{u['username']}" if u['username'] else f"#{u['chat_id']}" for u in approved]) or "គ្មាន (None)"
+                return await self.safe_reply(
+                    update,
+                    f"🏛️ <b>[SUPER ADMIN FLEET APPROVAL COMPLETE]</b> 🟢\n"
+                    f"══════════════════════════════════════\n"
+                    f"• បានអនុម័ត VIP Users ជោគជ័យ ៖ <code>{len(approved)} នាក់</code>\n"
+                    f"• បញ្ជីឈ្មោះ ៖ <b>{names_str}</b>\n"
+                    f"• របៀបជួញដូរ ៖ <code>🟢 LIVE MAINNET (Verified)</code>\n"
+                    f"• អាជ្ញាប័ណ្ណ ៖ <code>👑 LIFETIME VIP</code>\n"
+                    f"• ស្ថានភាព Auto-Trade ៖ <code>🟢 ON (Active Swarm)</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"<i>កងនាវា VIP ទាំងអស់ត្រូវបាន Approved និង Arm រួចរាល់សម្រាប់ការជួញដូរពិត!</i>"
+                )
+            cid, u_info = self._resolve_target(target)
+            if not cid:
+                return await self.safe_reply(update, f"⚠️ រកមិនឃើញ target: <code>{target}</code>")
+            db.approve_capital_user(cid)
+            capital_engine.invalidate_user_capital_engine(cid)
+            acc = u_info.get("account_id") if u_info else target
+            u_name = u_info.get("username") if u_info else f"User_{cid}"
+            try:
+                u_msg = (
+                    f"🎉 <b>[អបអរសាទរ! CAPITAL.COM LIVE TRADING ត្រូវបានអនុម័ត]</b> 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 <b>គណនីរបស់អ្នកត្រូវបាន Super Admin អនុម័តឱ្យដំណើរការជួញដូរផ្ទាល់ ១០០%!</b>\n"
+                    f"🏦 <b>Account ID ៖</b> <code>{acc}</code> (🟢 LIVE MAINNET)\n"
+                    f"⚡ មុខងារ <b>1-Tap BUY/SELL</b> &amp; <b>24/7 Auto-Trade</b> ត្រូវបានបើកដំណើរការពេញលេញ!\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"👉 វាយបញ្ជា /capital ដើម្បីចាប់ផ្តើមជួញដូរភ្លាមៗ!"
+                )
+                await context.bot.send_message(chat_id=cid, text=u_msg, parse_mode="HTML")
+            except Exception:
+                pass
+            return await self.safe_reply(
+                update,
+                f"✅ <b>[ADMIN]</b> បានអនុម័ត Capital Live Trading សម្រាប់ <b>@{u_name}</b> "
+                f"(<code>Account: {acc}</code> | Chat ID: {cid}) ជោគជ័យ! 🟢 LIVE MAINNET"
+            )
+
+        elif sub in ["add", "new", "register"] and len(args) > 2:
+            target_u = args[1]
+            target_acc = args[2]
+            budget = float(args[3]) if len(args) > 3 and args[3].replace('.', '', 1).isdigit() else 100.0
+            res = db.add_or_update_vip_capital_user(username=target_u, account_id=target_acc, budget=budget)
+            if res.get("success"):
+                capital_engine.invalidate_user_capital_engine(res["chat_id"])
+                return await self.safe_reply(
+                    update,
+                    f"👑 <b>[ADMIN VIP USER REGISTERED &amp; APPROVED]</b> 💎\n"
+                    f"══════════════════════════════════════\n"
+                    f"👤 <b>Username ៖</b> @{res['username']}\n"
+                    f"🏦 <b>Live Account ID ៖</b> <code>{res['account_id']}</code> (🟢 LIVE MAINNET)\n"
+                    f"🆔 <b>Assigned ID ៖</b> <code>{res['chat_id']}</code>\n"
+                    f"👑 <b>អាជ្ញាប័ណ្ណ ៖</b> <code>👑 LIFETIME VIP</code>\n"
+                    f"🤖 <b>24/7 Auto-Trade ៖</b> <code>🟢 ON (${res['budget']:.2f}/Trade)</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"<i>អ្នកប្រើប្រាស់ត្រូវបានបញ្ចូលទៅក្នុង Fleet និង Arm សម្រាប់ការជួញដូរមាសស្វ័យប្រវត្ត!</i>"
+                )
+            else:
+                return await self.safe_reply(update, f"⚠️ បរាជ័យក្នុងការចុះឈ្មោះ ៖ {res.get('error')}")
+
+        elif sub in ["inspect", "check", "dossier"] and len(args) > 1:
             return await self.handle_inspect_user(update, args[1])
         elif sub in ["on", "enable", "start"] and len(args) > 1:
             target = args[1]
@@ -1642,6 +1741,12 @@ class QuantGoldBot:
             nav_row.append(InlineKeyboardButton("បន្ទាប់ (Next) ➡️", callback_data=f"admin_users:list:{page + 1}"))
         if nav_row:
             kb_rows.append(nav_row)
+
+        pending_u = [d for d in dossiers if d["has_capital"] and not d["is_demo"] and not d.get("is_referral_verified")]
+        if pending_u:
+            kb_rows.append([
+                InlineKeyboardButton(f"✅ អនុម័ត All Pending ({len(pending_u)} នាក់)", callback_data="admin_users:approve_all")
+            ])
 
         kb_rows.append([
             InlineKeyboardButton("🔄 Sync VIP Users ទាំងអស់", callback_data="admin_users:sync"),
@@ -2894,9 +2999,30 @@ class QuantGoldBot:
                 card, kb = self.build_admin_users_list_card(page=0)
                 await self.safe_edit(query, card, reply_markup=kb)
 
+            elif sub_action == "approve_all":
+                approved = db.approve_all_pending_capital_users()
+                for app_u in approved:
+                    capital_engine.invalidate_user_capital_engine(app_u["chat_id"])
+                    try:
+                        u_msg = (
+                            f"🎉 <b>[អបអរសាទរ! CAPITAL.COM LIVE TRADING ត្រូវបានអនុម័ត]</b> 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👑 <b>គណនីរបស់អ្នកត្រូវបាន Super Admin អនុម័តឱ្យដំណើរការជួញដូរផ្ទាល់ ១០០%!</b>\n"
+                            f"🏦 <b>Account ID ៖</b> <code>{app_u.get('account_id')}</code> (🟢 LIVE MAINNET)\n"
+                            f"⚡ មុខងារ <b>1-Tap BUY/SELL</b> &amp; <b>24/7 Auto-Trade</b> ត្រូវបានបើកដំណើរការពេញលេញ!\n"
+                            f"{ui_standards.DIVIDER_LIGHT}\n"
+                            f"👉 វាយបញ្ជា /capital ដើម្បីចាប់ផ្តើមជួញដូរភ្លាមៗ!"
+                        )
+                        await context.bot.send_message(chat_id=app_u["chat_id"], text=u_msg, parse_mode="HTML")
+                    except Exception:
+                        pass
+                await query.answer(f"✅ បានអនុម័ត VIP Users ជោគជ័យ {len(approved)} នាក់! (🟢 LIVE)", show_alert=True)
+                card, kb = self.build_admin_users_list_card(page=0)
+                await self.safe_edit(query, card, reply_markup=kb)
+
             elif sub_action == "cap_app":
                 target_cid = int(parts[2]) if len(parts) > 2 else chat_id
-                db.set_capital_user_referral_status(target_cid, is_verified=True, referral_code="az48cxia")
+                db.approve_capital_user(target_cid)
                 capital_engine.invalidate_user_capital_engine(target_cid)
                 await query.answer("✅ បានអនុម័ត Capital Live Trading ជោគជ័យ!")
                 card, kb = self.build_admin_user_dossier_card(target_cid)
@@ -2940,7 +3066,7 @@ class QuantGoldBot:
                     return await query.answer("⛔ Access Denied! Super Admin authority required.", show_alert=True)
 
                 if act == "approve":
-                    db.set_capital_user_referral_status(target_cid, is_verified=True, referral_code="az48cxia")
+                    db.approve_capital_user(target_cid)
                     capital_engine.invalidate_user_capital_engine(target_cid)
                     await query.answer("✅ Approved Capital Live Trading!")
 

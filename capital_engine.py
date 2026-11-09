@@ -521,7 +521,8 @@ class CapitalComEngine:
         identifier: Optional[str] = None,
         password: Optional[str] = None,
         is_demo: Optional[bool] = None,
-        custom_chat_id: Optional[int] = None
+        custom_chat_id: Optional[int] = None,
+        desired_account_id: Optional[str] = None
     ):
         if is_demo is not None:
             self.is_demo = is_demo
@@ -532,6 +533,7 @@ class CapitalComEngine:
         self._custom_chat_id: Optional[int] = custom_chat_id
         self.chat_id: Optional[int] = custom_chat_id
         self.last_auth_error: str = ""
+        self.desired_account_id: str = str(desired_account_id or "").strip()
 
         raw_key = (api_key or "").strip()
         raw_id = (identifier or "").strip()
@@ -639,12 +641,26 @@ class CapitalComEngine:
                 self._auth_backoff_until = 0.0
                 
                 body = res.json()
-                self.active_account_id = body.get("currentAccountId")
+                current_acc = str(body.get("currentAccountId") or "")
+                self.active_account_id = current_acc
+
+                # Auto-switch to desired account if specified and different from currentAccountId
+                if self.desired_account_id and self.desired_account_id != current_acc:
+                    logger.info(f"🔄 [Capital.com] Auto-switching session to requested account {self.desired_account_id}...")
+                    switched = self.switch_account(self.desired_account_id)
+                    if switched:
+                        self.active_account_id = self.desired_account_id
+                    else:
+                        logger.warning(f"⚠️ [Capital.com] Could not switch to {self.desired_account_id}, active remains {current_acc}")
+
                 target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
                 if target_cid and self.active_account_id:
                     try:
                         import database as db
-                        db.update_user_capital_account_id(target_cid, self.active_account_id, is_demo=self.is_demo)
+                        # Prevent colliding Super Admin credentials with VIP accounts
+                        if not self.desired_account_id or self.active_account_id == self.desired_account_id:
+                            if target_cid != 859271875 or self.active_account_id not in ["331963468326458564"]:
+                                db.update_user_capital_account_id(target_cid, self.active_account_id, is_demo=self.is_demo)
                     except Exception:
                         pass
                 
@@ -3320,45 +3336,71 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
 
         # Priority 1: Super Admin (859271875 @Soknitha) Dedicated Engine
         if int(chat_id) == SUPER_ADMIN_ID:
+            sa_acc = (
+                (os.getenv("CAPITAL_DEMO_ACCOUNT_ID") or "329832717876539678").strip()
+                if is_demo else
+                (os.getenv("CAPITAL_ACCOUNT_ID") or "216890638652757188").strip()
+            )
             if raw_key and raw_key != "ENV_VAULT" and bool(creds.get("is_demo", False)) == is_demo:
                 engine = CapitalComEngine(
                     api_key=raw_key,
                     identifier=creds.get("identifier"),
                     password=creds.get("password"),
                     is_demo=is_demo,
-                    custom_chat_id=chat_id
+                    custom_chat_id=chat_id,
+                    desired_account_id=sa_acc
                 )
             else:
-                engine = CapitalComEngine(is_demo=is_demo, custom_chat_id=chat_id)
+                engine = CapitalComEngine(
+                    is_demo=is_demo,
+                    custom_chat_id=chat_id,
+                    desired_account_id=sa_acc
+                )
             _user_engine_pool[pool_key] = engine
             return engine
 
         # Priority 2: VIP User with valid custom credentials matching requested environment
-        if creds and raw_key and raw_key != "ENV_VAULT":
+        if creds and raw_key:
             cred_is_demo = bool(creds.get("is_demo", False))
-            if cred_is_demo == is_demo:
-                engine = CapitalComEngine(
-                    api_key=raw_key,
-                    identifier=creds.get("identifier"),
-                    password=creds.get("password"),
-                    is_demo=is_demo,
-                    custom_chat_id=chat_id
-                )
-                _user_engine_pool[pool_key] = engine
-                return engine
-            elif is_demo:
-                # VIP user has live credentials but is trying demo -> safe demo sandbox
-                engine = CapitalComEngine(is_demo=True, custom_chat_id=chat_id)
-                _user_engine_pool[pool_key] = engine
-                return engine
+            target_acc = str(creds.get("demo_account_id") if is_demo else creds.get("account_id") or "").strip()
+            if raw_key != "ENV_VAULT":
+                if cred_is_demo == is_demo:
+                    engine = CapitalComEngine(
+                        api_key=raw_key,
+                        identifier=creds.get("identifier"),
+                        password=creds.get("password"),
+                        is_demo=is_demo,
+                        custom_chat_id=chat_id,
+                        desired_account_id=target_acc
+                    )
+                    _user_engine_pool[pool_key] = engine
+                    return engine
+                elif is_demo:
+                    # VIP user has live credentials but is trying demo -> safe demo sandbox
+                    engine = CapitalComEngine(
+                        is_demo=True,
+                        custom_chat_id=chat_id,
+                        desired_account_id=target_acc
+                    )
+                    _user_engine_pool[pool_key] = engine
+                    return engine
+                else:
+                    # VIP user only configured demo but live was requested -> unauthenticated guest
+                    engine = CapitalComEngine(
+                        api_key="UNAUTHENTICATED_GUEST",
+                        identifier="",
+                        password="",
+                        is_demo=False,
+                        custom_chat_id=chat_id
+                    )
+                    _user_engine_pool[pool_key] = engine
+                    return engine
             else:
-                # VIP user only configured demo but live was requested -> unauthenticated guest
+                # Sub-account sharing master login credentials (e.g. @chengphol with account 331963468326458564)
                 engine = CapitalComEngine(
-                    api_key="UNAUTHENTICATED_GUEST",
-                    identifier="",
-                    password="",
-                    is_demo=False,
-                    custom_chat_id=chat_id
+                    is_demo=is_demo,
+                    custom_chat_id=chat_id,
+                    desired_account_id=target_acc
                 )
                 _user_engine_pool[pool_key] = engine
                 return engine

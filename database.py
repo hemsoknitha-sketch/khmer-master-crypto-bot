@@ -1300,6 +1300,28 @@ def register_user(chat_id: int, username: str) -> bool:
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # 0. Check if this username matches a pre-registered placeholder user (e.g. chengphol)
+    u_clean = str(username or "").lstrip('@').strip().lower()
+    if u_clean:
+        cursor.execute("SELECT chat_id FROM users WHERE LOWER(username) = ? AND chat_id != ?", (u_clean, chat_id))
+        pre_row = cursor.fetchone()
+        if pre_row:
+            old_cid = pre_row[0]
+            try:
+                # Migrate placeholder records to the real Telegram chat_id
+                cursor.execute("UPDATE users SET chat_id = ?, username = ? WHERE chat_id = ?", (chat_id, username, old_cid))
+                cursor.execute("UPDATE OR IGNORE user_capital_credentials SET chat_id = ? WHERE chat_id = ?", (chat_id, old_cid))
+                cursor.execute("DELETE FROM user_capital_credentials WHERE chat_id = ?", (old_cid,))
+                cursor.execute("UPDATE OR IGNORE capital_auto_config SET chat_id = ? WHERE chat_id = ?", (chat_id, old_cid))
+                cursor.execute("DELETE FROM capital_auto_config WHERE chat_id = ?", (old_cid,))
+                cursor.execute("UPDATE OR IGNORE capital_auto_trades SET chat_id = ? WHERE chat_id = ?", (chat_id, old_cid))
+                cursor.execute("UPDATE OR IGNORE capital_user_referrals SET client_chat_id = ? WHERE client_chat_id = ?", (chat_id, old_cid))
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e_mig:
+                print(f"Notice migrating placeholder {old_cid} -> {chat_id}: {e_mig}")
+
     cursor.execute("SELECT chat_id FROM users WHERE chat_id = ?", (chat_id,))
     is_new = False
     if cursor.fetchone() is None:
@@ -1316,7 +1338,7 @@ def register_user(chat_id: int, username: str) -> bool:
         conn.commit()
         
     conn.close()
-    return None
+    return is_new
 
 def set_arbitrage_api(chat_id: int, exchange: str, api_key: str, api_secret: str):
     """Store API keys for alternate exchanges (e.g., Bybit, OKX) securely."""
@@ -1983,14 +2005,29 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
                     tier_label = "👑 LIFETIME VIP"
 
             acc_id = str(r[5] or "")
-            if cid == 859271875 and (not acc_id or acc_id == "330894176088577220"):
+            if cid == 859271875 and (not acc_id or acc_id in ["330894176088577220", "331963468326458564"]):
                 acc_id = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
+            elif (cid == 331963468 or str(r[1] or "").lower() == "chengphol") and not acc_id:
+                acc_id = "331963468326458564"
+            elif (cid == 1744387717 or str(r[1] or "").lower() == "ansaravy") and not acc_id:
+                acc_id = "332192407263204548"
 
             u_name = str(r[1] or "")
             if cid == 859271875 and not u_name:
                 u_name = "Soknitha"
             elif cid == 537186806 and not u_name:
                 u_name = "HemSinath"
+            elif (cid == 1744387717 or acc_id == "332192407263204548") and not u_name:
+                u_name = "ansaravy"
+            elif (cid == 331963468 or acc_id == "331963468326458564") and not u_name:
+                u_name = "chengphol"
+
+            # Auto-verify known VIPs
+            is_ref_flag = bool(r[7])
+            if cid in [859271875, 1744387717, 331963468] or u_name.lower() in ["ansaravy", "chengphol"] or acc_id in ["331963468326458564", "332192407263204548"]:
+                is_ref_flag = True
+                is_vip_flag = True
+                tier_label = "👑 SUPER ADMIN (LIFETIME)" if cid == 859271875 else "👑 LIFETIME VIP"
 
             results.append({
                 "chat_id": cid,
@@ -2003,8 +2040,8 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
                 "joined_at": str(r[4] or "N/A"),
                 "account_id": acc_id if acc_id else "None",
                 "has_capital": bool(acc_id and acc_id != "None"),
-                "is_demo": bool(r[6]),
-                "is_referral_verified": bool(r[7]),
+                "is_demo": False if is_ref_flag and cid in [1744387717, 331963468] else bool(r[6]),
+                "is_referral_verified": is_ref_flag,
                 "auto_enabled": bool(r[8]),
                 "auto_budget": float(r[9]),
                 "auto_max_pos": int(r[10]),
@@ -4534,6 +4571,32 @@ def ensure_capital_super_admin_defaults():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        # Ensure schema prerequisites
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS capital_auto_config (
+                chat_id INTEGER PRIMARY KEY,
+                is_enabled BOOLEAN NOT NULL DEFAULT 0,
+                budget REAL DEFAULT 50.0,
+                max_positions INTEGER DEFAULT 2,
+                last_trade_time REAL DEFAULT 0.0,
+                schedule_mode TEXT DEFAULT 'SMART_SESSION_TIMED',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        try:
+            cursor.execute("ALTER TABLE capital_auto_config ADD COLUMN is_demo INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN demo_account_id TEXT DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            cursor.execute("CREATE TABLE IF NOT EXISTS prop_firm_challenge_config (chat_id INTEGER PRIMARY KEY, is_enabled INTEGER DEFAULT 0)")
+        except Exception:
+            pass
+
         # 1. Ensure capital_auto_config row for Super Admin strictly on LIVE MAINNET (is_demo=0)
         cursor.execute("""
             INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
@@ -4571,30 +4634,32 @@ def ensure_capital_super_admin_defaults():
         cursor.execute("UPDATE capital_orb_config SET is_demo = 0, is_enabled = 1, session_mode = 'ALL', max_positions = 10 WHERE chat_id = 859271875")
 
         # 3. Purge accidental VIP account collision from Super Admin:
-        # If Super Admin has credentials pointing to another VIP user's account (like 330894176088577220),
-        # remove it so Super Admin cleanly uses the Global Master Account (216890638652757188 from .env)!
+        # If Super Admin has credentials pointing to another VIP user's account (like 330894176088577220 or 331963468326458564),
+        # reset it so Super Admin cleanly uses the Global Master Account (216890638652757188 from .env)!
         cursor.execute("SELECT account_id FROM user_capital_credentials WHERE chat_id = 859271875")
         sa_row = cursor.fetchone()
-        if sa_row and str(sa_row[0]) == "330894176088577220":
+        if sa_row and str(sa_row[0]) in ["330894176088577220", "331963468326458564"]:
             cursor.execute("DELETE FROM user_capital_credentials WHERE chat_id = 859271875")
-            print("🛡️ [AUTO-HEAL] Purged collided VIP account 330894176088577220 from Super Admin credentials!")
+            print("🛡️ [AUTO-HEAL] Purged collided VIP account from Super Admin credentials!")
 
         # 4. Disable Prop Firm mode for Super Admin so Super Admin is strictly on LIVE MAINNET
         cursor.execute("UPDATE prop_firm_challenge_config SET is_enabled = 0 WHERE chat_id = 859271875")
 
         # 5. Ensure Super Admin is registered in user_capital_credentials as verified Live Master
         sa_live_acc = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188").strip()
+        sa_demo_acc = os.getenv("CAPITAL_DEMO_ACCOUNT_ID", "329832717876539678").strip()
         cursor.execute("""
             INSERT INTO user_capital_credentials (
-                chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
-            ) VALUES (859271875, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', ?, 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                chat_id, api_key, identifier, password, account_id, demo_account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
+            ) VALUES (859271875, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', ?, ?, 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT(chat_id) DO UPDATE SET
                 account_id = excluded.account_id,
+                demo_account_id = excluded.demo_account_id,
                 is_demo = 0,
                 is_referral_verified = 1,
                 referral_code = 'az48cxia',
                 updated_at = CURRENT_TIMESTAMP
-        """, (sa_live_acc,))
+        """, (sa_live_acc, sa_demo_acc))
 
         # 6. Ensure Super Admin 859271875 (@Soknitha) and VIP Lifetime 537186806 (@HemSinath) in users table
         cursor.execute("SELECT chat_id FROM users WHERE chat_id = 859271875")
@@ -4608,6 +4673,72 @@ def ensure_capital_super_admin_defaults():
             cursor.execute("INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (537186806, 'HemSinath', 1, 'lifetime', CURRENT_TIMESTAMP)")
         else:
             cursor.execute("UPDATE users SET username = 'HemSinath', is_vip = 1, license_expiry = 'lifetime' WHERE chat_id = 537186806")
+
+        # 7. Seed & Approve VIP User @ansaravy (#1744387717) with Live Account 332192407263204548
+        cursor.execute("SELECT chat_id FROM users WHERE chat_id = 1744387717")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (1744387717, 'ansaravy', 1, 'lifetime', CURRENT_TIMESTAMP)")
+        else:
+            cursor.execute("UPDATE users SET username = 'ansaravy', is_vip = 1, license_expiry = 'lifetime' WHERE chat_id = 1744387717")
+
+        cursor.execute("""
+            INSERT INTO user_capital_credentials (
+                chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
+            ) VALUES (1744387717, '', '', '', '332192407263204548', 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                account_id = '332192407263204548',
+                is_demo = 0,
+                is_referral_verified = 1,
+                referral_code = 'az48cxia',
+                verified_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        """)
+        cursor.execute("""
+            INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
+            VALUES (1744387717, 1, 35.19, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
+        """)
+        cursor.execute("""
+            INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+            VALUES (1744387717, 859271875, 'az48cxia')
+            ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
+        """)
+
+        # 8. Seed & Approve VIP User @chengphol (Owner of Live Account ID 331963468326458564)
+        cheng_cid = 331963468
+        cursor.execute("SELECT chat_id FROM users WHERE LOWER(username) = 'chengphol'")
+        cheng_row = cursor.fetchone()
+        if cheng_row:
+            cheng_cid = cheng_row[0]
+        else:
+            cursor.execute("SELECT chat_id FROM users WHERE chat_id = ?", (cheng_cid,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (?, 'chengphol', 1, 'lifetime', CURRENT_TIMESTAMP)", (cheng_cid,))
+            else:
+                cursor.execute("UPDATE users SET username = 'chengphol', is_vip = 1, license_expiry = 'lifetime' WHERE chat_id = ?", (cheng_cid,))
+
+        cursor.execute("""
+            INSERT INTO user_capital_credentials (
+                chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
+            ) VALUES (?, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', '331963468326458564', 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                account_id = '331963468326458564',
+                is_demo = 0,
+                is_referral_verified = 1,
+                referral_code = 'az48cxia',
+                verified_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        """, (cheng_cid,))
+        cursor.execute("""
+            INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
+            VALUES (?, 1, 100.0, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
+        """, (cheng_cid,))
+        cursor.execute("""
+            INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+            VALUES (?, 859271875, 'az48cxia')
+            ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
+        """, (cheng_cid,))
 
         conn.commit()
         conn.close()
@@ -5595,6 +5726,190 @@ def get_pending_capital_verification_users() -> List[Dict[str, Any]]:
         except Exception:
             pass
         return []
+
+def approve_all_pending_capital_users() -> List[Dict[str, Any]]:
+    """
+    Super Admin 1-Click Fleet Approver:
+    Approves all pending Capital.com accounts in SQLite, locks them to LIVE MAINNET (is_demo=0),
+    grants Lifetime VIP licenses, and enables 24/7 Quant Gold Auto-Trading.
+    """
+    pending = get_pending_capital_verification_users()
+    approved = []
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        for p in pending:
+            cid = p["chat_id"]
+            acc_id = p["account_id"]
+            u_name = p["username"]
+            cursor.execute("""
+                UPDATE user_capital_credentials
+                SET is_referral_verified = 1, is_demo = 0, referral_code = 'az48cxia', verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = ?
+            """, (cid,))
+            cursor.execute("""
+                INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+                VALUES (?, 859271875, 'az48cxia')
+                ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
+            """, (cid,))
+            cursor.execute("""
+                UPDATE users SET is_vip = 1, license_expiry = 'lifetime'
+                WHERE chat_id = ?
+            """, (cid,))
+            cursor.execute("""
+                INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo)
+                VALUES (?, 1, 50.0, 5, CURRENT_TIMESTAMP, 0)
+                ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
+            """, (cid,))
+            approved.append({"chat_id": cid, "account_id": acc_id, "username": u_name})
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Error approving all pending capital users: {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return approved
+
+def approve_capital_user(chat_id: int) -> bool:
+    """
+    Approves a single Capital.com user for Live Trading, unlocks VIP Lifetime license,
+    and enables 24/7 Quant Gold Auto-Trade.
+    """
+    if not chat_id:
+        return False
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE user_capital_credentials
+            SET is_referral_verified = 1, is_demo = 0, referral_code = 'az48cxia', verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+        """, (chat_id,))
+        cursor.execute("""
+            INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+            VALUES (?, 859271875, 'az48cxia')
+            ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
+        """, (chat_id,))
+        cursor.execute("""
+            UPDATE users SET is_vip = 1, license_expiry = 'lifetime'
+            WHERE chat_id = ?
+        """, (chat_id,))
+        cursor.execute("""
+            INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo)
+            VALUES (?, 1, 50.0, 5, CURRENT_TIMESTAMP, 0)
+            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
+        """, (chat_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error approving capital user {chat_id}: {e}")
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def add_or_update_vip_capital_user(
+    username: str,
+    account_id: str,
+    chat_id: Optional[int] = None,
+    budget: float = 100.0,
+    max_positions: int = 5,
+    is_lifetime: bool = True
+) -> Dict[str, Any]:
+    """
+    Directly adds or updates a VIP user in SQLite with their verified Capital.com account.
+    If chat_id is not provided, allocates a deterministic placeholder chat_id that will
+    be seamlessly updated when the user sends /start on Telegram.
+    """
+    clean_u = str(username or "").lstrip('@').strip()
+    clean_acc = str(account_id or "").strip()
+    if not clean_acc:
+        return {"success": False, "error": "Missing account_id"}
+    
+    # Deterministic placeholder chat_id if None
+    if not chat_id:
+        existing_cid = find_user_by_identifier(clean_u)
+        if existing_cid:
+            target_cid = existing_cid
+        else:
+            try:
+                target_cid = int(clean_acc[:9])
+            except Exception:
+                target_cid = 331963468
+    else:
+        target_cid = int(chat_id)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Update/insert users table
+        cursor.execute("SELECT chat_id FROM users WHERE chat_id = ?", (target_cid,))
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at)
+                VALUES (?, ?, 1, ?, CURRENT_TIMESTAMP)
+            """, (target_cid, clean_u, 'lifetime' if is_lifetime else '365'))
+        else:
+            cursor.execute("""
+                UPDATE users SET username = ?, is_vip = 1, license_expiry = ?
+                WHERE chat_id = ?
+            """, (clean_u, 'lifetime' if is_lifetime else '365', target_cid))
+
+        # 2. Update/insert user_capital_credentials
+        cursor.execute("""
+            INSERT INTO user_capital_credentials (
+                chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
+            ) VALUES (?, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', ?, 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                account_id = excluded.account_id,
+                is_demo = 0,
+                is_referral_verified = 1,
+                referral_code = 'az48cxia',
+                verified_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        """, (target_cid, clean_acc))
+
+        # 3. Update/insert capital_auto_config
+        cursor.execute("""
+            INSERT INTO capital_auto_config (
+                chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode
+            ) VALUES (?, 1, ?, ?, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+            ON CONFLICT(chat_id) DO UPDATE SET
+                is_enabled = 1,
+                budget = excluded.budget,
+                max_positions = excluded.max_positions,
+                is_demo = 0,
+                updated_at = CURRENT_TIMESTAMP
+        """, (target_cid, float(budget), int(max_positions)))
+
+        # 4. Referral tracking
+        cursor.execute("""
+            INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+            VALUES (?, 859271875, 'az48cxia')
+            ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
+        """, (target_cid,))
+
+        conn.commit()
+        return {
+            "success": True,
+            "chat_id": target_cid,
+            "username": clean_u,
+            "account_id": clean_acc,
+            "budget": budget,
+            "max_positions": max_positions
+        }
+    except Exception as e:
+        print(f"⚠️ Error in add_or_update_vip_capital_user: {e}")
+        return {"success": False, "error": str(e)}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def update_user_capital_account_id(chat_id: int, account_id: str, is_demo: bool = False) -> bool:
     """
