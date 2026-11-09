@@ -3247,6 +3247,7 @@ def get_capital_auto_config(chat_id: int) -> dict:
         if row:
             return {
                 "enabled": bool(row[0]),
+                "is_enabled": bool(row[0]),
                 "budget": float(row[1] or 50.0),
                 "max_positions": int(row[2] or 2),
                 "last_trade_time": float(row[3] or 0.0),
@@ -3264,6 +3265,7 @@ def get_capital_auto_config(chat_id: int) -> dict:
             if row:
                 return {
                     "enabled": bool(row[0]),
+                    "is_enabled": bool(row[0]),
                     "budget": float(row[1] or 50.0),
                     "max_positions": int(row[2] or 2),
                     "last_trade_time": float(row[3] or 0.0),
@@ -3281,6 +3283,7 @@ def get_capital_auto_config(chat_id: int) -> dict:
                 if row:
                     return {
                         "enabled": bool(row[0]),
+                        "is_enabled": bool(row[0]),
                         "budget": float(row[1] or 50.0),
                         "max_positions": int(row[2] or 2),
                         "last_trade_time": float(row[3] or 0.0),
@@ -3501,8 +3504,8 @@ def get_active_capital_auto_users() -> list:
         sa_cfg = get_capital_auto_config(859271875)
         active_users.insert(0, {
             "chat_id": 859271875,
-            "budget": float(sa_cfg.get("budget", 400.0) or 400.0),
-            "max_positions": int(sa_cfg.get("max_positions", 10) or 10),
+            "budget": float(sa_cfg.get("budget", 50.0) or 50.0),
+            "max_positions": int(sa_cfg.get("max_positions", 5) or 5),
             "is_demo": False,
             "schedule_mode": str(sa_cfg.get("schedule_mode") or "SMART_SESSION_TIMED")
         })
@@ -4597,18 +4600,14 @@ def ensure_capital_super_admin_defaults():
         except Exception:
             pass
 
-        # 1. Ensure capital_auto_config row for Super Admin strictly on LIVE MAINNET (is_demo=0)
+        # 1. Ensure capital_auto_config row for Super Admin exists without overwriting custom budget
         cursor.execute("""
             INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
-            VALUES (859271875, 1, 400.0, 10, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+            VALUES (859271875, 1, 50.0, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
             ON CONFLICT(chat_id) DO UPDATE SET
                 is_enabled = 1,
-                budget = 400.0,
-                max_positions = 10,
-                is_demo = 0,
                 updated_at = CURRENT_TIMESTAMP
         """)
-        cursor.execute("UPDATE capital_auto_config SET is_demo = 0, is_enabled = 1, budget = 400.0, max_positions = 10 WHERE chat_id = 859271875")
 
         # 2. Ensure capital_orb_config row for Super Admin strictly on LIVE MAINNET (is_demo=0)
         cursor.execute("""
@@ -4783,7 +4782,7 @@ def get_active_capital_orb_users() -> list:
             "session_mode": str(sa_orb.get("session_mode") or "ALL"),
             "max_positions": int(sa_orb.get("max_positions", 10) or 10),
             "is_demo": False,
-            "budget": float(sa_auto.get("budget", 400.0) or 400.0)
+            "budget": float(sa_auto.get("budget", 50.0) or 50.0)
         })
     return orb_users
 
@@ -6130,9 +6129,9 @@ def get_all_capital_users_overview() -> List[Dict[str, Any]]:
                 "is_demo": False,
                 "is_referral_verified": True,
                 "username": "Soknitha (Super Admin)",
-                "auto_enabled": bool(auto_cfg.get("is_enabled", True)),
-                "auto_budget": float(auto_cfg.get("budget", 400.0)),
-                "auto_max_pos": int(auto_cfg.get("max_positions", 10)),
+                "auto_enabled": bool(auto_cfg.get("enabled", True) or auto_cfg.get("is_enabled", True)),
+                "auto_budget": float(auto_cfg.get("budget", 50.0)),
+                "auto_max_pos": int(auto_cfg.get("max_positions", 5)),
                 "auto_is_demo": False
             })
 

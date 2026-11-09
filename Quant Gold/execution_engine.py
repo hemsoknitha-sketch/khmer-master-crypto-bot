@@ -708,12 +708,14 @@ class QuantGoldExecutionEngine:
                         # Balance < $4.07
                         if is_admin:
                             auto_cfg = db.get_capital_auto_config(cid) or {}
+                            cur_b = float(auto_cfg.get("budget", 50.0) or 50.0)
+                            cur_mp = int(auto_cfg.get("max_positions", 5) or 5)
                             if not bool(auto_cfg.get("enabled", False)) or not bool(auto_cfg.get("is_demo", False)):
                                 db.set_capital_auto_config(
                                     chat_id=cid,
                                     enabled=True,
-                                    budget=50.0,
-                                    max_positions=5,
+                                    budget=cur_b,
+                                    max_positions=cur_mp,
                                     is_demo=True
                                 )
                                 logger.info(f"🟡 [SUPER ADMIN DEMO FALLBACK] Super Admin live < $4.07. Demo Mirror active.")

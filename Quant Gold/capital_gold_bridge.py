@@ -573,9 +573,9 @@ class QuantGoldCapitalBridge:
         tier_lbl = "👑 SUPER ADMIN" if is_admin else dossier.get("tier_label", "👑 LIFETIME VIP (គ្មានដែនកំណត់)")
 
         auto_cfg = db.get_capital_auto_config(chat_id) or {}
-        auto_on = bool(auto_cfg.get("enabled", False))
-        budget = float(auto_cfg.get("budget", 400.0 if is_admin else 50.0))
-        max_pos = int(auto_cfg.get("max_positions", 10 if is_admin else 5))
+        auto_on = bool(auto_cfg.get("enabled", False) or auto_cfg.get("is_enabled", False))
+        budget = float(auto_cfg.get("budget", 50.0) or 50.0)
+        max_pos = int(auto_cfg.get("max_positions", 5) or 5)
         auto_status = f"🟢 ON (${budget:.2f} / Trade | Max {max_pos} Pos)" if auto_on else "🔴 OFF (Paused)"
 
         open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")

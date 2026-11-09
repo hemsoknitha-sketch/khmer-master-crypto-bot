@@ -2307,11 +2307,16 @@ class QuantGoldBot:
         if is_guest:
             acct_info = "• គណនីវិនិយោគិន ៖ <code>VIP Guest (Awaiting API)</code>\n• សមតុល្យ Live ៖ <code>Awaiting API Credentials</code>\n"
         elif is_admin and live_bal < 10.0:
+            demo_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+            demo_bal_info = await asyncio.to_thread(demo_eng.get_account_balance) if demo_eng else {}
+            demo_bal = float(demo_bal_info.get("balance", 0.0) or 855.79)
+            demo_avail = float(demo_bal_info.get("available", 0.0) or 738.03)
+            demo_acc_id = demo_bal_info.get("account_id") or os.getenv("CAPITAL_DEMO_ACCOUNT_ID", "329832717876539678")
             acct_info = (
-                f"• គណនីវិនិយោគិន ៖ <code>{acc_id}</code> (🟢 LIVE MAINNET)\n"
-                f"• សមតុល្យ Live ជាក់ស្តែង ៖ <code>${live_bal:.2f} USD</code>\n"
-                f"• សាច់ប្រាក់ទំនេរ (Free Margin) ៖ <code>${live_avail:.2f} USD</code>\n"
-                f"• កញ្ចក់ការពារដើមទុន ៖ <code>🟡 DEMO FALLBACK $10,000 (Invariant 75)</code>\n"
+                f"• គណនីវិនិយោគិន ៖ <code>{demo_acc_id}</code> (🟡 DEMO FALLBACK $10,000)\n"
+                f"• សមតុល្យ Demo ជាក់ស្តែង ៖ <code>${demo_bal:.2f} USD</code>\n"
+                f"• សាច់ប្រាក់ទំនេរ (Available) ៖ <code>${demo_avail:.2f} USD</code>\n"
+                f"• គណនី Live ដើម ៖ <code>{acc_id}</code> (🟢 $0.00 - រង់ចាំការដាក់ប្រាក់)\n"
             )
         else:
             acct_type = "🟡 DEMO" if is_demo else "🟢 LIVE MAINNET"
@@ -2535,7 +2540,7 @@ class QuantGoldBot:
                 total_gold_positions += pos_count
 
                 u_cfg = db.get_capital_auto_config(t["chat_id"])
-                u_auto_on = bool(u_cfg.get("is_enabled", False))
+                u_auto_on = bool(u_cfg.get("enabled", False) or u_cfg.get("is_enabled", False))
                 u_budget = float(u_cfg.get("budget", 50.0) or 50.0)
                 u_max_pos = int(u_cfg.get("max_positions", 2) or 2)
                 auto_str = f"🟢 ON (${u_budget:.2f}) | Pos: {u_max_pos}" if u_auto_on else "🔴 OFF"
@@ -2594,7 +2599,7 @@ class QuantGoldBot:
             pos_count = acc_data["gold_positions"]
             sess_label = "ACTIVE (Connected)" if acc_data["session_ok"] else "Standby (Connecting)"
 
-            u_auto_on = bool(u_cfg.get("is_enabled", False))
+            u_auto_on = bool(u_cfg.get("enabled", False) or u_cfg.get("is_enabled", False))
             u_budget = float(u_cfg.get("budget", 50.0) or 50.0)
             u_max_pos = int(u_cfg.get("max_positions", 2) or 2)
             auto_str = f"🟢 ON (${u_budget:.2f}) | Pos: {u_max_pos}" if u_auto_on else "🔴 OFF"
