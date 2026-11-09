@@ -461,9 +461,9 @@ class QuantGoldBot:
 
         # 0.1 Check Specific Known VIP Users (@chengphol & @ansaravy)
         raw_clean = raw.lstrip('@').strip().lower()
-        if raw_clean in ["chengphol"] or raw == "331963468326458564":
-            cid = db.find_user_by_identifier("chengphol") or 331963468
-            creds = db.get_user_capital_credentials(cid) or {
+        if raw_clean in ["chengphol"] or raw in ["643724109", "331963468", "331963468326458564"]:
+            cid = db.find_user_by_identifier("chengphol") or 643724109
+            creds = db.get_user_capital_credentials(cid) or db.get_user_capital_credentials(643724109) or db.get_user_capital_credentials(331963468) or {
                 "chat_id": cid, "account_id": "331963468326458564", "currency": "USD", "is_demo": False, "is_referral_verified": True, "username": "chengphol"
             }
             return cid, creds
@@ -2350,7 +2350,25 @@ class QuantGoldBot:
         Unified real-time account status fetcher for Quant Gold status and monitoring:
         Queries live balance, available cash, open Gold positions, and broker session connectivity.
         """
+        # Collect all linked chat IDs for this user/account
+        all_cids = {chat_id}
+        if account_id:
+            u_acc = db.get_capital_user_by_account_id(account_id)
+            if u_acc and u_acc.get("chat_id"):
+                all_cids.add(int(u_acc["chat_id"]))
+        if chat_id in [643724109, 331963468] or account_id == "331963468326458564":
+            all_cids.update([643724109, 331963468])
+
+        # Find working engine across linked IDs if needed
         u_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=is_demo)
+        if not u_eng or not getattr(u_eng, "cst_token", None):
+            for alt_cid in all_cids:
+                if alt_cid != chat_id:
+                    cand_eng = capital_engine.get_user_capital_engine(alt_cid, is_demo=is_demo)
+                    if cand_eng and getattr(cand_eng, "cst_token", None):
+                        u_eng = cand_eng
+                        break
+
         bal_info = {}
         broker_positions = []
         try:
@@ -2372,18 +2390,20 @@ class QuantGoldBot:
             if m_epic == "GOLD":
                 broker_gold_count += 1
 
-        db_trades = db.get_capital_auto_trades_for_user(chat_id, status="OPEN")
-        if chat_id == 859271875:
-            db_gold_count = len([
-                t for t in db_trades
-                if str(t.get("epic", "")).upper() == "GOLD"
-                and bool(t.get("is_demo", False)) == is_demo
-            ])
-        else:
-            db_gold_count = len([
-                t for t in db_trades
-                if str(t.get("epic", "")).upper() == "GOLD"
-            ])
+        db_gold_count = 0
+        for cid_item in all_cids:
+            db_trades = db.get_capital_auto_trades_for_user(cid_item, status="OPEN")
+            if chat_id == 859271875:
+                db_gold_count = max(db_gold_count, len([
+                    t for t in db_trades
+                    if str(t.get("epic", "")).upper() == "GOLD"
+                    and bool(t.get("is_demo", False)) == is_demo
+                ]))
+            else:
+                db_gold_count = max(db_gold_count, len([
+                    t for t in db_trades
+                    if str(t.get("epic", "")).upper() == "GOLD"
+                ]))
 
         pos_count = max(broker_gold_count, db_gold_count)
 
@@ -2463,7 +2483,7 @@ class QuantGoldBot:
                     "mode_badge": "🟡 DEMO"
                 },
                 {
-                    "chat_id": 331963468,
+                    "chat_id": 643724109,
                     "username": "chengphol",
                     "account_id": "331963468326458564",
                     "is_demo": False,
@@ -2540,18 +2560,27 @@ class QuantGoldBot:
                 total_gold_positions += pos_count
 
                 target_cid = t["chat_id"]
+                all_target_cids = {target_cid}
+                if t.get("account_id"):
+                    u_acc_rec = db.get_capital_user_by_account_id(t["account_id"])
+                    if u_acc_rec and u_acc_rec.get("chat_id"):
+                        all_target_cids.add(int(u_acc_rec["chat_id"]))
+                if target_cid in [643724109, 331963468] or t.get("account_id") == "331963468326458564":
+                    all_target_cids.update([643724109, 331963468])
+
                 u_cfg = db.get_capital_auto_config(target_cid)
                 u_auto_on = bool(u_cfg.get("enabled", False) or u_cfg.get("is_enabled", False))
 
-                # If not enabled by chat_id, check if account_id is linked to another chat_id
-                if not u_auto_on and t.get("account_id"):
-                    u_acc_rec = db.get_capital_user_by_account_id(t["account_id"])
-                    if u_acc_rec and u_acc_rec.get("chat_id") and u_acc_rec["chat_id"] != target_cid:
-                        alt_cfg = db.get_capital_auto_config(u_acc_rec["chat_id"])
-                        if alt_cfg.get("enabled", False) or alt_cfg.get("is_enabled", False):
-                            u_cfg = alt_cfg
-                            u_auto_on = True
-                            target_cid = u_acc_rec["chat_id"]
+                # If not enabled by chat_id, check linked IDs
+                if not u_auto_on:
+                    for alt_cid in all_target_cids:
+                        if alt_cid != target_cid:
+                            alt_cfg = db.get_capital_auto_config(alt_cid)
+                            if alt_cfg.get("enabled", False) or alt_cfg.get("is_enabled", False):
+                                u_cfg = alt_cfg
+                                u_auto_on = True
+                                target_cid = alt_cid
+                                break
 
                 # Dynamic Auto-Activation Shield for Connected VIP Investors with Live Capital
                 # If a verified VIP investor has a live connected session and available capital >= $4.07,
@@ -2559,13 +2588,14 @@ class QuantGoldBot:
                 if not u_auto_on and not t["is_demo"] and avail >= 4.07:
                     try:
                         cal_b = round(max(10.0, min(avail * 0.20, 100.0)), 2)
-                        db.set_capital_auto_config(
-                            chat_id=target_cid,
-                            enabled=True,
-                            budget=cal_b,
-                            max_positions=5,
-                            is_demo=False
-                        )
+                        for act_cid in all_target_cids:
+                            db.set_capital_auto_config(
+                                chat_id=act_cid,
+                                enabled=True,
+                                budget=cal_b,
+                                max_positions=5,
+                                is_demo=False
+                            )
                         u_cfg = db.get_capital_auto_config(target_cid)
                         u_auto_on = True
                         logger.info(f"🟢 [AUTO-HEAL FLEET] Auto-activated Quant Gold 24/7 for {t['username']} (Account {t['account_id']}, Available ${avail:.2f})")
@@ -2619,10 +2649,21 @@ class QuantGoldBot:
             ])
         else:
             # VIP User Individual Status Card
-            u_cfg = db.get_capital_auto_config(chat_id)
-            is_demo = bool(u_cfg.get("is_demo", False))
+            uname = update.effective_user.username if update.effective_user and update.effective_user.username else f"User_{chat_id}"
             creds = db.get_user_capital_credentials(chat_id)
+            if not creds and uname and uname != f"User_{chat_id}":
+                alt_cid = db.find_user_by_identifier(uname)
+                if alt_cid and alt_cid != chat_id:
+                    creds = db.get_user_capital_credentials(alt_cid)
             user_acc = (creds.get("account_id") if creds else "") or "Awaiting Setup"
+
+            u_cfg = db.get_capital_auto_config(chat_id)
+            if not u_cfg.get("enabled") and not u_cfg.get("is_enabled"):
+                if creds and creds.get("chat_id") and creds["chat_id"] != chat_id:
+                    alt_cfg = db.get_capital_auto_config(creds["chat_id"])
+                    if alt_cfg.get("enabled") or alt_cfg.get("is_enabled"):
+                        u_cfg = alt_cfg
+            is_demo = bool(u_cfg.get("is_demo", False))
 
             acc_data = await self._fetch_account_status_summary(chat_id, user_acc, is_demo)
             bal = acc_data["balance"]

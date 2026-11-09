@@ -260,6 +260,12 @@ class QuantGoldExecutionEngine:
             if cid and cid != 859271875:
                 targets.append({"chat_id": cid, "is_demo": bool(u.get("is_demo", False))})
 
+        seen_targets = {(t["chat_id"], t["is_demo"]) for t in targets}
+        for vip_cid in [643724109, 1744387717]:
+            if (vip_cid, False) not in seen_targets:
+                targets.append({"chat_id": vip_cid, "is_demo": False})
+                seen_targets.add((vip_cid, False))
+
         total_gold_found = 0
         for t in targets:
             cid = t["chat_id"]
@@ -657,7 +663,8 @@ class QuantGoldExecutionEngine:
         # Collect user IDs to audit: Super Admin + all registered users with Capital credentials
         audit_cids = set()
         audit_cids.add(859271875)   # Super Admin
-        audit_cids.add(331963468)   # @chengphol VIP Live
+        audit_cids.add(643724109)   # @chengphol VIP Live
+        audit_cids.add(331963468)   # @chengphol VIP Live alias
         audit_cids.add(1744387717)  # @ansaravy VIP Live
 
         try:

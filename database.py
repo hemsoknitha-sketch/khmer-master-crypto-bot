@@ -2007,7 +2007,7 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
             acc_id = str(r[5] or "")
             if cid == 859271875 and (not acc_id or acc_id in ["330894176088577220", "331963468326458564"]):
                 acc_id = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
-            elif (cid == 331963468 or str(r[1] or "").lower() == "chengphol") and not acc_id:
+            elif (cid in [643724109, 331963468] or str(r[1] or "").lower() == "chengphol") and not acc_id:
                 acc_id = "331963468326458564"
             elif (cid == 1744387717 or str(r[1] or "").lower() == "ansaravy") and not acc_id:
                 acc_id = "332192407263204548"
@@ -2019,12 +2019,12 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
                 u_name = "HemSinath"
             elif (cid == 1744387717 or acc_id == "332192407263204548") and not u_name:
                 u_name = "ansaravy"
-            elif (cid == 331963468 or acc_id == "331963468326458564") and not u_name:
+            elif (cid in [643724109, 331963468] or acc_id == "331963468326458564") and not u_name:
                 u_name = "chengphol"
 
             # Auto-verify known VIPs
             is_ref_flag = bool(r[7])
-            if cid in [859271875, 1744387717, 331963468] or u_name.lower() in ["ansaravy", "chengphol"] or acc_id in ["331963468326458564", "332192407263204548"]:
+            if cid in [859271875, 1744387717, 643724109, 331963468] or u_name.lower() in ["ansaravy", "chengphol"] or acc_id in ["331963468326458564", "332192407263204548"]:
                 is_ref_flag = True
                 is_vip_flag = True
                 tier_label = "👑 SUPER ADMIN (LIFETIME)" if cid == 859271875 else "👑 LIFETIME VIP"
@@ -2040,7 +2040,7 @@ def get_full_users_management_dossiers() -> List[Dict[str, Any]]:
                 "joined_at": str(r[4] or "N/A"),
                 "account_id": acc_id if acc_id else "None",
                 "has_capital": bool(acc_id and acc_id != "None"),
-                "is_demo": False if is_ref_flag and cid in [1744387717, 331963468] else bool(r[6]),
+                "is_demo": False if is_ref_flag and cid in [1744387717, 643724109, 331963468] else bool(r[6]),
                 "is_referral_verified": is_ref_flag,
                 "auto_enabled": bool(r[8]),
                 "auto_budget": float(r[9]),
@@ -4263,7 +4263,7 @@ def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None
             set_b = float(budget) if budget is not None else 50.0
             set_m = int(max_positions) if max_positions is not None else 4
             set_s = str(schedule_mode) if schedule_mode is not None else "SMART_SESSION_TIMED"
-            for u_id in set(cred_users + ([331963468, 1744387717] if not preserve_super_admin else [])):
+            for u_id in set(cred_users + ([643724109, 1744387717] if not preserve_super_admin else [])):
                 cursor.execute(f"""
                     INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, is_demo, schedule_mode)
                     VALUES (?, 1, ?, ?, {demo_val}, ?)
@@ -4710,41 +4710,47 @@ def ensure_capital_super_admin_defaults():
         """)
 
         # 8. Seed & Approve VIP User @chengphol (Owner of Live Account ID 331963468326458564)
-        cheng_cid = 331963468
-        cursor.execute("SELECT chat_id FROM users WHERE LOWER(username) = 'chengphol'")
+        cheng_cid = 643724109
+        cursor.execute("SELECT chat_id FROM users WHERE LOWER(username) = 'chengphol' OR chat_id IN (643724109, 331963468)")
         cheng_row = cursor.fetchone()
-        if cheng_row:
+        if cheng_row and cheng_row[0]:
             cheng_cid = cheng_row[0]
-        else:
-            cursor.execute("SELECT chat_id FROM users WHERE chat_id = ?", (cheng_cid,))
-            if not cursor.fetchone():
-                cursor.execute("INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at) VALUES (?, 'chengphol', 1, 'lifetime', CURRENT_TIMESTAMP)", (cheng_cid,))
-            else:
-                cursor.execute("UPDATE users SET username = 'chengphol', is_vip = 1, license_expiry = 'lifetime' WHERE chat_id = ?", (cheng_cid,))
 
-        cursor.execute("""
-            INSERT INTO user_capital_credentials (
-                chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
-            ) VALUES (?, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', '331963468326458564', 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT(chat_id) DO UPDATE SET
-                account_id = '331963468326458564',
-                is_demo = 0,
-                is_referral_verified = 1,
-                referral_code = 'az48cxia',
-                verified_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-        """, (cheng_cid,))
-        for cid_enable in set([cheng_cid, 331963468]):
+        # If 331963468 was created as an artificial placeholder, migrate it to 643724109 if cheng_cid == 643724109
+        if cheng_cid == 643724109:
+            cursor.execute("DELETE FROM users WHERE chat_id = 331963468")
+            cursor.execute("DELETE FROM user_capital_credentials WHERE chat_id = 331963468")
+            cursor.execute("DELETE FROM capital_auto_config WHERE chat_id = 331963468")
+            cursor.execute("DELETE FROM capital_user_referrals WHERE client_chat_id = 331963468")
+
+        for cid_item in set([cheng_cid, 643724109]):
+            cursor.execute("""
+                INSERT INTO users (chat_id, username, is_vip, license_expiry, joined_at)
+                VALUES (?, 'chengphol', 1, 'lifetime', CURRENT_TIMESTAMP)
+                ON CONFLICT(chat_id) DO UPDATE SET username = 'chengphol', is_vip = 1, license_expiry = 'lifetime'
+            """, (cid_item,))
+            cursor.execute("""
+                INSERT INTO user_capital_credentials (
+                    chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
+                ) VALUES (?, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', '331963468326458564', 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    account_id = '331963468326458564',
+                    is_demo = 0,
+                    is_referral_verified = 1,
+                    referral_code = 'az48cxia',
+                    verified_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (cid_item,))
             cursor.execute("""
                 INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
                 VALUES (?, 1, 100.0, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
                 ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
-            """, (cid_enable,))
-        cursor.execute("""
-            INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
-            VALUES (?, 859271875, 'az48cxia')
-            ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
-        """, (cheng_cid,))
+            """, (cid_item,))
+            cursor.execute("""
+                INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+                VALUES (?, 859271875, 'az48cxia')
+                ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
+            """, (cid_item,))
 
         cursor.execute("UPDATE user_capital_credentials SET api_key = 'ENV_VAULT' WHERE (api_key IS NULL OR api_key = '') AND account_id IS NOT NULL AND account_id != ''")
         conn.commit()
@@ -5842,11 +5848,15 @@ def add_or_update_vip_capital_user(
         existing_cid = find_user_by_identifier(clean_u)
         if existing_cid:
             target_cid = existing_cid
+        elif clean_u.lower() == "chengphol" or clean_acc == "331963468326458564":
+            target_cid = 643724109
+        elif clean_u.lower() == "ansaravy" or clean_acc == "332192407263204548":
+            target_cid = 1744387717
         else:
             try:
                 target_cid = int(clean_acc[:9])
             except Exception:
-                target_cid = 331963468
+                target_cid = 643724109
     else:
         target_cid = int(chat_id)
 
