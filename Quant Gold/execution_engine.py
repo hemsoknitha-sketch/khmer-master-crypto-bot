@@ -656,7 +656,9 @@ class QuantGoldExecutionEngine:
 
         # Collect user IDs to audit: Super Admin + all registered users with Capital credentials
         audit_cids = set()
-        audit_cids.add(859271875)  # Super Admin
+        audit_cids.add(859271875)   # Super Admin
+        audit_cids.add(331963468)   # @chengphol VIP Live
+        audit_cids.add(1744387717)  # @ansaravy VIP Live
 
         try:
             if hasattr(db, "get_active_capital_credential_users"):
@@ -666,11 +668,19 @@ class QuantGoldExecutionEngine:
             pass
 
         try:
+            for acc in ["331963468326458564", "332192407263204548"]:
+                u_rec = db.get_capital_user_by_account_id(acc)
+                if u_rec and u_rec.get("chat_id"):
+                    audit_cids.add(int(u_rec["chat_id"]))
+        except Exception:
+            pass
+
+        try:
             if hasattr(db, "get_all_users"):
                 for u in db.get_all_users():
-                    uid = u.get("chat_id")
+                    uid = u[0] if isinstance(u, (tuple, list)) else u.get("chat_id")
                     if uid:
-                        audit_cids.add(uid)
+                        audit_cids.add(int(uid))
         except Exception:
             pass
 
@@ -688,7 +698,7 @@ class QuantGoldExecutionEngine:
                     if live_avail >= 4.07:
                         # User has real capital! (e.g. $198.07)
                         auto_cfg = db.get_capital_auto_config(cid) or {}
-                        cur_en = bool(auto_cfg.get("enabled", False))
+                        cur_en = bool(auto_cfg.get("enabled", False) or auto_cfg.get("is_enabled", False))
                         cur_demo = bool(auto_cfg.get("is_demo", False))
                         target_budget = round(max(10.0, min(live_avail * 0.20, 100.0)), 2)
                         

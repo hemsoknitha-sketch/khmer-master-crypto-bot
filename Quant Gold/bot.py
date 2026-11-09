@@ -2539,8 +2539,39 @@ class QuantGoldBot:
                     total_live_available += avail
                 total_gold_positions += pos_count
 
-                u_cfg = db.get_capital_auto_config(t["chat_id"])
+                target_cid = t["chat_id"]
+                u_cfg = db.get_capital_auto_config(target_cid)
                 u_auto_on = bool(u_cfg.get("enabled", False) or u_cfg.get("is_enabled", False))
+
+                # If not enabled by chat_id, check if account_id is linked to another chat_id
+                if not u_auto_on and t.get("account_id"):
+                    u_acc_rec = db.get_capital_user_by_account_id(t["account_id"])
+                    if u_acc_rec and u_acc_rec.get("chat_id") and u_acc_rec["chat_id"] != target_cid:
+                        alt_cfg = db.get_capital_auto_config(u_acc_rec["chat_id"])
+                        if alt_cfg.get("enabled", False) or alt_cfg.get("is_enabled", False):
+                            u_cfg = alt_cfg
+                            u_auto_on = True
+                            target_cid = u_acc_rec["chat_id"]
+
+                # Dynamic Auto-Activation Shield for Connected VIP Investors with Live Capital
+                # If a verified VIP investor has a live connected session and available capital >= $4.07,
+                # auto-trading should be active by default! Auto-heal in database immediately.
+                if not u_auto_on and not t["is_demo"] and avail >= 4.07:
+                    try:
+                        cal_b = round(max(10.0, min(avail * 0.20, 100.0)), 2)
+                        db.set_capital_auto_config(
+                            chat_id=target_cid,
+                            enabled=True,
+                            budget=cal_b,
+                            max_positions=5,
+                            is_demo=False
+                        )
+                        u_cfg = db.get_capital_auto_config(target_cid)
+                        u_auto_on = True
+                        logger.info(f"🟢 [AUTO-HEAL FLEET] Auto-activated Quant Gold 24/7 for {t['username']} (Account {t['account_id']}, Available ${avail:.2f})")
+                    except Exception as e_ah:
+                        logger.debug(f"Auto-heal fleet note: {e_ah}")
+
                 u_budget = float(u_cfg.get("budget", 50.0) or 50.0)
                 u_max_pos = int(u_cfg.get("max_positions", 2) or 2)
                 auto_str = f"🟢 ON (${u_budget:.2f}) | Pos: {u_max_pos}" if u_auto_on else "🔴 OFF"
@@ -2600,6 +2631,20 @@ class QuantGoldBot:
             sess_label = "ACTIVE (Connected)" if acc_data["session_ok"] else "Standby (Connecting)"
 
             u_auto_on = bool(u_cfg.get("enabled", False) or u_cfg.get("is_enabled", False))
+            if not u_auto_on and not is_demo and avail >= 4.07:
+                try:
+                    cal_b = round(max(10.0, min(avail * 0.20, 100.0)), 2)
+                    db.set_capital_auto_config(
+                        chat_id=chat_id,
+                        enabled=True,
+                        budget=cal_b,
+                        max_positions=5,
+                        is_demo=False
+                    )
+                    u_cfg = db.get_capital_auto_config(chat_id)
+                    u_auto_on = True
+                except Exception:
+                    pass
             u_budget = float(u_cfg.get("budget", 50.0) or 50.0)
             u_max_pos = int(u_cfg.get("max_positions", 2) or 2)
             auto_str = f"🟢 ON (${u_budget:.2f}) | Pos: {u_max_pos}" if u_auto_on else "🔴 OFF"

@@ -4257,16 +4257,17 @@ def enable_all_capital_users(engine: str = "ALL", budget: Optional[float] = None
             
             cursor.execute(f"UPDATE user_capital_credentials SET is_demo = {demo_val}{where_admin}")
 
-            # 2. Insert any user who exists in user_capital_credentials but not in capital_auto_config yet
+            # 2. Insert or update any user who exists in user_capital_credentials or fleet in capital_auto_config
             cursor.execute(f"SELECT DISTINCT chat_id FROM user_capital_credentials{where_admin}")
             cred_users = [row[0] for row in cursor.fetchall()]
             set_b = float(budget) if budget is not None else 50.0
             set_m = int(max_positions) if max_positions is not None else 4
             set_s = str(schedule_mode) if schedule_mode is not None else "SMART_SESSION_TIMED"
-            for u_id in cred_users:
+            for u_id in set(cred_users + ([331963468, 1744387717] if not preserve_super_admin else [])):
                 cursor.execute(f"""
-                    INSERT OR IGNORE INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, is_demo, schedule_mode)
+                    INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, is_demo, schedule_mode)
                     VALUES (?, 1, ?, ?, {demo_val}, ?)
+                    ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = {demo_val}, updated_at = CURRENT_TIMESTAMP
                 """, (u_id, set_b, set_m, set_s))
                 if cursor.rowcount > 0:
                     updated_count += 1
@@ -4592,6 +4593,10 @@ def ensure_capital_super_admin_defaults():
         except Exception:
             pass
         try:
+            cursor.execute("ALTER TABLE capital_auto_config ADD COLUMN schedule_mode TEXT DEFAULT 'SMART_SESSION_TIMED'")
+        except Exception:
+            pass
+        try:
             cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN demo_account_id TEXT DEFAULT ''")
         except Exception:
             pass
@@ -4729,11 +4734,12 @@ def ensure_capital_super_admin_defaults():
                 verified_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
         """, (cheng_cid,))
-        cursor.execute("""
-            INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
-            VALUES (?, 1, 100.0, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
-            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
-        """, (cheng_cid,))
+        for cid_enable in set([cheng_cid, 331963468]):
+            cursor.execute("""
+                INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
+                VALUES (?, 1, 100.0, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+                ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
+            """, (cid_enable,))
         cursor.execute("""
             INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
             VALUES (?, 859271875, 'az48cxia')
@@ -4744,7 +4750,7 @@ def ensure_capital_super_admin_defaults():
         conn.commit()
         conn.close()
     except Exception as e_sd:
-        pass
+        print(f"⚠️ [ensure_capital_super_admin_defaults] Note: {e_sd}")
 
 def get_active_capital_orb_users() -> list:
     """Returns a list of all active Capital ORB users."""
