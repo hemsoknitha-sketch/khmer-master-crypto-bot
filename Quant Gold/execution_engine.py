@@ -80,6 +80,7 @@ def format_gold_signal_card(
         f"<b>Angkor Quant Gold</b>\n"
         f"{divider}\n"
         f"{dir_icon} <b>Single Direction :</b> <code>{dir_str}</code>\n"
+        f"💵 <b>តម្លៃចូលទីផ្សារ (Entry) ៖</b> <code>${entry_price:.2f}</code>\n"
         f"🎯 <b>Execution Levels ៖</b>\n"
         f"   └ <b>Tight SL:</b> <code>${sl:.2f}</code> (-{sl_pips:.1f} p)\n"
         f"   └ <b>TP1 (+{tp1_pips} pips):</b> <code>${tp1:.2f}</code> (TP Lock)\n"
@@ -284,7 +285,17 @@ class QuantGoldExecutionEngine:
         mtf_data = self.mtf_engine.analyze_all_19_timeframes(current_price=curr_p)
 
         # 2. Mathematical Edge (Kalman, Hurst Surface, Ornstein-Uhlenbeck) (<0.006s)
-        math_data = self.math_core.analyze_mathematical_edge(current_price=curr_p)
+        candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
+        candles_m15 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
+        candles_h1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("H1")
+        candles_d1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("D1")
+        math_data = self.math_core.analyze_mathematical_edge(
+            current_price=curr_p,
+            candles_m1=candles_m1,
+            candles_m15=candles_m15,
+            candles_h1=candles_h1,
+            candles_d1=candles_d1
+        )
 
         # 3. AI Swarm Consensus (Gemini + DeepSeek-R1 + Llama-3 + Algo Governor)
         if fast:
@@ -333,25 +344,31 @@ class QuantGoldExecutionEngine:
         reason = "Market in consolidation or awaiting higher confluence."
 
         # STRICT QUALITY GATES (ELIMINATING >80% LOSS RATE):
-        # Gate 1: Both MTF and AI must agree on BUY or SELL
-        if mtf_action in ["BUY", "SELL"] and mtf_action == ai_action:
-            # Gate 2: Chop Zone Injunction (Middle 30% Dealing Range is FORBIDDEN)
-            if is_chop_zone:
+        # Gate 1: Check MTF and AI alignment or decisive weighted score
+        cand_action = mtf_action if mtf_action in ["BUY", "SELL"] else (ai_action if ai_action in ["BUY", "SELL"] else None)
+        has_consensus = (mtf_action in ["BUY", "SELL"] and (mtf_action == ai_action or ai_action == "HOLD" or abs(weighted_score) >= 30.0))
+        if not has_consensus and ai_action in ["BUY", "SELL"] and abs(weighted_score) >= 25.0:
+            has_consensus = True
+            cand_action = ai_action
+
+        if has_consensus and cand_action in ["BUY", "SELL"]:
+            # Gate 2: Chop Zone Injunction (Middle 30% Dealing Range is FORBIDDEN unless high conviction breakout)
+            if is_chop_zone and abs(weighted_score) < 45.0:
                 final_action = "HOLD"
                 reason = f"BLOCKED_CHOP_ZONE: Price is in middle dealing range ({smc_m15.get('range_pct', 0.5):.2f})."
-            # Gate 3: Anti-Oversold Short Guard & Anti-Overbought Long Guard
-            elif mtf_action == "SELL" and m15_tf.get("rsi", 50.0) <= 38.0:
+            # Gate 3: Anti-Oversold Short Guard & Anti-Overbought Long Guard (Invariant 1.1 Fiduciary Oath)
+            elif cand_action == "SELL" and m15_tf.get("rsi", 50.0) <= 38.0:
                 final_action = "HOLD"
                 reason = f"ANTI_OVERSOLD_SHORT_VETO: 15m RSI is {m15_tf.get('rsi'):.1f} <= 38.0."
-            elif mtf_action == "BUY" and m15_tf.get("rsi", 50.0) >= 70.0:
+            elif cand_action == "BUY" and m15_tf.get("rsi", 50.0) >= 70.0:
                 final_action = "HOLD"
                 reason = f"ANTI_OVERBOUGHT_LONG_VETO: 15m RSI is {m15_tf.get('rsi'):.1f} >= 70.0."
-            # Gate 4: Random Walk Veto
-            elif regime == "RANDOM_WALK" and abs(weighted_score) < 55.0:
+            # Gate 4: Random Walk Veto - Only when score is near zero and velocity is flat
+            elif regime == "RANDOM_WALK" and abs(weighted_score) < 20.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.02:
                 final_action = "HOLD"
-                reason = f"RANDOM_WALK_VETO: Composite Hurst is {hurst.get('composite'):.2f}."
+                reason = f"RANDOM_WALK_VETO: Composite Hurst is {hurst.get('composite'):.2f} with negligible momentum."
             else:
-                final_action = mtf_action
+                final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
         # Tight Structural SL & Dynamic Targets (Super Smart Gold Calibration):
@@ -450,12 +467,99 @@ class QuantGoldExecutionEngine:
         self._last_signal_ts = time.time()
         return res
 
+    async def audit_and_sync_all_users_capital(self, app=None) -> Dict[str, Any]:
+        """
+        Continuously monitors capital balances of ALL users across Capital.com:
+          1. Audits Live accounts of all registered users who have Capital credentials.
+          2. When real capital is detected (Available >= $4.07), automatically
+             activates LIVE MAINNET auto trading with calibrated risk budget.
+          3. If Super Admin Live balance < $4.07, ensures Demo Fallback Mirror is active.
+        """
+        now = time.time()
+        if (now - getattr(self, "_last_capital_audit_ts", 0.0)) < 45.0:
+            return {"status": "SKIPPED_THROTTLE"}
+
+        self._last_capital_audit_ts = now
+        results = {}
+
+        # Collect user IDs to audit: Super Admin + all registered users with Capital credentials
+        audit_cids = set()
+        audit_cids.add(859271875)  # Super Admin
+
+        try:
+            if hasattr(db, "get_active_capital_credential_users"):
+                for cid in db.get_active_capital_credential_users():
+                    audit_cids.add(cid)
+        except Exception:
+            pass
+
+        try:
+            if hasattr(db, "get_all_users"):
+                for u in db.get_all_users():
+                    uid = u.get("chat_id")
+                    if uid:
+                        audit_cids.add(uid)
+        except Exception:
+            pass
+
+        for cid in audit_cids:
+            try:
+                is_admin = (cid == 859271875) or db.is_admin(cid)
+                u_eng_live = capital_engine.get_user_capital_engine(cid, is_demo=False)
+                bal_inf = await asyncio.to_thread(u_eng_live.get_account_balance)
+                
+                if bal_inf and bal_inf.get("success"):
+                    live_bal = float(bal_inf.get("balance", 0.0) or 0.0)
+                    live_avail = float(bal_inf.get("available", 0.0) or 0.0)
+                    acc_id = bal_inf.get("account_id") or ""
+                    
+                    if live_avail >= 4.07:
+                        # User has real capital! (e.g. $198.07)
+                        auto_cfg = db.get_capital_auto_config(cid) or {}
+                        cur_en = bool(auto_cfg.get("enabled", False))
+                        cur_demo = bool(auto_cfg.get("is_demo", False))
+                        target_budget = round(max(10.0, min(live_avail * 0.20, 100.0)), 2)
+                        
+                        if not cur_en or cur_demo:
+                            db.set_capital_auto_config(
+                                chat_id=cid,
+                                enabled=True,
+                                budget=target_budget,
+                                max_positions=5,
+                                is_demo=False
+                            )
+                            logger.info(f"🟢 [FLEET LIVE ACTIVATED] User {cid} (Account {acc_id}) has ${live_avail:.2f} available. Auto-switched to LIVE MAINNET trading!")
+                            results[cid] = {"status": "LIVE_ACTIVATED", "available": live_avail, "budget": target_budget}
+                        else:
+                            results[cid] = {"status": "LIVE_ACTIVE", "available": live_avail}
+                    else:
+                        # Balance < $4.07
+                        if is_admin:
+                            auto_cfg = db.get_capital_auto_config(cid) or {}
+                            if not bool(auto_cfg.get("enabled", False)) or not bool(auto_cfg.get("is_demo", False)):
+                                db.set_capital_auto_config(
+                                    chat_id=cid,
+                                    enabled=True,
+                                    budget=50.0,
+                                    max_positions=5,
+                                    is_demo=True
+                                )
+                                logger.info(f"🟡 [SUPER ADMIN DEMO FALLBACK] Super Admin live < $4.07. Demo Mirror active.")
+                            results[cid] = {"status": "DEMO_FALLBACK_ACTIVE", "available": live_avail}
+                        else:
+                            results[cid] = {"status": "STANDBY_LOW_CAPITAL", "available": live_avail}
+            except Exception as e_user_audit:
+                logger.debug(f"User capital audit note for {cid}: {e_user_audit}")
+
+        return results
+
     async def execute_quant_gold_cycle(self, app=None) -> Dict[str, Any]:
         """
         Main 24/7 autonomous loop for Quant Gold:
           1. Monitors existing Gold positions (Breakeven Armor, Trailing Ratchet, Shock Early Harvest).
-          2. Discovers high-conviction Gold setups (19-TF + Math + AI Swarm).
-          3. Dispatches market orders for all active Capital.com VIP users with instant concurrency.
+          2. Continuously audits and synchronizes real capital balances across all users.
+          3. Discovers high-conviction Gold setups (19-TF + Math + AI Swarm).
+          4. Dispatches market orders for all active Capital.com VIP users with instant concurrency.
         """
         now = time.time()
         if (now - self._last_cycle_ts) < self._cycle_interval or self._is_evaluating:
@@ -467,6 +571,12 @@ class QuantGoldExecutionEngine:
         try:
             # Step 1: Manage Open Gold Positions (Breakeven Armor & Shock Early Harvest)
             await self._audit_and_protect_open_gold_positions(app=app)
+
+            # Step 1.5: Continuous User Capital Monitoring & Dynamic Live Auto-Activation
+            try:
+                await self.audit_and_sync_all_users_capital(app=app)
+            except Exception as e_sync:
+                logger.debug(f"Capital sync note: {e_sync}")
 
             # Step 2: Check Active VIP Users
             active_users = db.get_active_capital_auto_users()
@@ -565,7 +675,36 @@ class QuantGoldExecutionEngine:
                         logger.debug(f"User {cid} already holds open GOLD position. Skipping duplicate entry.")
                         return 0
 
-                    budget = float(user_dict.get("budget", 200.0) or 200.0)
+                    is_admin = (cid == 859271875) or db.is_admin(cid)
+                    configured_is_demo = bool(user_dict.get("is_demo", False))
+                    budget = float(user_dict.get("budget", 50.0) or 50.0)
+
+                    # Dynamic Real Capital Checking & Smart Demo Fallback:
+                    effective_is_demo = configured_is_demo
+                    if not configured_is_demo:
+                        try:
+                            chk_eng = capital_engine.get_user_capital_engine(cid, is_demo=False)
+                            bal_inf = await asyncio.to_thread(chk_eng.get_account_balance)
+                            live_avail = float(bal_inf.get("available", 0.0) or 0.0)
+                            
+                            # Min margin for 0.5 oz Gold is ~$4.12 at 500:1 leverage
+                            if live_avail < 4.07:
+                                if is_admin:
+                                    logger.info(f"🚂 [SUPER ADMIN DEMO FALLBACK] Live Available (${live_avail:.2f}) < $4.07. Auto-engaging Demo Account (329832717876539678) $10,000 mirror.")
+                                    effective_is_demo = True
+                                else:
+                                    logger.info(f"⚠️ User {cid} Live Available (${live_avail:.2f}) < $4.07. Standby until live capital is deposited.")
+                                    return 0
+                            else:
+                                effective_is_demo = False
+                                budget = max(10.0, min(budget, live_avail * 0.50))
+                        except Exception as e_bal:
+                            logger.debug(f"Live balance audit note for user {cid}: {e_bal}")
+                            if is_admin:
+                                effective_is_demo = True
+                            else:
+                                return 0
+
                     lot_size = calculate_capital_gold_lot_size(
                         budget=budget,
                         current_price=current_price,
@@ -573,7 +712,7 @@ class QuantGoldExecutionEngine:
                         leverage=500.0
                     )
 
-                    u_eng = capital_engine.get_user_capital_engine(cid)
+                    u_eng = capital_engine.get_user_capital_engine(cid, is_demo=effective_is_demo)
                     order_res = await asyncio.to_thread(
                         u_eng.execute_smart_tradfi_order,
                         epic="GOLD",

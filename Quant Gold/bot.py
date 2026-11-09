@@ -2245,15 +2245,21 @@ class QuantGoldBot:
         curr_p = (bid + ask) / 2.0
 
         u_eng = capital_engine.get_user_capital_engine(chat_id)
-        session_ok = bool(getattr(u_eng, "is_authenticated", False) or getattr(u_eng, "session_token", None) or getattr(u_eng, "cst", None))
-        session_label = "ACTIVE (Connected)" if session_ok else "Standby (Connecting)"
 
         bal_info = {}
         try:
-            bal_info = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=2.5) if u_eng else {}
+            bal_info = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=3.5) if u_eng else {}
         except Exception as e_s:
             logger.debug(f"Status balance query note: {e_s}")
             bal_info = {}
+
+        session_ok = bool(
+            getattr(u_eng, "cst_token", None) 
+            or getattr(u_eng, "security_token", None) 
+            or (bal_info and bal_info.get("success") is True)
+            or (bal_info and bal_info.get("balance") is not None)
+        )
+        session_label = "ACTIVE (Connected)" if session_ok else "Standby (Connecting)"
 
         live_bal = float(bal_info.get("balance", 0.0) or 0.0)
         live_avail = float(bal_info.get("available", 0.0) or 0.0)

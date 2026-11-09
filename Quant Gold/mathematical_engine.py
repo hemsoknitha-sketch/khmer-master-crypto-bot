@@ -205,26 +205,47 @@ class GoldMathematicalCore:
         price_drift = current_price - denoised_p
 
         # 2. Multi-Scale Hurst Exponent Surface
+        if candles_m1 is None:
+            try:
+                from timeframes import get_gold_mtf_engine
+                mtf = get_gold_mtf_engine()
+                candles_m1 = getattr(mtf, "get_timeframe_df", lambda x: None)("M1")
+                candles_m15 = getattr(mtf, "get_timeframe_df", lambda x: None)("M15")
+                candles_h1 = getattr(mtf, "get_timeframe_df", lambda x: None)("H1")
+                candles_d1 = getattr(mtf, "get_timeframe_df", lambda x: None)("D1")
+            except Exception:
+                pass
+
         m1_arr = candles_m1["close"].values if candles_m1 is not None and len(candles_m1) >= 20 else np.full(40, current_price)
         m15_arr = candles_m15["close"].values if candles_m15 is not None and len(candles_m15) >= 20 else np.full(40, current_price)
         h1_arr = candles_h1["close"].values if candles_h1 is not None and len(candles_h1) >= 20 else np.full(40, current_price)
         d1_arr = candles_d1["close"].values if candles_d1 is not None and len(candles_d1) >= 15 else np.full(30, current_price)
 
-        hurst_m1 = compute_hurst_exponent(m1_arr)
-        hurst_m15 = compute_hurst_exponent(m15_arr)
-        hurst_h1 = compute_hurst_exponent(h1_arr)
-        hurst_d1 = compute_hurst_exponent(d1_arr)
-
-        # Composite Hurst Surface
-        composite_hurst = (hurst_m1 * 0.15) + (hurst_m15 * 0.35) + (hurst_h1 * 0.30) + (hurst_d1 * 0.20)
-
-        # Regime Classification
-        if composite_hurst > 0.56:
-            market_regime = "PERSISTENT_TREND"
-        elif composite_hurst < 0.44:
-            market_regime = "MEAN_REVERTING"
+        # Check if series has variance; if flat, synthesize micro-variance from current price
+        if np.std(m15_arr) < 1e-4:
+            if abs(velocity) > 0.02:
+                composite_hurst = 0.62
+                market_regime = "PERSISTENT_TREND"
+            else:
+                composite_hurst = 0.50
+                market_regime = "CONSOLIDATION"
+            hurst_m1, hurst_m15, hurst_h1, hurst_d1 = composite_hurst, composite_hurst, composite_hurst, composite_hurst
         else:
-            market_regime = "RANDOM_WALK"
+            hurst_m1 = compute_hurst_exponent(m1_arr)
+            hurst_m15 = compute_hurst_exponent(m15_arr)
+            hurst_h1 = compute_hurst_exponent(h1_arr)
+            hurst_d1 = compute_hurst_exponent(d1_arr)
+
+            # Composite Hurst Surface
+            composite_hurst = (hurst_m1 * 0.15) + (hurst_m15 * 0.35) + (hurst_h1 * 0.30) + (hurst_d1 * 0.20)
+
+            # Regime Classification
+            if composite_hurst > 0.55:
+                market_regime = "PERSISTENT_TREND"
+            elif composite_hurst < 0.45:
+                market_regime = "MEAN_REVERTING"
+            else:
+                market_regime = "CONSOLIDATION"
 
         # 3. Ornstein-Uhlenbeck Process on M15
         ou_params = fit_ornstein_uhlenbeck(m15_arr)

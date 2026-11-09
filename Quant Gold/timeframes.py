@@ -428,6 +428,7 @@ class GoldMultiTimeframeEngine:
         timeframe_dfs["D1"] = base_d1_df
         timeframe_dfs["W1"] = resample_ohlcv(base_d1_df, target_mins=7)
         timeframe_dfs["MN"] = resample_ohlcv(base_d1_df, target_mins=30)
+        self._last_timeframe_dfs = timeframe_dfs
 
         # Calculate metrics per timeframe
         tf_results: Dict[str, Any] = {}
@@ -471,10 +472,13 @@ class GoldMultiTimeframeEngine:
 
         # Overall recommendation
         action = "HOLD"
-        # Strict High-Probability Entry: Must have weighted_score >= 45.0, at least 13/19 timeframes aligned, and win_prob >= 78%
-        if weighted_score >= 45.0 and bullish_count >= 13 and win_prob >= 78.0 and macro_aligned:
+        # High-Probability Confluence Entry (Calibrated Institutional Alpha):
+        # Require weighted_score >= 25.0 (or <= -25.0), at least 9/19 timeframes aligned, and win_prob >= 62.0%
+        # Macro check: must not directly oppose a severe macro counter-trend
+        macro_opposed = (macro_score < -25.0 and dom_dir == "BUY") or (macro_score > 25.0 and dom_dir == "SELL")
+        if weighted_score >= 25.0 and bullish_count >= 9 and win_prob >= 62.0 and not macro_opposed:
             action = "BUY"
-        elif weighted_score <= -45.0 and bearish_count >= 13 and win_prob >= 78.0 and macro_aligned:
+        elif weighted_score <= -25.0 and bearish_count >= 9 and win_prob >= 62.0 and not macro_opposed:
             action = "SELL"
 
         result = {
@@ -501,6 +505,12 @@ class GoldMultiTimeframeEngine:
         self._cache = result
         self._cache_ts = now
         return result
+
+    def get_timeframe_df(self, tf: str) -> Optional[pd.DataFrame]:
+        """Returns the cached DataFrame for the given timeframe (e.g. 'M1', 'M15', 'H1', 'D1')."""
+        if hasattr(self, "_last_timeframe_dfs") and self._last_timeframe_dfs:
+            return self._last_timeframe_dfs.get(tf.upper())
+        return None
 
 
 # Singleton
