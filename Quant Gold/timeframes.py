@@ -124,7 +124,7 @@ class GoldMultiTimeframeEngine:
         self._cache_ts: float = 0.0
         self._cache_ttl: float = 2.0  # 2-second RAM TTL for sub-millisecond querying
 
-    def build_synthetic_gold_candles(self, base_price: float = 2735.0, count: int = 300) -> pd.DataFrame:
+    def build_synthetic_gold_candles(self, base_price: float = 4095.0, count: int = 300) -> pd.DataFrame:
         """
         Generates realistic synthetic M1 Gold candles for offline testing, sandboxing,
         or when broker API is temporarily unreachable.
@@ -380,7 +380,7 @@ class GoldMultiTimeframeEngine:
         base_m1_df: Optional[Any] = None,
         base_h1_df: Optional[pd.DataFrame] = None,
         base_d1_df: Optional[pd.DataFrame] = None,
-        current_price: float = 2735.0
+        current_price: float = 4095.0
     ) -> Dict[str, Any]:
         """
         Processes and scores all 19 timeframes simultaneously, aggregating an

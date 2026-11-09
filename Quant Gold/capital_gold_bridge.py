@@ -60,7 +60,7 @@ class QuantGoldCapitalBridge:
             )
         except Exception:
             sig_data = self.exec_engine.get_cached_gold_signal() or {}
-        curr_p = sig_data.get("current_price", 2735.0)
+        curr_p = sig_data.get("current_price", 4095.0)
         action = sig_data.get("action", "HOLD")
         conf = sig_data.get("confidence", 50.0)
         sl = sig_data.get("sl", 0.0)
@@ -240,7 +240,7 @@ class QuantGoldCapitalBridge:
             logger.warning(f"Fast signal note on admin start card: {e_sig}")
             sig_data = self.exec_engine.get_cached_gold_signal() or {}
 
-        curr_p = float(sig_data.get("current_price", 2735.0) or 2735.0)
+        curr_p = float(sig_data.get("current_price", 4095.0) or 4095.0)
         action = str(sig_data.get("action", "HOLD") or "HOLD")
         conf = float(sig_data.get("confidence", 78.5) or 78.5)
         spread = float(sig_data.get("spread", 0.35) or 0.35)
@@ -368,7 +368,7 @@ class QuantGoldCapitalBridge:
             logger.warning(f"Fast signal note on vip start card: {e_sig}")
             sig_data = self.exec_engine.get_cached_gold_signal() or {}
 
-        curr_p = float(sig_data.get("current_price", 2735.0) or 2735.0)
+        curr_p = float(sig_data.get("current_price", 4095.0) or 4095.0)
         action = str(sig_data.get("action", "HOLD") or "HOLD")
         conf = float(sig_data.get("confidence", 78.5) or 78.5)
         spread = float(sig_data.get("spread", 0.35) or 0.35)

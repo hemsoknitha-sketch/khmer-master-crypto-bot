@@ -135,7 +135,7 @@ def fit_ornstein_uhlenbeck(series: np.ndarray, dt: float = 1.0) -> Dict[str, flo
       sigma: Volatility
     """
     if len(series) < 10:
-        return {"theta": 0.05, "mu": float(series[-1] if len(series) else 2735.0), "half_life": 14.0, "sigma": 1.0}
+        return {"theta": 0.05, "mu": float(series[-1] if len(series) else 4095.0), "half_life": 14.0, "sigma": 1.0}
 
     x = series[:-1]
     y = series[1:]

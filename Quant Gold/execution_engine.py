@@ -100,14 +100,20 @@ def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: floa
     dir_icon = "🟢" if is_buy else "🔴"
     st = str(stage).upper()
 
+    # Institutional Sanity Clamping: Prevent runaway/corrupted pip display
+    safe_pips = max(10, min(int(pips), 350))
+
     if "TP1" in st:
-        stage_desc = f"TP1 Hit (+{max(73, pips)} pips) | TP Lock (Breakeven Armor 0.0R)!"
+        disp_pips = min(safe_pips, 100) if safe_pips >= 73 else 73
+        stage_desc = f"TP1 Hit (+{disp_pips} pips) | TP Lock (Breakeven Armor 0.0R)!"
     elif "TP2" in st:
-        stage_desc = f"TP2 Hit (+{max(152, pips)} pips) | Guaranteed Cash Floor Locked!"
+        disp_pips = min(safe_pips, 190) if safe_pips >= 152 else 152
+        stage_desc = f"TP2 Hit (+{disp_pips} pips) | Guaranteed Cash Floor Locked!"
     elif "TP3" in st:
-        stage_desc = f"TP3 Hit (+{max(243, pips)} pips) | Moonshot Runner Harvested!"
+        disp_pips = min(safe_pips, 280) if safe_pips >= 243 else 243
+        stage_desc = f"TP3 Hit (+{disp_pips} pips) | Moonshot Runner Harvested!"
     else:
-        stage_desc = f"Profit Locked (+{pips} pips) | Position Harvested!"
+        stage_desc = f"Profit Locked (+{safe_pips} pips) | Position Harvested!"
 
     divider = "───────────────"
 
@@ -207,6 +213,7 @@ class QuantGoldExecutionEngine:
         self._cached_broker_gold_count: int = 0
         self._user_standby_log_ts: Dict[int, float] = {}
         self._admin_demo_log_ts: float = 0.0
+        self._last_valid_gold_quote: Tuple[float, float, float] = (4095.50, 4096.00, 0.50)
 
     def has_active_gold_trade(self) -> bool:
         """
@@ -365,7 +372,7 @@ class QuantGoldExecutionEngine:
     def get_live_gold_price_quote(self) -> Tuple[float, float, float]:
         """
         Retrieves real-time Gold quote (bid, ask, spread).
-        Uses live Capital.com API if connected, or fallback to MT5/Binance/Cache.
+        Uses live Capital.com API if connected, with resilient dynamic RAM caching and hard sanity floor.
         """
         if _check_network_online():
             try:
@@ -374,15 +381,40 @@ class QuantGoldExecutionEngine:
                 if details.get("success"):
                     bid = float(details.get("bid", 0.0))
                     ask = float(details.get("ask", 0.0))
-                    spread = float(details.get("spread", 0.35))
-                    if bid > 0 and ask > 0:
-                        return bid, ask, spread
+                    spread = float(details.get("spread", 0.50))
+                    if bid >= 3500.0 and ask >= 3500.0:
+                        self._last_valid_gold_quote = (bid, ask, max(0.20, spread))
+                        return bid, ask, max(0.20, spread)
             except Exception:
                 pass
 
-        # High-precision fallback
-        base_p = 2735.0
-        return base_p - 0.15, base_p + 0.15, 0.30
+            try:
+                c_eng = capital_engine.get_capital_engine()
+                prices = c_eng.get_prices("GOLD")
+                if prices.get("success") and prices.get("prices"):
+                    last_p = prices["prices"][-1]
+                    bid = float(last_p.get("closePrice", {}).get("bid", 0.0) or 0.0)
+                    ask = float(last_p.get("closePrice", {}).get("ask", 0.0) or 0.0)
+                    spread = round(abs(ask - bid), 2) if ask > bid else 0.50
+                    if bid >= 3500.0 and ask >= 3500.0:
+                        self._last_valid_gold_quote = (bid, ask, max(0.20, spread))
+                        return bid, ask, max(0.20, spread)
+            except Exception:
+                pass
+
+        # Priority 3: Cached quote in RAM memory
+        cached = getattr(self, "_last_valid_gold_quote", None)
+        if cached and cached[0] >= 3500.0 and cached[1] >= 3500.0:
+            return cached
+
+        # Priority 4: Active entry price or last signal price
+        entry_hint = getattr(self, "_active_gold_entry_price", 0.0)
+        if entry_hint >= 3500.0:
+            return entry_hint - 0.25, entry_hint + 0.25, 0.50
+
+        # Absolute safety baseline for 2026 Gold ($4,095.00)
+        base_p = 4095.0
+        return base_p - 0.25, base_p + 0.25, 0.50
 
     async def broadcast_to_vip_users(self, text: str, app=None, reply_markup=None) -> int:
         """
@@ -1174,6 +1206,11 @@ class QuantGoldExecutionEngine:
             bid, ask, spread = self.get_live_gold_price_quote()
             curr_p = (bid + ask) / 2.0
             
+            # Step -1: Price Sanity Veto: Abort audit cycle if quote is corrupted
+            if curr_p < 3500.0 or curr_p > 6000.0:
+                logger.warning(f"⚠️ [PRICE SANITY VETO] Gold price ${curr_p:.2f} is outside reasonable bounds ($3500-$6000). Aborting position audit cycle.")
+                return
+
             # Step 0: Sync and adopt any untracked open positions from broker
             await self._sync_and_adopt_broker_positions()
 
@@ -1234,12 +1271,25 @@ class QuantGoldExecutionEngine:
                 tp3 = float(tr.get("tp3", 0.0) or 0.0)
                 scale_tier = int(tr.get("scale_tier", 0) or 0)
 
-                # Calibrate fallback targets if missing
-                if tp1 <= 0.0:
+                # Step 1: Entry price sanity & price jump anomaly guard
+                if entry_p < 3500.0 or entry_p > 6000.0:
+                    logger.warning(f"⚠️ [AUDIT IGNORED] Corrupted/legacy entry price ${entry_p:.2f} for deal {deal_id}. Skipping.")
+                    continue
+
+                price_delta = abs(curr_p - entry_p)
+                if price_delta > 120.0:
+                    logger.warning(
+                        f"⚠️ [PRICE JUMP ANOMALY] Current Gold ${curr_p:.2f} differs by ${price_delta:.2f} "
+                        f"from entry ${entry_p:.2f} for deal {deal_id}. Skipping milestone evaluation to protect position."
+                    )
+                    continue
+
+                # Calibrate fallback targets if missing or invalid
+                if tp1 <= 0.0 or tp1 < 3500.0 or tp1 > 6000.0:
                     tp1 = round((entry_p + 7.30) if dir_side == "BUY" else (entry_p - 7.30), 2)
-                if tp2 <= 0.0:
+                if tp2 <= 0.0 or tp2 < 3500.0 or tp2 > 6000.0:
                     tp2 = round((entry_p + 15.20) if dir_side == "BUY" else (entry_p - 15.20), 2)
-                if tp3 <= 0.0:
+                if tp3 <= 0.0 or tp3 < 3500.0 or tp3 > 6000.0:
                     tp3 = round((entry_p + 24.32) if dir_side == "BUY" else (entry_p - 24.32), 2)
 
                 pnl_pts = (curr_p - entry_p) if dir_side == "BUY" else (entry_p - curr_p)
@@ -1272,15 +1322,15 @@ class QuantGoldExecutionEngine:
                         self._clear_active_trade(deal_id, cooldown=900.0)
                     continue
 
-                # Track peak UPL for Flash Shock Protective Early Harvest
+                # Track peak UPL for Flash Shock Protective Early Harvest (bounded to sane $150 max)
                 current_peak = self._peak_upl_map.get(deal_key, 0.0)
-                if upl > current_peak:
+                if upl > current_peak and upl <= 150.0:
                     self._peak_upl_map[deal_key] = upl
                     current_peak = upl
 
                 # Flash Shock Protective Early Harvest (Invariants 35 & 104):
                 # If Peak UPL >= $2.50 (or pips >= 40) and price retraces >= 50% from peak
-                if current_peak >= 2.50 and upl <= (current_peak * 0.50) and upl > 0.50:
+                if 2.50 <= current_peak <= 150.0 and upl <= (current_peak * 0.50) and upl > 0.50:
                     logger.info(f"⚡ [FLASH SHOCK HARVEST] Gold trade {deal_id} peak ${current_peak:.2f} retraced >= 50% to ${upl:.2f}. Executing protective early harvest!")
                     try:
                         if cid:
@@ -1302,8 +1352,11 @@ class QuantGoldExecutionEngine:
                     except Exception as e_shk:
                         logger.debug(f"Flash shock harvest note: {e_shk}")
 
-                # Check TP1 Hit (+73 pips)
-                is_tp1 = (dir_side == "BUY" and curr_p >= tp1) or (dir_side == "SELL" and curr_p <= tp1) or (pnl_pts >= 7.30)
+                # Check TP1 Hit (+73 pips / $7.30 move) - bounded to legitimate range ($7.30 to $60.00)
+                is_tp1 = (7.30 <= pnl_pts <= 60.0) or (
+                    ((dir_side == "BUY" and curr_p >= tp1) or (dir_side == "SELL" and curr_p <= tp1))
+                    and (5.0 <= pnl_pts <= 60.0)
+                )
                 if is_tp1 and scale_tier < 1:
                     key_tp1 = f"{deal_id}:TP1"
                     if key_tp1 not in self._notified_milestones:
@@ -1335,8 +1388,11 @@ class QuantGoldExecutionEngine:
                         except Exception as e_be:
                             logger.debug(f"Breakeven update note: {e_be}")
 
-                # Check TP2 Hit (+152 pips)
-                is_tp2 = (dir_side == "BUY" and curr_p >= tp2) or (dir_side == "SELL" and curr_p <= tp2) or (pnl_pts >= 15.20)
+                # Check TP2 Hit (+152 pips / $15.20 move) - bounded to legitimate range ($15.20 to $80.00)
+                is_tp2 = (15.20 <= pnl_pts <= 80.0) or (
+                    ((dir_side == "BUY" and curr_p >= tp2) or (dir_side == "SELL" and curr_p <= tp2))
+                    and (12.0 <= pnl_pts <= 80.0)
+                )
                 if is_tp2 and scale_tier < 2:
                     key_tp2 = f"{deal_id}:TP2"
                     if key_tp2 not in self._notified_milestones:
@@ -1366,8 +1422,11 @@ class QuantGoldExecutionEngine:
                     except Exception as e_cf:
                         logger.debug(f"Cash floor update note: {e_cf}")
 
-                # Check TP3 Hit (+243 pips Moonshot)
-                is_tp3 = (dir_side == "BUY" and curr_p >= tp3) or (dir_side == "SELL" and curr_p <= tp3) or (pnl_pts >= 24.32)
+                # Check TP3 Hit (+243 pips Moonshot / $24.32 move) - bounded to legitimate range ($24.32 to $120.00)
+                is_tp3 = (24.32 <= pnl_pts <= 120.0) or (
+                    ((dir_side == "BUY" and curr_p >= tp3) or (dir_side == "SELL" and curr_p <= tp3))
+                    and (20.0 <= pnl_pts <= 120.0)
+                )
                 if is_tp3 and scale_tier < 3:
                     key_tp3 = f"{deal_id}:TP3"
                     if key_tp3 not in self._notified_milestones:
@@ -1398,7 +1457,7 @@ class QuantGoldExecutionEngine:
 
                 # Check if position stopped out on broker (SL hit or closed)
                 # If stopped out in profit: notify VIP. If stopped out in loss: DO NOT NOTIFY VIP.
-                is_sl_hit = (dir_side == "BUY" and curr_p <= sl and sl > 0) or (dir_side == "SELL" and curr_p >= sl and sl > 0)
+                is_sl_hit = (dir_side == "BUY" and curr_p <= sl and sl >= 3500.0) or (dir_side == "SELL" and curr_p >= sl and sl >= 3500.0)
                 if is_sl_hit:
                     key_close = f"{deal_id}:CLOSED"
                     if key_close not in self._notified_milestones:
