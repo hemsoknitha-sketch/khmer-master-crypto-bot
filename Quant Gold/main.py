@@ -130,7 +130,11 @@ class QuantGoldSystem:
                         pass
                 break
 
-        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+        bot_token = (
+            os.getenv("QUANT_GOLD_BOT_TOKEN")
+            or os.getenv("TELEGRAM_BOT_TOKEN_GOLD")
+            or os.getenv("TELEGRAM_BOT_TOKEN", "")
+        ).strip()
         if not bot_token or bot_token == "your_telegram_bot_token_here":
             logger.error("❌ TELEGRAM_BOT_TOKEN is missing in .env! Please update your .env file.")
             sys.exit(1)

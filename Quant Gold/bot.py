@@ -116,6 +116,16 @@ class QuantGoldBot:
                 BotCommand("help", "📖 User Guide & Fiduciary Covenant")
             ]
             try:
+                # Query and store active bot identity dynamically
+                try:
+                    me = await application.bot.get_me()
+                    bot_user = me.username or "AngkorQuantBot"
+                    os.environ["TELEGRAM_BOT_USERNAME"] = bot_user
+                    application.bot_data["bot_username"] = bot_user
+                    logger.info(f"🤖 Connected to Bot: @{bot_user} (ID: {me.id})")
+                except Exception as e_me:
+                    logger.warning(f"Notice getting bot info in post_init: {e_me}")
+
                 # Clear stale caches across all scopes including Super Admin custom scopes
                 for scope in [
                     BotCommandScopeDefault(),

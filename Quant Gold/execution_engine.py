@@ -43,8 +43,9 @@ def get_gold_signal_reply_markup():
     """Returns the clean inline keyboard matching institutional signal design."""
     try:
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        bot_handle = os.getenv("TELEGRAM_BOT_USERNAME", "AngkorQuantBot").replace("@", "").strip() or "AngkorQuantBot"
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🥇 Open in Angkor Quant ↗", url="https://t.me/KHQuantGoldBot")]
+            [InlineKeyboardButton("🥇 Open in Angkor Quant ↗", url=f"https://t.me/{bot_handle}")]
         ])
     except Exception:
         return None

@@ -79,6 +79,9 @@ fi
 if [ -f ".env" ]; then
     cp -f .env vps_db_backup/ 2>/dev/null || true
 fi
+if [ -f "Quant Gold/.env" ]; then
+    cp -f "Quant Gold/.env" vps_db_backup/quant_gold.env 2>/dev/null || true
+fi
 echo "🛡️ [SAFEGUARD] VIP Database and .env backed up successfully."
 
 # 3. Reset and Pull Latest Code from GitHub
@@ -92,6 +95,13 @@ if ls vps_db_backup/bot_database.db* 1> /dev/null 2>&1; then
 fi
 if [ -f "vps_db_backup/.env" ]; then
     cp -f vps_db_backup/.env . 2>/dev/null || true
+fi
+if [ -f "vps_db_backup/quant_gold.env" ]; then
+    cp -f "vps_db_backup/quant_gold.env" "Quant Gold/.env" 2>/dev/null || true
+fi
+# Auto-sync .env to Quant Gold/.env if Quant Gold/.env does not exist
+if [ -f ".env" ] && [ ! -f "Quant Gold/.env" ]; then
+    cp -f .env "Quant Gold/.env" 2>/dev/null || true
 fi
 echo "🛡️ [RESTORE] VIP Database and .env restored 100%."
 

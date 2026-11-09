@@ -65,7 +65,11 @@ from telegram import (
     BotCommandScopeChat
 )
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TOKEN = (
+    os.getenv("QUANT_GOLD_BOT_TOKEN")
+    or os.getenv("TELEGRAM_BOT_TOKEN_GOLD")
+    or os.getenv("TELEGRAM_BOT_TOKEN", "")
+).strip()
 
 
 async def sync_menu():
@@ -94,6 +98,7 @@ async def sync_menu():
         BotCommand("admin_users", "👥 Inspect & Manage All Users Dossiers"),
         BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
         BotCommand("admin_license", "👑 VIP License Approvals & Database Pruning"),
+        BotCommand("admin_agreements", "📜 Super Admin Legal Agreements Audit Citadel"),
         BotCommand("emergency_stop", "🚨 Super Admin Emergency Trading Freeze"),
         BotCommand("unlock", "🟢 Super Admin Release Trading Freeze")
     ]
