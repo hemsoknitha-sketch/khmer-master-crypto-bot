@@ -4742,7 +4742,6 @@ def ensure_capital_super_admin_defaults():
         """, (cheng_cid,))
 
         cursor.execute("UPDATE user_capital_credentials SET api_key = 'ENV_VAULT' WHERE (api_key IS NULL OR api_key = '') AND account_id IS NOT NULL AND account_id != ''")
-
         conn.commit()
         conn.close()
     except Exception as e_sd:
