@@ -437,12 +437,12 @@ class QuantGoldBot:
             await self.safe_reply(update, fallback_card, reply_markup=bottom_kb)
 
     def _resolve_target(self, target_input: str) -> Tuple[Optional[int], Optional[Dict[str, Any]]]:
-        """Resolves chat_id and user record from chat_id or Capital account_id."""
+        """Resolves chat_id and user record from chat_id, @username, or Capital account_id."""
         raw = str(target_input or "").strip()
         sa_live_acc = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188").strip()
 
         # 0. Check Super Admin
-        if raw in ["859271875", sa_live_acc] or (len(raw) >= 6 and raw in sa_live_acc):
+        if raw in ["859271875", sa_live_acc, "@Soknitha", "Soknitha"] or (len(raw) >= 6 and raw in sa_live_acc):
             sa_rec = {
                 "chat_id": 859271875,
                 "account_id": sa_live_acc,
@@ -458,7 +458,15 @@ class QuantGoldBot:
         if u_by_acc:
             return u_by_acc["chat_id"], u_by_acc
 
-        # 2. Check if numeric chat_id
+        # 2. Check if username or identifier via find_user_by_identifier
+        resolved_cid = db.find_user_by_identifier(raw)
+        if resolved_cid:
+            creds = db.get_user_capital_credentials(resolved_cid)
+            if creds:
+                return resolved_cid, creds
+            return resolved_cid, {"chat_id": resolved_cid, "account_id": "N/A", "is_demo": False, "is_referral_verified": False}
+
+        # 3. Check if numeric chat_id
         try:
             uid = int(raw)
             creds = db.get_user_capital_credentials(uid)
@@ -738,10 +746,18 @@ class QuantGoldBot:
         cred_args = list(params)
         is_admin_override = False
 
-        if is_admin and len(cred_args) >= 4 and cred_args[0].isdigit() and len(cred_args[0]) <= 10:
-            target_cid = int(cred_args[0])
-            cred_args = cred_args[1:]
-            is_admin_override = True
+        if is_admin and len(cred_args) >= 4:
+            first_tok = cred_args[0].strip()
+            if first_tok.isdigit() and len(first_tok) <= 10:
+                target_cid = int(first_tok)
+                cred_args = cred_args[1:]
+                is_admin_override = True
+            elif first_tok.startswith("@") or not first_tok.isalnum() or len(first_tok) < 15:
+                res_uid = db.find_user_by_identifier(first_tok)
+                if res_uid and res_uid != chat_id:
+                    target_cid = res_uid
+                    cred_args = cred_args[1:]
+                    is_admin_override = True
 
         # 3. Fault-Tolerant Intelligent Argument Parsing
         parse_ok, parse_err, parsed = self._parse_capital_api_tokens(cred_args)
@@ -807,30 +823,52 @@ class QuantGoldBot:
 
         is_demo_mode = (in_mode == "demo") if is_admin else False
 
-        # 5. Validating credentials against Capital.com
+        # 5. Validating credentials against Capital.com with fail-safe timeout
         wait_msg = await self.safe_reply(update, "⏳ <i>កំពុងផ្ទៀងផ្ទាត់ API Credentials ជាមួយ Capital.com Broker...</i>")
 
-        valid, vmsg, b_info = await asyncio.to_thread(
-            capital_engine.validate_capital_credentials,
-            in_key, in_email, in_pwd, is_demo_mode
-        )
+        valid = False
+        vmsg = ""
+        b_info = {}
+        try:
+            valid, vmsg, b_info = await asyncio.wait_for(
+                asyncio.to_thread(
+                    capital_engine.validate_capital_credentials,
+                    in_key, in_email, in_pwd, is_demo_mode
+                ),
+                timeout=22.0
+            )
+        except asyncio.TimeoutError:
+            valid = False
+            vmsg = "Connection Timeout: ចំណាយពេលយូរពេកក្នុងការភ្ជាប់ទៅកាន់ Broker (>22s)"
+        except Exception as e_val:
+            valid = False
+            vmsg = f"Network Exception: {e_val}"
 
         if not valid:
             err_lower = str(vmsg or "").lower()
-            if "invalid credentials" in err_lower or "authentication" in err_lower or "401" in err_lower:
-                diag_help = "Email ឬ Password មិនត្រឹមត្រូវ! សូមផ្ទៀងផ្ទាត់ Password ដែលអ្នកប្រើចូល Login លើ Web Capital.com។"
-            elif "api key" in err_lower or "x-cap-api-key" in err_lower:
-                diag_help = "API Key មិនត្រឹមត្រូវ ឬផុតកំណត់! សូមចូល Capital.com Settings -> API Integrations ដើម្បីបង្កើត Key ថ្មី។"
-            elif "connection" in err_lower or "timeout" in err_lower:
+            if any(k in err_lower for k in ["invalid.details", "invalid_details", "invalid details", "error.invalid", "401", "authentication"]):
+                diag_help = (
+                    "Email ឬ Password មិនត្រឹមត្រូវ! (Capital.com បដិសេធ Email ឬ Password នេះ)\n"
+                    "• សូមផ្ទៀងផ្ទាត់ Password ដែលអ្នកប្រើចូល Login លើ Web Capital.com (ពិនិត្យអក្សរធំ/តូច និងសញ្ញា)។\n"
+                    "⚠️ ប្រសិនបើលោកអ្នកបានចុះឈ្មោះតាម Google (Continue with Google) សូមចូល Web Capital.com -> Settings -> Security -> Create/Reset Password ដើម្បីបង្កើត Password ផ្ទាល់ខ្លួនជាមុនសិន ទើបអាចភ្ជាប់ API បាន។"
+                )
+            elif any(k in err_lower for k in ["invalid.api.key", "invalid_api_key", "api key", "x-cap-api-key"]):
+                diag_help = "API Key មិនត្រឹមត្រូវ ឬផុតកំណត់! សូមចូល Capital.com Web Platform -> Settings -> API Integrations ដើម្បីបង្កើត Key ថ្មី។"
+            elif any(k in err_lower for k in ["null.accountid", "no active demo"]):
+                diag_help = "គណនីនេះមិនទាន់មាន Sub-account នៅឡើយទេ! សូមចូលទៅកាន់ Web Capital.com ដើម្បីបើកគណនីជួញដូរ។"
+            elif any(k in err_lower for k in ["connection", "timeout", "network"]):
                 diag_help = "បញ្ហាតភ្ជាប់ Network ទៅកាន់ Broker! សូមរង់ចាំ ១០ វិនាទី រួចសាកល្បងម្តងទៀត។"
             else:
                 diag_help = f"ការផ្ទៀងផ្ទាត់មិនជោគជ័យ ៖ {vmsg}"
 
+            diag_safe = html.escape(str(diag_help))
+            vmsg_safe = html.escape(str(vmsg or "Unknown Broker Error"))
+
             fail_card = (
                 f"❌ <b>ការភ្ជាប់ CAPITAL.COM API មិនជោគជ័យ!</b> ⚠️\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"⚠️ <b>ការវិនិច្ឆ័យ ៖</b> <code>{diag_help}</code>\n"
-                f"ℹ️ <b>សារបច្ចេកទេស ៖</b> <code>{vmsg}</code>\n"
+                f"⚠️ <b>ការវិនិច្ឆ័យ ៖</b>\n<code>{diag_safe}</code>\n\n"
+                f"ℹ️ <b>សារបច្ចេកទេសពី Broker ៖</b> <code>{vmsg_safe}</code>\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
                 f"💡 <b>ការណែនាំផ្ទៀងផ្ទាត់ ៖</b>\n"
                 f"1. ពិនិត្យមើល <code>API_KEY</code> ដែលបានបង្កើតលើ Capital.com Web Platform\n"
@@ -844,13 +882,23 @@ class QuantGoldBot:
                 [InlineKeyboardButton(f"📞 ទំនាក់ទំនង ជំនួយការ (@{support_handle})", url=support_url)],
                 [InlineKeyboardButton("🔄 ព្យាយាមម្តងទៀត", callback_data="cap_api_help")]
             ])
+            delivered = False
             if wait_msg:
                 try:
                     await wait_msg.edit_text(fail_card, parse_mode="HTML", reply_markup=fail_kb)
-                    return
-                except Exception:
-                    pass
-            return await self.safe_reply(update, fail_card, reply_markup=fail_kb)
+                    delivered = True
+                except Exception as e_edit:
+                    logger.warning(f"Could not edit wait_msg with HTML ({e_edit}), trying plain text...")
+                    try:
+                        import re
+                        clean_fail = re.sub(r"<[^>]+>", "", fail_card)
+                        await wait_msg.edit_text(clean_fail, reply_markup=fail_kb)
+                        delivered = True
+                    except Exception:
+                        pass
+            if not delivered:
+                await self.safe_reply(update, fail_card, reply_markup=fail_kb)
+            return
 
         # 7. Extract real account details
         fetched_acc = str(b_info.get("account_id") or "").strip()
