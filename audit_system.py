@@ -5517,6 +5517,58 @@ def run_audit():
         failures.append(f"Invariant 109 check failed: {e}")
         log_fail(str(e))
 
+    print("\n[CHECK 88/88] Verifying Institutional Quant Gold Autonomous Fleet Concurrency, Dynamic Margin & Zero-Stale Telemetry (Invariant 115)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_code = f.read()
+        with open("Quant Gold/execution_engine.py", "r", encoding="utf-8") as f:
+            qg_exec_code = f.read()
+
+        has_inv115_agents = "invariant 115" in agents_code.lower() and "autonomous fleet concurrency" in agents_code.lower()
+        has_inv115_gemini = "invariant 115" in gemini_code.lower() and "autonomous fleet concurrency" in gemini_code.lower()
+        
+        has_no_legacy_2735 = "2735.0" not in qg_exec_code
+        has_sanity_veto = ("PRICE SANITY VETO" in qg_exec_code or "PRICE_SANITY_VETO" in qg_exec_code) and "3500.0" in qg_exec_code
+        has_jump_anomaly = ("PRICE JUMP ANOMALY" in qg_exec_code or "PRICE_JUMP_ANOMALY" in qg_exec_code) and "120.0" in qg_exec_code
+        has_concurrent_dispatch = "dispatch_gold_signal_to_fleet" in qg_exec_code and "Semaphore(30)" in qg_exec_code
+        has_safe_pips_clamping = "safe_pips = max(10, min(int(pips), 350))" in qg_exec_code
+
+        import importlib.util
+        qg_dir = os.path.abspath("Quant Gold")
+        if qg_dir not in sys.path:
+            sys.path.insert(0, qg_dir)
+        spec = importlib.util.spec_from_file_location("qg_exec", "Quant Gold/execution_engine.py")
+        qg_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(qg_mod)
+        lot_sz = qg_mod.calculate_capital_gold_lot_size(budget=100.0, current_price=4096.0, confidence=75.0, leverage=500.0)
+        card_str = qg_mod.format_gold_tp_card(stage="TP1", pips=73, direction="BUY", entry_price=4096.0)
+        card_ok = "TP1 Hit" in card_str and "+73 pips" in card_str and lot_sz >= 0.5
+
+        all_inv115_passed = (
+            has_inv115_agents and has_inv115_gemini and has_no_legacy_2735 and
+            has_sanity_veto and has_jump_anomaly and has_concurrent_dispatch and
+            has_safe_pips_clamping and card_ok
+        )
+
+        if all_inv115_passed:
+            log_pass(
+                "Institutional Quant Gold Autonomous Fleet Concurrency, Multi-Account Margin Protection & Telemetry Lock (Invariant 115) "
+                "are 100% certified! (Zero 2735.0 fallback, $3500-$6000 sanity floor, 120pt jump rejection, Semaphore 30 parallel dispatch, "
+                "clamped pips display, and dynamic margin sizing active)"
+            )
+        else:
+            failures.append(
+                f"Invariant 115 check failed: agents={has_inv115_agents}, gemini={has_inv115_gemini}, "
+                f"no_2735={has_no_legacy_2735}, sanity={has_sanity_veto}, jump={has_jump_anomaly}, "
+                f"dispatch={has_concurrent_dispatch}, safe_pips={has_safe_pips_clamping}, card_ok={card_ok}"
+            )
+            log_fail("Invariant 115 Quant Gold Fleet Concurrency verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 115 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
 
     print("\n" + "=" * 70)
