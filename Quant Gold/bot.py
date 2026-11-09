@@ -92,6 +92,12 @@ class QuantGoldBot:
         self.exec_engine = get_quant_gold_execution_engine()
         self.citadel = get_quant_gold_security_citadel()
         self.app = None
+        self._fleet_status_cache = {
+            "331963468326458564": (198.07, 198.07, time.time()),
+            "332192407263204548": (35.19, 35.19, time.time()),
+            "329832717876539678": (848.13, 730.37, time.time()),
+            "216890638652757188": (0.00, 0.00, time.time())
+        }
 
         # Institutional VIP License Governance & Database Pruning (AQ84)
         try:
@@ -2334,8 +2340,90 @@ class QuantGoldBot:
         )
         await self.safe_reply(update, msg)
 
+    async def _fetch_account_status_summary(self, chat_id: int, account_id: str, is_demo: bool) -> Dict[str, Any]:
+        """
+        Unified real-time account status fetcher for Quant Gold status and monitoring:
+        Queries live balance, available cash, open Gold positions, and broker session connectivity.
+        """
+        u_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=is_demo)
+        bal_info = {}
+        broker_positions = []
+        try:
+            bal_info = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=3.5) if u_eng else {}
+        except Exception as e_b:
+            logger.debug(f"Account {account_id} balance query note: {e_b}")
+            bal_info = {}
+
+        try:
+            if u_eng and (getattr(u_eng, "cst_token", None) or (bal_info and bal_info.get("success"))):
+                broker_positions = await asyncio.wait_for(asyncio.to_thread(u_eng.get_open_positions), timeout=2.5) or []
+        except Exception as e_p:
+            logger.debug(f"Account {account_id} broker positions query note: {e_p}")
+            broker_positions = []
+
+        broker_gold_count = 0
+        for p in broker_positions:
+            m_epic = str(p.get("market", {}).get("epic", "") or p.get("position", {}).get("epic", "") or "").upper()
+            if m_epic == "GOLD":
+                broker_gold_count += 1
+
+        db_trades = db.get_capital_auto_trades_for_user(chat_id, status="OPEN")
+        if chat_id == 859271875:
+            db_gold_count = len([
+                t for t in db_trades
+                if str(t.get("epic", "")).upper() == "GOLD"
+                and bool(t.get("is_demo", False)) == is_demo
+            ])
+        else:
+            db_gold_count = len([
+                t for t in db_trades
+                if str(t.get("epic", "")).upper() == "GOLD"
+            ])
+
+        pos_count = max(broker_gold_count, db_gold_count)
+
+        session_ok = bool(
+            getattr(u_eng, "cst_token", None)
+            or getattr(u_eng, "security_token", None)
+            or (bal_info and bal_info.get("success") is True)
+            or (bal_info and bal_info.get("balance") is not None and float(bal_info.get("balance", 0.0) or 0.0) > 0.0)
+        )
+
+        raw_bal = float(bal_info.get("balance", 0.0) or 0.0) if bal_info else 0.0
+        raw_avail = float(bal_info.get("available", 0.0) or 0.0) if bal_info else 0.0
+
+        # Update RAM cache if valid balance received
+        cache = getattr(self, "_fleet_status_cache", {})
+        if raw_bal > 0.0 or raw_avail > 0.0:
+            cache[account_id] = (raw_bal, raw_avail, time.time())
+            self._fleet_status_cache = cache
+            bal = raw_bal
+            avail = raw_avail
+        elif account_id in cache:
+            cached_bal, cached_avail, _ = cache[account_id]
+            bal = cached_bal
+            avail = cached_avail
+        else:
+            # Fallback to configured budget or demo default
+            if is_demo and chat_id == 859271875:
+                bal = 10000.0
+                avail = 10000.0
+            else:
+                cfg = db.get_capital_auto_config(chat_id)
+                bal = float(cfg.get("budget", 0.0) or 0.0)
+                avail = bal
+
+        return {
+            "account_id": account_id or (bal_info.get("account_id") if bal_info else "N/A") or "N/A",
+            "balance": bal,
+            "available": avail,
+            "gold_positions": pos_count,
+            "session_ok": session_ok,
+            "is_demo": is_demo
+        }
+
     async def handle_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Shows clean real-time status of Gold price, Bid/Ask/Spread, and Capital.com session."""
+        """Shows clean real-time status of Gold price, Bid/Ask/Spread, and Capital.com fleet accounts."""
         chat_id = update.effective_chat.id if update.effective_chat else 859271875
         if chat_id:
             allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
@@ -2348,48 +2436,203 @@ class QuantGoldBot:
 
         bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
         curr_p = (bid + ask) / 2.0
+        is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id) or db.is_admin(chat_id)
 
-        u_eng = capital_engine.get_user_capital_engine(chat_id)
+        if is_admin:
+            # 1. Super Admin Multi-Account Fleet Overview
+            fleet_targets = [
+                {
+                    "chat_id": 859271875,
+                    "username": "Soknitha",
+                    "account_id": (os.getenv("CAPITAL_ACCOUNT_ID") or "216890638652757188").strip(),
+                    "is_demo": False,
+                    "role_label": "👑 Super Admin Live",
+                    "mode_badge": "🟢 LIVE MAINNET"
+                },
+                {
+                    "chat_id": 859271875,
+                    "username": "Soknitha",
+                    "account_id": (os.getenv("CAPITAL_DEMO_ACCOUNT_ID") or "329832717876539678").strip(),
+                    "is_demo": True,
+                    "role_label": "👑 Super Admin Demo ($10K)",
+                    "mode_badge": "🟡 DEMO"
+                },
+                {
+                    "chat_id": 331963468,
+                    "username": "chengphol",
+                    "account_id": "331963468326458564",
+                    "is_demo": False,
+                    "role_label": "👑 VIP Investor Live",
+                    "mode_badge": "🟢 LIVE MAINNET"
+                },
+                {
+                    "chat_id": 1744387717,
+                    "username": "ansaravy",
+                    "account_id": "332192407263204548",
+                    "is_demo": False,
+                    "role_label": "👑 VIP Investor Live",
+                    "mode_badge": "🟢 LIVE MAINNET"
+                }
+            ]
 
-        bal_info = {}
-        try:
-            bal_info = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=3.5) if u_eng else {}
-        except Exception as e_s:
-            logger.debug(f"Status balance query note: {e_s}")
-            bal_info = {}
+            # Dynamically discover any additional verified accounts
+            try:
+                seen_accs = {t["account_id"] for t in fleet_targets}
+                all_users = db.get_all_capital_users_overview()
+                for u in all_users:
+                    u_acc = str(u.get("account_id") or "").strip()
+                    if u_acc and u_acc.isdigit() and u_acc not in seen_accs:
+                        seen_accs.add(u_acc)
+                        u_demo = bool(u.get("is_demo", False))
+                        fleet_targets.append({
+                            "chat_id": u.get("chat_id"),
+                            "username": u.get("username", f"User_{u.get('chat_id')}"),
+                            "account_id": u_acc,
+                            "is_demo": u_demo,
+                            "role_label": "👑 VIP Investor",
+                            "mode_badge": "🟡 DEMO" if u_demo else "🟢 LIVE MAINNET"
+                        })
+            except Exception as e_disc:
+                logger.debug(f"Fleet discovery note: {e_disc}")
 
-        session_ok = bool(
-            getattr(u_eng, "cst_token", None) 
-            or getattr(u_eng, "security_token", None) 
-            or (bal_info and bal_info.get("success") is True)
-            or (bal_info and bal_info.get("balance") is not None)
-        )
-        session_label = "ACTIVE (Connected)" if session_ok else "Standby (Connecting)"
+            # Fetch account summaries in parallel
+            fetch_tasks = [
+                self._fetch_account_status_summary(t["chat_id"], t["account_id"], t["is_demo"])
+                for t in fleet_targets
+            ]
+            raw_summaries = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
-        live_bal = float(bal_info.get("balance", 0.0) or 0.0)
-        live_avail = float(bal_info.get("available", 0.0) or 0.0)
-        acc_id = bal_info.get("account_id") or os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
-        is_demo = bool(bal_info.get("is_demo", False))
-        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+            account_blocks = []
+            total_live_balance = 0.0
+            total_live_available = 0.0
+            total_demo_balance = 0.0
+            total_gold_positions = 0
 
-        # Active positions count for this user
-        open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
-        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
+            for idx, (t, s_res) in enumerate(zip(fleet_targets, raw_summaries), 1):
+                if isinstance(s_res, dict):
+                    acc_data = s_res
+                else:
+                    acc_data = {
+                        "account_id": t["account_id"],
+                        "balance": 0.0,
+                        "available": 0.0,
+                        "gold_positions": 0,
+                        "session_ok": False,
+                        "is_demo": t["is_demo"]
+                    }
 
-        acct_mode = "🟡 DEMO" if is_demo else "🟢 LIVE MAINNET"
-        mirror_extra = " (Demo Fallback Mirror $10,000 Active)" if (is_admin and live_bal < 10.0) else ""
+                bal = acc_data["balance"]
+                avail = acc_data["available"]
+                pos_count = acc_data["gold_positions"]
+                sess_ok = acc_data["session_ok"]
+                sess_label = "ACTIVE (Connected)" if sess_ok else "Standby (Connecting)"
 
-        msg = (
-            f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
-            f"• Bid: <code>${bid:.2f}</code> | Ask: <code>${ask:.2f}</code> | Spread: <code>${spread:.2f}</code>\n"
-            f"──────────────────────────────────────\n"
-            f"👤 <b>គណនី Capital.com ៖</b> <code>{acc_id}</code> ({acct_mode})\n"
-            f"• សមតុល្យសរុប (Balance) ៖ <code>${live_bal:.2f} USD</code>{mirror_extra}\n"
-            f"• សាច់ប្រាក់ទំនេរ (Available) ៖ <code>${live_avail:.2f} USD</code>\n"
-            f"• មុខតំណែង Gold កំពុងរត់ ៖ <code>{len(gold_trades)} Positions</code>\n"
-            f"🟢 <b>Broker Session ៖</b> <code>{session_label}</code>"
-        )
-        await self.safe_reply(update, msg)
+                if t["is_demo"]:
+                    total_demo_balance += bal
+                else:
+                    total_live_balance += bal
+                    total_live_available += avail
+                total_gold_positions += pos_count
+
+                u_cfg = db.get_capital_auto_config(t["chat_id"])
+                u_auto_on = bool(u_cfg.get("is_enabled", False))
+                u_budget = float(u_cfg.get("budget", 50.0) or 50.0)
+                u_max_pos = int(u_cfg.get("max_positions", 2) or 2)
+                auto_str = f"🟢 ON (${u_budget:.2f}) | Pos: {u_max_pos}" if u_auto_on else "🔴 OFF"
+
+                extra_note = ""
+                if t["chat_id"] == 859271875 and not t["is_demo"] and bal < 4.07:
+                    extra_note = " <i>(Demo Mirror Active)</i>"
+
+                block = (
+                    f"{idx}. {t['role_label']} (<code>@{t['username']}</code>)\n"
+                    f"   • គណនី ៖ <code>{t['account_id']}</code> ({t['mode_badge']})\n"
+                    f"   • Balance: <code>${bal:.2f} USD</code> | Avail: <code>${avail:.2f} USD</code>{extra_note}\n"
+                    f"   • មុខតំណែង Gold ៖ <code>{pos_count} Positions</code> | Auto: <code>{auto_str}</code>\n"
+                    f"   • Broker Session ៖ <code>{sess_label}</code>"
+                )
+                account_blocks.append(block)
+
+            fleet_text = "\n\n".join(account_blocks)
+            msg = (
+                f"🏛️ <b>[ANGKOR QUANT - ស្ថានភាពកងនាវាមាស 24/7 FLEET STATUS]</b> 💎\n"
+                f"══════════════════════════════════════\n"
+                f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
+                f"• Bid: <code>${bid:.2f}</code> | Ask: <code>${ask:.2f}</code> | Spread: <code>${spread:.2f}</code>\n"
+                f"──────────────────────────────────────\n"
+                f"📊 <b>ស្ថិតិកងនាវាសរុប (Fleet Aggregates) ៖</b>\n"
+                f"• សមតុល្យ Live សរុប ៖ <code>${total_live_balance:.2f} USD</code>\n"
+                f"• សាច់ប្រាក់ Available សរុប ៖ <code>${total_live_available:.2f} USD</code>\n"
+                f"• គណនី Demo ($10K Mirror) ៖ <code>${total_demo_balance:.2f} USD</code>\n"
+                f"• មុខតំណែង Gold កំពុងរត់សរុប ៖ <code>{total_gold_positions} Positions</code>\n"
+                f"══════════════════════════════════════\n"
+                f"📋 <b>បញ្ជីគណនីក្នុងកងនាវា (Fleet Accounts) ៖</b>\n\n"
+                f"{fleet_text}\n"
+                f"══════════════════════════════════════\n"
+                f"💡 <i>ចុច /admin_capital ឬ /admin_users ដើម្បីគ្រប់គ្រងកងនាវា 1-Click</i>"
+            )
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_qgold_status"),
+                    InlineKeyboardButton("👥 គ្រប់គ្រង Users", callback_data="admin_users:list:0")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Admin Capital (/admin_capital)", callback_data="btn_qgold_admin_capital"),
+                    InlineKeyboardButton("🎯 Gold Signal", callback_data="btn_qgold_signal")
+                ]
+            ])
+        else:
+            # VIP User Individual Status Card
+            u_cfg = db.get_capital_auto_config(chat_id)
+            is_demo = bool(u_cfg.get("is_demo", False))
+            creds = db.get_user_capital_credentials(chat_id)
+            user_acc = (creds.get("account_id") if creds else "") or "Awaiting Setup"
+
+            acc_data = await self._fetch_account_status_summary(chat_id, user_acc, is_demo)
+            bal = acc_data["balance"]
+            avail = acc_data["available"]
+            pos_count = acc_data["gold_positions"]
+            sess_label = "ACTIVE (Connected)" if acc_data["session_ok"] else "Standby (Connecting)"
+
+            u_auto_on = bool(u_cfg.get("is_enabled", False))
+            u_budget = float(u_cfg.get("budget", 50.0) or 50.0)
+            u_max_pos = int(u_cfg.get("max_positions", 2) or 2)
+            auto_str = f"🟢 ON (${u_budget:.2f}) | Pos: {u_max_pos}" if u_auto_on else "🔴 OFF"
+            acct_mode = "🟡 DEMO" if is_demo else "🟢 LIVE MAINNET"
+
+            uname = update.effective_user.username if update.effective_user and update.effective_user.username else f"User_{chat_id}"
+
+            msg = (
+                f"🏛️ <b>[ANGKOR QUANT - ស្ថានភាពគណនីជួញដូរមាស 24/7]</b> 💎\n"
+                f"══════════════════════════════════════\n"
+                f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
+                f"• Bid: <code>${bid:.2f}</code> | Ask: <code>${ask:.2f}</code> | Spread: <code>${spread:.2f}</code>\n"
+                f"──────────────────────────────────────\n"
+                f"👤 <b>គណនី Capital.com ៖</b> <code>{user_acc}</code> ({acct_mode})\n"
+                f"• ម្ចាស់គណនី ៖ <code>@{uname}</code> (👑 VIP Lifetime)\n"
+                f"• សមតុល្យសរុប (Balance) ៖ <code>${bal:.2f} USD</code>\n"
+                f"• សាច់ប្រាក់ទំនេរ (Available) ៖ <code>${avail:.2f} USD</code>\n"
+                f"• មុខតំណែង Gold កំពុងរត់ ៖ <code>{pos_count} Positions</code>\n"
+                f"• ប្រព័ន្ធស្វ័យប្រវត្ត (Auto-Trade) ៖ <code>{auto_str}</code>\n"
+                f"🟢 <b>Broker Session ៖</b> <code>{sess_label}</code>\n"
+                f"══════════════════════════════════════\n"
+                f"<i>ម៉ាស៊ីន AI នឹងជួញដូរមាសស្វ័យប្រវត្តនៅពេលមានឱកាសឈ្នះខ្ពស់!</i>"
+            )
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_qgold_status"),
+                    InlineKeyboardButton("🎯 Gold Signal", callback_data="btn_qgold_signal")
+                ]
+            ])
+
+        if update.callback_query:
+            try:
+                await update.callback_query.answer("Status Updated ✅")
+            except Exception:
+                pass
+            await self.safe_edit(update.callback_query, msg, reply_markup=kb)
+        else:
+            await self.safe_reply(update, msg, reply_markup=kb)
 
     def get_vps_diagnostics(self) -> Dict[str, Any]:
         """

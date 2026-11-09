@@ -4684,8 +4684,9 @@ def ensure_capital_super_admin_defaults():
         cursor.execute("""
             INSERT INTO user_capital_credentials (
                 chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, verified_at, updated_at
-            ) VALUES (1744387717, '', '', '', '332192407263204548', 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (1744387717, 'ENV_VAULT', 'ENV_VAULT', 'ENV_VAULT', '332192407263204548', 'USD', 0, 1, 'az48cxia', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT(chat_id) DO UPDATE SET
+                api_key = 'ENV_VAULT',
                 account_id = '332192407263204548',
                 is_demo = 0,
                 is_referral_verified = 1,
@@ -4739,6 +4740,8 @@ def ensure_capital_super_admin_defaults():
             VALUES (?, 859271875, 'az48cxia')
             ON CONFLICT(client_chat_id) DO UPDATE SET partner_chat_id = 859271875, partner_code = 'az48cxia'
         """, (cheng_cid,))
+
+        cursor.execute("UPDATE user_capital_credentials SET api_key = 'ENV_VAULT' WHERE (api_key IS NULL OR api_key = '') AND account_id IS NOT NULL AND account_id != ''")
 
         conn.commit()
         conn.close()

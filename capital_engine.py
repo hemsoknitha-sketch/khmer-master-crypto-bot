@@ -809,8 +809,15 @@ class CapitalComEngine:
                     
                     # Smart Account Selection:
                     primary = None
+                    # Priority 0: Match desired_account_id if specified (Invariant 75 Multi-Account Isolation)
+                    if self.desired_account_id:
+                        for acc in accounts:
+                            if str(acc.get("accountId")) == str(self.desired_account_id):
+                                primary = acc
+                                break
+
                     # Priority 1: Match authenticated session account ID (from POST /session currentAccountId)
-                    if self.active_account_id:
+                    if not primary and self.active_account_id:
                         for acc in accounts:
                             if str(acc.get("accountId")) == str(self.active_account_id):
                                 primary = acc
@@ -3360,10 +3367,10 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
             return engine
 
         # Priority 2: VIP User with valid custom credentials matching requested environment
-        if creds and raw_key:
+        if creds and (raw_key or creds.get("account_id")):
             cred_is_demo = bool(creds.get("is_demo", False))
             target_acc = str(creds.get("demo_account_id") if is_demo else creds.get("account_id") or "").strip()
-            if raw_key != "ENV_VAULT":
+            if raw_key and raw_key != "ENV_VAULT":
                 if cred_is_demo == is_demo:
                     engine = CapitalComEngine(
                         api_key=raw_key,
