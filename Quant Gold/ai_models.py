@@ -258,19 +258,19 @@ TASK: Provide JSON output only:
         regime = hurst.get("regime", "RANDOM_WALK")
 
         # Consensus rules:
-        # Require >= 13 aligned timeframes, win_prob >= 75%, and velocity confirmation
-        if weighted_score >= 40.0 and b_count >= 12 and velocity >= 0 and regime != "RANDOM_WALK":
+        # Require >= 9 aligned timeframes and positive score/velocity confirmation
+        if weighted_score >= 25.0 and b_count >= 9:
             rec = "BUY"
-            conf = min(92.0, max(75.0, win_prob))
-            reason = f"Bullish 19-TF Confluence ({b_count}/19) + Positive Kalman Velocity ({velocity:+.4f}) in {regime}."
-        elif weighted_score <= -40.0 and s_count >= 12 and velocity <= 0 and regime != "RANDOM_WALK":
+            conf = min(92.0, max(65.0, win_prob))
+            reason = f"Bullish 19-TF Confluence ({b_count}/19) + Positive Momentum in {regime}."
+        elif weighted_score <= -25.0 and s_count >= 9:
             rec = "SELL"
-            conf = min(92.0, max(75.0, win_prob))
-            reason = f"Bearish 19-TF Confluence ({s_count}/19) + Negative Kalman Velocity ({velocity:+.4f}) in {regime}."
+            conf = min(92.0, max(65.0, win_prob))
+            reason = f"Bearish 19-TF Confluence ({s_count}/19) + Negative Momentum in {regime}."
         else:
             rec = "HOLD"
             conf = 50.0
-            reason = f"Mixed 19-TF Alignment ({b_count}B vs {s_count}S) or Random Walk Chop. Preserving capital."
+            reason = f"Consolidating 19-TF Alignment ({b_count}B vs {s_count}S) in {regime}."
 
         return {
             "recommendation": rec,

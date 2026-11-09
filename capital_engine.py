@@ -943,6 +943,27 @@ class CapitalComEngine:
         """Forces next get_accounts() call to fetch fresh balance from broker."""
         self._accounts_cache_time = 0.0
 
+    def switch_account(self, account_id: str) -> bool:
+        """
+        Switches active trading account on Capital.com session via PUT /session.
+        Allows instant switching between Live/Demo accounts (e.g. 216890638652757188 and 329832717876539678).
+        """
+        if getattr(self, "is_guest", False) or not self.ensure_session():
+            return False
+        url = f"{self.base_url}/session"
+        try:
+            res = self.session.put(url, headers=self.get_auth_headers(), json={"accountId": str(account_id)}, timeout=8)
+            if res.status_code == 200:
+                self.active_account_id = str(account_id)
+                self.invalidate_account_cache()
+                logger.info(f"🔄 [CAPITAL SWITCH] Successfully switched active account to {account_id}")
+                return True
+            else:
+                logger.warning(f"⚠️ [CAPITAL SWITCH] Failed to switch account to {account_id}: HTTP {res.status_code} {res.text}")
+        except Exception as e:
+            logger.debug(f"switch_account exception: {e}")
+        return False
+
     def get_account_transactions(self, last_period_seconds: int = 604800) -> List[Dict[str, Any]]:
         """
         Fetches direct broker transaction history (deposits, withdrawals, trades, funding)
@@ -1670,7 +1691,7 @@ class CapitalComEngine:
                     avail_cash = float(bal_chk.get("available", 0.0) or 0.0)
                     if req_margin > 0 and avail_cash < req_margin:
                         is_sa_caller = (getattr(self, "custom_chat_id", None) == SUPER_ADMIN_ID or 
-                                        getattr(self, "account_id", "") in ["216890638652757188", "1612591526"])
+                                        str(getattr(self, "account_id", "")) in ["216890638652757188", "329832717876539678", "1612591526"])
                         if is_sa_caller:
                             logger.info(f"👑 [SUPER ADMIN MARGIN BYPASS] Required margin ${req_margin:,.2f} > Avail ${avail_cash:,.2f}. Proceeding without local pre-flight margin block for Super Admin!")
                         else:
@@ -2078,7 +2099,7 @@ class CapitalComEngine:
                     avail_cash = float(bal_chk.get("available", 0.0) or 0.0)
                     if req_margin > 0 and avail_cash < req_margin:
                         is_sa_caller = (getattr(self, "custom_chat_id", None) == SUPER_ADMIN_ID or 
-                                        getattr(self, "account_id", "") in ["216890638652757188", "1612591526"])
+                                        str(getattr(self, "account_id", "")) in ["216890638652757188", "329832717876539678", "1612591526"])
                         if is_sa_caller:
                             logger.info(f"👑 [SUPER ADMIN MARGIN BYPASS] Working Order required margin ${req_margin:,.2f} > Avail ${avail_cash:,.2f}. Proceeding without local pre-flight margin block for Super Admin!")
                         else:
