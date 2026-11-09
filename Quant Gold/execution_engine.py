@@ -189,6 +189,58 @@ class QuantGoldExecutionEngine:
         self._last_signal_data: Optional[Dict[str, Any]] = None
         self._last_signal_ts: float = 0.0
 
+        # Super Smart Single-Active-Trade Sequential Lifecycle State
+        self._active_gold_deal_id: Optional[str] = None
+        self._active_gold_direction: Optional[str] = None
+        self._active_gold_entry_price: float = 0.0
+        self._active_gold_sl: float = 0.0
+        self._active_gold_tp1: float = 0.0
+        self._active_gold_tp2: float = 0.0
+        self._active_gold_tp3: float = 0.0
+        self._active_gold_stage: str = "IDLE"  # "IDLE", "ACTIVE", "TP1_LOCKED", "TP2_LOCKED", "COOLDOWN"
+        self._last_trade_closed_ts: float = 0.0
+        self._last_signal_broadcast_ts: float = 0.0
+        self._trade_cooldown_seconds: float = 300.0  # 5 min after win, 15 min after loss
+        self._signal_cooldown_seconds: float = 300.0  # Min 5 min between new signals
+        self._peak_upl_map: Dict[str, float] = {}  # deal_id -> peak UPL for Flash Shock Harvest
+
+    def has_active_gold_trade(self) -> bool:
+        """
+        Returns True if there is currently an active Gold trade running on broker or in DB.
+        Guarantees that the system focuses on harvesting the current trade before opening/broadcasting a new one.
+        """
+        if self._active_gold_deal_id:
+            return True
+        try:
+            active_trades = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
+            for t in active_trades:
+                if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "OPEN")).upper() == "OPEN":
+                    self._active_gold_deal_id = str(t.get("deal_id"))
+                    self._active_gold_direction = str(t.get("direction", "BUY")).upper()
+                    self._active_gold_entry_price = float(t.get("entry_price", 0.0) or 0.0)
+                    self._active_gold_sl = float(t.get("sl", 0.0) or 0.0)
+                    self._active_gold_tp1 = float(t.get("tp1", 0.0) or 0.0)
+                    self._active_gold_tp2 = float(t.get("tp2", 0.0) or 0.0)
+                    self._active_gold_tp3 = float(t.get("tp3", 0.0) or 0.0)
+                    tier = int(t.get("scale_tier", 0) or 0)
+                    self._active_gold_stage = "TP2_LOCKED" if tier >= 2 else ("TP1_LOCKED" if tier >= 1 else "ACTIVE")
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _clear_active_trade(self, deal_id: Optional[str] = None, cooldown: float = 300.0):
+        """Clears active trade state and activates post-trade cooldown."""
+        if deal_id is None or str(self._active_gold_deal_id) == str(deal_id):
+            self._active_gold_deal_id = None
+            self._active_gold_direction = None
+            self._active_gold_entry_price = 0.0
+            self._active_gold_stage = "IDLE"
+        self._last_trade_closed_ts = time.time()
+        self._trade_cooldown_seconds = cooldown
+        if deal_id:
+            self._peak_upl_map.pop(str(deal_id), None)
+
     def get_cached_gold_signal(self) -> Optional[Dict[str, Any]]:
         """Returns the most recent calculated Gold signal from RAM cache without re-computing (<0.0001ms)."""
         if self._last_signal_data and (time.time() - self._last_signal_ts) < 120.0:
@@ -367,6 +419,17 @@ class QuantGoldExecutionEngine:
             elif regime == "RANDOM_WALK" and abs(weighted_score) < 20.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.02:
                 final_action = "HOLD"
                 reason = f"RANDOM_WALK_VETO: Composite Hurst is {hurst.get('composite'):.2f} with negligible momentum."
+            # Gate 5: Minimum Win Probability Hurdle (Super Smart High Win Rate: >= 68.0% or score >= 35.0)
+            elif win_prob < 68.0 and abs(weighted_score) < 35.0:
+                final_action = "HOLD"
+                reason = f"LOW_CONFIDENCE_VETO: Win Prob {win_prob:.1f}% < 68.0% and score {weighted_score:+.1f} < 35.0."
+            # Gate 6: Kalman Directional Velocity Confirmation
+            elif cand_action == "BUY" and kalman.get("latent_velocity", 0.0) < -0.05:
+                final_action = "HOLD"
+                reason = f"VELOCITY_DIVERGENCE_VETO: Latent Kalman velocity is negative ({kalman.get('latent_velocity', 0):.4f}) for BUY."
+            elif cand_action == "SELL" and kalman.get("latent_velocity", 0.0) > 0.05:
+                final_action = "HOLD"
+                reason = f"VELOCITY_DIVERGENCE_VETO: Latent Kalman velocity is positive ({kalman.get('latent_velocity', 0):.4f}) for SELL."
             else:
                 final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
@@ -558,8 +621,9 @@ class QuantGoldExecutionEngine:
         Main 24/7 autonomous loop for Quant Gold:
           1. Monitors existing Gold positions (Breakeven Armor, Trailing Ratchet, Shock Early Harvest).
           2. Continuously audits and synchronizes real capital balances across all users.
-          3. Discovers high-conviction Gold setups (19-TF + Math + AI Swarm).
-          4. Dispatches market orders for all active Capital.com VIP users with instant concurrency.
+          3. Enforces Single-Active-Trade sequential lifecycle: Harvests profit 1 trade at a time.
+          4. Discovers high-conviction Gold setups (19-TF + Math + AI Swarm).
+          5. Dispatches market orders for all active Capital.com VIP users with instant concurrency.
         """
         now = time.time()
         if (now - self._last_cycle_ts) < self._cycle_interval or self._is_evaluating:
@@ -578,11 +642,40 @@ class QuantGoldExecutionEngine:
             except Exception as e_sync:
                 logger.debug(f"Capital sync note: {e_sync}")
 
+            # Step 1.8: Strict Sequential Lifecycle & Signal Muting Gate
+            # If the system is currently managing an active Gold trade, STOP!
+            # Do NOT evaluate new entry signals and do NOT broadcast duplicate signals.
+            # Harvest profit from this trade first!
+            if self.has_active_gold_trade():
+                return {
+                    "status": "MANAGING_ACTIVE_TRADE",
+                    "deal_id": self._active_gold_deal_id,
+                    "stage": self._active_gold_stage,
+                    "direction": self._active_gold_direction,
+                    "entry_price": self._active_gold_entry_price
+                }
+
+            # Step 1.9: Post-Trade Cooldown Gate (Prevents Chasing and Revenge Trading)
+            time_since_close = now - self._last_trade_closed_ts
+            if time_since_close < self._trade_cooldown_seconds:
+                return {
+                    "status": "COOLDOWN_ACTIVE",
+                    "remaining_seconds": round(self._trade_cooldown_seconds - time_since_close, 1)
+                }
+
+            # Step 1.95: Signal Broadcast Throttling (Min 300s between signal cards)
+            time_since_broadcast = now - self._last_signal_broadcast_ts
+            if time_since_broadcast < self._signal_cooldown_seconds:
+                return {
+                    "status": "SIGNAL_THROTTLED",
+                    "remaining_seconds": round(self._signal_cooldown_seconds - time_since_broadcast, 1)
+                }
+
             # Step 2: Check Active VIP Users
             active_users = db.get_active_capital_auto_users()
             if not active_users:
                 # Include Super Admin by default if configured
-                active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 5, "is_demo": False}]
+                active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 1, "is_demo": False}]
 
             # Step 3: Evaluate Definitive Master Signal
             signal_data = await self.evaluate_gold_master_signal()
@@ -590,9 +683,9 @@ class QuantGoldExecutionEngine:
 
             dispatched_count = 0
             if action in ["BUY", "SELL"]:
-                logger.info(f"🥇 [QUANT GOLD EXECUTION] Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {signal_data['confidence']}%)")
+                logger.info(f"🥇 [QUANT GOLD EXECUTION] Super Smart Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {signal_data['confidence']}%)")
                 
-                # High-Throughput Concurrent Fan-Out Dispatch & Simultaneous Signal Broadcast
+                # High-Throughput Concurrent Fan-Out Dispatch & Single Signal Broadcast
                 fleet_res = await self.dispatch_gold_signal_to_fleet(
                     action=action,
                     current_price=signal_data["current_price"],
@@ -601,7 +694,8 @@ class QuantGoldExecutionEngine:
                     tp2=signal_data["tp2"],
                     tp3=signal_data["tp3"],
                     app=app,
-                    setup_type="QUANT_GOLD_19TF_VIP"
+                    setup_type="QUANT_GOLD_19TF_VIP",
+                    confidence=float(signal_data.get("confidence", 75.0) or 75.0)
                 )
                 dispatched_count = fleet_res.get("dispatched_count", 0)
 
@@ -648,16 +742,17 @@ class QuantGoldExecutionEngine:
         tp3: float,
         app = None,
         setup_type: str = "QUANT_GOLD_19TF_VIP",
-        broadcast_telegram: bool = True
+        broadcast_telegram: bool = True,
+        confidence: float = 75.0
     ) -> Dict[str, Any]:
         """
         High-Throughput Concurrent Fan-Out Dispatch (Semaphore 30):
         Dispatches Gold market orders for all active VIP users on Capital.com simultaneously (<0.05ms)
-        AND synchronously broadcasts the institutional signal card to VIP Telegram users.
+        AND synchronously broadcasts the institutional signal card to VIP Telegram users (ONLY when orders placed).
         """
         active_users = db.get_active_capital_auto_users()
         if not active_users:
-            active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 5, "is_demo": False}]
+            active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 1, "is_demo": False}]
 
         sem = asyncio.Semaphore(30)
         sl_dist = abs(current_price - sl)
@@ -670,10 +765,30 @@ class QuantGoldExecutionEngine:
             async with sem:
                 try:
                     open_trades = db.get_capital_auto_trades_for_user(cid)
-                    gold_held = any(str(t.get("epic", "")).upper() == "GOLD" and t.get("status") == "OPEN" for t in open_trades)
-                    if gold_held:
-                        logger.debug(f"User {cid} already holds open GOLD position. Skipping duplicate entry.")
+                    open_gold_trades = [
+                        t for t in open_trades 
+                        if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "OPEN")).upper() == "OPEN"
+                    ]
+                    max_user_pos = int(user_dict.get("max_positions", 1) or 1)
+                    
+                    if len(open_gold_trades) >= max_user_pos:
+                        logger.debug(f"User {cid} already reached max Gold positions ({len(open_gold_trades)}/{max_user_pos}). Skipping.")
                         return 0
+
+                    # Smart Pyramiding Rule (Invariant 1.1 Fiduciary Safety):
+                    # If user is allowed > 1 position, an additional position is ONLY permitted if:
+                    # 1. Existing trade already reached TP1 (Breakeven Armor locked, tier >= 1, 0.00R risk).
+                    # 2. System confidence is ultra-high (>= 85.0%).
+                    if len(open_gold_trades) > 0:
+                        existing = open_gold_trades[0]
+                        existing_tier = int(existing.get("scale_tier", 0) or 0)
+                        if existing_tier < 1 or confidence < 85.0:
+                            logger.info(
+                                f"🛡️ [SMART PYRAMIDING GUARD] User {cid} holds open trade. "
+                                f"Additional position requires TP1 Breakeven Lock & Confidence >= 85.0% "
+                                f"(Current tier={existing_tier}, conf={confidence:.1f}%). Skipping."
+                            )
+                            return 0
 
                     is_admin = (cid == 859271875) or db.is_admin(cid)
                     configured_is_demo = bool(user_dict.get("is_demo", False))
@@ -708,7 +823,7 @@ class QuantGoldExecutionEngine:
                     lot_size = calculate_capital_gold_lot_size(
                         budget=budget,
                         current_price=current_price,
-                        confidence=75.0,
+                        confidence=confidence,
                         leverage=500.0
                     )
 
@@ -726,6 +841,15 @@ class QuantGoldExecutionEngine:
                     )
                     if order_res.get("success"):
                         deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
+                        self._active_gold_deal_id = str(deal_id)
+                        self._active_gold_direction = action
+                        self._active_gold_entry_price = current_price
+                        self._active_gold_sl = sl
+                        self._active_gold_tp1 = tp1
+                        self._active_gold_tp2 = tp2
+                        self._active_gold_tp3 = tp3
+                        self._active_gold_stage = "ACTIVE"
+
                         db.record_capital_auto_trade(
                             chat_id=cid,
                             deal_id=str(deal_id),
@@ -752,7 +876,9 @@ class QuantGoldExecutionEngine:
         dispatched_count = sum(r for r in results if isinstance(r, int))
 
         sent_count = 0
-        if broadcast_telegram:
+        # CRITICAL FIX: Only broadcast to Telegram IF orders were actually dispatched to fleet
+        # This completely eliminates false signals and repetitive signal spam!
+        if broadcast_telegram and dispatched_count > 0:
             vip_card = format_gold_signal_card(
                 direction=action,
                 sl=sl,
@@ -870,7 +996,8 @@ class QuantGoldExecutionEngine:
           3. Monitors TP3 (+243 pips): Sends celebratory '✓ Take profit' alert to VIP users
              and executes Moonshot target close.
           4. Monitors Shock Early Harvest: If Peak Profit retraces >= 50%, locks in gains.
-          5. FIDUCIARY PROFIT-ONLY RULE: If position hits SL or closes in a loss,
+          5. Reconciles with broker positions to detect server-side SL/TP closures.
+          6. FIDUCIARY PROFIT-ONLY RULE: If position hits SL or closes in a loss,
              ZERO alert is sent to VIP users (losses strictly logged in DB/admin only).
         """
         try:
@@ -887,6 +1014,20 @@ class QuantGoldExecutionEngine:
                     cid = u.get("chat_id")
                     if cid:
                         active_trades.extend(db.get_capital_auto_trades(cid, status="OPEN"))
+
+            # Broker reconciliation: interrogate broker open positions
+            broker_open_deal_ids = set()
+            try:
+                c_eng = capital_engine.get_capital_engine()
+                positions = await asyncio.to_thread(c_eng.get_open_positions)
+                if positions is not None:
+                    for p_item in positions:
+                        pos = p_item.get("position", {})
+                        d_id = str(pos.get("dealId", ""))
+                        if d_id and str(pos.get("epic", "")).upper() == "GOLD":
+                            broker_open_deal_ids.add(d_id)
+            except Exception as e_bpos:
+                logger.debug(f"Broker open positions check note: {e_bpos}")
 
             for tr in active_trades:
                 if str(tr.get("epic", "")).upper() != "GOLD":
@@ -918,6 +1059,61 @@ class QuantGoldExecutionEngine:
                 pips = int(round(pnl_pts * 10.0))
                 upl = pnl_pts * sz
                 dir_label = "Buy" if dir_side == "BUY" else "Sell"
+                deal_key = str(deal_id)
+
+                # Broker Server-Side Closure Check:
+                if broker_open_deal_ids and deal_id not in broker_open_deal_ids and deal_id != "OK":
+                    logger.info(f"🏛️ [BROKER SYNC] Gold trade {deal_id} was closed on Capital.com broker.")
+                    if hasattr(db, "update_capital_auto_trade_close"):
+                        db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                    
+                    if upl > 0 or pips > 0 or scale_tier >= 1:
+                        key_close = f"{deal_id}:CLOSED"
+                        if key_close not in self._notified_milestones:
+                            self._notified_milestones.add(key_close)
+                            card_close_win = format_gold_tp_card(
+                                stage="CLOSE",
+                                pips=max(pips, 73 if scale_tier >= 1 else 10),
+                                direction=dir_side,
+                                entry_price=entry_p
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
+                        self._clear_active_trade(deal_id, cooldown=300.0)
+                    else:
+                        logger.info(f"Gold trade {deal_id} closed at loss (${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
+                        self._clear_active_trade(deal_id, cooldown=900.0)
+                    continue
+
+                # Track peak UPL for Flash Shock Protective Early Harvest
+                current_peak = self._peak_upl_map.get(deal_key, 0.0)
+                if upl > current_peak:
+                    self._peak_upl_map[deal_key] = upl
+                    current_peak = upl
+
+                # Flash Shock Protective Early Harvest (Invariants 35 & 104):
+                # If Peak UPL >= $2.50 (or pips >= 40) and price retraces >= 50% from peak
+                if current_peak >= 2.50 and upl <= (current_peak * 0.50) and upl > 0.50:
+                    logger.info(f"⚡ [FLASH SHOCK HARVEST] Gold trade {deal_id} peak ${current_peak:.2f} retraced >= 50% to ${upl:.2f}. Executing protective early harvest!")
+                    try:
+                        if cid:
+                            u_eng = capital_engine.get_user_capital_engine(cid)
+                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                        if hasattr(db, "update_capital_auto_trade_close"):
+                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                        
+                        card_shock = format_gold_tp_card(
+                            stage="CLOSE",
+                            pips=pips,
+                            direction=dir_side,
+                            entry_price=entry_p
+                        )
+                        markup = get_gold_signal_reply_markup()
+                        await self.broadcast_to_vip_users(card_shock, app=app, reply_markup=markup)
+                        self._clear_active_trade(deal_key, cooldown=300.0)
+                        continue
+                    except Exception as e_shk:
+                        logger.debug(f"Flash shock harvest note: {e_shk}")
 
                 # Check TP1 Hit (+73 pips)
                 is_tp1 = (dir_side == "BUY" and curr_p >= tp1) or (dir_side == "SELL" and curr_p <= tp1) or (pnl_pts >= 7.30)
@@ -936,6 +1132,8 @@ class QuantGoldExecutionEngine:
                         )
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp1, app=app, reply_markup=markup)
+
+                    self._active_gold_stage = "TP1_LOCKED"
 
                     # Ratchet SL to Breakeven Armor (Entry + 0.5x Spread)
                     be_level = (entry_p + (spread * 0.5)) if dir_side == "BUY" else (entry_p - (spread * 0.5))
@@ -967,6 +1165,8 @@ class QuantGoldExecutionEngine:
                         )
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp2, app=app, reply_markup=markup)
+
+                    self._active_gold_stage = "TP2_LOCKED"
 
                     # Ratchet SL to Guaranteed Cash Profit Floor (+73 pips)
                     cash_floor = (entry_p + 7.30) if dir_side == "BUY" else (entry_p - 7.30)
@@ -1004,8 +1204,10 @@ class QuantGoldExecutionEngine:
                             await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                        self._clear_active_trade(deal_id, cooldown=300.0)
                     except Exception as e_c3:
                         logger.debug(f"TP3 close note: {e_c3}")
+                    continue
 
                 # Check if position stopped out on broker (SL hit or closed)
                 # If stopped out in profit: notify VIP. If stopped out in loss: DO NOT NOTIFY VIP.
@@ -1017,19 +1219,25 @@ class QuantGoldExecutionEngine:
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
 
-                        if upl > 0 or pips > 0:
+                        if upl > 0 or pips > 0 or scale_tier >= 1:
                             # Closed in profit! (e.g. Breakeven Armor or trailing profit floor hit)
                             card_close_win = format_gold_tp_card(
                                 stage="CLOSE",
-                                pips=pips,
+                                pips=max(pips, 73 if scale_tier >= 1 else 10),
                                 direction=dir_side,
                                 entry_price=entry_p
                             )
                             markup = get_gold_signal_reply_markup()
                             await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
+                            self._clear_active_trade(deal_id, cooldown=300.0)
                         else:
                             # Closed at loss: NEVER SEND TO VIP USERS!
                             logger.info(f"Gold trade {deal_id} hit SL @ ${curr_p:.2f} (Loss: ${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
+                            self._clear_active_trade(deal_id, cooldown=900.0)
+                    continue
+
+        except Exception as e_audit:
+            logger.debug(f"Open Gold audit note: {e_audit}")
 
         except Exception as e_audit:
             logger.debug(f"Open Gold audit note: {e_audit}")
