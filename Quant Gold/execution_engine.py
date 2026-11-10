@@ -1049,30 +1049,33 @@ class QuantGoldExecutionEngine:
                             )
                             return 0
 
-                    # Point 7: Daily Capital Governor (Invariant 52 - +5% Target Lock / -2.5% Loss Floor)
-                    try:
-                        from portfolio_circuit_breaker import is_capital_daily_locked
-                        chk_bal_gov = 1000.0
-                        if not configured_is_demo:
-                            try:
-                                chk_eng_gov = capital_engine.get_user_capital_engine(cid, is_demo=False)
-                                bal_inf_gov = await asyncio.to_thread(chk_eng_gov.get_account_balance)
-                                chk_bal_gov = float(bal_inf_gov.get("available", 1000.0) or 1000.0)
-                            except Exception:
-                                pass
-                        is_locked, lock_reason, _ = is_capital_daily_locked(cid, current_balance=chk_bal_gov, is_demo=configured_is_demo)
-                        if is_locked:
-                            logger.info(
-                                f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
-                                f"Capital strictly preserved under Invariant 52."
-                            )
-                            return 0
-                    except Exception as e_gov:
-                        logger.debug(f"Daily Governor check note for user {cid}: {e_gov}")
-
                     is_admin = (cid == 859271875) or db.is_admin(cid)
                     configured_is_demo = bool(user_dict.get("is_demo", False))
                     budget = float(user_dict.get("budget", 50.0) or 50.0)
+
+                    # Point 7: Daily Capital Governor (Invariant 52 - +5% Target Lock / -2.5% Loss Floor)
+                    # Super Admin (859271875) possesses unconditional execution authority (Invariant 75)
+                    if not is_admin:
+                        try:
+                            from portfolio_circuit_breaker import is_capital_daily_locked
+                            chk_bal_gov = 0.0
+                            if not configured_is_demo:
+                                try:
+                                    chk_eng_gov = capital_engine.get_user_capital_engine(cid, is_demo=False)
+                                    bal_inf_gov = await asyncio.to_thread(chk_eng_gov.get_account_balance)
+                                    chk_bal_gov = float(bal_inf_gov.get("available", 0.0) or 0.0)
+                                except Exception:
+                                    pass
+                            if chk_bal_gov > 0:
+                                is_locked, lock_reason, _ = is_capital_daily_locked(cid, current_balance=chk_bal_gov, is_demo=configured_is_demo)
+                                if is_locked:
+                                    logger.info(
+                                        f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
+                                        f"Capital strictly preserved under Invariant 52."
+                                    )
+                                    return 0
+                        except Exception as e_gov:
+                            logger.debug(f"Daily Governor check note for user {cid}: {e_gov}")
 
                     # Dynamic Real Capital Checking & Smart Demo Fallback:
                     effective_is_demo = configured_is_demo
@@ -1457,12 +1460,32 @@ class QuantGoldExecutionEngine:
                     self._peak_pnl_pts_map[deal_key] = pnl_pts
                     current_peak_pts = pnl_pts
 
+                is_manual_trade = (
+                    str(tr.get("strategy", "")).upper() == "MANUAL" or
+                    str(tr.get("deal_reference", "")).startswith("MANUAL") or
+                    str(tr.get("source", "")).upper() == "MANUAL"
+                )
+
                 # Flash Shock Protective Early Harvest (Invariants 35 & 104):
-                # Triggered if EITHER:
-                # 1. Price points moved >= +3.50 (+35 pips) and retraced >= 50% from peak points (while still >= +1.00 pts profit)
-                # 2. Dollar UPL reached >= $2.00 and retraced >= 50% from peak UPL (while still >= $0.50 profit)
-                is_shock_pts = (3.50 <= current_peak_pts <= 150.0 and pnl_pts <= (current_peak_pts * 0.50) and pnl_pts >= 1.00)
-                is_shock_upl = (2.00 <= current_peak <= 150.0 and upl <= (current_peak * 0.50) and upl >= 0.50)
+                # Never choke trades on micro-oscillations ($0.19 - $0.49 crumbs).
+                # 1. Price points moved >= +12.00 (+120 pips, near TP1) and retraced >= 50% (while retaining >= +5.00 pts & upl >= $2.50)
+                # 2. Dollar UPL reached >= $5.00 and retraced >= 50% from peak UPL (while retaining >= $2.50 net floor)
+                # 3. User Manual trades are 100% EXEMPT: Allowed to run to TP1/TP2 or user manual close.
+                is_shock_pts = (
+                    not is_manual_trade and
+                    current_peak_pts >= 12.00 and
+                    current_peak_pts <= 150.0 and
+                    pnl_pts <= (current_peak_pts * 0.50) and
+                    pnl_pts >= 5.00 and
+                    upl >= 2.50
+                )
+                is_shock_upl = (
+                    not is_manual_trade and
+                    current_peak >= 5.00 and
+                    current_peak <= 150.0 and
+                    upl <= (current_peak * 0.50) and
+                    upl >= 2.50
+                )
 
                 if is_shock_pts or is_shock_upl:
                     logger.info(

@@ -355,7 +355,7 @@ class CapitalDailyAGIGovernor:
             if not is_demo:
                 db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{today_str}", str(round(current_balance, 2)))
             return current_balance
-        return 1000.0  # Safe fallback
+        return 0.0  # Do not set false 1000.0 baseline when balance is unknown
 
     @classmethod
     def evaluate_and_check_daily_lock(
@@ -371,12 +371,65 @@ class CapitalDailyAGIGovernor:
         """
         import database as db
         today_str = cls.get_today_str()
+
+        # Super Admin Absolute Authority & Unrestricted Execution (Invariant 75)
+        is_admin_user = (chat_id == 859271875) or db.is_admin(chat_id)
+        if is_admin_user:
+            telemetry_admin = {
+                "today": today_str,
+                "starting_capital": current_balance,
+                "current_balance": current_balance,
+                "daily_pnl_usd": 0.0,
+                "daily_pnl_pct": 0.0,
+                "target_pct": cls.DAILY_PROFIT_TARGET_PCT,
+                "floor_pct": cls.DAILY_LOSS_FLOOR_PCT,
+                "is_target_locked": False,
+                "is_loss_locked": False,
+                "can_trade": True,
+                "status": "SUPER_ADMIN_UNRESTRICTED"
+            }
+            return False, "Super Admin Absolute Execution Authority (Invariant 75)", telemetry_admin
+
         baseline = cls.get_daily_starting_capital(chat_id, current_balance, is_demo=is_demo)
+        if baseline <= 0.0:
+            baseline = current_balance if current_balance > 0 else 100.0
+
         daily_pnl_usd = round(current_balance - baseline, 2)
         daily_pnl_pct = round((daily_pnl_usd / max(1.0, baseline)) * 100.0, 2)
 
         env_tag = "demo" if is_demo else "live"
         lock_key = f"cap_daily_lock_{chat_id}_{env_tag}_{today_str}"
+
+        # Automatic Desynchronization Detection & Self-Healing (Invariant 52):
+        # If daily_pnl_usd shows huge negative loss (e.g. <= -$50 or <= -20%) but actual realized closed trades
+        # in the database today do not reflect this loss (e.g. profitable or minimal loss),
+        # this is an artificial baseline anomaly caused by a stale fallback (e.g. 1000.0 fallback).
+        if daily_pnl_pct <= -20.0 and current_balance > 0:
+            real_closed_loss = 0.0
+            try:
+                if hasattr(db, "get_capital_auto_trades_for_user"):
+                    u_trades = db.get_capital_auto_trades_for_user(chat_id)
+                    today_trades = [t for t in u_trades if str(t.get("created_at", ""))[:10] == today_str or str(t.get("exit_time", ""))[:10] == today_str]
+                    real_closed_loss = sum(float(t.get("pnl", 0.0) or 0.0) for t in today_trades if "CLOSED" in str(t.get("status", "")).upper())
+            except Exception:
+                pass
+
+            if real_closed_loss > -20.0:
+                logger.info(
+                    f"🔄 [CIRCUIT BREAKER SELF-HEAL] Cleared baseline desynchronization for user {chat_id}: "
+                    f"baseline was ${baseline:.2f}, balance is ${current_balance:.2f}, real closed PnL today is ${real_closed_loss:.2f}. "
+                    f"Auto-correcting baseline."
+                )
+                baseline = max(1.0, round(current_balance - real_closed_loss, 2))
+                db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{env_tag}_{today_str}", str(round(baseline, 2)))
+                if not is_demo:
+                    db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{today_str}", str(round(baseline, 2)))
+                daily_pnl_usd = round(current_balance - baseline, 2)
+                daily_pnl_pct = round((daily_pnl_usd / max(1.0, baseline)) * 100.0, 2)
+                db.update_system_setting(lock_key, "NORMAL")
+                if not is_demo:
+                    db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
+
         existing_lock = db.get_system_setting(lock_key)
         if not existing_lock and not is_demo:
             existing_lock = db.get_system_setting(f"cap_daily_lock_{chat_id}_{today_str}")

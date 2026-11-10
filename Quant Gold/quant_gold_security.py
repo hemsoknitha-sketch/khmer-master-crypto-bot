@@ -228,6 +228,10 @@ class QuantGoldSecurityCitadel:
         """Returns True if the system is currently under emergency lockdown."""
         return self._circuit_breaker_locked
 
+    def get_lockdown_status(self) -> Tuple[bool, str]:
+        """Returns (is_locked: bool, reason: str)."""
+        return self._circuit_breaker_locked, self._lock_reason or "NORMAL"
+
     def trigger_emergency_lockdown(self, admin_id: int, reason: str = "MANUAL_LOCKDOWN") -> bool:
         """Engages immediate system-wide trading freeze across Quant Gold."""
         if not self.is_super_admin(admin_id):

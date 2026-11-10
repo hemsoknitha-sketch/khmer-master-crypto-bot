@@ -548,6 +548,36 @@ class QuantGoldBot:
             return await self.handle_guardian_rescue(update, context)
         elif sub_cmd in ["BACKUP", "HF_BACKUP", "VAULT"]:
             return await self.handle_backup(update, context)
+        elif sub_cmd in ["RESET", "RESET_DAILY", "UNLOCK_DAILY", "RESET_GOVERNOR"]:
+            target_chat_id = chat_id
+            if len(args) > 1 and is_admin:
+                if str(args[1]).lower() == "all":
+                    import portfolio_circuit_breaker
+                    active_users = db.get_active_capital_auto_users() or []
+                    for u in active_users:
+                        u_cid = u.get("chat_id")
+                        if u_cid:
+                            portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(u_cid)
+                    portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(859271875)
+                    return await self.safe_reply(
+                        update,
+                        "🔄 <b>[FLEET DAILY LIMITS RESET]</b> 🔓\n"
+                        "• បានដោះសោរ Daily Governor Lock សម្រាប់កងនាវាទាំងអស់រួចរាល់!\n"
+                        "• ប្រព័ន្ធដំណើរការវិនិយោគស្វ័យប្រវត្តជាធម្មតាវិញភ្លាមៗ 24/7។"
+                    )
+                else:
+                    resolved_cid, _ = self._resolve_target(args[1])
+                    if resolved_cid:
+                        target_chat_id = resolved_cid
+
+            import portfolio_circuit_breaker
+            portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(target_chat_id)
+            return await self.safe_reply(
+                update,
+                f"🔄 <b>[DAILY GOVERNOR RESET]</b> 🔓\n"
+                f"• បានដោះសោរ Daily Governor Lock សម្រាប់ <code>{target_chat_id}</code> រួចរាល់!\n"
+                f"• ប្រព័ន្ធវិនិយោគស្វ័យប្រវត្តដំណើរការវិញភ្លាមៗ 24/7។"
+            )
         elif sub_cmd in ["BUDGET", "ALLOC", "AMOUNT"]:
             target_chat_id = chat_id
             target_label = f"Chat ID: {chat_id}"
@@ -3287,6 +3317,35 @@ class QuantGoldBot:
             except Exception:
                 pass
             await self.handle_close_all(update, context)
+
+        elif data in ["btn_cap_reset_daily", "btn_cap_governor_reset", "btn_cap_daily_reset"]:
+            try:
+                await query.answer("🔄 Resetting Daily Governor Lock...")
+            except Exception:
+                pass
+            import portfolio_circuit_breaker
+            portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id)
+            await self.safe_reply(
+                update,
+                "🔄 <b>[DAILY GOVERNOR RESET]</b> 🔓\n"
+                "• បានដោះសោរ Daily Governor Lock រួចរាល់!\n"
+                "• ប្រព័ន្ធដំណើរការវិនិយោគស្វ័យប្រវត្តជាធម្មតាវិញភ្លាមៗ 24/7។"
+            )
+
+        elif data == "btn_cap_reset_247":
+            try:
+                await query.answer("💎 Enabling 24/7 Citadel Compounding...")
+            except Exception:
+                pass
+            db.update_system_setting(f"cap_24_7_citadel_unlocked_{chat_id}", "1")
+            import portfolio_circuit_breaker
+            portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id)
+            await self.safe_reply(
+                update,
+                "💎 <b>[24/7 CITADEL COMPOUNDING ENGAGED]</b> 👑\n"
+                "• បានដោះសោររបាំង +5% Daily Lock ដើម្បីវិនិយោគបន្តឥតឈប់ឈរ 24/7!\n"
+                "• Per-Trade Stop-Loss & Dynamic Breakeven Armor នៅតែការពារ ១០០%។"
+            )
 
         elif data.startswith("cap_flip:"):
             target_deal_id = data.split(":", 1)[1]
