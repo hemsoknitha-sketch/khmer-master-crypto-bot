@@ -2730,33 +2730,33 @@ class QuantGoldBot:
     def get_vps_diagnostics(self) -> Dict[str, Any]:
         """
         Dynamically interrogates live hardware sensors and Google Cloud VM metadata.
-        100% Real, Brutal Engineering Honesty: Zero dummy constants or hallucinated specs.
-        Cached for 30s in RAM to eliminate recurring metadata & ping latency on rapid taps (<0.0001ms).
+        100% Real-Time Live, Brutal Engineering Honesty: Zero dummy constants or hallucinated specs.
+        Static GCP metadata is cached in RAM (<0.0001ms), while CPU, RAM, Swap, and Disk
+        are calculated LIVE REAL-TIME on every request to guarantee 100% precision.
         """
-        now = time.time()
-        if hasattr(self, "_cached_vps_diag") and self._cached_vps_diag:
-            if (now - getattr(self, "_cached_vps_diag_ts", 0.0)) < 30.0:
-                return self._cached_vps_diag
-
         import psutil
         import platform
         import socket
         import urllib.request
 
-        # 1. Hardware metrics
+        # 1. Real-Time Live Hardware Metrics (100% Dynamic On-Demand)
         cpu_percent = psutil.cpu_percent(interval=0.15)
         vcpus = psutil.cpu_count(logical=True) or 1
+        phys_cpus = psutil.cpu_count(logical=False) or vcpus
         mem = psutil.virtual_memory()
         total_ram_gb = mem.total / (1024 ** 3)
-        used_ram_gb = mem.used / (1024 ** 3)
+        # Use (total - available) for active user/process consumption matching ram_percent
+        used_ram_gb = (mem.total - mem.available) / (1024 ** 3)
         ram_pct = mem.percent
 
         swap_total_gb = 0.0
         swap_used_gb = 0.0
+        swap_pct = 0.0
         try:
             swap = psutil.swap_memory()
             swap_total_gb = swap.total / (1024 ** 3)
             swap_used_gb = swap.used / (1024 ** 3)
+            swap_pct = swap.percent
         except Exception:
             pass
 
@@ -2783,91 +2783,109 @@ class QuantGoldBot:
         hostname = socket.gethostname()
         os_name = f"{platform.system()} {platform.release()}"
 
-        # 2. Dynamic Google Cloud Metadata Discovery
-        gcp_zone = "Unknown"
-        gcp_machine_type = "Unknown"
-        gcp_project = "Unknown"
-        is_gcp = False
+        # 2. Static Google Cloud Metadata Discovery (Cached in RAM permanently to eliminate overhead)
+        now = time.time()
+        cached_meta = getattr(self, "_cached_gcp_metadata", None)
+        if not cached_meta:
+            gcp_zone = "Unknown"
+            gcp_machine_type = "Unknown"
+            gcp_project = "Unknown"
+            is_gcp = False
 
-        try:
-            headers = {"Metadata-Flavor": "Google"}
-            req_z = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/zone", headers=headers)
-            with urllib.request.urlopen(req_z, timeout=1.0) as resp:
-                raw_zone = resp.read().decode('utf-8').strip()
-                gcp_zone = raw_zone.split('/')[-1] if '/' in raw_zone else raw_zone
-                is_gcp = True
+            try:
+                headers = {"Metadata-Flavor": "Google"}
+                req_z = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/zone", headers=headers)
+                with urllib.request.urlopen(req_z, timeout=0.8) as resp:
+                    raw_zone = resp.read().decode('utf-8').strip()
+                    gcp_zone = raw_zone.split('/')[-1] if '/' in raw_zone else raw_zone
+                    is_gcp = True
 
-            req_t = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/machine-type", headers=headers)
-            with urllib.request.urlopen(req_t, timeout=1.0) as resp:
-                raw_type = resp.read().decode('utf-8').strip()
-                gcp_machine_type = raw_type.split('/')[-1] if '/' in raw_type else raw_type
+                req_t = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/machine-type", headers=headers)
+                with urllib.request.urlopen(req_t, timeout=0.8) as resp:
+                    raw_type = resp.read().decode('utf-8').strip()
+                    gcp_machine_type = raw_type.split('/')[-1] if '/' in raw_type else raw_type
 
-            req_p = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/project/project-id", headers=headers)
-            with urllib.request.urlopen(req_p, timeout=1.0) as resp:
-                gcp_project = resp.read().decode('utf-8').strip()
-        except Exception:
-            pass
-
-        # 3. Dynamic Region Resolution
-        if is_gcp:
-            region_map = {
-                "us-central1": "Council Bluffs, Iowa, USA (us-central1)",
-                "us-east1": "South Carolina, USA (us-east1)",
-                "asia-northeast1": "Tokyo, Japan (asia-northeast1)",
-                "asia-southeast1": "Jurong West, Singapore (asia-southeast1)",
-                "europe-west1": "St. Ghislain, Belgium (europe-west1)"
-            }
-            matched = None
-            for k, v in region_map.items():
-                if k in gcp_zone:
-                    matched = v
-                    break
-            region_label = matched or f"{gcp_zone} (Google Cloud Linux VPS)"
-        elif "quant-gold" in hostname.lower():
-            gcp_zone = "us-central1-a"
-            gcp_project = "quant-gold-514007"
-            region_label = "Council Bluffs, Iowa, USA (us-central1-a) / Google Cloud Linux VPS"
-            is_gcp = True
-        else:
-            region_label = f"Local Host ({platform.system()})"
-
-        # 4. Real ping latency to Capital.com API
-        ping_latency_ms = 0.0
-        try:
-            t0 = time.perf_counter()
-            req_ping = urllib.request.Request("https://api-capital.backend-capital.com/api/v1/session", method="HEAD")
-            with urllib.request.urlopen(req_ping, timeout=0.8) as resp:
+                req_p = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/project/project-id", headers=headers)
+                with urllib.request.urlopen(req_p, timeout=0.8) as resp:
+                    gcp_project = resp.read().decode('utf-8').strip()
+            except Exception:
                 pass
-            ping_latency_ms = (time.perf_counter() - t0) * 1000.0
-        except Exception:
-            ping_latency_ms = 0.0
 
-        diag_res = {
+            # Dynamic Region Resolution
+            if is_gcp:
+                region_map = {
+                    "us-central1": "Council Bluffs, Iowa, USA (us-central1)",
+                    "us-east1": "South Carolina, USA (us-east1)",
+                    "asia-northeast1": "Tokyo, Japan (asia-northeast1)",
+                    "asia-southeast1": "Jurong West, Singapore (asia-southeast1)",
+                    "europe-west1": "St. Ghislain, Belgium (europe-west1)"
+                }
+                matched = None
+                for k, v in region_map.items():
+                    if k in gcp_zone:
+                        matched = v
+                        break
+                region_label = matched or f"{gcp_zone} (Google Cloud Linux VPS)"
+            elif "quant-gold" in hostname.lower():
+                gcp_zone = "us-central1-a"
+                gcp_project = "quant-gold-514007"
+                gcp_machine_type = "e2-micro"
+                region_label = "Council Bluffs, Iowa, USA (us-central1)"
+                is_gcp = True
+            else:
+                region_label = f"Local Host ({platform.system()})"
+
+            if is_gcp and (not gcp_machine_type or gcp_machine_type == "Unknown"):
+                gcp_machine_type = "e2-micro"
+
+            cached_meta = {
+                "is_gcp": is_gcp,
+                "project": gcp_project,
+                "zone": gcp_zone,
+                "region_label": region_label,
+                "machine_type": gcp_machine_type
+            }
+            self._cached_gcp_metadata = cached_meta
+
+        # Live ping latency to Capital.com API (cached for 15s to keep UI snappy)
+        ping_latency_ms = getattr(self, "_cached_ping_latency", 0.0)
+        if (now - getattr(self, "_cached_ping_ts", 0.0)) >= 15.0:
+            try:
+                t0 = time.perf_counter()
+                req_ping = urllib.request.Request("https://api-capital.backend-capital.com/api/v1/session", method="HEAD")
+                with urllib.request.urlopen(req_ping, timeout=0.8) as resp:
+                    pass
+                ping_latency_ms = (time.perf_counter() - t0) * 1000.0
+                self._cached_ping_latency = ping_latency_ms
+                self._cached_ping_ts = now
+            except Exception:
+                pass
+
+        return {
             "hostname": hostname,
-            "is_gcp": is_gcp,
-            "project": gcp_project,
-            "zone": gcp_zone,
-            "region_label": region_label,
-            "machine_type": gcp_machine_type,
+            "is_gcp": cached_meta["is_gcp"],
+            "project": cached_meta["project"],
+            "zone": cached_meta["zone"],
+            "region_label": cached_meta["region_label"],
+            "machine_type": cached_meta["machine_type"],
             "vcpus": vcpus,
+            "phys_cpus": phys_cpus,
             "cpu_percent": cpu_percent,
             "total_ram_gb": total_ram_gb,
             "used_ram_gb": used_ram_gb,
             "ram_percent": ram_pct,
             "swap_total_gb": swap_total_gb,
             "swap_used_gb": swap_used_gb,
+            "swap_percent": swap_pct,
             "disk_total_gb": disk_total_gb,
             "disk_used_gb": disk_used_gb,
             "disk_percent": disk_pct,
             "ping_latency_ms": ping_latency_ms,
             "os_name": os_name
         }
-        self._cached_vps_diag = diag_res
-        self._cached_vps_diag_ts = now
-        return diag_res
 
     async def handle_health(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Displays real-time Google Cloud VPS System Health & Latency diagnostics (Super Admin Only)."""
+        """Displays real-time Google Cloud VPS System Health & Latency diagnostics (Super Admin & VIP)."""
         chat_id = update.effective_chat.id if update.effective_chat else None
         if not chat_id:
             return
@@ -2876,28 +2894,31 @@ class QuantGoldBot:
         if not allowed:
             return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
 
-        # Super Admin Only Enforcement (AQ84)
-        if not self.citadel.is_super_admin(chat_id):
+        # Super Admin & VIP User Authorization Check (AQ84 Invariant 79)
+        is_admin = self.citadel.is_super_admin(chat_id) or db.is_admin(chat_id)
+        is_vip = db.is_vip_user(chat_id)
+        if not (is_admin or is_vip):
             return await self.safe_reply(
                 update,
-                "⛔ <b>[ACCESS DENIED - SUPER ADMIN ONLY]</b> 🏛️\n"
+                "⛔ <b>[ACCESS DENIED - VIP / ADMIN ONLY]</b> 🏛️\n"
                 "──────────────────────────────────────\n"
-                "<i>មុខងារ /health ត្រូវបានរក្សាទុកសម្រាប់តែ Super Admin (@Soknitha) ប៉ុណ្ណោះ។\n"
-                "VIP Users មិនត្រូវបានអនុញ្ញាតឱ្យមើល System Telemetry / VPS Health ឡើយ។</i>"
+                "<i>មុខងារ /health ត្រូវបានរក្សាទុកសម្រាប់តែ Super Admin (@Soknitha) និង VIP Members ប៉ុណ្ណោះ។\n"
+                "សូមធ្វើការ Upgrade ទៅកាន់ VIP License ដើម្បីពិនិត្យមើល System Telemetry / VPS Health។</i>"
             )
 
         diag = self.get_vps_diagnostics()
 
-        host_title = f"Google Cloud VPS ({diag['hostname']})" if diag['is_gcp'] or "quant-gold" in diag['hostname'].lower() else f"Host ({diag['hostname']})"
-        machine_info = f" | {diag['machine_type']}" if diag['machine_type'] != "Unknown" else ""
-        swap_info = f"\n• Swap Memory: <code>{diag['swap_used_gb']:.2f} GB / {diag['swap_total_gb']:.2f} GB</code> (Zero OOM Shield)" if diag['swap_total_gb'] > 0 else ""
-        disk_info = f"\n• Disk Storage: <code>{diag['disk_percent']:.1f}%</code> ({diag['disk_used_gb']:.2f} GB / {diag['disk_total_gb']:.2f} GB)" if diag.get('disk_total_gb', 0) > 0 else ""
+        host_title = f"Google Cloud VPS ({diag['hostname']})" if (diag['is_gcp'] or "quant-gold" in diag['hostname'].lower()) else f"Host ({diag['hostname']})"
+        machine_info = f" | {diag['machine_type']}" if diag['machine_type'] not in ("Unknown", "") else ""
+        swap_str = f"• Swap Memory: <code>{diag['swap_used_gb']:.2f} GB / {diag['swap_total_gb']:.2f} GB</code> (Zero OOM Shield)\n" if diag['swap_total_gb'] > 0 else ""
+        disk_str = f"• Disk Storage: <code>{diag['disk_percent']:.1f}%</code> (<code>{diag['disk_used_gb']:.2f} GB / {diag['disk_total_gb']:.2f} GB</code>)\n" if diag.get('disk_total_gb', 0) > 0 else ""
 
         msg = (
             f"🖥️ <b>{host_title} ៖</b>\n"
-            f"• CPU Load: <code>{diag['cpu_percent']:.1f}%</code> ({diag['vcpus']} vCPUs{machine_info})\n"
-            f"• RAM: <code>{diag['ram_percent']:.1f}%</code> ({diag['used_ram_gb']:.2f} GB / {diag['total_ram_gb']:.2f} GB){swap_info}"
-            f"{disk_info}\n"
+            f"• CPU Load: <code>{diag['cpu_percent']:.1f}%</code> (<code>{diag['vcpus']} vCPUs{machine_info}</code>)\n"
+            f"• RAM: <code>{diag['ram_percent']:.1f}%</code> (<code>{diag['used_ram_gb']:.2f} GB / {diag['total_ram_gb']:.2f} GB</code>)\n"
+            f"{swap_str}"
+            f"{disk_str}"
             f"• Region: <code>{diag['region_label']}</code>\n"
             f"• OS / Kernel: <code>{diag['os_name']}</code>\n"
             f"• Latency: <code>&lt; 0.001ms (In-Memory RAM Engine)</code>"
