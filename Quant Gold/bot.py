@@ -542,6 +542,8 @@ class QuantGoldBot:
             return await self.handle_close_all(update, context)
         elif sub_cmd in ["STATUS", "SCAN"]:
             return await self.handle_status(update, context)
+        elif sub_cmd in ["RESCUE", "ADOPT", "GUARDIAN", "PROTECT"]:
+            return await self.handle_guardian_rescue(update, context)
         elif sub_cmd in ["ON", "ENABLE", "START"]:
             target_chat_id = chat_id
             target_label = f"Chat ID: {chat_id}"
@@ -2127,10 +2129,16 @@ class QuantGoldBot:
         total_upl = 0.0
         seen_deals = set()
 
+        # Check directional conflict against cached AI signal
+        cached_sig = self.exec_engine.get_cached_gold_signal()
+        q_act = str(cached_sig.get("action", "")).upper() if cached_sig else ""
+        q_conf = float(cached_sig.get("confidence", 50.0)) if cached_sig else 50.0
+
+        rescue_buttons = []
         for i, t in enumerate(gold_trades, 1):
             deal_id = str(t.get("deal_id", ""))
             seen_deals.add(deal_id)
-            direction = t.get("direction", "BUY")
+            direction = str(t.get("direction", "BUY")).upper()
             size = float(t.get("size", 0.5) or 0.5)
             entry = float(t.get("entry_price", curr_p) or curr_p)
             sl = float(t.get("sl", 0.0) or 0.0)
@@ -2142,10 +2150,21 @@ class QuantGoldBot:
             p_icon = "🟢" if upl >= 0 else "🔴"
             be_str = "🛡️ Breakeven Active (0.00R Risk)" if be_active else "⏳ Initial Structural SL"
 
+            conflict_line = ""
+            if direction == "BUY" and q_act in ["SELL", "SHORT"] and q_conf >= 60.0:
+                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ SELL ({q_conf:.1f}%)</i>\n"
+                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក SELL (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
+            elif direction == "SELL" and q_act in ["BUY", "LONG"] and q_conf >= 60.0:
+                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ BUY ({q_conf:.1f}%)</i>\n"
+                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក BUY (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
+            elif sl <= 0.0:
+                rescue_buttons.append([InlineKeyboardButton(f"🛡️ បំពាក់ Breakeven SL (#{deal_id})", callback_data=f"cap_protect:{deal_id}")])
+
             lines.append(
                 f"<b>#{i} {direction} {size} oz GOLD</b>\n"
                 f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
                 f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | {be_str}\n"
+                f"{conflict_line}"
             )
 
         # Append any live broker positions not tracked in local DB
@@ -2164,23 +2183,36 @@ class QuantGoldBot:
             total_upl += upl
             p_icon = "🟢" if upl >= 0 else "🔴"
 
+            conflict_line = ""
+            if direction == "BUY" and q_act in ["SELL", "SHORT"] and q_conf >= 60.0:
+                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ SELL ({q_conf:.1f}%)</i>\n"
+                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក SELL (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
+            elif direction == "SELL" and q_act in ["BUY", "LONG"] and q_conf >= 60.0:
+                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ BUY ({q_conf:.1f}%)</i>\n"
+                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក BUY (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
+            elif sl <= 0.0:
+                rescue_buttons.append([InlineKeyboardButton(f"🛡️ បំពាក់ Breakeven SL (#{deal_id})", callback_data=f"cap_protect:{deal_id}")])
+
             lines.append(
                 f"<b>#Broker {direction} {size} oz GOLD</b>\n"
                 f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code>\n"
                 f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | 🌐 Live Broker Sync\n"
+                f"{conflict_line}"
             )
 
         t_icon = "🟢" if total_upl >= 0 else "🔴"
         lines.append(f"══════════════════════════════════════")
         lines.append(f"💰 <b>Total Net UPL ៖</b> <code>{t_icon} ${total_upl:+.2f}</code>")
 
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all")],
-            [
-                InlineKeyboardButton("🏛️ Capital.com Live (/capital)", callback_data="btn_capital_menu"),
-                InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions")
-            ]
+        kb_rows = []
+        if rescue_buttons:
+            kb_rows.extend(rescue_buttons)
+        kb_rows.append([InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all")])
+        kb_rows.append([
+            InlineKeyboardButton("🛡️ Guardian Audit (/capital rescue)", callback_data="cap_action:RESCUE"),
+            InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions")
         ])
+        kb = InlineKeyboardMarkup(kb_rows)
         await self.safe_reply(update, "\n".join(lines), reply_markup=kb)
 
     async def handle_close_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2244,6 +2276,24 @@ class QuantGoldBot:
             f"✅ <b>[POSITIONS CLOSED]</b> 🛑\n"
             f"បានបិទរាល់ Position មាសចំនួន <code>{closed_cnt}</code> ដោយជោគជ័យ!"
         )
+
+    async def handle_guardian_rescue(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Audits open TradFi / Gold positions and renders the Manual Trade Guardian report card."""
+        chat_id = update.effective_chat.id
+        if not chat_id:
+            return
+        # Fiduciary VIP Referral & Authorization Check (Invariant 36)
+        auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
+        if not auth_ok:
+            card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
+            return await self.safe_reply(update, card, reply_markup=kb)
+
+        import capital_manual_trade_guardian as cmtg
+        auto_cfg = db.get_capital_auto_config(chat_id)
+        is_d = bool(auto_cfg.get("is_demo", False))
+        audit = await asyncio.to_thread(capital_engine.audit_and_adopt_tradfi_positions, chat_id, is_d, context.application)
+        msg_txt, kb = cmtg.format_guardian_audit_report(audit, chat_id, "khmer")
+        await self.safe_reply(update, msg_txt, reply_markup=kb, parse_mode="Markdown")
 
     async def handle_toggle_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Toggles 24/7 Autonomous Gold Trading with real isolated live account telemetry."""
@@ -3135,6 +3185,86 @@ class QuantGoldBot:
             except Exception:
                 pass
             await self.handle_close_all(update, context)
+
+        elif data.startswith("cap_flip:"):
+            target_deal_id = data.split(":", 1)[1]
+            try:
+                await query.answer("🔄 កំពុងដំណើរការ Reverse-Flip ស្រោចស្រង់...")
+            except Exception:
+                pass
+            auto_cfg = db.get_capital_auto_config(chat_id)
+            is_d = bool(auto_cfg.get("is_demo", False))
+            res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, target_deal_id, chat_id, is_d, context.application, "REVERSE_FLIP")
+            if res.get("success"):
+                rep = (
+                    f"🔄 <b>[REVERSE-FLIP RESCUE SUCCESS]</b> 🛡️\n"
+                    f"══════════════════════════════════════\n"
+                    f"🏛️ <b>ឧបករណ៍ ៖</b> <code>{res.get('epic', 'GOLD')}</code>\n"
+                    f"🚪 <b>Position ចាស់ ៖</b> បានបិទកាត់ខាតត្រឹម <code>{res.get('old_upl', 0.0):+.2f} USD</code>\n"
+                    f"🚀 <b>ទិសដៅថ្មី (ស្របស្ថាប័ន) ៖</b> <code>{res.get('new_direction')}</code> ទំហំ <code>{res.get('new_size')}</code> oz\n"
+                    f"🛑 <b>Stop-Loss ៖</b> <code>${res.get('new_sl', 0.0):,.2f}</code>\n"
+                    f"🎯 <b>Take-Profit (TP1) ៖</b> <code>${res.get('new_tp', 0.0):,.2f}</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"✅ <i>បានបង្វែរពីការបរាជ័យ មកជាជ័យជំនះរឹងមាំជោគជ័យ!</i>"
+                )
+            else:
+                rep = f"❌ <b>កំហុស ៖</b> {res.get('error', 'Reverse order failed')}"
+            await self.safe_reply(update, rep)
+
+        elif data.startswith("cap_protect:"):
+            target_deal_id = data.split(":", 1)[1]
+            try:
+                await query.answer("🛡️ កំពុងបំពាក់ Stop-Loss សុវត្ថិភាព...")
+            except Exception:
+                pass
+            auto_cfg = db.get_capital_auto_config(chat_id)
+            is_d = bool(auto_cfg.get("is_demo", False))
+            res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, target_deal_id, chat_id, is_d, context.application, "PROTECT_ONLY")
+            if res.get("success"):
+                rep = f"🛡️ <b>[BREATHING SL ATTACHED]</b>\nបានបំពាក់ Stop-Loss សុវត្ថិភាព <code>${res.get('sl', 0.0):,.2f}</code> ជោគជ័យ!"
+            else:
+                rep = f"❌ <b>កំហុស ៖</b> {res.get('error', 'Failed to attach SL')}"
+            await self.safe_reply(update, rep)
+
+        elif data.startswith("cap_close:"):
+            target_deal_id = data.split(":", 1)[1]
+            try:
+                await query.answer("Closing position to cash...")
+            except Exception:
+                pass
+            auto_cfg = db.get_capital_auto_config(chat_id)
+            is_d = bool(auto_cfg.get("is_demo", False))
+            res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, target_deal_id, chat_id, is_d, context.application, "CLOSE_FLAT")
+            if res.get("success"):
+                rep = f"✅ <b>[POSITION CLOSED]</b> បានបិទ Deal #{target_deal_id} ទូទាត់ជាសាច់ប្រាក់សុទ្ធជោគជ័យ!"
+            else:
+                rep = f"❌ <b>កំហុស ៖</b> {res.get('error', 'Failed to close position')}"
+            await self.safe_reply(update, rep)
+
+        elif data == "cap_action:RESCUE":
+            try:
+                await query.answer("Scanning for manual & unprotected trades...")
+            except Exception:
+                pass
+            await self.handle_guardian_rescue(update, context)
+
+        elif data == "cap_rescue_toggle":
+            is_on = db.is_capital_auto_rescue_enabled(chat_id)
+            new_state = not is_on
+            db.set_capital_auto_rescue_enabled(chat_id, new_state)
+            try:
+                await query.answer(f"Auto-Rescue is now {'ON' if new_state else 'OFF'}")
+            except Exception:
+                pass
+            await self.handle_guardian_rescue(update, context)
+
+        elif data == "cap_back_dashboard":
+            try:
+                await query.answer("Returning to Capital dashboard...")
+            except Exception:
+                pass
+            card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
+            await self.safe_edit(query, card, reply_markup=kb)
 
         elif data == "btn_qgold_license":
             try:

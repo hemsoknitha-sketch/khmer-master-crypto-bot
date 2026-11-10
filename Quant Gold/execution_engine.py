@@ -209,6 +209,7 @@ class QuantGoldExecutionEngine:
         self._trade_cooldown_seconds: float = 300.0  # 5 min after win, 15 min after loss
         self._signal_cooldown_seconds: float = 300.0  # Min 5 min between new signals
         self._peak_upl_map: Dict[str, float] = {}  # deal_id -> peak UPL for Flash Shock Harvest
+        self._peak_pnl_pts_map: Dict[str, float] = {}  # deal_id -> peak price points (pips) for size-invariant harvest
         self._last_broker_adopt_ts: float = 0.0
         self._cached_broker_gold_count: int = 0
         self._user_standby_log_ts: Dict[int, float] = {}
@@ -307,7 +308,35 @@ class QuantGoldExecutionEngine:
                         bid, ask, _ = self.get_live_gold_price_quote()
                         level = (bid + ask) / 2.0
 
-                    sl_dist = abs(level - sl) if sl > 0 else 16.0
+                    # Point 1 & 2: Check for naked SL (sl <= 0) or suicidal SL (> 15% distance)
+                    is_suicidal_sl = (
+                        sl > 0 and (
+                            (direction == "BUY" and sl < (level * 0.85)) or
+                            (direction == "SELL" and sl > (level * 1.15))
+                        )
+                    )
+                    is_naked_sl = (sl <= 0.0)
+
+                    # Dynamic breathing SL distance: max(spread * 3.5, level * 0.008, 16.0)
+                    _, _, quote_spread = self.get_live_gold_price_quote()
+                    safe_dist = max(quote_spread * 3.5, level * 0.008, 16.0)
+
+                    if (is_naked_sl or is_suicidal_sl) and level > 0.0:
+                        emergency_sl = round((level - safe_dist) if direction == "BUY" else (level + safe_dist), 2)
+                        try:
+                            upd_res = await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=emergency_sl)
+                            if upd_res and upd_res.get("success", False):
+                                sl = emergency_sl
+                                logger.info(
+                                    f"🛡️ [EMERGENCY SL PATROL] Attached dynamic breathing SL @ ${emergency_sl:.2f} "
+                                    f"to manual/unprotected Gold deal #{deal_id} on Capital.com broker!"
+                                )
+                            else:
+                                logger.warning(f"⚠️ [EMERGENCY SL PATROL] Broker rejected SL update for #{deal_id}: {upd_res}")
+                        except Exception as e_sl_att:
+                            logger.error(f"❌ [EMERGENCY SL PATROL] Error attaching SL to #{deal_id}: {e_sl_att}")
+
+                    sl_dist = abs(level - sl) if sl > 0 else safe_dist
                     tp1 = round((level + sl_dist * 1.50) if direction == "BUY" else (level - sl_dist * 1.50), 2)
                     tp2 = round((level + sl_dist * 2.50) if direction == "BUY" else (level - sl_dist * 2.50), 2)
                     tp3 = round((level + sl_dist * 4.00) if direction == "BUY" else (level - sl_dist * 4.00), 2)
@@ -332,7 +361,7 @@ class QuantGoldExecutionEngine:
                         )
                         logger.info(
                             f"🏛️ [BROKER SYNC] Auto-adopted active GOLD position from broker: "
-                            f"Deal #{deal_id} {direction} {size} lot @ ${level:.2f} (User {cid}, Demo={is_demo})"
+                            f"Deal #{deal_id} {direction} {size} lot @ ${level:.2f} (SL: ${sl:.2f}) (User {cid}, Demo={is_demo})"
                         )
 
                     # Bind active state in RAM memory
@@ -362,6 +391,7 @@ class QuantGoldExecutionEngine:
         self._cached_broker_gold_count = max(0, getattr(self, "_cached_broker_gold_count", 1) - 1)
         if deal_id:
             self._peak_upl_map.pop(str(deal_id), None)
+            self._peak_pnl_pts_map.pop(str(deal_id), None)
 
     def get_cached_gold_signal(self) -> Optional[Dict[str, Any]]:
         """Returns the most recent calculated Gold signal from RAM cache without re-computing (<0.0001ms)."""
@@ -946,6 +976,17 @@ class QuantGoldExecutionEngine:
                         logger.debug(f"User {cid} already reached max Gold positions ({len(open_gold_trades)}/{max_user_pos}). Skipping.")
                         return 0
 
+                    # Point 6: Over-Trading & Opposing Signal Veto Shield
+                    if len(open_gold_trades) > 0:
+                        existing = open_gold_trades[0]
+                        existing_dir = str(existing.get("direction", "")).upper()
+                        if existing_dir and action and existing_dir != action:
+                            logger.info(
+                                f"🛡️ [OPPOSING SIGNAL VETO] User {cid} holds open {existing_dir} trade. "
+                                f"New opposing {action} signal strictly muted to prevent hedge-lock collisions."
+                            )
+                            return 0
+
                     # Smart Pyramiding Rule (Invariant 1.1 Fiduciary Safety):
                     # If user is allowed > 1 position, an additional position is ONLY permitted if:
                     # 1. Existing trade already reached TP1 (Breakeven Armor locked, tier >= 1, 0.00R risk).
@@ -960,6 +1001,27 @@ class QuantGoldExecutionEngine:
                                 f"(Current tier={existing_tier}, conf={confidence:.1f}%). Skipping."
                             )
                             return 0
+
+                    # Point 7: Daily Capital Governor (Invariant 52 - +5% Target Lock / -2.5% Loss Floor)
+                    try:
+                        from portfolio_circuit_breaker import is_capital_daily_locked
+                        chk_bal_gov = 1000.0
+                        if not configured_is_demo:
+                            try:
+                                chk_eng_gov = capital_engine.get_user_capital_engine(cid, is_demo=False)
+                                bal_inf_gov = await asyncio.to_thread(chk_eng_gov.get_account_balance)
+                                chk_bal_gov = float(bal_inf_gov.get("available", 1000.0) or 1000.0)
+                            except Exception:
+                                pass
+                        is_locked, lock_reason, _ = is_capital_daily_locked(cid, current_balance=chk_bal_gov, is_demo=configured_is_demo)
+                        if is_locked:
+                            logger.info(
+                                f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
+                                f"Capital strictly preserved under Invariant 52."
+                            )
+                            return 0
+                    except Exception as e_gov:
+                        logger.debug(f"Daily Governor check note for user {cid}: {e_gov}")
 
                     is_admin = (cid == 859271875) or db.is_admin(cid)
                     configured_is_demo = bool(user_dict.get("is_demo", False))
@@ -1333,16 +1395,31 @@ class QuantGoldExecutionEngine:
                         self._clear_active_trade(deal_id, cooldown=900.0)
                     continue
 
-                # Track peak UPL for Flash Shock Protective Early Harvest (bounded to sane $150 max)
+                # Track peak UPL (dollars) and peak price points (pips) for Flash Shock Harvest
                 current_peak = self._peak_upl_map.get(deal_key, 0.0)
                 if upl > current_peak and upl <= 150.0:
                     self._peak_upl_map[deal_key] = upl
                     current_peak = upl
 
+                current_peak_pts = getattr(self, "_peak_pnl_pts_map", {}).get(deal_key, 0.0)
+                if pnl_pts > current_peak_pts and pnl_pts <= 150.0:
+                    if not hasattr(self, "_peak_pnl_pts_map"):
+                        self._peak_pnl_pts_map = {}
+                    self._peak_pnl_pts_map[deal_key] = pnl_pts
+                    current_peak_pts = pnl_pts
+
                 # Flash Shock Protective Early Harvest (Invariants 35 & 104):
-                # If Peak UPL >= $2.50 (or pips >= 40) and price retraces >= 50% from peak
-                if 2.50 <= current_peak <= 150.0 and upl <= (current_peak * 0.50) and upl > 0.50:
-                    logger.info(f"⚡ [FLASH SHOCK HARVEST] Gold trade {deal_id} peak ${current_peak:.2f} retraced >= 50% to ${upl:.2f}. Executing protective early harvest!")
+                # Triggered if EITHER:
+                # 1. Price points moved >= +3.50 (+35 pips) and retraced >= 50% from peak points (while still >= +1.00 pts profit)
+                # 2. Dollar UPL reached >= $2.00 and retraced >= 50% from peak UPL (while still >= $0.50 profit)
+                is_shock_pts = (3.50 <= current_peak_pts <= 150.0 and pnl_pts <= (current_peak_pts * 0.50) and pnl_pts >= 1.00)
+                is_shock_upl = (2.00 <= current_peak <= 150.0 and upl <= (current_peak * 0.50) and upl >= 0.50)
+
+                if is_shock_pts or is_shock_upl:
+                    logger.info(
+                        f"⚡ [FLASH SHOCK HARVEST] Gold trade {deal_id} peak ({current_peak_pts:.2f} pts / ${current_peak:.2f}) "
+                        f"retraced >= 50% to ({pnl_pts:.2f} pts / ${upl:.2f}). Executing protective early harvest!"
+                    )
                     try:
                         if cid:
                             u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
