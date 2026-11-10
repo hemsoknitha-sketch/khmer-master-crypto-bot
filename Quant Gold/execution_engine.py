@@ -221,13 +221,29 @@ class QuantGoldExecutionEngine:
         Returns True if there is currently an active Gold trade running on broker or in DB.
         Guarantees that the system focuses on harvesting the current trade before opening/broadcasting a new one.
         """
+        # If cached broker count is explicitly 0, verify and clear stale in-memory active deal id
+        if getattr(self, "_cached_broker_gold_count", None) == 0:
+            active_trades = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
+            real_db_trades = [
+                t for t in active_trades
+                if str(t.get("epic", "")).upper() == "GOLD"
+                and str(t.get("status", "OPEN")).upper() == "OPEN"
+                and not str(t.get("deal_id", "")).startswith("MANUAL_")
+            ]
+            if not real_db_trades:
+                self._active_gold_deal_id = None
+                self._active_gold_direction = None
+                self._active_gold_stage = "IDLE"
+                return False
+
         if self._active_gold_deal_id:
             return True
         try:
             active_trades = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
             for t in active_trades:
-                if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "OPEN")).upper() == "OPEN":
-                    self._active_gold_deal_id = str(t.get("deal_id"))
+                d_id = str(t.get("deal_id", ""))
+                if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "OPEN")).upper() == "OPEN" and not d_id.startswith("MANUAL_"):
+                    self._active_gold_deal_id = d_id
                     self._active_gold_direction = str(t.get("direction", "BUY")).upper()
                     self._active_gold_entry_price = float(t.get("entry_price", 0.0) or 0.0)
                     self._active_gold_sl = float(t.get("sl", 0.0) or 0.0)
@@ -377,6 +393,25 @@ class QuantGoldExecutionEngine:
                 logger.debug(f"Broker adopt note for {cid} (demo={is_demo}): {e_adopt}")
 
         self._cached_broker_gold_count = total_gold_found
+        if total_gold_found == 0 and self._active_gold_deal_id:
+            logger.info(
+                f"🏛️ [BROKER SYNC] Zero open Gold positions on broker. "
+                f"Auto-reconciling and clearing phantom trade #{self._active_gold_deal_id}."
+            )
+            old_deal = self._active_gold_deal_id
+            self._clear_active_trade(old_deal, cooldown=0.0)
+            try:
+                active_db = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
+                for dtr in active_db:
+                    if str(dtr.get("epic", "")).upper() == "GOLD":
+                        db.update_capital_auto_trade_close(
+                            dtr.get("deal_id"),
+                            exit_price=self.get_live_gold_price_quote()[0],
+                            pnl=0.0
+                        )
+                        logger.info(f"🏛️ [BROKER SYNC] Reconciled and closed lingering DB trade #{dtr.get('deal_id')}.")
+            except Exception:
+                pass
         return total_gold_found
 
     def _clear_active_trade(self, deal_id: Optional[str] = None, cooldown: float = 300.0):
@@ -1354,7 +1389,39 @@ class QuantGoldExecutionEngine:
                 tp3 = float(tr.get("tp3", 0.0) or 0.0)
                 scale_tier = int(tr.get("scale_tier", 0) or 0)
 
-                # Step 1: Entry price sanity & price jump anomaly guard
+                pnl_pts = (curr_p - entry_p) if dir_side == "BUY" else (entry_p - curr_p)
+                pips = int(round(pnl_pts * 10.0))
+                upl = pnl_pts * sz
+                dir_label = "Buy" if dir_side == "BUY" else "Sell"
+                deal_key = str(deal_id)
+
+                # Step 1: Broker Server-Side Closure Check
+                # If broker accounts were audited and this deal is not in broker_open_deal_ids, it is closed!
+                user_audited = (cid, is_demo) in checked_engs or (859271875, is_demo) in checked_engs or len(checked_engs) > 0
+                if user_audited and deal_id not in broker_open_deal_ids and deal_id != "OK":
+                    logger.info(f"🏛️ [BROKER SYNC] Gold trade {deal_id} was closed on Capital.com broker.")
+                    if hasattr(db, "update_capital_auto_trade_close"):
+                        db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                    
+                    if upl > 0 or pips > 0 or scale_tier >= 1:
+                        key_close = f"{deal_id}:CLOSED"
+                        if key_close not in self._notified_milestones:
+                            self._notified_milestones.add(key_close)
+                            card_close_win = format_gold_tp_card(
+                                stage="CLOSE",
+                                pips=max(pips, 73 if scale_tier >= 1 else 10),
+                                direction=dir_side,
+                                entry_price=entry_p
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
+                        self._clear_active_trade(deal_id, cooldown=300.0)
+                    else:
+                        logger.info(f"Gold trade {deal_id} closed at loss (${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
+                        self._clear_active_trade(deal_id, cooldown=300.0)
+                    continue
+
+                # Step 2: Entry price sanity & price jump anomaly guard
                 if entry_p < 3500.0 or entry_p > 6000.0:
                     logger.warning(f"⚠️ [AUDIT IGNORED] Corrupted/legacy entry price ${entry_p:.2f} for deal {deal_id}. Skipping.")
                     continue
@@ -1375,36 +1442,6 @@ class QuantGoldExecutionEngine:
                     tp2 = round((entry_p + sl_ref_dist * 2.50) if dir_side == "BUY" else (entry_p - sl_ref_dist * 2.50), 2)
                 if tp3 <= 0.0 or tp3 < 3500.0 or tp3 > 6000.0:
                     tp3 = round((entry_p + sl_ref_dist * 4.00) if dir_side == "BUY" else (entry_p - sl_ref_dist * 4.00), 2)
-
-                pnl_pts = (curr_p - entry_p) if dir_side == "BUY" else (entry_p - curr_p)
-                pips = int(round(pnl_pts * 10.0))
-                upl = pnl_pts * sz
-                dir_label = "Buy" if dir_side == "BUY" else "Sell"
-                deal_key = str(deal_id)
-
-                # Broker Server-Side Closure Check:
-                if broker_open_deal_ids and deal_id not in broker_open_deal_ids and deal_id != "OK":
-                    logger.info(f"🏛️ [BROKER SYNC] Gold trade {deal_id} was closed on Capital.com broker.")
-                    if hasattr(db, "update_capital_auto_trade_close"):
-                        db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
-                    
-                    if upl > 0 or pips > 0 or scale_tier >= 1:
-                        key_close = f"{deal_id}:CLOSED"
-                        if key_close not in self._notified_milestones:
-                            self._notified_milestones.add(key_close)
-                            card_close_win = format_gold_tp_card(
-                                stage="CLOSE",
-                                pips=max(pips, 73 if scale_tier >= 1 else 10),
-                                direction=dir_side,
-                                entry_price=entry_p
-                            )
-                            markup = get_gold_signal_reply_markup()
-                            await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
-                        self._clear_active_trade(deal_id, cooldown=300.0)
-                    else:
-                        logger.info(f"Gold trade {deal_id} closed at loss (${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
-                        self._clear_active_trade(deal_id, cooldown=900.0)
-                    continue
 
                 # Track peak UPL (dollars) and peak price points (pips) for Flash Shock Harvest
                 current_peak = self._peak_upl_map.get(deal_key, 0.0)
