@@ -1368,6 +1368,41 @@ class QuantGoldExecutionEngine:
             tp2 = round((curr_p + tp2_dist) if direction.upper() == "BUY" else (curr_p - tp2_dist), 2)
             tp3 = round((curr_p + tp3_dist) if direction.upper() == "BUY" else (curr_p - tp3_dist), 2)
 
+            # Check existing user open trades for Agile Pyramiding or Trend Reversal Flip
+            user_open_trades = db.get_capital_auto_trades_for_user(chat_id) or []
+            gold_trades = [
+                t for t in user_open_trades
+                if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "")).upper() == "OPEN"
+            ]
+            opposing = [t for t in gold_trades if str(t.get("direction", "")).upper() != direction.upper()]
+            is_manual_reversal = len(opposing) > 0
+            is_manual_pyramid = (not is_manual_reversal) and (len(gold_trades) > 0)
+
+            # Trend Reversal Flip: Harvest / close opposing trades before opening new directional wave
+            if is_manual_reversal:
+                for ot in opposing:
+                    d_id = str(ot.get("deal_id", ""))
+                    if d_id and d_id != "OK":
+                        try:
+                            await asyncio.to_thread(u_eng.close_position, deal_id=d_id)
+                        except Exception as e_c:
+                            logger.debug(f"Manual reversal broker close deal {d_id} note: {e_c}")
+                    if hasattr(db, "update_capital_auto_trade_close"):
+                        db.update_capital_auto_trade_close(d_id, exit_price=curr_p, pnl=0.0)
+
+            # Also check broker live positions to ensure zero opposing broker lock
+            try:
+                b_pos = await asyncio.to_thread(u_eng.get_open_positions) if hasattr(u_eng, "get_open_positions") else []
+                for bp in b_pos:
+                    p_sub = bp.get("position", bp)
+                    p_epic = str(bp.get("market", {}).get("epic", p_sub.get("epic", ""))).upper()
+                    p_dir = str(p_sub.get("direction", "")).upper()
+                    p_deal = str(p_sub.get("dealId", ""))
+                    if p_epic == "GOLD" and p_dir != direction.upper() and p_deal:
+                        await asyncio.to_thread(u_eng.close_position, deal_id=p_deal)
+            except Exception as e_bclose:
+                logger.debug(f"Manual reversal broker sweep note: {e_bclose}")
+
             order_res = await asyncio.to_thread(
                 u_eng.execute_smart_tradfi_order,
                 epic="GOLD",
@@ -1377,13 +1412,14 @@ class QuantGoldExecutionEngine:
                 tp=tp1,
                 bypass_quant_eval=True,
                 bypass_citadel=True,
-                setup_type="VIP_1TAP_GOLD"
+                setup_type="QUANT_GOLD_REVERSAL_FLIP" if is_manual_reversal else ("QUANT_GOLD_PYRAMID" if is_manual_pyramid else "VIP_1TAP_GOLD")
             )
 
             if order_res.get("success"):
                 deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
                 entry_price = float(order_res.get("entry_price") or order_res.get("price") or curr_p)
 
+                tranche_label = f"PYRAMID_{len(gold_trades)+1}" if is_manual_pyramid else ("REVERSAL_FLIP" if is_manual_reversal else "SINGLE")
                 db.record_capital_auto_trade(
                     chat_id=chat_id,
                     deal_id=str(deal_id),
@@ -1396,22 +1432,26 @@ class QuantGoldExecutionEngine:
                     tp=tp1,
                     scale_tier=0,
                     sl_dist=sl_dist,
-                    tranche_id="SINGLE",
+                    tranche_id=tranche_label,
                     tp1=tp1,
                     tp2=tp2,
                     tp3=tp3
                 )
-                logger.info(f"✅ [1-TAP GOLD] User {chat_id} placed {direction} {size} oz GOLD @ ${entry_price:.2f} (SL: ${sl:.2f}, TP1: ${tp1:.2f})")
+                logger.info(f"✅ [1-TAP GOLD] User {chat_id} placed {direction} {size} oz GOLD @ ${entry_price:.2f} (Tranche: {tranche_label}, SL: ${sl:.2f}, TP1: ${tp1:.2f})")
 
                 # If broadcast to VIP requested
                 if broadcast_vip:
+                    c_type = "REVERSAL" if is_manual_reversal else ("PYRAMID" if is_manual_pyramid else "SIGNAL")
+                    tr_num = len(gold_trades) + 1 if is_manual_pyramid else 1
                     vip_card = format_gold_signal_card(
                         direction=direction,
                         sl=sl,
                         tp1=tp1,
                         tp2=tp2,
                         tp3=tp3,
-                        entry_price=entry_price
+                        entry_price=entry_price,
+                        card_type=c_type,
+                        tranche_num=tr_num
                     )
                     markup = get_gold_signal_reply_markup()
                     await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)
