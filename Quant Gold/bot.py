@@ -548,6 +548,52 @@ class QuantGoldBot:
             return await self.handle_guardian_rescue(update, context)
         elif sub_cmd in ["BACKUP", "HF_BACKUP", "VAULT"]:
             return await self.handle_backup(update, context)
+        elif sub_cmd in ["BUDGET", "ALLOC", "AMOUNT"]:
+            target_chat_id = chat_id
+            target_label = f"Chat ID: {chat_id}"
+            user_budget = None
+            if len(args) > 1 and str(args[1]).lower() == "all" and is_admin:
+                b_val = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 50.0
+                n = db.enable_all_capital_users(engine="AUTO", budget=b_val, max_positions=5, is_demo=False)
+                return await self.safe_reply(
+                    update,
+                    f"💰 <b>[FLEET BUDGET CONFIGURED ALL USERS]</b>\n"
+                    f"• បានកំណត់ Budget សម្រាប់ VIP Users ទាំងអស់ ៖ <code>${b_val:.2f} / Trade</code> (ចំនួន <code>{n}</code> នាក់)"
+                )
+            if len(args) > 1:
+                try:
+                    user_budget = float(args[1])
+                except ValueError:
+                    resolved_cid, u_info = self._resolve_target(args[1])
+                    if resolved_cid:
+                        target_chat_id = resolved_cid
+                        acc = u_info.get("account_id") if u_info else args[1]
+                        target_label = f"Account: {acc} (Chat ID: {target_chat_id})"
+                    if len(args) > 2:
+                        try:
+                            user_budget = float(args[2])
+                        except ValueError:
+                            pass
+            if user_budget is None or user_budget <= 0.0:
+                return await self.safe_reply(
+                    update,
+                    "⚠️ <i>សូមបញ្ចូលចំនួន Budget ត្រឹមត្រូវ (ឧ. <code>/capital budget 10</code> ឬ <code>/capital budget all 50</code> ឬ <code>/capital budget @username 100</code>)</i>"
+                )
+            auto_cfg = db.get_capital_auto_config(target_chat_id) or {}
+            db.set_capital_auto_config(
+                chat_id=target_chat_id,
+                enabled=bool(auto_cfg.get("enabled", True)),
+                budget=user_budget,
+                max_positions=int(auto_cfg.get("max_positions", 5)),
+                is_demo=bool(auto_cfg.get("is_demo", False))
+            )
+            return await self.safe_reply(
+                update,
+                f"✅ <b>[QUANT GOLD BUDGET CONFIGURED]</b> 💰\n"
+                f"• គោលដៅ ៖ <code>{target_label}</code>\n"
+                f"• Budget កំណត់ ៖ <code>${user_budget:.2f} / Trade</code> (ចងចាំជាអចិន្ត្រៃយ៍ក្នុង Database)\n"
+                f"• Max Positions ៖ <code>5</code>"
+            )
         elif sub_cmd in ["ON", "ENABLE", "START"]:
             target_chat_id = chat_id
             target_label = f"Chat ID: {chat_id}"
@@ -2693,7 +2739,8 @@ class QuantGoldBot:
                 # auto-trading should be active by default! Auto-heal in database immediately.
                 if not u_auto_on and not t["is_demo"] and avail >= 4.07:
                     try:
-                        cal_b = round(max(10.0, min(avail * 0.20, 100.0)), 2)
+                        existing_b = float(u_cfg.get("budget", 0.0) or 0.0)
+                        cal_b = existing_b if existing_b > 0 else round(max(10.0, min(avail * 0.20, 100.0)), 2)
                         for act_cid in all_target_cids:
                             db.set_capital_auto_config(
                                 chat_id=act_cid,
@@ -2780,7 +2827,8 @@ class QuantGoldBot:
             u_auto_on = bool(u_cfg.get("enabled", False) or u_cfg.get("is_enabled", False))
             if not u_auto_on and not is_demo and avail >= 4.07:
                 try:
-                    cal_b = round(max(10.0, min(avail * 0.20, 100.0)), 2)
+                    existing_b = float(u_cfg.get("budget", 0.0) or 0.0)
+                    cal_b = existing_b if existing_b > 0 else round(max(10.0, min(avail * 0.20, 100.0)), 2)
                     db.set_capital_auto_config(
                         chat_id=chat_id,
                         enabled=True,

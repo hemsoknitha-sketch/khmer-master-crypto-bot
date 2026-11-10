@@ -3306,12 +3306,12 @@ def is_capital_auto_enabled(chat_id: int) -> bool:
 def set_capital_auto_config(
     chat_id: int,
     enabled: bool,
-    budget: float = 50.0,
+    budget: Optional[float] = None,
     max_positions: Optional[int] = None,
     is_demo: bool = False,
     schedule_mode: Optional[str] = None
 ):
-    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False, preserves schedule_mode)."""
+    """Sets or updates the Capital.com Autonomous Trading config (Preserves existing custom budget & schedule_mode if not explicitly overridden)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -3325,6 +3325,18 @@ def set_capital_auto_config(
         conn.commit()
     except Exception:
         pass
+
+    # If budget not explicitly provided, preserve existing setting
+    if budget is None:
+        try:
+            cursor.execute("SELECT budget FROM capital_auto_config WHERE chat_id = ?", (chat_id,))
+            r_b = cursor.fetchone()
+            if r_b and r_b[0] is not None and float(r_b[0]) > 0:
+                budget = float(r_b[0])
+        except Exception:
+            pass
+    if budget is None:
+        budget = 50.0
 
     # If schedule_mode not explicitly provided, preserve existing setting
     if schedule_mode is None:
@@ -4745,7 +4757,7 @@ def ensure_capital_super_admin_defaults():
         cursor.execute("""
             INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
             VALUES (643724109, 1, 100.0, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
-            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, budget = 100.0, max_positions = 5, updated_at = CURRENT_TIMESTAMP
+            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
         """)
         cursor.execute("""
             INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)

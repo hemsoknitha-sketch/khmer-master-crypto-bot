@@ -811,7 +811,8 @@ class QuantGoldExecutionEngine:
                         auto_cfg = db.get_capital_auto_config(cid) or {}
                         cur_en = bool(auto_cfg.get("enabled", False) or auto_cfg.get("is_enabled", False))
                         cur_demo = bool(auto_cfg.get("is_demo", False))
-                        target_budget = round(max(10.0, min(live_avail * 0.20, 100.0)), 2)
+                        existing_b = float(auto_cfg.get("budget", 0.0) or 0.0)
+                        target_budget = existing_b if existing_b > 0 else round(max(10.0, min(live_avail * 0.20, 100.0)), 2)
                         
                         if not cur_en or cur_demo:
                             db.set_capital_auto_config(
