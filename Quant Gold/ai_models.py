@@ -22,7 +22,7 @@ import time
 import json
 import logging
 import asyncio
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 logger = logging.getLogger("QUANT_GOLD_AI")
 
@@ -37,19 +37,27 @@ except ImportError:
     genai = None
 
 
+_NET_CHECK_CACHE: Tuple[float, bool] = (0.0, False)
+
 def _check_network_online() -> bool:
-    """Fast non-blocking pre-check for network reachability."""
+    """Fast non-blocking pre-check for network reachability with 10s caching."""
+    global _NET_CHECK_CACHE
     import os
     if os.getenv("OFFLINE_MODE", "0") == "1":
         return False
+    now = time.time()
+    if (now - _NET_CHECK_CACHE[0]) < 10.0:
+        return _NET_CHECK_CACHE[1]
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.15)
+        s.settimeout(0.3)
         s.connect(('1.1.1.1', 80))
         s.close()
+        _NET_CHECK_CACHE = (now, True)
         return True
     except Exception:
+        _NET_CHECK_CACHE = (now, False)
         return False
 
 
@@ -135,7 +143,7 @@ TASK: Provide JSON output only:
 
     def _query_deepseek_r1_hf(self, prompt: str) -> Optional[Dict[str, Any]]:
         """Queries DeepSeek-R1 via Hugging Face Serverless API."""
-        if not self.hf_client:
+        if not _check_network_online() or not self.hf_client:
             return None
         models = [
             "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
@@ -170,7 +178,7 @@ TASK: Provide JSON output only:
 
     def _query_llama_70b_hf(self, prompt: str) -> Optional[Dict[str, Any]]:
         """Queries Llama-3.3-70B-Instruct via Hugging Face Serverless API."""
-        if not self.hf_client:
+        if not _check_network_online() or not self.hf_client:
             return None
         models = [
             "meta-llama/Llama-3.3-70B-Instruct",
@@ -203,7 +211,7 @@ TASK: Provide JSON output only:
 
     def _query_gemini_flash(self, prompt: str) -> Optional[Dict[str, Any]]:
         """Queries Google Gemini Flash API."""
-        if not self.gemini_ready or not genai:
+        if not _check_network_online() or not self.gemini_ready or not genai:
             return None
         models = [
             "gemini-2.5-flash",
@@ -302,8 +310,9 @@ TASK: Provide JSON output only:
         deepseek_res = None
         llama_res = None
 
-        is_online = _check_network_online() and os.getenv("OFFLINE_MODE", "0") != "1"
-        if now >= self._network_offline_until and is_online:
+        is_offline_flag = os.getenv("OFFLINE_MODE", "0") == "1"
+        is_online = (not is_offline_flag) and _check_network_online()
+        if not is_offline_flag and now >= self._network_offline_until and is_online:
             # Concurrently query AI models with bounded timeout
             async def _run_gemini():
                 return await asyncio.to_thread(self._query_gemini_flash, prompt)
@@ -322,7 +331,7 @@ TASK: Provide JSON output only:
                         _run_llama(),
                         return_exceptions=True
                     ),
-                    timeout=3.0
+                    timeout=2.0
                 )
                 gemini_res = results[0] if isinstance(results[0], dict) else None
                 deepseek_res = results[1] if isinstance(results[1], dict) else None

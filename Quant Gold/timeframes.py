@@ -123,6 +123,39 @@ class GoldMultiTimeframeEngine:
         self._cache: Dict[str, Any] = {}
         self._cache_ts: float = 0.0
         self._cache_ttl: float = 2.0  # 2-second RAM TTL for sub-millisecond querying
+        self._real_candle_cache: Dict[str, Tuple[float, pd.DataFrame]] = {}
+
+    def fetch_real_gold_candles(self, resolution: str = "MINUTE_15", max_bars: int = 100) -> Optional[pd.DataFrame]:
+        """
+        Fetches live historical OHLCV candles for Gold from Capital.com broker API.
+        Caches in RAM for 30s to prevent spamming broker API.
+        """
+        now = time.time()
+        cached = self._real_candle_cache.get(resolution)
+        if cached and (now - cached[0]) < 30.0 and cached[1] is not None and len(cached[1]) >= 10:
+            return cached[1].copy()
+
+        try:
+            import capital_engine
+            c_eng = capital_engine.get_capital_engine()
+            raw_candles = c_eng.get_historical_prices("GOLD", resolution=resolution, max_bars=max_bars)
+            if raw_candles and len(raw_candles) >= 10:
+                df = pd.DataFrame(raw_candles)
+                if "snapshotTime" in df.columns:
+                    df["timestamp"] = pd.to_datetime(df["snapshotTime"], errors="coerce")
+                elif "timestamp" not in df.columns:
+                    df["timestamp"] = pd.date_range(end=pd.Timestamp.now(), periods=len(df), freq="15min")
+                for col in ["open", "high", "low", "close", "volume"]:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors="coerce")
+                df = df.dropna(subset=["close"])
+                if len(df) >= 10:
+                    self._real_candle_cache[resolution] = (now, df)
+                    logger.debug(f"Retrieved {len(df)} real Gold candles from Capital.com ({resolution}).")
+                    return df.copy()
+        except Exception as e:
+            logger.debug(f"Could not fetch real Gold candles ({resolution}): {e}")
+        return None
 
     def build_synthetic_gold_candles(self, base_price: float = 4095.0, count: int = 300) -> pd.DataFrame:
         """
@@ -394,12 +427,35 @@ class GoldMultiTimeframeEngine:
         if (now - self._cache_ts) < self._cache_ttl and self._cache:
             return self._cache
 
+        # Priority 1: Fetch REAL candles directly from Capital.com broker API
+        real_m15 = self.fetch_real_gold_candles(resolution="MINUTE_15", max_bars=100)
+        real_h1 = self.fetch_real_gold_candles(resolution="HOUR", max_bars=80)
+        real_d1 = self.fetch_real_gold_candles(resolution="DAY", max_bars=30)
+        real_m5 = self.fetch_real_gold_candles(resolution="MINUTE_5", max_bars=120)
+
         # Ensure base data
-        if base_m1_df is None or len(base_m1_df) < 60:
+        if base_m1_df is None or len(base_m1_df) < 30:
+            if real_m5 is not None and len(real_m5) >= 30:
+                base_m1_df = real_m5
+            else:
+                real_m1 = self.fetch_real_gold_candles(resolution="MINUTE", max_bars=120)
+                if real_m1 is not None and len(real_m1) >= 30:
+                    base_m1_df = real_m1
+
+        if base_h1_df is None or len(base_h1_df) < 10:
+            if real_h1 is not None and len(real_h1) >= 10:
+                base_h1_df = real_h1
+
+        if base_d1_df is None or len(base_d1_df) < 5:
+            if real_d1 is not None and len(real_d1) >= 5:
+                base_d1_df = real_d1
+
+        # Priority 2: Graceful offline fallback to synthetic ONLY if broker returned no candles
+        if base_m1_df is None or len(base_m1_df) < 30:
             base_m1_df = self.build_synthetic_gold_candles(base_price=current_price, count=360)
-        if base_h1_df is None or len(base_h1_df) < 24:
+        if base_h1_df is None or len(base_h1_df) < 10:
             base_h1_df = resample_ohlcv(base_m1_df, target_mins=60)
-        if base_d1_df is None or len(base_d1_df) < 10:
+        if base_d1_df is None or len(base_d1_df) < 5:
             base_d1_df = resample_ohlcv(base_h1_df, target_mins=24)
 
         timeframe_dfs: Dict[str, pd.DataFrame] = {}
@@ -409,9 +465,9 @@ class GoldMultiTimeframeEngine:
         timeframe_dfs["M2"] = resample_ohlcv(base_m1_df, target_mins=2)
         timeframe_dfs["M3"] = resample_ohlcv(base_m1_df, target_mins=3)
         timeframe_dfs["M4"] = resample_ohlcv(base_m1_df, target_mins=4)
-        timeframe_dfs["M5"] = resample_ohlcv(base_m1_df, target_mins=5)
+        timeframe_dfs["M5"] = real_m5 if (real_m5 is not None and len(real_m5) >= 20) else resample_ohlcv(base_m1_df, target_mins=5)
         timeframe_dfs["M10"] = resample_ohlcv(base_m1_df, target_mins=10)
-        timeframe_dfs["M15"] = resample_ohlcv(base_m1_df, target_mins=15)
+        timeframe_dfs["M15"] = real_m15 if (real_m15 is not None and len(real_m15) >= 15) else resample_ohlcv(base_m1_df, target_mins=15)
         timeframe_dfs["M20"] = resample_ohlcv(base_m1_df, target_mins=20)
         timeframe_dfs["M30"] = resample_ohlcv(base_m1_df, target_mins=30)
         timeframe_dfs["M45"] = resample_ohlcv(base_m1_df, target_mins=45)
@@ -428,6 +484,19 @@ class GoldMultiTimeframeEngine:
         timeframe_dfs["D1"] = base_d1_df
         timeframe_dfs["W1"] = resample_ohlcv(base_d1_df, target_mins=7)
         timeframe_dfs["MN"] = resample_ohlcv(base_d1_df, target_mins=30)
+
+        # Update last candle close with live real-time tick price
+        if current_price and current_price >= 3500.0:
+            for tf_name, tf_df in timeframe_dfs.items():
+                if tf_df is not None and len(tf_df) > 0:
+                    try:
+                        tf_df.iloc[-1, tf_df.columns.get_loc("close")] = float(current_price)
+                        if float(current_price) > float(tf_df.iloc[-1]["high"]):
+                            tf_df.iloc[-1, tf_df.columns.get_loc("high")] = float(current_price)
+                        if float(current_price) < float(tf_df.iloc[-1]["low"]):
+                            tf_df.iloc[-1, tf_df.columns.get_loc("low")] = float(current_price)
+                    except Exception:
+                        pass
         self._last_timeframe_dfs = timeframe_dfs
 
         # Calculate metrics per timeframe

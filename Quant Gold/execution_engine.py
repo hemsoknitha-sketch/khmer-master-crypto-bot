@@ -67,7 +67,7 @@ def format_gold_signal_card(
     dir_str = "BUY" if is_buy else "SELL"
     dir_icon = "🟢" if is_buy else "🔴"
     if entry_price <= 0.0:
-        entry_price = round(sl + 6.08, 2) if is_buy else round(sl - 6.08, 2)
+        entry_price = round(sl + 16.0, 2) if is_buy else round(sl - 16.0, 2)
 
     sl_pips = abs(entry_price - sl) * 10
     tp1_pips = int(round(abs(tp1 - entry_price) * 10))
@@ -307,10 +307,10 @@ class QuantGoldExecutionEngine:
                         bid, ask, _ = self.get_live_gold_price_quote()
                         level = (bid + ask) / 2.0
 
-                    tp1 = round((level + 7.30) if direction == "BUY" else (level - 7.30), 2)
-                    tp2 = round((level + 15.20) if direction == "BUY" else (level - 15.20), 2)
-                    tp3 = round((level + 24.32) if direction == "BUY" else (level - 24.32), 2)
-                    sl_dist = abs(level - sl) if sl > 0 else 6.08
+                    sl_dist = abs(level - sl) if sl > 0 else 16.0
+                    tp1 = round((level + sl_dist * 1.50) if direction == "BUY" else (level - sl_dist * 1.50), 2)
+                    tp2 = round((level + sl_dist * 2.50) if direction == "BUY" else (level - sl_dist * 2.50), 2)
+                    tp3 = round((level + sl_dist * 4.00) if direction == "BUY" else (level - sl_dist * 4.00), 2)
 
                     if not db.has_capital_auto_trade_record(deal_id):
                         db.record_capital_auto_trade(
@@ -581,16 +581,24 @@ class QuantGoldExecutionEngine:
                 final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
-        # Tight Structural SL & Dynamic Targets (Super Smart Gold Calibration):
-        # Symmetrical and mathematically precise:
-        # Tight SL Distance = $6.08 (~60.8 pips)
-        # TP1 Distance = $7.30 (+73 pips / +1.2R, Breakeven Armor Lock)
-        # TP2 Distance = $15.20 (+152 pips / +2.5R, Guaranteed Cash Floor)
-        # TP3 Distance = $24.32 (+243 pips / +4.0R, Moonshot Runner)
-        sl_distance = 6.08
-        tp1_distance = 7.30
-        tp2_distance = 15.20
-        tp3_distance = 24.32
+        # Dynamic Breathing Stop Loss & Institutional Targets (Invariant 35 & 98):
+        # Strict Standard: SL Distance >= max(2.50 * ATR_15m, 3.5 * Spread, 0.0035 * Price)
+        m15_tf = mtf_data.get("timeframes", {}).get("M15", {})
+        m15_atr = float(m15_tf.get("atr", 6.5) or 6.5)
+        if m15_atr < 2.0 or m15_atr > 35.0:
+            m15_atr = 6.5  # Sane default for Gold (XAUUSD)
+
+        raw_sl_dist = max(2.50 * m15_atr, spread * 3.50, 0.0035 * curr_p)
+        # Breathing room: dynamically clamped between $14.50 and $24.00 (145 - 240 pips)
+        sl_distance = round(max(14.50, min(24.0, raw_sl_dist)), 2)
+
+        # Multi-Tier Asymmetric Targets (R:R >= 1:1.50 to 1:4.00):
+        # TP1 (+1.5R): High hit-rate -> shifts SL to Breakeven Armor, locking trade at 0.00R Free Roll
+        tp1_distance = round(max(sl_distance * 1.50, 22.0), 2)
+        # TP2 (+2.5R): Guaranteed Cash Profit Floor
+        tp2_distance = round(max(sl_distance * 2.50, 38.0), 2)
+        # TP3 (+4.0R): Institutional Moonshot Runner
+        tp3_distance = round(max(sl_distance * 4.00, 65.0), 2)
 
         prospective_buy = {
             "entry": round(curr_p, 2),
@@ -655,8 +663,8 @@ class QuantGoldExecutionEngine:
             "tp3": tp3_price,
             "prospective_buy": prospective_buy,
             "prospective_sell": prospective_sell,
-            "risk_reward_ratio": "1:1.20 / 1:2.50 / 1:4.00",
-            "targets_pips": "+73 pips / +152 pips / +243 pips",
+            "risk_reward_ratio": "1:1.50 / 1:2.50 / 1:4.00",
+            "targets_pips": f"+{int(tp1_distance*10)} pips / +{int(tp2_distance*10)} pips / +{int(tp3_distance*10)} pips",
             "mtf_summary": {
                 "weighted_score": weighted_score,
                 "counts": counts,
@@ -862,14 +870,18 @@ class QuantGoldExecutionEngine:
                 if app and dispatched_count > 0:
                     try:
                         import notification_manager
+                        sl_pips_disp = abs(signal_data['current_price'] - signal_data['sl']) * 10
+                        tp1_pips_disp = abs(signal_data['tp1'] - signal_data['current_price']) * 10
+                        tp2_pips_disp = abs(signal_data['tp2'] - signal_data['current_price']) * 10
+                        tp3_pips_disp = abs(signal_data['tp3'] - signal_data['current_price']) * 10
                         alert_msg = (
                             f"🥇 <b>[QUANT GOLD AUTO DISPATCH]</b> ⚡\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"📊 <b>Action :</b> <code>{'🟢 BUY' if action == 'BUY' else '🔴 SELL'}</code> @ <code>${signal_data['current_price']:.2f}</code>\n"
-                            f"🛡️ <b>Structural SL :</b> <code>${signal_data['sl']:.2f}</code> (-60.8 pips)\n"
-                            f"🎯 <b>Target TP1 (+1.2R) :</b> <code>${signal_data['tp1']:.2f}</code> (+73 pips | Breakeven Lock)\n"
-                            f"🎯 <b>Target TP2 (+2.5R) :</b> <code>${signal_data['tp2']:.2f}</code> (+152 pips | Cash Floor)\n"
-                            f"🚀 <b>Moonshot TP3 (+4.0R) :</b> <code>${signal_data['tp3']:.2f}</code> (+243 pips | Moonshot)\n"
+                            f"🛡️ <b>Structural SL :</b> <code>${signal_data['sl']:.2f}</code> (-{sl_pips_disp:.0f} pips)\n"
+                            f"🎯 <b>Target TP1 (+1.5R) :</b> <code>${signal_data['tp1']:.2f}</code> (+{tp1_pips_disp:.0f} pips | Breakeven Lock)\n"
+                            f"🎯 <b>Target TP2 (+2.5R) :</b> <code>${signal_data['tp2']:.2f}</code> (+{tp2_pips_disp:.0f} pips | Cash Floor)\n"
+                            f"🚀 <b>Moonshot TP3 (+4.0R) :</b> <code>${signal_data['tp3']:.2f}</code> (+{tp3_pips_disp:.0f} pips | Moonshot)\n"
                             f"⚡ <b>19-TF Alignment :</b> <code>{signal_data['mtf_summary']['counts']['bullish']}B / {signal_data['mtf_summary']['counts']['bearish']}S</code>\n"
                             f"🧠 <b>Win Confidence :</b> <code>{signal_data['confidence']:.1f}%</code>\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -970,22 +982,20 @@ class QuantGoldExecutionEngine:
                                         logger.info(f"🚂 [SUPER ADMIN DEMO FALLBACK] Live Available (${live_avail:.2f}) < $4.07. Auto-engaging Demo Account (329832717876539678) $10,000 mirror.")
                                     effective_is_demo = True
                                 else:
+                                    # Auto-engage Demo Mirror for VIP users until they deposit live funds!
+                                    effective_is_demo = True
                                     last_sb = self._user_standby_log_ts.get(cid, 0.0) if hasattr(self, "_user_standby_log_ts") else 0.0
                                     if (now_ts - last_sb) >= 600.0:
                                         if not hasattr(self, "_user_standby_log_ts"):
                                             self._user_standby_log_ts = {}
                                         self._user_standby_log_ts[cid] = now_ts
-                                        logger.info(f"⚠️ User {cid} Live Available (${live_avail:.2f}) < $4.07. Standby until live capital is deposited.")
-                                    return 0
+                                        logger.info(f"🔄 [VIP DEMO MIRROR] User {cid} Live Available (${live_avail:.2f}) < $4.07. Auto-engaging Demo Mirror until live capital is deposited.")
                             else:
                                 effective_is_demo = False
                                 budget = max(10.0, min(budget, live_avail * 0.50))
                         except Exception as e_bal:
                             logger.debug(f"Live balance audit note for user {cid}: {e_bal}")
-                            if is_admin:
-                                effective_is_demo = True
-                            else:
-                                return 0
+                            effective_is_demo = True
 
                     u_eng = capital_engine.get_user_capital_engine(cid, is_demo=effective_is_demo)
 
@@ -1285,12 +1295,13 @@ class QuantGoldExecutionEngine:
                     continue
 
                 # Calibrate fallback targets if missing or invalid
+                sl_ref_dist = abs(entry_p - sl) if (sl > 0 and abs(entry_p - sl) > 5.0) else 16.0
                 if tp1 <= 0.0 or tp1 < 3500.0 or tp1 > 6000.0:
-                    tp1 = round((entry_p + 7.30) if dir_side == "BUY" else (entry_p - 7.30), 2)
+                    tp1 = round((entry_p + sl_ref_dist * 1.50) if dir_side == "BUY" else (entry_p - sl_ref_dist * 1.50), 2)
                 if tp2 <= 0.0 or tp2 < 3500.0 or tp2 > 6000.0:
-                    tp2 = round((entry_p + 15.20) if dir_side == "BUY" else (entry_p - 15.20), 2)
+                    tp2 = round((entry_p + sl_ref_dist * 2.50) if dir_side == "BUY" else (entry_p - sl_ref_dist * 2.50), 2)
                 if tp3 <= 0.0 or tp3 < 3500.0 or tp3 > 6000.0:
-                    tp3 = round((entry_p + 24.32) if dir_side == "BUY" else (entry_p - 24.32), 2)
+                    tp3 = round((entry_p + sl_ref_dist * 4.00) if dir_side == "BUY" else (entry_p - sl_ref_dist * 4.00), 2)
 
                 pnl_pts = (curr_p - entry_p) if dir_side == "BUY" else (entry_p - curr_p)
                 pips = int(round(pnl_pts * 10.0))
