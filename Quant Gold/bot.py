@@ -2896,7 +2896,7 @@ class QuantGoldBot:
 
         # Super Admin & VIP User Authorization Check (AQ84 Invariant 79)
         is_admin = self.citadel.is_super_admin(chat_id) or db.is_admin(chat_id)
-        is_vip = db.is_vip_user(chat_id)
+        is_vip = db.is_vip(chat_id) if hasattr(db, "is_vip") else getattr(db, "is_vip_user", lambda cid: False)(chat_id)
         if not (is_admin or is_vip):
             return await self.safe_reply(
                 update,

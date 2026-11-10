@@ -1424,6 +1424,8 @@ def is_vip(chat_id: int) -> bool:
         cache_set(cache_key, False, ttl_seconds=60)
         return False
 
+is_vip_user = is_vip  # Canonical backward-compatible alias
+
 def is_admin(chat_id: int) -> bool:
     """Checks if a user is an Administrator (Super Admin or via License) with ultra-fast in-memory caching.
     Super Admin is strictly 859271875 (@Soknitha). 537186806 (@HemSinath) is a VIP User with Lifetime License.
