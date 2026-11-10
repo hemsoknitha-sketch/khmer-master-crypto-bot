@@ -70,49 +70,18 @@ from execution_engine import (
 def get_quant_gold_bottom_keyboard(chat_id: Optional[int] = None) -> ReplyKeyboardMarkup:
     """
     Super Smart & Beautiful Persistent 1-Tap Bottom Keyboard for Quick Commands.
-    Features dynamic live state:
-      - Live Auto-Trade status badge: '🤖 Auto-Trade (🟢 ON)' vs '🤖 Auto-Trade (🔴 OFF)'.
-      - Live Open Positions count badge: '📊 Positions (1 Open)' vs '📊 Open Positions'.
-      - Role-tailored executive controls for Super Admin vs VIP Users.
+    Institutional Gold Trading Deck (4 rows, 9 core 1-tap buttons):
+      Row 1: [ 🥇 Quant Gold Dashboard ]  [ 🎯 Gold Signal ]
+      Row 2: [ 🟢 BUY GOLD (0.5 oz) ]     [ 🔴 SELL GOLD (0.5 oz) ]
+      Row 3: [ 📊 Open Positions ]         [ 🤖 Auto-Trade (ON/OFF) ]
+      Row 4: [ 💵 Status ]                 [ 👑 VIP License ]  [ 📖 Help ]
     """
-    is_auto = True
-    budget = 50.0
-    pos_count = 0
-    is_admin = False
-
-    if chat_id:
-        try:
-            is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
-            auto_cfg = db.get_capital_auto_config(chat_id) or {}
-            is_auto = bool(auto_cfg.get("enabled", True))
-            budget = float(auto_cfg.get("budget", 50.0) or 50.0)
-
-            open_trades = db.get_capital_auto_trades_for_user(chat_id) if hasattr(db, "get_capital_auto_trades_for_user") else []
-            pos_count = len([
-                t for t in open_trades
-                if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "")).upper() == "OPEN"
-            ])
-        except Exception:
-            pass
-
-    auto_label = f"🤖 Auto-Trade ({'🟢 ON' if is_auto else '🔴 OFF'})"
-    pos_label = f"📊 Positions ({pos_count} Open)" if pos_count > 0 else "📊 Open Positions"
-
-    if is_admin:
-        keyboard = [
-            [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
-            [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
-            [KeyboardButton(pos_label), KeyboardButton(auto_label)],
-            [KeyboardButton("💵 Fleet Status"), KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")],
-            [KeyboardButton("🔄 Reset Daily 🔓"), KeyboardButton("🖥️ Health"), KeyboardButton("🛡️ Security")]
-        ]
-    else:
-        keyboard = [
-            [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
-            [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
-            [KeyboardButton(pos_label), KeyboardButton(auto_label)],
-            [KeyboardButton("💵 Status"), KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")]
-        ]
+    keyboard = [
+        [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
+        [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
+        [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)")],
+        [KeyboardButton("💵 Status"), KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")]
+    ]
 
     return ReplyKeyboardMarkup(
         keyboard,
