@@ -69,11 +69,14 @@ def format_gold_signal_card(
     tp1: float,
     tp2: float,
     tp3: float,
-    entry_price: float = 0.0
+    entry_price: float = 0.0,
+    card_type: str = "SIGNAL",
+    tranche_num: int = 1
 ) -> str:
     """
     Renders institutional Angkor Quant Gold Signal Card
     with single-direction execution levels and TP targets.
+    Supports standard SIGNAL, AGILE PYRAMID, and TREND REVERSAL FLIP.
     """
     is_buy = str(direction).upper() == "BUY"
     dir_str = "BUY" if is_buy else "SELL"
@@ -88,10 +91,20 @@ def format_gold_signal_card(
 
     divider = "───────────────"
 
+    if card_type == "REVERSAL":
+        header = "<b>Angkor Quant Gold (Trend Reversal Flip)</b> 🔄"
+        action_line = f"🔄 <b>Trend Reversal Flip :</b> <code>{dir_icon} {dir_str}</code> (Opposing Harvested)\n"
+    elif card_type == "PYRAMID":
+        header = f"<b>Angkor Quant Gold (Agile Pyramid #{tranche_num})</b> ⚡"
+        action_line = f"⚡ <b>Pyramid Scale-In :</b> <code>{dir_icon} {dir_str}</code> (Protected Risk)\n"
+    else:
+        header = "<b>Angkor Quant Gold</b>"
+        action_line = f"{dir_icon} <b>Single Direction :</b> <code>{dir_str}</code>\n"
+
     return (
-        f"<b>Angkor Quant Gold</b>\n"
+        f"{header}\n"
         f"{divider}\n"
-        f"{dir_icon} <b>Single Direction :</b> <code>{dir_str}</code>\n"
+        f"{action_line}"
         f"💵 <b>តម្លៃចូលទីផ្សារ (Entry) ៖</b> <code>${entry_price:.2f}</code>\n"
         f"🎯 <b>Execution Levels ៖</b>\n"
         f"   └ <b>Tight SL:</b> <code>${sl:.2f}</code> (-{sl_pips:.1f} p)\n"
@@ -272,6 +285,22 @@ class QuantGoldExecutionEngine:
             return True
 
         return False
+
+    def get_active_gold_trades_list(self) -> List[Dict[str, Any]]:
+        """
+        Returns all open active Gold trades currently tracked in DB.
+        Used for Agile Multi-Position Pyramiding and Trend Reversal Flip calculations.
+        """
+        try:
+            active_trades = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
+            return [
+                t for t in active_trades
+                if str(t.get("epic", "")).upper() == "GOLD"
+                and str(t.get("status", "OPEN")).upper() == "OPEN"
+                and not str(t.get("deal_id", "")).startswith("MANUAL_")
+            ]
+        except Exception:
+            return []
 
     async def _sync_and_adopt_broker_positions(self) -> int:
         """
@@ -898,50 +927,101 @@ class QuantGoldExecutionEngine:
                 except Exception as e_bck:
                     logger.debug(f"Cloud backup dispatch note: {e_bck}")
 
-            # Step 1.8: Strict Sequential Lifecycle & Signal Muting Gate
-            # If the system is currently managing an active Gold trade, STOP!
-            # Do NOT evaluate new entry signals and do NOT broadcast duplicate signals.
-            # Harvest profit from this trade first!
-            if self.has_active_gold_trade():
-                return {
-                    "status": "MANAGING_ACTIVE_TRADE",
-                    "deal_id": self._active_gold_deal_id,
-                    "stage": self._active_gold_stage,
-                    "direction": self._active_gold_direction,
-                    "entry_price": self._active_gold_entry_price
-                }
+            # Step 1.8: Agile Multi-Position Pyramiding & Trend Reversal Flip Gatekeeper (AQ84)
+            active_gold_trades = self.get_active_gold_trades_list()
+            has_existing = len(active_gold_trades) > 0
+            existing_dir = str(active_gold_trades[0].get("direction", "BUY")).upper() if has_existing else None
 
-            # Step 1.9: Post-Trade Cooldown Gate (Prevents Chasing and Revenge Trading)
+            # Step 1.9: Post-Trade Cooldown Gate (Prevents Chasing immediately after stop-out)
             time_since_close = now - self._last_trade_closed_ts
-            if time_since_close < self._trade_cooldown_seconds:
+            if time_since_close < self._trade_cooldown_seconds and not has_existing:
                 return {
                     "status": "COOLDOWN_ACTIVE",
                     "remaining_seconds": round(self._trade_cooldown_seconds - time_since_close, 1)
-                }
-
-            # Step 1.95: Signal Broadcast Throttling (Min 300s between signal cards)
-            time_since_broadcast = now - self._last_signal_broadcast_ts
-            if time_since_broadcast < self._signal_cooldown_seconds:
-                return {
-                    "status": "SIGNAL_THROTTLED",
-                    "remaining_seconds": round(self._signal_cooldown_seconds - time_since_broadcast, 1)
                 }
 
             # Step 2: Check Active VIP Users
             active_users = db.get_active_capital_auto_users()
             if not active_users:
                 # Include Super Admin by default if configured
-                active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 1, "is_demo": False}]
+                active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 5, "is_demo": False}]
 
             # Step 3: Evaluate Definitive Master Signal
             signal_data = await self.evaluate_gold_master_signal()
             action = signal_data.get("action", "HOLD")
+            confidence = float(signal_data.get("confidence", 75.0) or 75.0)
+            current_price = float(signal_data.get("current_price", 4000.0) or 4000.0)
+            sl_val = float(signal_data.get("sl", 0.0) or 0.0)
+            sl_dist = abs(current_price - sl_val)
 
             dispatched_count = 0
             if action in ["BUY", "SELL"]:
-                logger.info(f"🥇 [QUANT GOLD EXECUTION] Super Smart Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {signal_data['confidence']}%)")
-                
-                # High-Throughput Concurrent Fan-Out Dispatch & Single Signal Broadcast
+                is_reversal_flip = False
+                is_pyramid = False
+
+                if has_existing:
+                    if action != existing_dir:
+                        # Opposing Signal -> Evaluate Trend Reversal Flip
+                        if confidence >= 75.0:
+                            is_reversal_flip = True
+                            logger.info(
+                                f"🔄 [TREND REVERSAL FLIP DETECTED] High-conviction {action} signal (Confidence: {confidence:.1f}%) "
+                                f"opposes current {existing_dir} position. Engaging Reversal Flip Protocol!"
+                            )
+                        else:
+                            logger.info(
+                                f"🛡️ [REVERSAL FILTER] Opposing {action} signal confidence ({confidence:.1f}%) < 75.0%. "
+                                f"Holding existing {existing_dir} trade."
+                            )
+                            return {
+                                "status": "MANAGING_ACTIVE_TRADE",
+                                "deal_id": self._active_gold_deal_id,
+                                "stage": self._active_gold_stage,
+                                "direction": self._active_gold_direction,
+                                "entry_price": self._active_gold_entry_price
+                            }
+                    else:
+                        # Same Direction -> Evaluate Agile Pyramiding (Scale-In)
+                        # Check:
+                        # 1. Existing trade is protected: scale_tier >= 1 (Breakeven Armor locked) OR profit >= +1.5R ($2.50)
+                        # 2. Price separation >= min_separation (prevents cluster orders at exact same tick)
+                        # 3. Confidence >= 75.0%
+                        min_sep = max(1.50, sl_dist * 0.35)
+                        any_protected = any(
+                            int(t.get("scale_tier", 0) or 0) >= 1
+                            or (
+                                (existing_dir == "BUY" and current_price - float(t.get("entry_price", current_price) or current_price) >= max(2.50, sl_dist * 0.40))
+                                or (existing_dir == "SELL" and float(t.get("entry_price", current_price) or current_price) - current_price >= max(2.50, sl_dist * 0.40))
+                            )
+                            for t in active_gold_trades
+                        )
+                        too_close = any(
+                            abs(current_price - float(t.get("entry_price", 0.0) or 0.0)) < min_sep
+                            for t in active_gold_trades
+                        )
+                        if any_protected and not too_close and confidence >= 75.0:
+                            is_pyramid = True
+                            logger.info(
+                                f"⚡ [AGILE PYRAMIDING APPROVED] Existing {existing_dir} is protected. "
+                                f"Adding pyramiding tranche #{len(active_gold_trades)+1} in direction {action} @ ${current_price:.2f} "
+                                f"(Separation: ${min_sep:.2f}, Confidence: {confidence:.1f}%)"
+                            )
+                        else:
+                            logger.debug(
+                                f"🛡️ [PYRAMIDING HOLD] Protected={any_protected}, TooClose={too_close}, Conf={confidence:.1f}%. "
+                                f"Continuing to manage existing {existing_dir} position."
+                            )
+                            return {
+                                "status": "MANAGING_ACTIVE_TRADE",
+                                "deal_id": self._active_gold_deal_id,
+                                "stage": self._active_gold_stage,
+                                "direction": self._active_gold_direction,
+                                "entry_price": self._active_gold_entry_price
+                            }
+
+                logger.info(f"🥇 [QUANT GOLD EXECUTION] Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {confidence:.1f}%, Reversal={is_reversal_flip}, Pyramid={is_pyramid})")
+
+                # High-Throughput Concurrent Fan-Out Dispatch & Broadcast
                 fleet_res = await self.dispatch_gold_signal_to_fleet(
                     action=action,
                     current_price=signal_data["current_price"],
@@ -950,8 +1030,10 @@ class QuantGoldExecutionEngine:
                     tp2=signal_data["tp2"],
                     tp3=signal_data["tp3"],
                     app=app,
-                    setup_type="QUANT_GOLD_19TF_VIP",
-                    confidence=float(signal_data.get("confidence", 75.0) or 75.0)
+                    setup_type="QUANT_GOLD_REVERSAL_FLIP" if is_reversal_flip else ("QUANT_GOLD_PYRAMID" if is_pyramid else "QUANT_GOLD_19TF_VIP"),
+                    confidence=confidence,
+                    is_reversal_flip=is_reversal_flip,
+                    is_pyramid=is_pyramid
                 )
                 dispatched_count = fleet_res.get("dispatched_count", 0)
 
@@ -963,8 +1045,9 @@ class QuantGoldExecutionEngine:
                         tp1_pips_disp = abs(signal_data['tp1'] - signal_data['current_price']) * 10
                         tp2_pips_disp = abs(signal_data['tp2'] - signal_data['current_price']) * 10
                         tp3_pips_disp = abs(signal_data['tp3'] - signal_data['current_price']) * 10
+                        prefix_title = "🔄 [TREND REVERSAL FLIP]" if is_reversal_flip else ("⚡ [AGILE PYRAMIDING ENTRY]" if is_pyramid else "🥇 [QUANT GOLD AUTO DISPATCH]")
                         alert_msg = (
-                            f"🥇 <b>[QUANT GOLD AUTO DISPATCH]</b> ⚡\n"
+                            f"{prefix_title} ⚡\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"📊 <b>Action :</b> <code>{'🟢 BUY' if action == 'BUY' else '🔴 SELL'}</code> @ <code>${signal_data['current_price']:.2f}</code>\n"
                             f"🛡️ <b>Structural SL :</b> <code>${signal_data['sl']:.2f}</code> (-{sl_pips_disp:.0f} pips)\n"
@@ -979,6 +1062,19 @@ class QuantGoldExecutionEngine:
                         await notification_manager.broadcast_admin(alert_msg, parse_mode="HTML")
                     except Exception:
                         pass
+            else:
+                if has_existing:
+                    return {
+                        "status": "MANAGING_ACTIVE_TRADE",
+                        "deal_id": self._active_gold_deal_id,
+                        "stage": self._active_gold_stage,
+                        "direction": self._active_gold_direction,
+                        "entry_price": self._active_gold_entry_price
+                    }
+                return {
+                    "status": "HOLD",
+                    "current_price": current_price
+                }
 
             return {
                 "status": "COMPLETED",
@@ -1003,19 +1099,25 @@ class QuantGoldExecutionEngine:
         app = None,
         setup_type: str = "QUANT_GOLD_19TF_VIP",
         broadcast_telegram: bool = True,
-        confidence: float = 75.0
+        confidence: float = 75.0,
+        is_reversal_flip: bool = False,
+        is_pyramid: bool = False
     ) -> Dict[str, Any]:
         """
         High-Throughput Concurrent Fan-Out Dispatch (Semaphore 30):
         Dispatches Gold market orders for all active VIP users on Capital.com simultaneously (<0.05ms)
-        AND synchronously broadcasts the institutional signal card to VIP Telegram users (ONLY when orders placed).
+        Supports:
+          1. Clean First Entry (SINGLE)
+          2. Agile Multi-Position Pyramiding (Scale-In across distinct structural levels)
+          3. Trend Reversal Flip (Opposing Harvest & Instant Flip into new directional wave)
         """
         active_users = db.get_active_capital_auto_users()
         if not active_users:
-            active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 1, "is_demo": False}]
+            active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 5, "is_demo": False}]
 
         sem = asyncio.Semaphore(30)
         sl_dist = abs(current_price - sl)
+        min_separation = max(1.50, sl_dist * 0.35)
 
         async def _dispatch_single_user(user_dict: dict) -> int:
             cid = user_dict.get("chat_id")
@@ -1024,96 +1126,20 @@ class QuantGoldExecutionEngine:
 
             async with sem:
                 try:
-                    open_trades = db.get_capital_auto_trades_for_user(cid)
-                    open_gold_trades = [
-                        t for t in open_trades 
-                        if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "OPEN")).upper() == "OPEN"
-                    ]
-                    max_user_pos = int(user_dict.get("max_positions", 1) or 1)
-                    
-                    if len(open_gold_trades) >= max_user_pos:
-                        logger.debug(f"User {cid} already reached max Gold positions ({len(open_gold_trades)}/{max_user_pos}). Skipping.")
-                        return 0
-
-                    # Point 6: Over-Trading & Opposing Signal Veto Shield
-                    if len(open_gold_trades) > 0:
-                        existing = open_gold_trades[0]
-                        existing_dir = str(existing.get("direction", "")).upper()
-                        if existing_dir and action and existing_dir != action:
-                            logger.info(
-                                f"🛡️ [OPPOSING SIGNAL VETO] User {cid} holds open {existing_dir} trade. "
-                                f"New opposing {action} signal strictly muted to prevent hedge-lock collisions."
-                            )
-                            return 0
-
-                    # Smart Pyramiding Rule (Invariant 1.1 Fiduciary Safety):
-                    # If user is allowed > 1 position, an additional position is ONLY permitted if:
-                    # 1. Existing trade already reached TP1 (Breakeven Armor locked, tier >= 1, 0.00R risk).
-                    # 2. System confidence is ultra-high (>= 85.0%).
-                    if len(open_gold_trades) > 0:
-                        existing = open_gold_trades[0]
-                        existing_tier = int(existing.get("scale_tier", 0) or 0)
-                        if existing_tier < 1 or confidence < 85.0:
-                            logger.info(
-                                f"🛡️ [SMART PYRAMIDING GUARD] User {cid} holds open trade. "
-                                f"Additional position requires TP1 Breakeven Lock & Confidence >= 85.0% "
-                                f"(Current tier={existing_tier}, conf={confidence:.1f}%). Skipping."
-                            )
-                            return 0
-
                     is_admin = (cid == 859271875) or db.is_admin(cid)
                     configured_is_demo = bool(user_dict.get("is_demo", False))
                     budget = float(user_dict.get("budget", 50.0) or 50.0)
+                    max_user_pos = int(user_dict.get("max_positions", 5) or 5)
 
-                    # Point 7: Daily Capital Governor (Invariant 52 - +5% Target Lock / -2.5% Loss Floor)
-                    # Super Admin (859271875) possesses unconditional execution authority (Invariant 75)
-                    if not is_admin:
-                        try:
-                            from portfolio_circuit_breaker import is_capital_daily_locked
-                            chk_bal_gov = 0.0
-                            if not configured_is_demo:
-                                try:
-                                    chk_eng_gov = capital_engine.get_user_capital_engine(cid, is_demo=False)
-                                    bal_inf_gov = await asyncio.to_thread(chk_eng_gov.get_account_balance)
-                                    chk_bal_gov = float(bal_inf_gov.get("available", 0.0) or 0.0)
-                                except Exception:
-                                    pass
-                            if chk_bal_gov > 0:
-                                is_locked, lock_reason, _ = is_capital_daily_locked(cid, current_balance=chk_bal_gov, is_demo=configured_is_demo)
-                                if is_locked:
-                                    logger.info(
-                                        f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
-                                        f"Capital strictly preserved under Invariant 52."
-                                    )
-                                    return 0
-                        except Exception as e_gov:
-                            logger.debug(f"Daily Governor check note for user {cid}: {e_gov}")
-
-                    # Dynamic Real Capital Checking & Smart Demo Fallback:
+                    # Dynamic Real Capital Checking & Smart Demo Fallback
                     effective_is_demo = configured_is_demo
                     if not configured_is_demo:
                         try:
                             chk_eng = capital_engine.get_user_capital_engine(cid, is_demo=False)
                             bal_inf = await asyncio.to_thread(chk_eng.get_account_balance)
                             live_avail = float(bal_inf.get("available", 0.0) or 0.0)
-                            
-                            # Min margin for 0.5 oz Gold is ~$4.12 at 500:1 leverage
                             if live_avail < 4.07:
-                                now_ts = time.time()
-                                if is_admin:
-                                    if (now_ts - getattr(self, "_admin_demo_log_ts", 0.0)) >= 600.0:
-                                        self._admin_demo_log_ts = now_ts
-                                        logger.info(f"🚂 [SUPER ADMIN DEMO FALLBACK] Live Available (${live_avail:.2f}) < $4.07. Auto-engaging Demo Account (329832717876539678) $10,000 mirror.")
-                                    effective_is_demo = True
-                                else:
-                                    # Auto-engage Demo Mirror for VIP users until they deposit live funds!
-                                    effective_is_demo = True
-                                    last_sb = self._user_standby_log_ts.get(cid, 0.0) if hasattr(self, "_user_standby_log_ts") else 0.0
-                                    if (now_ts - last_sb) >= 600.0:
-                                        if not hasattr(self, "_user_standby_log_ts"):
-                                            self._user_standby_log_ts = {}
-                                        self._user_standby_log_ts[cid] = now_ts
-                                        logger.info(f"🔄 [VIP DEMO MIRROR] User {cid} Live Available (${live_avail:.2f}) < $4.07. Auto-engaging Demo Mirror until live capital is deposited.")
+                                effective_is_demo = True
                             else:
                                 effective_is_demo = False
                                 budget = max(10.0, min(budget, live_avail * 0.50))
@@ -1123,39 +1149,109 @@ class QuantGoldExecutionEngine:
 
                     u_eng = capital_engine.get_user_capital_engine(cid, is_demo=effective_is_demo)
 
-                    # Pre-flight check: ensure broker does not already hold an active GOLD position for this user
+                    # ── STEP A: TREND REVERSAL FLIP HARVEST ──
+                    if is_reversal_flip:
+                        user_open_trades = db.get_capital_auto_trades_for_user(cid) or []
+                        for ot in user_open_trades:
+                            if str(ot.get("epic", "")).upper() == "GOLD" and str(ot.get("status", "OPEN")).upper() == "OPEN":
+                                ot_dir = str(ot.get("direction", "")).upper()
+                                if ot_dir != action:
+                                    d_id = ot.get("deal_id")
+                                    if d_id and d_id != "OK":
+                                        try:
+                                            if u_eng:
+                                                await asyncio.to_thread(u_eng.close_position, deal_id=d_id)
+                                            if hasattr(db, "close_capital_auto_trade"):
+                                                db.close_capital_auto_trade(d_id, exit_price=current_price, exit_reason="TREND_REVERSAL_FLIP")
+                                            logger.info(f"🔄 [REVERSAL FLIP] Closed opposing {ot_dir} trade {d_id} for user {cid} at ${current_price:.2f}")
+                                        except Exception as e_rf:
+                                            logger.warning(f"Error closing opposing deal {d_id}: {e_rf}")
+
+                    # ── STEP B: CAPACITY & DUPLICATION CHECK ──
+                    open_trades = db.get_capital_auto_trades_for_user(cid) or []
+                    open_gold_trades = [
+                        t for t in open_trades 
+                        if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "OPEN")).upper() == "OPEN"
+                    ]
+
+                    if len(open_gold_trades) >= max_user_pos:
+                        logger.debug(f"User {cid} already reached max Gold positions ({len(open_gold_trades)}/{max_user_pos}). Skipping.")
+                        return 0
+
+                    if not is_reversal_flip and len(open_gold_trades) > 0:
+                        existing = open_gold_trades[0]
+                        existing_dir = str(existing.get("direction", "")).upper()
+                        if existing_dir and action and existing_dir != action:
+                            logger.info(
+                                f"🛡️ [OPPOSING SIGNAL VETO] User {cid} holds open {existing_dir} trade. "
+                                f"New opposing {action} signal strictly muted to prevent hedge-lock collisions."
+                            )
+                            return 0
+
+                    # Price Separation Guard: Prevent duplicate order execution at exact same tick
+                    for ot in open_gold_trades:
+                        ot_entry = float(ot.get("entry_price", 0.0) or 0.0)
+                        if abs(ot_entry - current_price) < min_separation:
+                            logger.info(
+                                f"🛡️ [PRICE SEPARATION GUARD] User {cid} holds open trade near ${ot_entry:.2f}. "
+                                f"New entry ${current_price:.2f} within ${min_separation:.2f} buffer. Skipping cluster duplicate."
+                            )
+                            return 0
+
+                    # ── STEP C: DAILY CAPITAL GOVERNOR CHECK ──
+                    if not is_admin:
+                        try:
+                            from portfolio_circuit_breaker import is_capital_daily_locked
+                            chk_bal_gov = live_avail if not effective_is_demo else 10000.0
+                            if chk_bal_gov > 0:
+                                is_locked, lock_reason, _ = is_capital_daily_locked(cid, current_balance=chk_bal_gov, is_demo=effective_is_demo)
+                                if is_locked:
+                                    logger.info(
+                                        f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
+                                        f"Capital strictly preserved under Invariant 52."
+                                    )
+                                    return 0
+                        except Exception as e_gov:
+                            logger.debug(f"Daily Governor check note for user {cid}: {e_gov}")
+
+                    # ── STEP D: BROKER PRE-FLIGHT RECONCILIATION ──
                     try:
                         b_pos = await asyncio.wait_for(asyncio.to_thread(u_eng.get_open_positions), timeout=3.0) if u_eng else []
+                        broker_gold = []
                         for p_item in (b_pos or []):
                             p_sub = p_item.get("position", p_item)
                             p_epic = str(p_item.get("market", {}).get("epic") or p_sub.get("epic") or "").upper()
                             if p_epic == "GOLD":
-                                d_id = str(p_sub.get("dealId") or p_sub.get("deal_id") or "")
-                                logger.debug(f"User {cid} already has active GOLD position {d_id} on broker. Skipping duplicate order placement.")
-                                if d_id and not db.has_capital_auto_trade_record(d_id):
-                                    p_lvl = float(p_sub.get("level") or p_sub.get("openLevel") or current_price)
-                                    p_dir = str(p_sub.get("direction", action)).upper()
-                                    p_sz = float(p_sub.get("size", 0.5) or 0.5)
-                                    db.record_capital_auto_trade(
-                                        chat_id=cid,
-                                        deal_id=d_id,
-                                        deal_reference=d_id,
-                                        epic="GOLD",
-                                        direction=p_dir,
-                                        size=p_sz,
-                                        entry_price=p_lvl,
-                                        sl=float(p_sub.get("stopLevel", sl) or sl),
-                                        tp=float(p_sub.get("profitLevel", tp1) or tp1),
-                                        tp1=tp1, tp2=tp2, tp3=tp3,
-                                        sl_dist=sl_dist, scale_tier=0,
-                                        is_demo=int(effective_is_demo)
-                                    )
-                                self._active_gold_deal_id = d_id
-                                self._active_gold_stage = "ACTIVE"
+                                broker_gold.append(p_item)
+
+                        if is_reversal_flip:
+                            for bp in broker_gold:
+                                p_sub = bp.get("position", bp)
+                                bp_dir = str(p_sub.get("direction", "")).upper()
+                                bp_id = p_sub.get("dealId") or p_sub.get("deal_id")
+                                if bp_dir != action and bp_id:
+                                    try:
+                                        await asyncio.to_thread(u_eng.close_position, deal_id=bp_id)
+                                        logger.info(f"🔄 [BROKER REVERSAL FLIP] Closed broker opposing {bp_dir} deal {bp_id} for user {cid}")
+                                    except Exception as e_b_rf:
+                                        logger.warning(f"Error closing broker opposing deal {bp_id}: {e_b_rf}")
+                            b_pos = await asyncio.wait_for(asyncio.to_thread(u_eng.get_open_positions), timeout=3.0) if u_eng else []
+                            broker_gold = [p for p in (b_pos or []) if str(p.get("market", {}).get("epic") or p.get("position", p).get("epic") or "").upper() == "GOLD"]
+
+                        if len(broker_gold) >= max_user_pos:
+                            logger.debug(f"User {cid} already has max GOLD positions ({len(broker_gold)}/{max_user_pos}) on broker. Skipping duplicate order placement.")
+                            return 0
+
+                        for bp in broker_gold:
+                            p_sub = bp.get("position", bp)
+                            bp_lvl = float(p_sub.get("level") or p_sub.get("openLevel") or current_price)
+                            if abs(bp_lvl - current_price) < min_separation:
+                                logger.debug(f"User {cid} holds broker position near ${bp_lvl:.2f}. Skipping cluster duplicate.")
                                 return 0
                     except Exception as e_chk_pos:
                         logger.debug(f"Pre-flight broker check note for {cid}: {e_chk_pos}")
 
+                    # ── STEP E: ORDER EXECUTION ──
                     lot_size = calculate_capital_gold_lot_size(
                         budget=budget,
                         current_price=current_price,
@@ -1185,6 +1281,7 @@ class QuantGoldExecutionEngine:
                         self._active_gold_tp3 = tp3
                         self._active_gold_stage = "ACTIVE"
 
+                        tranche_label = f"PYRAMID_{len(open_gold_trades)+1}" if is_pyramid else ("REVERSAL_FLIP" if is_reversal_flip else "SINGLE")
                         db.record_capital_auto_trade(
                             chat_id=cid,
                             deal_id=str(deal_id),
@@ -1197,7 +1294,7 @@ class QuantGoldExecutionEngine:
                             tp=tp1,
                             scale_tier=0,
                             sl_dist=sl_dist,
-                            tranche_id="SINGLE",
+                            tranche_id=tranche_label,
                             tp1=tp1,
                             tp2=tp2,
                             tp3=tp3,
@@ -1212,16 +1309,18 @@ class QuantGoldExecutionEngine:
         dispatched_count = sum(r for r in results if isinstance(r, int))
 
         sent_count = 0
-        # CRITICAL FIX: Only broadcast to Telegram IF orders were actually dispatched to fleet
-        # This completely eliminates false signals and repetitive signal spam!
         if broadcast_telegram and dispatched_count > 0:
+            c_type = "REVERSAL" if is_reversal_flip else ("PYRAMID" if is_pyramid else "SIGNAL")
+            tr_num = len(self.get_active_gold_trades_list()) if is_pyramid else 1
             vip_card = format_gold_signal_card(
                 direction=action,
                 sl=sl,
                 tp1=tp1,
                 tp2=tp2,
                 tp3=tp3,
-                entry_price=current_price
+                entry_price=current_price,
+                card_type=c_type,
+                tranche_num=tr_num
             )
             markup = get_gold_signal_reply_markup()
             sent_count = await self.broadcast_to_vip_users(vip_card, app=app, reply_markup=markup)
