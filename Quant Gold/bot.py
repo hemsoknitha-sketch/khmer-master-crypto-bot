@@ -67,15 +67,55 @@ from execution_engine import (
 )
 
 
-def get_quant_gold_bottom_keyboard() -> ReplyKeyboardMarkup:
-    """Persistent 1-Tap Bottom Keyboard for Quick Commands."""
-    return ReplyKeyboardMarkup(
-        [
+def get_quant_gold_bottom_keyboard(chat_id: Optional[int] = None) -> ReplyKeyboardMarkup:
+    """
+    Super Smart & Beautiful Persistent 1-Tap Bottom Keyboard for Quick Commands.
+    Features dynamic live state:
+      - Live Auto-Trade status badge: '🤖 Auto-Trade (🟢 ON)' vs '🤖 Auto-Trade (🔴 OFF)'.
+      - Live Open Positions count badge: '📊 Positions (1 Open)' vs '📊 Open Positions'.
+      - Role-tailored executive controls for Super Admin vs VIP Users.
+    """
+    is_auto = True
+    budget = 50.0
+    pos_count = 0
+    is_admin = False
+
+    if chat_id:
+        try:
+            is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+            auto_cfg = db.get_capital_auto_config(chat_id) or {}
+            is_auto = bool(auto_cfg.get("enabled", True))
+            budget = float(auto_cfg.get("budget", 50.0) or 50.0)
+
+            open_trades = db.get_capital_auto_trades_for_user(chat_id) if hasattr(db, "get_capital_auto_trades_for_user") else []
+            pos_count = len([
+                t for t in open_trades
+                if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "")).upper() == "OPEN"
+            ])
+        except Exception:
+            pass
+
+    auto_label = f"🤖 Auto-Trade ({'🟢 ON' if is_auto else '🔴 OFF'})"
+    pos_label = f"📊 Positions ({pos_count} Open)" if pos_count > 0 else "📊 Open Positions"
+
+    if is_admin:
+        keyboard = [
             [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
             [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
-            [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)")],
+            [KeyboardButton(pos_label), KeyboardButton(auto_label)],
+            [KeyboardButton("💵 Fleet Status"), KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")],
+            [KeyboardButton("🔄 Reset Daily 🔓"), KeyboardButton("🖥️ Health"), KeyboardButton("🛡️ Security")]
+        ]
+    else:
+        keyboard = [
+            [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
+            [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
+            [KeyboardButton(pos_label), KeyboardButton(auto_label)],
             [KeyboardButton("💵 Status"), KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")]
-        ],
+        ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
         resize_keyboard=True,
         is_persistent=True
     )
@@ -368,7 +408,7 @@ class QuantGoldBot:
             agreement_status = legal_agreement.get_user_agreement_status(chat_id)
             is_agreed = bool(agreement_status.get("accepted", False)) or is_admin or is_founder
 
-            bottom_kb = get_quant_gold_bottom_keyboard()
+            bottom_kb = get_quant_gold_bottom_keyboard(chat_id)
 
             # ── TIER 1: NEW / UNREGISTERED USER (UNSIGNED LEGAL AGREEMENT) ──
             if not is_agreed and not is_admin:
@@ -441,7 +481,7 @@ class QuantGoldBot:
                 f"──────────────────────\n"
                 f"👇 <i>សូមជ្រើសរើសមុខងារបញ្ជា 1-Tap ខាងក្រោម ៖</i>"
             )
-            bottom_kb = get_quant_gold_bottom_keyboard()
+            bottom_kb = get_quant_gold_bottom_keyboard(chat_id)
             await self.safe_reply(update, fallback_card, reply_markup=bottom_kb)
 
     def _resolve_target(self, target_input: str) -> Tuple[Optional[int], Optional[Dict[str, Any]]]:
@@ -2284,16 +2324,47 @@ class QuantGoldBot:
         lines.append(f"══════════════════════════════════════")
         lines.append(f"💰 <b>Total Net UPL ៖</b> <code>{t_icon} ${total_upl:+.2f}</code>")
 
+        close_deal_btns = []
+        for t in gold_trades:
+            d_id = str(t.get("deal_id", ""))
+            d_sz = float(t.get("size", 0.5) or 0.5)
+            d_dir = str(t.get("direction", "BUY")).upper()
+            d_entry = float(t.get("entry_price", curr_p) or curr_p)
+            d_upl = (curr_p - d_entry) * d_sz if d_dir == "BUY" else (d_entry - curr_p) * d_sz
+            d_icon = "🟢" if d_upl >= 0 else "🔴"
+            if d_id and d_id != "OK":
+                close_deal_btns.append(InlineKeyboardButton(f"🚪 Close #{d_id} ({d_icon} ${d_upl:+.2f})", callback_data=f"btn_qgold_close_deal:{d_id}"))
+
+        for bp in broker_gold:
+            pos_info = bp.get("position", {}) if isinstance(bp.get("position"), dict) else bp
+            d_id = str(pos_info.get("dealId", ""))
+            d_sz = float(pos_info.get("size", 0.5) or 0.5)
+            d_dir = str(pos_info.get("direction", "BUY")).upper()
+            d_entry = float(pos_info.get("level", curr_p) or curr_p)
+            d_upl = float(pos_info.get("upl", 0.0) or 0.0)
+            if d_upl == 0.0:
+                d_upl = (curr_p - d_entry) * d_sz if d_dir == "BUY" else (d_entry - curr_p) * d_sz
+            d_icon = "🟢" if d_upl >= 0 else "🔴"
+            if d_id and d_id not in seen_deals and d_id != "OK":
+                close_deal_btns.append(InlineKeyboardButton(f"🚪 Close #{d_id} ({d_icon} ${d_upl:+.2f})", callback_data=f"btn_qgold_close_deal:{d_id}"))
+
         kb_rows = []
         if rescue_buttons:
             kb_rows.extend(rescue_buttons)
+        if close_deal_btns:
+            for c_btn in close_deal_btns:
+                kb_rows.append([c_btn])
         kb_rows.append([InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all")])
         kb_rows.append([
-            InlineKeyboardButton("🛡️ Guardian Audit (/capital rescue)", callback_data="cap_action:RESCUE"),
-            InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions")
+            InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions"),
+            InlineKeyboardButton("🥇 Back to Dashboard", callback_data="btn_qgold_refresh")
         ])
         kb = InlineKeyboardMarkup(kb_rows)
-        await self.safe_reply(update, "\n".join(lines), reply_markup=kb)
+        bottom_kb = get_quant_gold_bottom_keyboard(chat_id)
+        if update.callback_query:
+            await self.safe_edit(update.callback_query, "\n".join(lines), reply_markup=kb)
+        else:
+            await self.safe_reply(update, "\n".join(lines), reply_markup=kb)
 
     async def handle_close_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Closes all active Gold positions immediately."""
@@ -2523,7 +2594,31 @@ class QuantGoldBot:
             f"══════════════════════════════════════{warn_note}\n"
             f"<i>{ 'ម៉ាស៊ីន AI នឹងជួញដូរមាសស្វ័យប្រវត្តនៅពេលមានឱកាសឈ្នះខ្ពស់!' if new_st else 'ម៉ាស៊ីន AI ត្រូវបានផ្អាកការបើក Position ថ្មី។' }</i>"
         )
-        await self.safe_reply(update, msg)
+        auto_toggle_btn = (
+            InlineKeyboardButton("🔴 ផ្អាក Auto-Trade (Turn OFF)", callback_data="btn_qgold_auto_off")
+            if new_st
+            else InlineKeyboardButton("🟢 បើក Auto-Trade (Turn ON)", callback_data="btn_qgold_auto_on")
+        )
+        kb = InlineKeyboardMarkup([
+            [auto_toggle_btn],
+            [
+                InlineKeyboardButton("💵 Budget $10", callback_data="btn_qgold_budget_10"),
+                InlineKeyboardButton("💵 Budget $50", callback_data="btn_qgold_budget_50"),
+                InlineKeyboardButton("💵 Budget $100", callback_data="btn_qgold_budget_100")
+            ],
+            [
+                InlineKeyboardButton("🔄 Reset Daily Lock 🔓", callback_data="btn_cap_reset_daily"),
+                InlineKeyboardButton("📊 Positions", callback_data="btn_qgold_positions")
+            ],
+            [
+                InlineKeyboardButton("🥇 Back to Dashboard", callback_data="btn_qgold_refresh")
+            ]
+        ])
+        bottom_kb = get_quant_gold_bottom_keyboard(chat_id)
+        if update.callback_query:
+            await self.safe_edit(update.callback_query, msg, reply_markup=kb)
+        else:
+            await self.safe_reply(update, msg, reply_markup=kb)
 
     async def _fetch_account_status_summary(self, chat_id: int, account_id: str, is_demo: bool) -> Dict[str, Any]:
         """
@@ -3154,7 +3249,20 @@ class QuantGoldBot:
                 f"• <code>/admin_capital fleet</code> (ពិនិត្យ All Users)\n"
                 f"══════════════════════════════════════\n"
             )
-        await self.safe_reply(update, help_text)
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🥇 Quant Gold Dashboard", callback_data="btn_qgold_refresh"),
+                InlineKeyboardButton("🎯 Gold Signal", callback_data="btn_qgold_signal")
+            ],
+            [
+                InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle"),
+                InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions")
+            ],
+            [
+                InlineKeyboardButton("📞 Angkor Quant Support", url="https://t.me/AngkorQuantSupport")
+            ]
+        ])
+        await self.safe_reply(update, help_text, reply_markup=kb)
 
     async def handle_agreement(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays the full Angkor Quant Legal Agreement & Risk Waiver (/agreement, /about)."""
@@ -3268,6 +3376,59 @@ class QuantGoldBot:
                 await query.answer("Auto-Trade Toggled!")
             except Exception:
                 pass
+
+        elif data in ["btn_qgold_auto_on", "btn_qgold_auto_off"]:
+            turn_on = (data == "btn_qgold_auto_on")
+            auto_cfg = db.get_capital_auto_config(chat_id) or {}
+            db.set_capital_auto_config(
+                chat_id=chat_id,
+                enabled=turn_on,
+                budget=float(auto_cfg.get("budget", 50.0) or 50.0),
+                max_positions=int(auto_cfg.get("max_positions", 5) or 5),
+                is_demo=bool(auto_cfg.get("is_demo", False))
+            )
+            ans_txt = "🟢 Auto-Trade បានបើកដំណើរការ ២៤/៧!" if turn_on else "🔴 Auto-Trade បានផ្អាកបណ្តោះអាសន្ន!"
+            try:
+                await query.answer(ans_txt)
+            except Exception:
+                pass
+            await self.handle_toggle_auto(update, context)
+
+        elif data in ["btn_qgold_budget_10", "btn_qgold_budget_50", "btn_qgold_budget_100"]:
+            b_val = 10.0 if "10" in data else (50.0 if "50" in data else 100.0)
+            auto_cfg = db.get_capital_auto_config(chat_id) or {}
+            db.set_capital_auto_config(
+                chat_id=chat_id,
+                enabled=bool(auto_cfg.get("enabled", True)),
+                budget=b_val,
+                max_positions=int(auto_cfg.get("max_positions", 5) or 5),
+                is_demo=bool(auto_cfg.get("is_demo", False))
+            )
+            try:
+                await query.answer(f"💰 Budget កំណត់ត្រឹម ${b_val:.2f} / Trade! ✅")
+            except Exception:
+                pass
+            await self.handle_toggle_auto(update, context)
+
+        elif data.startswith("btn_qgold_close_deal:"):
+            target_deal_id = data.split(":", 1)[1]
+            try:
+                await query.answer(f"🚪 កំពុងបិទ Deal #{target_deal_id}...")
+            except Exception:
+                pass
+            u_eng = capital_engine.get_user_capital_engine(chat_id)
+            if u_eng:
+                await asyncio.to_thread(u_eng.close_position, deal_id=target_deal_id)
+            if hasattr(db, "update_capital_auto_trade_close"):
+                db.update_capital_auto_trade_close(target_deal_id, exit_price=0.0, pnl=0.0)
+            await self.handle_positions(update, context)
+
+        elif data == "btn_qgold_license":
+            try:
+                await query.answer("Checking VIP License...")
+            except Exception:
+                pass
+            await self.handle_license(update, context)
 
         elif data == "btn_qgold_positions":
             try:
@@ -3857,19 +4018,31 @@ class QuantGoldBot:
     async def handle_text_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handles clicks from the bottom persistent keyboard."""
         text = update.effective_message.text.strip() if update.effective_message and update.effective_message.text else ""
+        chat_id = update.effective_chat.id if update.effective_chat else None
 
-        if "Quant Gold Dashboard" in text or "Scan 19 TFs" in text:
+        if "Dashboard" in text or "Scan" in text:
             await self.handle_start(update, context)
         elif "Signal" in text:
             await self.handle_signal(update, context)
-        elif "BUY GOLD" in text:
+        elif "BUY GOLD" in text or text.startswith("🟢"):
             await self.handle_buy(update, context)
-        elif "SELL GOLD" in text:
+        elif "SELL GOLD" in text or text.startswith("🔴"):
             await self.handle_sell(update, context)
-        elif "Open Positions" in text:
+        elif "Position" in text or "Positions" in text:
             await self.handle_positions(update, context)
-        elif "Auto-Trade" in text:
+        elif "Auto-Trade" in text or "Auto" in text:
             await self.handle_toggle_auto(update, context)
+        elif "Reset Daily" in text or "🔓" in text:
+            if chat_id:
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id)
+                await self.safe_reply(
+                    update,
+                    "🔄 <b>[DAILY GOVERNOR RESET]</b> 🔓\n"
+                    "• បានដោះសោរ Daily Governor Lock រួចរាល់!\n"
+                    "• ប្រព័ន្ធដំណើរការវិនិយោគស្វ័យប្រវត្តជាធម្មតាវិញភ្លាមៗ 24/7។",
+                    reply_markup=get_quant_gold_bottom_keyboard(chat_id)
+                )
         elif "Status" in text:
             await self.handle_status(update, context)
         elif "License" in text or "VIP" in text:
@@ -3878,6 +4051,10 @@ class QuantGoldBot:
             await self.handle_health(update, context)
         elif "Security" in text or "Citadel" in text:
             await self.handle_security(update, context)
-        elif "Help" in text:
+        elif "Help" in text or "Guide" in text:
             await self.handle_help(update, context)
+        elif "Close" in text or "Panic" in text:
+            await self.handle_close_all(update, context)
+        else:
+            await self.handle_start(update, context)
 

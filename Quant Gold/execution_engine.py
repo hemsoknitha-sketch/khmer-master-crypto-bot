@@ -18,6 +18,7 @@ Key Architecture:
 =====================================================
 """
 
+import os
 import time
 import math
 import logging
@@ -40,14 +41,25 @@ logger = logging.getLogger("QUANT_GOLD_EXECUTION")
 
 
 def get_gold_signal_reply_markup():
-    """Returns the clean inline keyboard matching institutional signal design."""
+    """Returns the clean, super smart inline keyboard matching institutional signal design."""
     try:
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         bot_handle = os.getenv("TELEGRAM_BOT_USERNAME", "AngkorQuantBot").replace("@", "").strip() or "AngkorQuantBot"
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🥇 Open in Angkor Quant ↗", url=f"https://t.me/{bot_handle}")]
+            [
+                InlineKeyboardButton("🟢 1-Tap BUY (0.5 oz)", callback_data="btn_qgold_buy"),
+                InlineKeyboardButton("🔴 1-Tap SELL (0.5 oz)", callback_data="btn_qgold_sell")
+            ],
+            [
+                InlineKeyboardButton("📊 Open Positions", callback_data="btn_qgold_positions"),
+                InlineKeyboardButton("🔄 Re-Scan 19-TF", callback_data="btn_qgold_signal")
+            ],
+            [
+                InlineKeyboardButton("🥇 Open in Angkor Quant ↗", url=f"https://t.me/{bot_handle}")
+            ]
         ])
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error in get_gold_signal_reply_markup: {e}", exc_info=True)
         return None
 
 
