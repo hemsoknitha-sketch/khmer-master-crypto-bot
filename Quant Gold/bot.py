@@ -232,6 +232,8 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("agreement", self.handle_agreement))
         self.app.add_handler(CommandHandler("about", self.handle_agreement))
         self.app.add_handler(CommandHandler("admin_agreements", self.handle_admin_agreements))
+        self.app.add_handler(CommandHandler("backup", self.handle_backup))
+        self.app.add_handler(CommandHandler("admin_backup", self.handle_backup))
         self.app.add_handler(CommandHandler("help", self.handle_help))
 
         # Callback query handler for 1-tap interactive buttons
@@ -544,6 +546,8 @@ class QuantGoldBot:
             return await self.handle_status(update, context)
         elif sub_cmd in ["RESCUE", "ADOPT", "GUARDIAN", "PROTECT"]:
             return await self.handle_guardian_rescue(update, context)
+        elif sub_cmd in ["BACKUP", "HF_BACKUP", "VAULT"]:
+            return await self.handle_backup(update, context)
         elif sub_cmd in ["ON", "ENABLE", "START"]:
             target_chat_id = chat_id
             target_label = f"Chat ID: {chat_id}"
@@ -2294,6 +2298,56 @@ class QuantGoldBot:
         audit = await asyncio.to_thread(capital_engine.audit_and_adopt_tradfi_positions, chat_id, is_d, context.application)
         msg_txt, kb = cmtg.format_guardian_audit_report(audit, chat_id, "khmer")
         await self.safe_reply(update, msg_txt, reply_markup=kb, parse_mode="Markdown")
+
+    async def handle_backup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Creates an atomic SQLite database backup and syncs it to private Hugging Face Cloud Vault."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+        if not is_admin:
+            return await self.safe_reply(update, "⛔ <i>សិទ្ធិផ្តាច់មុខសម្រាប់ Super Admin ប៉ុណ្ណោះ។</i>")
+
+        import backup_manager
+        await self.safe_reply(update, "⏳ <i>កំពុងដំណើរការ Atomic SQLite Snapshot & Upload ទៅកាន់ Hugging Face Private Vault...</i>")
+        res = await asyncio.to_thread(backup_manager.upload_backup_to_huggingface)
+
+        if res.get("success"):
+            repo_id = res.get("repo_id")
+            card = (
+                f"☁️ <b>[HUGGING FACE CLOUD BACKUP ជោគជ័យ]</b> 🛡️\n"
+                f"══════════════════════════════════════\n"
+                f"📦 <b>Private Vault ៖</b> <code>{repo_id}</code>\n"
+                f"💾 <b>ទំហំ Database ដើម ៖</b> <code>{res.get('raw_size_kb')} KB</code>\n"
+                f"🗜️ <b>ទំហំបង្ហាប់ (Gzip) ៖</b> <code>{res.get('compressed_size_kb')} KB</code>\n"
+                f"🔒 <b>ស្ថានភាព Privacy ៖</b> <code>100% PRIVATE DATASET (Zero Leakage)</code>\n"
+                f"⏱️ <b>កាលបរិច្ឆេទ ៖</b> <code>{res.get('timestamp')}</code>\n"
+                f"══════════════════════════════════════\n"
+                f"💎 <b>ទិន្នន័យត្រូវបានការពារ ៖</b>\n"
+                f"• បញ្ជី User Accounts & Telegram IDs\n"
+                f"• កាតព្វកិច្ច VIP Licenses & ប្រវត្តិប្រតិបត្តិការ Trades\n"
+                f"• ការកំណត់ Capital.com Auto-Trading\n"
+                f"══════════════════════════════════════\n"
+                f"🔄 <b>Disaster Recovery (របៀបស្រោចស្រង់ទិន្នន័យ) ៖</b>\n"
+                f"<code>python backup_manager.py restore</code>\n"
+                f"✅ <i>ទិន្នន័យត្រូវបានរក្សាទុកដោយសុវត្ថិភាពលើ Hugging Face Cloud!</i>"
+            )
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📦 មើលលើ Hugging Face", url=f"https://huggingface.co/datasets/{repo_id}")],
+                [InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព Dashboard", callback_data="btn_capital_menu")]
+            ])
+            await self.safe_reply(update, card, reply_markup=kb)
+        else:
+            reason = res.get("reason", "Unknown error")
+            err_card = (
+                f"⚠️ <b>[HUGGING FACE BACKUP NOTICE]</b>\n"
+                f"══════════════════════════════════════\n"
+                f"មិនអាច Sync ទៅកាន់ Hugging Face បានទេ ៖ <code>{reason}</code>\n\n"
+                f"💡 <i>សូមប្រាកដថាបានដាក់ <code>HF_TOKEN=\"hf_...\"</code> នៅក្នុង file <code>.env</code> លើ VPS។</i>\n"
+                f"✅ <i>ទោះជាយ៉ាងណា Local SQLite Backup ត្រូវបានរក្សាទុកក្នុង <code>backups/</code> ដោយជោគជ័យ!</i>"
+            )
+            await self.safe_reply(update, err_card)
 
     async def handle_toggle_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Toggles 24/7 Autonomous Gold Trading with real isolated live account telemetry."""

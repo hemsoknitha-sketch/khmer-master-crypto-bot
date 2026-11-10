@@ -839,6 +839,17 @@ class QuantGoldExecutionEngine:
             except Exception as e_sync:
                 logger.debug(f"Capital sync note: {e_sync}")
 
+            # Step 1.6: Automated 24h Hugging Face Cloud Database Backup
+            now_ts = time.time()
+            if (now_ts - getattr(self, "_last_hf_backup_ts", 0.0)) >= 86400.0:
+                self._last_hf_backup_ts = now_ts
+                try:
+                    import backup_manager
+                    asyncio.create_task(asyncio.to_thread(backup_manager.perform_backup, False, True))
+                    logger.info("☁️ [CLOUD VAULT] Dispatched automated 24h Hugging Face database backup task.")
+                except Exception as e_bck:
+                    logger.debug(f"Cloud backup dispatch note: {e_bck}")
+
             # Step 1.8: Strict Sequential Lifecycle & Signal Muting Gate
             # If the system is currently managing an active Gold trade, STOP!
             # Do NOT evaluate new entry signals and do NOT broadcast duplicate signals.
