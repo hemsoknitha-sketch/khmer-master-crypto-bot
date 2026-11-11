@@ -842,6 +842,7 @@ class QuantGoldExecutionEngine:
 
         for cid in audit_cids:
             try:
+                await asyncio.sleep(0.35)
                 is_admin = (cid == 859271875) or db.is_admin(cid)
                 u_eng_live = capital_engine.get_user_capital_engine(cid, is_demo=False)
                 bal_inf = await asyncio.to_thread(u_eng_live.get_account_balance)

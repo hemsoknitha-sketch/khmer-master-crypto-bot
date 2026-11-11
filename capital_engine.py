@@ -733,7 +733,10 @@ class CapitalComEngine:
                     err_msg = "error.null.accountId (No active Demo account found on Capital.com profile. Please switch to Demo on Capital.com web platform to activate your $10,000 demo account, or set CAPITAL_IS_DEMO=False for Live)."
 
                 self.last_auth_error = err_msg
-                self._auth_backoff_until = time.time() + 180.0  # 3-minute backoff to prevent log flooding and scheduler congestion
+                if "error.too-many.requests" in str(err_msg):
+                    self._auth_backoff_until = time.time() + 2.0
+                else:
+                    self._auth_backoff_until = time.time() + 180.0  # 3-minute backoff to prevent log flooding and scheduler congestion
                 if not self._auth_error_logged:
                     logger.error(f"Authentication failed: {err_msg}")
                     self._auth_error_logged = True
