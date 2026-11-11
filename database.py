@@ -6005,6 +6005,31 @@ def update_user_capital_account_id(chat_id: int, account_id: str, is_demo: bool 
             pass
         return False
 
+def set_user_capital_mode(chat_id: int, is_demo: bool) -> bool:
+    """
+    Toggles a user's active Capital.com trading mode between Live (is_demo=False)
+    and Demo (is_demo=True) across user_capital_credentials and capital_auto_config.
+    """
+    if not chat_id:
+        return False
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cid_int = int(chat_id)
+        demo_val = 1 if is_demo else 0
+        cursor.execute("UPDATE user_capital_credentials SET is_demo = ?, updated_at = CURRENT_TIMESTAMP WHERE chat_id = ?", (demo_val, cid_int))
+        cursor.execute("UPDATE capital_auto_config SET is_demo = ?, updated_at = CURRENT_TIMESTAMP WHERE chat_id = ?", (demo_val, cid_int))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error in set_user_capital_mode: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
 def get_capital_user_by_account_id(account_id: str) -> Optional[Dict[str, Any]]:
     """
     Finds a user's credential and profile record by Capital.com Account ID.

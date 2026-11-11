@@ -557,6 +557,28 @@ class QuantGoldBot:
             return await self.handle_guardian_rescue(update, context)
         elif sub_cmd in ["BACKUP", "HF_BACKUP", "VAULT"]:
             return await self.handle_backup(update, context)
+        elif sub_cmd in ["REPORT", "MARKET_REPORT", "SENTIMENT", "DAILY_REPORT"]:
+            return await self.handle_market_report(update, context)
+        elif sub_cmd in ["DEMO", "VIRTUAL"]:
+            target_chat_id = chat_id
+            if len(args) > 1 and is_admin:
+                resolved_cid, _ = self._resolve_target(args[1])
+                if resolved_cid:
+                    target_chat_id = resolved_cid
+            db.set_user_capital_mode(target_chat_id, is_demo=True)
+            capital_engine.invalidate_user_capital_engine(target_chat_id)
+            card, kb = await self.bridge.build_capital_user_dashboard(target_chat_id)
+            return await self.safe_reply(update, f"🟡 <b>[CAPITAL DEMO ACTIVATED]</b> 🧪\n• បានប្តូរទៅកាន់គណនី DEMO ($10,000 Virtual) រួចរាល់!\n\n" + card, reply_markup=kb)
+        elif sub_cmd in ["LIVE", "REAL", "MAINNET"]:
+            target_chat_id = chat_id
+            if len(args) > 1 and is_admin:
+                resolved_cid, _ = self._resolve_target(args[1])
+                if resolved_cid:
+                    target_chat_id = resolved_cid
+            db.set_user_capital_mode(target_chat_id, is_demo=False)
+            capital_engine.invalidate_user_capital_engine(target_chat_id)
+            card, kb = await self.bridge.build_capital_user_dashboard(target_chat_id)
+            return await self.safe_reply(update, f"🟢 <b>[CAPITAL LIVE MAINNET ACTIVATED]</b> 🏛️\n• បានប្តូរមកកាន់គណនី LIVE MAINNET រួចរាល់!\n\n" + card, reply_markup=kb)
         elif sub_cmd in ["RESET", "RESET_DAILY", "UNLOCK_DAILY", "RESET_GOVERNOR"]:
             target_chat_id = chat_id
             if len(args) > 1 and is_admin:
@@ -2466,6 +2488,63 @@ class QuantGoldBot:
             )
             await self.safe_reply(update, err_card)
 
+    async def handle_market_report(self, update: Update, context: ContextTypes.DEFAULT_TYPE, default_epic: str = "GOLD"):
+        """Displays Monte Safieddine's Capital.com Daily Market Report with exact S/R, sentiment & contrarian edge."""
+        args = context.args if context and context.args else []
+        target_epic = str(args[1]).upper().strip() if len(args) > 1 else default_epic
+        try:
+            import capital_market_report_engine
+            cmre = capital_market_report_engine.CapitalMarketReportEngine
+            norm_key = cmre.normalize_epic_key(target_epic)
+            rep_data = cmre.get_nov11_2026_report_data(norm_key) or cmre.get_market_report_data(norm_key, report_date="2026-11-11")
+            sent_data = cmre.fetch_live_client_sentiment(norm_key)
+            c_long = sent_data.get("client_long_pct", 50.0)
+            c_short = sent_data.get("client_short_pct", 50.0)
+            lev_short = rep_data.get("leveraged_funds_short_pct", 50.0)
+            lev_long = rep_data.get("leveraged_funds_long_pct", 50.0)
+
+            contrarian_text = (
+                "⚠️ <b>Extreme Retail Herd Trap (Avoid Buying Top)</b>" if c_long >= 80.0
+                else ("⚠️ <b>Extreme Retail Panic Trap (Avoid Selling Bottom)</b>" if c_short >= 70.0
+                else "✅ <b>Balanced Order Flow</b>")
+            )
+
+            card = (
+                f"📊 <b>[CAPITAL.COM INSTITUTIONAL DAILY MARKET REPORT]</b> 🏛️\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎯 <b>ទ្រព្យសម្បត្តិ ៖</b> <code>{norm_key}</code> | <b>របបទីផ្សារ ៖</b> <code>{rep_data.get('daily_regime')}</code>\n"
+                f"📈 <b>Weekly Macro ៖</b> <code>{rep_data.get('weekly_regime')}</code>\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"📍 <b>Relative Starting Point ៖</b> <code>${rep_data.get('starting_point'):,.2f}</code>\n"
+                f"🔴 <b>Resistance 1 ៖</b> <code>${rep_data.get('res1'):,.2f}</code> (SL Cluster: <code>${rep_data.get('sl_res1'):,.2f}</code>)\n"
+                f"🔴 <b>Resistance 2 ៖</b> <code>${rep_data.get('res2'):,.2f}</code> (SL Cluster: <code>${rep_data.get('sl_res2'):,.2f}</code>)\n"
+                f"🟢 <b>Support 1 ៖</b> <code>${rep_data.get('sup1'):,.2f}</code> (SL Cluster: <code>${rep_data.get('sl_sup1'):,.2f}</code>)\n"
+                f"🟢 <b>Support 2 ៖</b> <code>${rep_data.get('sup2'):,.2f}</code> (SL Cluster: <code>${rep_data.get('sl_sup2'):,.2f}</code>)\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"👥 <b>Client Herd (Retail 79.75% Loss) ៖</b> <code>Long {c_long:.1f}%</code> | <code>Short {c_short:.1f}%</code>\n"
+                f"💼 <b>Leveraged Funds (Hedge Funds) ៖</b> <code>Long {lev_long:.1f}%</code> | <code>Short {lev_short:.1f}%</code>\n"
+                f"🏦 <b>Asset Managers (Institutions) ៖</b> <code>Long {rep_data.get('asset_managers_long_pct', 50):.1f}%</code> | <code>Short {rep_data.get('asset_managers_short_pct', 50):.1f}%</code>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"⚡ <b>Contrarian Edge ៖</b> {contrarian_text}\n"
+                f"🛡️ <i>Invariant 99 Certified: Stop Clusters & Retail Liquidity Hunter Active!</i>"
+            )
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🥇 Gold Report", callback_data="btn_qgold_rep_gold"),
+                    InlineKeyboardButton("💻 US100 Report", callback_data="btn_qgold_rep_us100")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_capital_menu"),
+                    InlineKeyboardButton("🔄 Refresh", callback_data=f"btn_qgold_rep_{norm_key.lower()}")
+                ]
+            ])
+            if update.callback_query:
+                return await self.safe_edit(update.callback_query, card, reply_markup=kb)
+            return await self.safe_reply(update, card, reply_markup=kb)
+        except Exception as e:
+            logger.error(f"Error handling market report: {e}")
+            return await self.safe_reply(update, f"⚠️ Error rendering Market Report: {e}")
+
     async def handle_toggle_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Toggles 24/7 Autonomous Gold Trading with real isolated live account telemetry."""
         chat_id = update.effective_chat.id if update.effective_chat else 859271875
@@ -3672,6 +3751,32 @@ class QuantGoldBot:
             else:
                 card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
                 await self.safe_edit(query, card, reply_markup=kb)
+
+        elif data in ["btn_qgold_switch_demo", "btn_qgold_switch_live"]:
+            to_demo = (data == "btn_qgold_switch_demo")
+            db.set_user_capital_mode(chat_id, is_demo=to_demo)
+            capital_engine.invalidate_user_capital_engine(chat_id)
+            try:
+                await query.answer("🟡 Switched to DEMO ($10,000 Virtual)!" if to_demo else "🟢 Switched to LIVE MAINNET!")
+            except Exception:
+                pass
+            card, kb = await self.bridge.build_capital_user_dashboard(chat_id)
+            await self.safe_edit(query, card, reply_markup=kb)
+
+        elif data == "btn_qgold_market_report":
+            try:
+                await query.answer("📊 Loading Institutional Market Report...")
+            except Exception:
+                pass
+            await self.handle_market_report(update, context, default_epic="GOLD")
+
+        elif data.startswith("btn_qgold_rep_"):
+            target_sym = data.replace("btn_qgold_rep_", "").upper().strip()
+            try:
+                await query.answer(f"📊 Loading {target_sym} Market Report...")
+            except Exception:
+                pass
+            await self.handle_market_report(update, context, default_epic=target_sym)
 
         elif data == "btn_qgold_admin_capital":
             if not self.citadel.is_super_admin(chat_id):

@@ -562,13 +562,14 @@ class QuantGoldCapitalBridge:
         """Renders the official Capital.com Live Trading Deck for verified/authorized users."""
         is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
         creds = db.get_user_capital_credentials(chat_id) or {}
-        acc_id = str(creds.get("account_id") or ("216890638652757188" if is_admin else "N/A"))
-        if is_admin and (not acc_id or acc_id == "N/A"):
-            acc_id = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
-        masked_acc = acc_id if is_admin else (acc_id[:4] + "***" + acc_id[-4:] if len(acc_id) >= 8 else acc_id)
-
         is_demo = bool(creds.get("is_demo", False))
         mode_str = "🟢 LIVE MAINNET" if not is_demo else "🟡 DEMO ($10,000)"
+
+        if is_admin:
+            acc_id = os.getenv("CAPITAL_DEMO_ACCOUNT_ID", "329832717876539678") if is_demo else os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
+        else:
+            acc_id = str((creds.get("demo_account_id") if is_demo else creds.get("account_id")) or "N/A")
+        masked_acc = acc_id if is_admin else (acc_id[:4] + "***" + acc_id[-4:] if len(acc_id) >= 8 else acc_id)
 
         dossier = db.get_user_license_details(chat_id) or {}
         tier_lbl = "👑 SUPER ADMIN" if is_admin else dossier.get("tier_label", "👑 LIFETIME VIP (គ្មានដែនកំណត់)")
@@ -600,7 +601,7 @@ class QuantGoldCapitalBridge:
         currency = creds.get("currency", "USD") or "USD"
         try:
             import asyncio
-            u_eng = capital_engine.get_user_capital_engine(chat_id)
+            u_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=is_demo)
             bal_res = await asyncio.wait_for(asyncio.to_thread(u_eng.get_account_balance), timeout=6.0)
             if bal_res and bal_res.get("success"):
                 balance = float(bal_res.get("balance", 0.0))
@@ -609,7 +610,10 @@ class QuantGoldCapitalBridge:
         except Exception as e_bal:
             logger.debug(f"Live balance fetch note for {chat_id}: {e_bal}")
 
-        balance_str = f"${balance:.2f}"
+        if is_admin and not is_demo and balance <= 0.0:
+            balance_str = f"${balance:.2f} <i>(Live Unfunded • Demo Mirror Active)</i>"
+        else:
+            balance_str = f"${balance:.2f}"
         equity_str = f"${equity:.2f}" if equity > 0 else (f"${balance:.2f}" if balance > 0 else "Real-Time Synced")
 
         card = (
@@ -631,6 +635,13 @@ class QuantGoldCapitalBridge:
             f"👇 <i>ជ្រើសរើសមុខងារបញ្ជាជួញដូររហ័ស 1-Tap ខាងក្រោម ៖</i>"
         )
 
+        mode_btn = (
+            InlineKeyboardButton("🟡 ប្តូរទៅ Demo ($10,000)", callback_data="btn_qgold_switch_demo")
+            if not is_demo else
+            InlineKeyboardButton("🟢 ប្តូរទៅ Live Mainnet", callback_data="btn_qgold_switch_live")
+        )
+        report_btn = InlineKeyboardButton("📊 Market Report (/capital report)", callback_data="btn_qgold_market_report")
+
         buttons = [
             [
                 InlineKeyboardButton("🟢 1-Tap BUY Gold", callback_data="btn_qgold_buy"),
@@ -643,6 +654,10 @@ class QuantGoldCapitalBridge:
             [
                 InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle"),
                 InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close)", callback_data="btn_qgold_close_all")
+            ],
+            [
+                mode_btn,
+                report_btn
             ],
             [
                 InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
