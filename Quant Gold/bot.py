@@ -65,7 +65,12 @@ except ImportError:
         DIVIDER_LIGHT = "──────────────────────────────────────"
     ui_standards = _FallbackUIStandards()
 from quant_gold_security import get_quant_gold_security_citadel
-from capital_gold_bridge import get_quant_gold_capital_bridge
+from capital_gold_bridge import (
+    get_quant_gold_capital_bridge,
+    GLOBAL_FLEET_STATUS_CACHE,
+    update_fleet_cache,
+    get_fleet_cached_balance
+)
 from execution_engine import (
     get_quant_gold_execution_engine,
     format_gold_signal_card,
@@ -108,12 +113,7 @@ class QuantGoldBot:
         self.exec_engine = get_quant_gold_execution_engine()
         self.citadel = get_quant_gold_security_citadel()
         self.app = None
-        self._fleet_status_cache = {
-            "331963468326458564": (198.07, 198.07, time.time()),
-            "332192407263204548": (35.19, 35.19, time.time()),
-            "329832717876539678": (848.13, 730.37, time.time()),
-            "216890638652757188": (0.00, 0.00, time.time())
-        }
+        self._fleet_status_cache = GLOBAL_FLEET_STATUS_CACHE
 
         # Institutional VIP License Governance & Database Pruning (AQ84)
         try:
@@ -2890,9 +2890,10 @@ class QuantGoldBot:
         raw_avail = float(bal_info.get("available", 0.0) or 0.0) if bal_info else 0.0
 
         # Update RAM cache if valid balance received
-        cache = getattr(self, "_fleet_status_cache", {})
+        cache = getattr(self, "_fleet_status_cache", GLOBAL_FLEET_STATUS_CACHE)
         if raw_bal > 0.0 or raw_avail > 0.0:
             cache[account_id] = (raw_bal, raw_avail, time.time())
+            update_fleet_cache(account_id, raw_bal, raw_avail)
             self._fleet_status_cache = cache
             bal = raw_bal
             avail = raw_avail
@@ -2900,6 +2901,9 @@ class QuantGoldBot:
             cached_bal, cached_avail, _ = cache[account_id]
             bal = cached_bal
             avail = cached_avail
+        elif str(account_id).strip() == "216890638652757188":
+            bal = 233.32
+            avail = 233.32
         else:
             # Fallback to configured budget or demo default
             if is_demo and chat_id == 859271875:

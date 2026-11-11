@@ -821,14 +821,14 @@ class CapitalComEngine:
                     # Priority 0: Match desired_account_id if specified (Invariant 75 Multi-Account Isolation)
                     if self.desired_account_id:
                         for acc in accounts:
-                            if str(acc.get("accountId")) == str(self.desired_account_id):
+                            if str(acc.get("accountId")).strip() == str(self.desired_account_id).strip():
                                 primary = acc
                                 break
 
                     # Priority 1: Match authenticated session account ID (from POST /session currentAccountId)
                     if not primary and self.active_account_id:
                         for acc in accounts:
-                            if str(acc.get("accountId")) == str(self.active_account_id):
+                            if str(acc.get("accountId")).strip() == str(self.active_account_id).strip():
                                 primary = acc
                                 break
                     
