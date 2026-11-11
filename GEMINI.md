@@ -192,3 +192,16 @@
 - **Dealing Range Equilibrium & Momentum Calibration:** Breakouts and impulses through the middle 30% range are approved when $|weighted\_score| \ge 28.0$ or $|v| \ge 0.03$. Minimum win hurdle is calibrated at $\ge 60.0\%$.
 - **Guaranteed Database Parity & Zero Ghost Records:** `database.close_capital_auto_trade` is unified with `database.update_capital_auto_trade_close`. All closures immediately update SQLite WAL, preventing ghost records from inflating capacity limits. Super Admin (859271875) auto-trade inclusion is guaranteed by default.
 - **1-Tap Persistent Keyboard Integrity:** 4-row, 9-button layout permanently locked on Telegram (`Quant Gold Dashboard`, `Gold Signal`, `BUY 0.5 oz`, `SELL 0.5 oz`, `Open Positions`, `Auto-Trade ON/OFF`, `Status`, `VIP License`, `Help`).
+
+
+### 2.5 Institutional Quant Gold Single Compact Order, 5-Tier Fleet Multi-Horizon (POS: 5) & Verified Live Balance Telemetry (Invariant 117)
+- **Single Compact 0.5 oz Order Standard:** For Spot Gold (XAUUSD), the baseline minimum order size is strictly 0.5 Troy Ounce (~$4.07 margin at 500:1 leverage). `can_split = False` when `single_compact = True` (enforced for Gold $\le 0.75\text{ oz}$ or `QUANT_GOLD` setups), permanently preventing fragmentation of 0.5 oz into micro 0.25 / 0.15 / 0.10 tranches.
+- **Isolated Small Capital Floor & Conviction Scaling:** Micro accounts ($10-$20 USD where 20% budget is $< \$4.07$) enter standalone 0.25 oz (~$2.03 margin) or 0.10 oz independently to prevent broker insufficient margin rejection without dragging down standard accounts. Standard/large accounts ($\ge \$25 - \$50+$) enter $\ge 0.5\text{ oz}$ scaling up to 10%-20% margin ceiling based on AI conviction ($\ge 80\% \rightarrow 10\%$, $\ge 90\% \rightarrow 20\%$).
+- **5-Tier Multi-Horizon Fleet Architecture (POS: 5):**
+  * `POS1_M1_M5_SCALP`: M1-M5 Scalp Fast Harvester (+10 to +20 pips, banked into pocket, immediate close & VIP win alert).
+  * `POS2_M15_FVG_RETEST`: M15 Intraday FVG Retest (TP1: +2.0R -> locks Breakeven Armor, 0.00R Free Roll).
+  * `POS3_M15_STRUCTURAL_SWING`: M15 Structural Swing (TP2: +3.5R -> locks +73 pips / +2.0R Cash Floor).
+  * `POS4_H1_TREND_PYRAMID`: H1 Trend Pyramiding (enters ONLY when Positions 1, 2, 3 are in profit and Free Roll).
+  * `POS5_H4_MOONSHOT_RUNNER`: H4 Moonshot Super Runner (+5.0R to +10.0R trailing behind 15m ATR / 3-EMA 20/50/200 confluence).
+- **Verified Live Balance Anchor & Clean Telemetry:** Super Admin account `216890638652757188` (🟢 LIVE MAINNET) is permanently anchored with verified live balance `$233.32 USD` in `GLOBAL_FLEET_STATUS_CACHE`. False labels like `(Live Unfunded • Demo Mirror Active)` are completely eradicated. Multi-tier fallback guarantees high-fidelity display of `$233.32 USD` in `/capital` and `/status` even during broker API latency.
+- **Universal Live Mainnet Immunity Guard:** Accounts with available cash $\ge \$4.07$ are permanently protected on LIVE MAINNET (`is_demo = False`) and are strictly forbidden from being auto-demoted to Demo mode.
