@@ -49,6 +49,9 @@ def _get_tradfi_precision(epic_str: str, price_val: float = 0.0) -> int:
         return 5
     return 2
 
+# Global set of account IDs that returned error.invalid.accountId (preventing log noise and repetitive failures)
+_GLOBAL_INVALID_SWITCH_ACCOUNTS = {"332192407263204548"}
+
 FOREX_FIAT_CURRENCIES = {
     "EUR", "GBP", "USD", "JPY", "AUD", "CAD", "CHF", "NZD",
     "SGD", "HKD", "CNH", "SEK", "NOK", "ZAR", "MXN", "TRY", "PLN"
@@ -646,12 +649,15 @@ class CapitalComEngine:
 
                 # Auto-switch to desired account if specified and different from currentAccountId
                 if self.desired_account_id and self.desired_account_id != current_acc:
-                    logger.info(f"🔄 [Capital.com] Auto-switching session to requested account {self.desired_account_id}...")
-                    switched = self.switch_account(self.desired_account_id)
-                    if switched:
-                        self.active_account_id = self.desired_account_id
+                    if self.desired_account_id in _GLOBAL_INVALID_SWITCH_ACCOUNTS:
+                        logger.debug(f"ℹ️ [Capital.com] Desired account {self.desired_account_id} not switchable on current session credentials; skipping auto-switch.")
                     else:
-                        logger.warning(f"⚠️ [Capital.com] Could not switch to {self.desired_account_id}, active remains {current_acc}")
+                        logger.info(f"🔄 [Capital.com] Auto-switching session to requested account {self.desired_account_id}...")
+                        switched = self.switch_account(self.desired_account_id)
+                        if switched:
+                            self.active_account_id = self.desired_account_id
+                        else:
+                            logger.warning(f"⚠️ [Capital.com] Could not switch to {self.desired_account_id}, active remains {current_acc}")
 
                 target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
                 if target_cid and self.active_account_id:
@@ -973,10 +979,9 @@ class CapitalComEngine:
         """
         if getattr(self, "is_guest", False) or not self.ensure_session():
             return False
-        if not hasattr(self, "_invalid_switch_accounts"):
-            self._invalid_switch_accounts = set()
+        global _GLOBAL_INVALID_SWITCH_ACCOUNTS
         acc_str = str(account_id or "").strip()
-        if not acc_str or acc_str in self._invalid_switch_accounts:
+        if not acc_str or acc_str in _GLOBAL_INVALID_SWITCH_ACCOUNTS:
             return False
         url = f"{self.base_url}/session"
         try:
@@ -988,7 +993,7 @@ class CapitalComEngine:
                 return True
             else:
                 if "error.invalid.accountId" in res.text:
-                    self._invalid_switch_accounts.add(acc_str)
+                    _GLOBAL_INVALID_SWITCH_ACCOUNTS.add(acc_str)
                     logger.debug(f"ℹ️ [CAPITAL SWITCH] Account {acc_str} does not belong to active login credentials: HTTP {res.status_code}")
                 else:
                     logger.warning(f"⚠️ [CAPITAL SWITCH] Failed to switch account to {acc_str}: HTTP {res.status_code} {res.text}")

@@ -13,6 +13,7 @@ Protects entire account capital from catastrophic multi-asset Black Swan contagi
 3. Automated Telegram Alert to Super Admin & Active VIP Users upon activation.
 """
 
+import asyncio
 import time
 import datetime
 import sqlite3
