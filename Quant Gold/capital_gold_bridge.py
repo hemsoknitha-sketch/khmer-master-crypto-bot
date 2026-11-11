@@ -671,6 +671,10 @@ class QuantGoldCapitalBridge:
 
         if is_admin:
             buttons.append([
+                InlineKeyboardButton("🛑 បិទគ្រប់ Positions កងនាវា (Fleet Close)", callback_data="btn_qgold_fleet_close_all"),
+                InlineKeyboardButton("⏸️ ផ្អាក Auto កងនាវា (Fleet Off)", callback_data="btn_qgold_fleet_pause")
+            ])
+            buttons.append([
                 InlineKeyboardButton("👥 User Registry (/admin_users)", callback_data="admin_users:list:0"),
                 InlineKeyboardButton("👑 Fleet Controller (/admin_capital)", callback_data="btn_qgold_admin_capital")
             ])

@@ -327,8 +327,15 @@ class QuantGoldBot:
         if not self.citadel.is_super_admin(chat_id):
             return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
 
-        reason = " ".join(context.args) if context and context.args else "SUPER_ADMIN_MANUAL_LOCKDOWN"
+        args = context.args if context and context.args else []
+        reason = " ".join(args) if args else "SUPER_ADMIN_MANUAL_LOCKDOWN"
         self.citadel.trigger_emergency_lockdown(chat_id, reason)
+        db.set_capital_global_trading_switch(False, "ALL")
+
+        close_note = ""
+        if args and any(x.lower() in ["close", "closeall", "panic", "all"] for x in args):
+            res = await self.execute_fleet_close_all(chat_id)
+            close_note = f"\n• បានបិទ Positions កងនាវាភ្លាមៗ ៖ <code>{res.get('total_closed', 0)} Positions</code>"
 
         msg = (
             f"🚨 <b>[SUPER ADMIN EMERGENCY LOCKDOWN ENGAGED]</b> 🛑\n"
@@ -336,6 +343,7 @@ class QuantGoldBot:
             f"• បញ្ជាដោយ ៖ <code>Super Admin #{chat_id}</code>\n"
             f"• មូលហេតុ ៖ <code>{reason}</code>\n"
             f"• ស្ថានភាព ៖ <b>TRADING HALTED</b> (Position ថ្មីទាំងអស់ត្រូវបានផ្អាក)\n"
+            f"• Global Trading Switch ៖ <code>🔴 OFF</code>{close_note}\n"
             f"• ដោះសោរវិញ ៖ វាយពាក្យបញ្ជា <code>/unlock</code>"
         )
         await self.safe_reply(update, msg)
@@ -347,10 +355,12 @@ class QuantGoldBot:
             return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
 
         self.citadel.release_emergency_lockdown(chat_id)
+        db.set_capital_global_trading_switch(True, "ALL")
         msg = (
             f"🟢 <b>[CIRCUIT BREAKER RELEASED]</b> ✅\n"
             f"══════════════════════════════════════\n"
             f"• ដោះសោរដោយ ៖ <code>Super Admin #{chat_id}</code>\n"
+            f"• Global Trading Switch ៖ <code>🟢 ON</code>\n"
             f"• ស្ថានភាព ៖ <b>ARMED & SECURE (Trading Active)</b>\n"
             f"• ប្រព័ន្ធជួញដូរ Quant Gold ដំណើរការប្រក្រតីឡើងវិញ។"
         )
@@ -514,6 +524,80 @@ class QuantGoldBot:
             return uid, {"chat_id": uid, "account_id": "N/A", "is_demo": False, "is_referral_verified": False}
         except ValueError:
             return None, None
+
+    async def execute_fleet_close_all(self, caller_chat_id: int) -> Dict[str, Any]:
+        """
+        Super Admin Fleet Master Kill-Switch:
+        Closes all open Gold and TradFi positions across all registered VIP accounts and Super Admin simultaneously.
+        """
+        if str(caller_chat_id) != "859271875" and not db.is_admin(caller_chat_id):
+            return {"success": False, "error": "UNAUTHORIZED"}
+
+        # Gather all unique chat_ids from credentials and auto config
+        conn = db.get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT DISTINCT chat_id, is_demo FROM user_capital_credentials")
+        cred_users = c.fetchall()
+        c.execute("SELECT DISTINCT chat_id, is_demo FROM capital_auto_config WHERE is_enabled = 1")
+        cfg_users = c.fetchall()
+        conn.close()
+
+        user_map: Dict[int, bool] = {}
+        for r in cred_users:
+            if r[0]:
+                user_map[int(r[0])] = bool(r[1])
+        for r in cfg_users:
+            if r[0] and int(r[0]) not in user_map:
+                user_map[int(r[0])] = bool(r[1])
+
+        # Ensure Super Admin is included
+        user_map[859271875] = False
+
+        total_closed = 0
+        closed_users = []
+        errors = []
+
+        async def _close_single_user(uid: int, is_demo: bool):
+            nonlocal total_closed
+            try:
+                eng = capital_engine.get_user_capital_engine(uid, is_demo=is_demo)
+                if not eng:
+                    return
+                # Broker live positions flush
+                res = await asyncio.to_thread(eng.close_all_capital_positions)
+                n = int(res.get("closed_count", 0) if isinstance(res, dict) else 0)
+
+                # Also sweep open database trade records for this user
+                db_trades = db.get_capital_auto_trades_for_user(uid) or []
+                for t in db_trades:
+                    if str(t.get("status", "")).upper() == "OPEN":
+                        d_id = t.get("deal_id")
+                        if d_id and d_id != "OK":
+                            try:
+                                await asyncio.to_thread(eng.close_position, deal_id=d_id)
+                            except Exception:
+                                pass
+                            if hasattr(db, "update_capital_auto_trade_close"):
+                                db.update_capital_auto_trade_close(deal_id=str(d_id), exit_price=0.0, pnl=0.0)
+                            elif hasattr(db, "close_capital_auto_trade"):
+                                db.close_capital_auto_trade(deal_id=str(d_id), exit_price=0.0, exit_reason="SUPER_ADMIN_FLEET_CLOSE_ALL")
+
+                if n > 0:
+                    total_closed += n
+                    closed_users.append((uid, n))
+            except Exception as e_user:
+                errors.append(f"User {uid}: {e_user}")
+
+        tasks = [_close_single_user(uid, is_demo) for uid, is_demo in user_map.items()]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        return {
+            "success": True,
+            "total_closed": total_closed,
+            "users_affected": len(closed_users),
+            "total_users_checked": len(user_map),
+            "errors": errors
+        }
 
     async def handle_capital(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handles /capital and /gold commands with optional subcommands: on, off, inspect, positions, close."""
@@ -1409,6 +1493,41 @@ class QuantGoldBot:
             db.set_capital_auto_config(chat_id=cid, enabled=False)
             acc = u_info.get("account_id") if u_info else target
             return await self.safe_reply(update, f"⏸️ <b>[ADMIN]</b> បានផ្អាក Quant Gold 24/7 សម្រាប់ <code>Account: {acc}</code> (Chat ID: {cid})!")
+        elif sub in ["closeall", "close_all", "panic_all", "close", "flush"]:
+            target = args[1] if len(args) > 1 else "all"
+            if str(target).lower() == "all":
+                res = await self.execute_fleet_close_all(chat_id)
+                n_closed = res.get("total_closed", 0)
+                n_users = res.get("users_affected", 0)
+                n_total = res.get("total_users_checked", 0)
+                db.disable_all_capital_users(engine="AUTO", preserve_super_admin=False)
+                return await self.safe_reply(
+                    update,
+                    f"🛑 <b>[SUPER ADMIN FLEET EMERGENCY CLOSE ALL]</b> 🚨\n"
+                    f"══════════════════════════════════════\n"
+                    f"• បានបិទ Positions ទាំងអស់ក្នុងកងនាវា ៖ <code>{n_closed} Positions</code>\n"
+                    f"• គណនីដែលបានបិទរួចរាល់ ៖ <code>{n_users} / {n_total} Users</code>\n"
+                    f"• ស្ថានភាព Auto-Trade ៖ <code>🔴 OFF (Fleet Paused All)</code>\n"
+                    f"• មូលធនកងនាវា ៖ <b>100% FLAT CASH SECURED</b>\n"
+                    f"══════════════════════════════════════\n"
+                    f"<i>រាល់ការវិនិយោគរបស់ VIP Users ទាំងអស់ត្រូវបានបិទ និងចាក់សោរសាច់ប្រាក់សុវត្ថិភាពភ្លាមៗ!</i>"
+                )
+            cid, u_info = self._resolve_target(target)
+            if not cid:
+                return await self.safe_reply(update, f"⚠️ រកមិនឃើញ target: <code>{target}</code>")
+            cfg = db.get_capital_auto_config(cid) or {}
+            is_demo = bool(cfg.get("is_demo", False))
+            eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+            res = await asyncio.to_thread(eng.close_all_capital_positions) if eng else {}
+            n_closed = int(res.get("closed_count", 0) if isinstance(res, dict) else 0)
+            db.set_capital_auto_config(chat_id=cid, enabled=False)
+            acc = u_info.get("account_id") if u_info else target
+            return await self.safe_reply(
+                update,
+                f"🛑 <b>[ADMIN USER CLOSE ALL]</b>\n"
+                f"• បានបិទ <code>{n_closed} Positions</code> សម្រាប់ <code>Account: {acc}</code> (Chat ID: {cid})!\n"
+                f"• Auto-Trade ត្រូវបានផ្អាកជាស្វ័យប្រវត្ត។"
+            )
         elif sub in ["fleet", "balances", "users"]:
             # Query all registered capital credentials
             conn = db.get_db_connection()
@@ -2365,10 +2484,31 @@ class QuantGoldBot:
             await self.safe_reply(update, "\n".join(lines), reply_markup=kb)
 
     async def handle_close_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Closes all active Gold positions immediately."""
+        """Closes all active Gold positions immediately for user or entire fleet if admin."""
         chat_id = update.effective_chat.id
         if not chat_id:
             return
+
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+        args = context.args if context and context.args else []
+
+        # Super Admin Fleet-Wide Close All (/close all, /close_all all, /panic all)
+        if args and str(args[0]).lower() == "all" and is_admin:
+            res = await self.execute_fleet_close_all(chat_id)
+            n_closed = res.get("total_closed", 0)
+            n_users = res.get("users_affected", 0)
+            n_total = res.get("total_users_checked", 0)
+            db.disable_all_capital_users(engine="AUTO", preserve_super_admin=False)
+            return await self.safe_reply(
+                update,
+                f"🛑 <b>[SUPER ADMIN FLEET CLOSE ALL]</b> 🚨\n"
+                f"══════════════════════════════════════\n"
+                f"• បានបិទ Positions ទាំងអស់ក្នុងកងនាវា ៖ <code>{n_closed} Positions</code>\n"
+                f"• គណនីដែលបានបិទរួចរាល់ ៖ <code>{n_users} / {n_total} Users</code>\n"
+                f"• ស្ថានភាព Auto-Trade ៖ <code>🔴 OFF (Fleet Paused All)</code>\n"
+                f"• មូលធនកងនាវា ៖ <b>100% FLAT CASH SECURED</b>\n"
+                f"══════════════════════════════════════"
+            )
 
         # Fiduciary VIP Referral & Authorization Check (Invariant 36)
         auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
@@ -3534,6 +3674,64 @@ class QuantGoldBot:
             except Exception:
                 pass
             await self.handle_close_all(update, context)
+
+        elif data == "btn_qgold_fleet_close_all":
+            is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id)
+            if not is_admin:
+                return await query.answer("⛔ សិទ្ធិសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+            try:
+                await query.answer("🚨 កំពុងបិទ Positions ទាំងអស់របស់កងនាវា...", show_alert=False)
+            except Exception:
+                pass
+            res = await self.execute_fleet_close_all(chat_id)
+            db.disable_all_capital_users(engine="AUTO", preserve_super_admin=False)
+            msg = (
+                f"🛑 <b>[SUPER ADMIN FLEET EMERGENCY CLOSE ALL]</b> 🚨\n"
+                f"══════════════════════════════════════\n"
+                f"• បានបិទ Positions ទាំងអស់ក្នុងកងនាវា ៖ <code>{res.get('total_closed', 0)} Positions</code>\n"
+                f"• គណនីដែលបានបិទរួចរាល់ ៖ <code>{res.get('users_affected', 0)} / {res.get('total_users_checked', 0)} Users</code>\n"
+                f"• ស្ថានភាព Auto-Trade ៖ <code>🔴 OFF (Fleet Paused All)</code>\n"
+                f"• មូលធនកងនាវា ៖ <b>100% FLAT CASH SECURED</b>\n"
+                f"══════════════════════════════════════\n"
+                f"<i>រាល់ការវិនិយោគរបស់ VIP Users ទាំងអស់ត្រូវបានបិទ និងចាក់សោរសាច់ប្រាក់សុវត្ថិភាពភ្លាមៗ!</i>"
+            )
+            await self.safe_reply(update, msg)
+
+        elif data == "btn_qgold_fleet_pause":
+            is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id)
+            if not is_admin:
+                return await query.answer("⛔ សិទ្ធិសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+            try:
+                await query.answer("⏸️ កំពុងផ្អាក Auto-Trade របស់កងនាវាទាំងអស់...", show_alert=False)
+            except Exception:
+                pass
+            n = db.disable_all_capital_users(engine="AUTO", preserve_super_admin=True)
+            await self.safe_reply(
+                update,
+                f"⏸️ <b>[SUPER ADMIN FLEET PAUSED]</b> 🔴\n"
+                f"══════════════════════════════════════\n"
+                f"• បានផ្អាក Quant Gold 24/7 សម្រាប់ VIP Users ទាំងអស់ ៖ <code>{n} Users</code>\n"
+                f"• សុវត្ថិភាព Super Admin ៖ <code>Preserved Active</code>\n"
+                f"══════════════════════════════════════"
+            )
+
+        elif data == "btn_qgold_fleet_resume":
+            is_admin = (chat_id == 859271875) or self.citadel.is_super_admin(chat_id)
+            if not is_admin:
+                return await query.answer("⛔ សិទ្ធិសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+            try:
+                await query.answer("🚀 កំពុងបើក Auto-Trade របស់កងនាវាទាំងអស់ឡើងវិញ...", show_alert=False)
+            except Exception:
+                pass
+            n = db.enable_all_capital_users(engine="AUTO", budget=50.0, max_positions=5, is_demo=False)
+            await self.safe_reply(
+                update,
+                f"🚀 <b>[SUPER ADMIN FLEET RESUMED]</b> 🟢\n"
+                f"══════════════════════════════════════\n"
+                f"• បានបើកដំណើរការ Quant Gold 24/7 សម្រាប់ VIP Users ទាំងអស់ ៖ <code>{n} Users</code>\n"
+                f"• ថវិកាកំណត់ ៖ <code>$50.00 / Trade (Max 5 Pos)</code>\n"
+                f"══════════════════════════════════════"
+            )
 
         elif data in ["btn_cap_reset_daily", "btn_cap_governor_reset", "btn_cap_daily_reset"]:
             try:

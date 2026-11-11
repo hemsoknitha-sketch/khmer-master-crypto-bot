@@ -1178,9 +1178,32 @@ class QuantGoldExecutionEngine:
           2. Agile Multi-Position Pyramiding (Scale-In across distinct structural levels)
           3. Trend Reversal Flip (Opposing Harvest & Instant Flip into new directional wave)
         """
+        # 0. Global Emergency Lockdown & Fleet Trading Switch Pre-Flight Checks
+        try:
+            from quant_gold_security import get_quant_gold_security_citadel
+            if get_quant_gold_security_citadel().is_locked():
+                logger.info("🚨 [CIRCUIT BREAKER ACTIVE] Quant Gold emergency lockdown is engaged. Fleet dispatch aborted.")
+                return {"success": False, "dispatched_count": 0, "reason": "EMERGENCY_LOCKDOWN"}
+        except Exception:
+            pass
+
+        if hasattr(db, "is_capital_global_trading_enabled") and not db.is_capital_global_trading_enabled("AUTO"):
+            logger.info("⏸️ [FLEET TRADING PAUSED] Global Capital Auto switch is OFF. Fleet dispatch aborted.")
+            return {"success": False, "dispatched_count": 0, "reason": "GLOBAL_SWITCH_OFF"}
+
         active_users = db.get_active_capital_auto_users()
         if not active_users:
-            active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 5, "is_demo": False}]
+            sa_cfg = db.get_capital_auto_config(859271875) or {}
+            if sa_cfg.get("enabled") or sa_cfg.get("is_enabled"):
+                active_users = [{
+                    "chat_id": 859271875,
+                    "budget": float(sa_cfg.get("budget", 500.0) or 500.0),
+                    "max_positions": int(sa_cfg.get("max_positions", 5) or 5),
+                    "is_demo": bool(sa_cfg.get("is_demo", False))
+                }]
+            else:
+                logger.debug("No active users registered for auto-trade and Super Admin is paused. Skipping fleet dispatch.")
+                return {"success": True, "dispatched_count": 0, "reason": "NO_ACTIVE_USERS"}
 
         sem = asyncio.Semaphore(30)
         sl_dist = abs(current_price - sl)
