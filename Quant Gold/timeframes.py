@@ -541,13 +541,13 @@ class GoldMultiTimeframeEngine:
 
         # Overall recommendation
         action = "HOLD"
-        # High-Probability Confluence Entry (Calibrated Institutional Alpha):
-        # Require weighted_score >= 25.0 (or <= -25.0), at least 9/19 timeframes aligned, and win_prob >= 62.0%
+        # High-Probability Confluence Entry (Calibrated Institutional Alpha & Adaptive Agility):
+        # Require weighted_score >= 25.0 (or <= -25.0), at least 8/19 timeframes aligned, and win_prob >= 60.0%
         # Macro check: must not directly oppose a severe macro counter-trend
         macro_opposed = (macro_score < -25.0 and dom_dir == "BUY") or (macro_score > 25.0 and dom_dir == "SELL")
-        if weighted_score >= 25.0 and bullish_count >= 9 and win_prob >= 62.0 and not macro_opposed:
+        if (weighted_score >= 25.0 and bullish_count >= 8 and win_prob >= 60.0 and not macro_opposed) or (weighted_score >= 32.0 and not macro_opposed):
             action = "BUY"
-        elif weighted_score <= -25.0 and bearish_count >= 9 and win_prob >= 62.0 and not macro_opposed:
+        elif (weighted_score <= -25.0 and bearish_count >= 8 and win_prob >= 60.0 and not macro_opposed) or (weighted_score <= -32.0 and not macro_opposed):
             action = "SELL"
 
         result = {

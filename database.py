@@ -3711,6 +3711,10 @@ def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float)
     conn.commit()
     conn.close()
 
+def close_capital_auto_trade(deal_id: str, exit_price: float = 0.0, exit_reason: str = "CLOSED", pnl: float = 0.0):
+    """Canonical alias for closing a capital auto trade in capital_auto_trades."""
+    return update_capital_auto_trade_close(deal_id=deal_id, exit_price=exit_price, pnl=pnl)
+
 def get_capital_auto_pnl_summary(chat_id: Optional[int] = None) -> dict:
     """
     Calculates cumulative PnL, win rate, total trades, behavioral attribution

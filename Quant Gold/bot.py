@@ -2387,6 +2387,7 @@ class QuantGoldBot:
             if pos_id and str(pos_id) not in seen_deals:
                 try:
                     u_eng.close_position(pos_id)
+                    db.close_capital_auto_trade(pos_id, exit_price=0.0, exit_reason="USER_MANUAL_CLOSE_ALL")
                     closed_cnt += 1
                 except Exception as e:
                     logger.warning(f"Error closing broker deal {pos_id}: {e}")

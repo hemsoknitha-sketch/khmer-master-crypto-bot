@@ -973,16 +973,25 @@ class CapitalComEngine:
         """
         if getattr(self, "is_guest", False) or not self.ensure_session():
             return False
+        if not hasattr(self, "_invalid_switch_accounts"):
+            self._invalid_switch_accounts = set()
+        acc_str = str(account_id or "").strip()
+        if not acc_str or acc_str in self._invalid_switch_accounts:
+            return False
         url = f"{self.base_url}/session"
         try:
-            res = self.session.put(url, headers=self.get_auth_headers(), json={"accountId": str(account_id)}, timeout=8)
+            res = self.session.put(url, headers=self.get_auth_headers(), json={"accountId": acc_str}, timeout=8)
             if res.status_code == 200:
-                self.active_account_id = str(account_id)
+                self.active_account_id = acc_str
                 self.invalidate_account_cache()
-                logger.info(f"🔄 [CAPITAL SWITCH] Successfully switched active account to {account_id}")
+                logger.info(f"🔄 [CAPITAL SWITCH] Successfully switched active account to {acc_str}")
                 return True
             else:
-                logger.warning(f"⚠️ [CAPITAL SWITCH] Failed to switch account to {account_id}: HTTP {res.status_code} {res.text}")
+                if "error.invalid.accountId" in res.text:
+                    self._invalid_switch_accounts.add(acc_str)
+                    logger.debug(f"ℹ️ [CAPITAL SWITCH] Account {acc_str} does not belong to active login credentials: HTTP {res.status_code}")
+                else:
+                    logger.warning(f"⚠️ [CAPITAL SWITCH] Failed to switch account to {acc_str}: HTTP {res.status_code} {res.text}")
         except Exception as e:
             logger.debug(f"switch_account exception: {e}")
         return False

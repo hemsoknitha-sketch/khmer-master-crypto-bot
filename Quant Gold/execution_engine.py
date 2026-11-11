@@ -455,15 +455,19 @@ class QuantGoldExecutionEngine:
                 pass
         return total_gold_found
 
-    def _clear_active_trade(self, deal_id: Optional[str] = None, cooldown: float = 300.0):
-        """Clears active trade state and activates post-trade cooldown."""
+    def _clear_active_trade(self, deal_id: Optional[str] = None, cooldown: float = 30.0, direction: Optional[str] = None):
+        """Clears active trade state and activates adaptive post-trade cooldown (Invariant 88)."""
         if deal_id is None or str(self._active_gold_deal_id) == str(deal_id):
+            if self._active_gold_direction:
+                self._last_closed_trade_direction = self._active_gold_direction
             self._active_gold_deal_id = None
             self._active_gold_direction = None
             self._active_gold_entry_price = 0.0
             self._active_gold_stage = "IDLE"
+        elif direction:
+            self._last_closed_trade_direction = direction
         self._last_trade_closed_ts = time.time()
-        self._trade_cooldown_seconds = cooldown
+        self._trade_cooldown_seconds = max(0.0, float(cooldown))
         self._cached_broker_gold_count = max(0, getattr(self, "_cached_broker_gold_count", 1) - 1)
         if deal_id:
             self._peak_upl_map.pop(str(deal_id), None)
@@ -658,9 +662,9 @@ class QuantGoldExecutionEngine:
 
         if has_consensus and cand_action in ["BUY", "SELL"]:
             # Gate 2: Chop Zone Injunction (Middle 30% Dealing Range is FORBIDDEN unless high conviction breakout)
-            if is_chop_zone and abs(weighted_score) < 45.0:
+            if is_chop_zone and abs(weighted_score) < 28.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.03:
                 final_action = "HOLD"
-                reason = f"BLOCKED_CHOP_ZONE: Price is in middle dealing range ({smc_m15.get('range_pct', 0.5):.2f})."
+                reason = f"BLOCKED_CHOP_ZONE: Price is in middle dealing range ({smc_m15.get('range_pct', 0.5):.2f}) with low momentum."
             # Gate 3: Anti-Oversold Short Guard & Anti-Overbought Long Guard (Invariant 1.1 Fiduciary Oath)
             elif cand_action == "SELL" and m15_tf.get("rsi", 50.0) <= 38.0:
                 final_action = "HOLD"
@@ -672,10 +676,10 @@ class QuantGoldExecutionEngine:
             elif regime == "RANDOM_WALK" and abs(weighted_score) < 20.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.02:
                 final_action = "HOLD"
                 reason = f"RANDOM_WALK_VETO: Composite Hurst is {hurst.get('composite'):.2f} with negligible momentum."
-            # Gate 5: Minimum Win Probability Hurdle (Super Smart High Win Rate: >= 68.0% or score >= 35.0)
-            elif win_prob < 68.0 and abs(weighted_score) < 35.0:
+            # Gate 5: Minimum Win Probability Hurdle (Super Smart High Win Rate: >= 60.0% or score >= 28.0)
+            elif win_prob < 60.0 and abs(weighted_score) < 28.0:
                 final_action = "HOLD"
-                reason = f"LOW_CONFIDENCE_VETO: Win Prob {win_prob:.1f}% < 68.0% and score {weighted_score:+.1f} < 35.0."
+                reason = f"LOW_CONFIDENCE_VETO: Win Prob {win_prob:.1f}% < 60.0% and score {weighted_score:+.1f} < 28.0."
             # Gate 6: Kalman Directional Velocity Confirmation
             elif cand_action == "BUY" and kalman.get("latent_velocity", 0.0) < -0.05:
                 final_action = "HOLD"
@@ -932,27 +936,46 @@ class QuantGoldExecutionEngine:
             has_existing = len(active_gold_trades) > 0
             existing_dir = str(active_gold_trades[0].get("direction", "BUY")).upper() if has_existing else None
 
-            # Step 1.9: Post-Trade Cooldown Gate (Prevents Chasing immediately after stop-out)
+            # Step 1.9: Adaptive Post-Trade Cooldown Gate (Invariant 88)
             time_since_close = now - self._last_trade_closed_ts
-            if time_since_close < self._trade_cooldown_seconds and not has_existing:
+            last_closed_dir = getattr(self, "_last_closed_trade_direction", None)
+            if time_since_close < 15.0 and not has_existing:
                 return {
                     "status": "COOLDOWN_ACTIVE",
-                    "remaining_seconds": round(self._trade_cooldown_seconds - time_since_close, 1)
+                    "remaining_seconds": round(15.0 - time_since_close, 1)
                 }
 
-            # Step 2: Check Active VIP Users
-            active_users = db.get_active_capital_auto_users()
-            if not active_users:
-                # Include Super Admin by default if configured
-                active_users = [{"chat_id": 859271875, "budget": 500.0, "max_positions": 5, "is_demo": False}]
+            # Step 2: Check Active VIP Users & Super Admin Guarantee
+            active_users = db.get_active_capital_auto_users() or []
+            existing_cids = {u.get("chat_id") for u in active_users}
+            if 859271875 not in existing_cids:
+                sa_cfg = db.get_capital_auto_config(859271875) or {}
+                if sa_cfg.get("enabled", True):
+                    active_users.append({
+                        "chat_id": 859271875,
+                        "budget": float(sa_cfg.get("budget", 500.0) or 500.0),
+                        "max_positions": int(sa_cfg.get("max_positions", 5) or 5),
+                        "is_demo": bool(sa_cfg.get("is_demo", False)),
+                        "schedule_mode": sa_cfg.get("schedule_mode", "SMART_SESSION_TIMED")
+                    })
 
             # Step 3: Evaluate Definitive Master Signal
             signal_data = await self.evaluate_gold_master_signal()
             action = signal_data.get("action", "HOLD")
             confidence = float(signal_data.get("confidence", 75.0) or 75.0)
+            weighted_score = float(signal_data.get("mtf_summary", {}).get("weighted_score", 0.0) or 0.0)
             current_price = float(signal_data.get("current_price", 4000.0) or 4000.0)
             sl_val = float(signal_data.get("sl", 0.0) or 0.0)
             sl_dist = abs(current_price - sl_val)
+
+            # Prevent same-direction revenge chasing within post-loss cooldown
+            if action in ["BUY", "SELL"] and not has_existing:
+                if action == last_closed_dir and time_since_close < getattr(self, "_trade_cooldown_seconds", 45.0):
+                    logger.debug(f"🛡️ [POST-LOSS COOLDOWN] Same-direction {action} suppressed for {round(self._trade_cooldown_seconds - time_since_close, 1)}s to prevent revenge chase.")
+                    return {
+                        "status": "COOLDOWN_ACTIVE",
+                        "remaining_seconds": round(self._trade_cooldown_seconds - time_since_close, 1)
+                    }
 
             dispatched_count = 0
             if action in ["BUY", "SELL"]:
@@ -961,16 +984,16 @@ class QuantGoldExecutionEngine:
 
                 if has_existing:
                     if action != existing_dir:
-                        # Opposing Signal -> Evaluate Trend Reversal Flip
-                        if confidence >= 75.0:
+                        # Opposing Signal -> Evaluate Trend Reversal Flip (Prompt & Decisive Edge)
+                        if confidence >= 62.0 or abs(weighted_score) >= 25.0:
                             is_reversal_flip = True
                             logger.info(
-                                f"🔄 [TREND REVERSAL FLIP DETECTED] High-conviction {action} signal (Confidence: {confidence:.1f}%) "
+                                f"🔄 [TREND REVERSAL FLIP DETECTED] High-conviction {action} signal (Confidence: {confidence:.1f}%, Score: {weighted_score:+.1f}) "
                                 f"opposes current {existing_dir} position. Engaging Reversal Flip Protocol!"
                             )
                         else:
                             logger.info(
-                                f"🛡️ [REVERSAL FILTER] Opposing {action} signal confidence ({confidence:.1f}%) < 75.0%. "
+                                f"🛡️ [REVERSAL FILTER] Opposing {action} signal confidence ({confidence:.1f}%) < 62.0% and score ({weighted_score:+.1f}) < 25.0. "
                                 f"Holding existing {existing_dir} trade."
                             )
                             return {
@@ -982,10 +1005,6 @@ class QuantGoldExecutionEngine:
                             }
                     else:
                         # Same Direction -> Evaluate Agile Pyramiding (Scale-In)
-                        # Check:
-                        # 1. Existing trade is protected: scale_tier >= 1 (Breakeven Armor locked) OR profit >= +1.5R ($2.50)
-                        # 2. Price separation >= min_separation (prevents cluster orders at exact same tick)
-                        # 3. Confidence >= 75.0%
                         min_sep = max(1.50, sl_dist * 0.35)
                         any_protected = any(
                             int(t.get("scale_tier", 0) or 0) >= 1
@@ -999,7 +1018,7 @@ class QuantGoldExecutionEngine:
                             abs(current_price - float(t.get("entry_price", 0.0) or 0.0)) < min_sep
                             for t in active_gold_trades
                         )
-                        if any_protected and not too_close and confidence >= 75.0:
+                        if any_protected and not too_close and (confidence >= 65.0 or abs(weighted_score) >= 25.0):
                             is_pyramid = True
                             logger.info(
                                 f"⚡ [AGILE PYRAMIDING APPROVED] Existing {existing_dir} is protected. "
@@ -1161,7 +1180,9 @@ class QuantGoldExecutionEngine:
                                         try:
                                             if u_eng:
                                                 await asyncio.to_thread(u_eng.close_position, deal_id=d_id)
-                                            if hasattr(db, "close_capital_auto_trade"):
+                                            if hasattr(db, "update_capital_auto_trade_close"):
+                                                db.update_capital_auto_trade_close(d_id, exit_price=current_price, pnl=0.0)
+                                            elif hasattr(db, "close_capital_auto_trade"):
                                                 db.close_capital_auto_trade(d_id, exit_price=current_price, exit_reason="TREND_REVERSAL_FLIP")
                                             logger.info(f"🔄 [REVERSAL FLIP] Closed opposing {ot_dir} trade {d_id} for user {cid} at ${current_price:.2f}")
                                         except Exception as e_rf:
@@ -1173,6 +1194,10 @@ class QuantGoldExecutionEngine:
                         t for t in open_trades 
                         if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("status", "OPEN")).upper() == "OPEN"
                     ]
+
+                    # Filter out opposing trades if Reversal Flip occurred
+                    if is_reversal_flip:
+                        open_gold_trades = [t for t in open_gold_trades if str(t.get("direction", "")).upper() == action]
 
                     if len(open_gold_trades) >= max_user_pos:
                         logger.debug(f"User {cid} already reached max Gold positions ({len(open_gold_trades)}/{max_user_pos}). Skipping.")
@@ -1188,15 +1213,16 @@ class QuantGoldExecutionEngine:
                             )
                             return 0
 
-                    # Price Separation Guard: Prevent duplicate order execution at exact same tick
+                    # Price Separation Guard: Prevent duplicate order execution at exact same tick in SAME direction
                     for ot in open_gold_trades:
-                        ot_entry = float(ot.get("entry_price", 0.0) or 0.0)
-                        if abs(ot_entry - current_price) < min_separation:
-                            logger.info(
-                                f"🛡️ [PRICE SEPARATION GUARD] User {cid} holds open trade near ${ot_entry:.2f}. "
-                                f"New entry ${current_price:.2f} within ${min_separation:.2f} buffer. Skipping cluster duplicate."
-                            )
-                            return 0
+                        if str(ot.get("direction", "")).upper() == action:
+                            ot_entry = float(ot.get("entry_price", 0.0) or 0.0)
+                            if abs(ot_entry - current_price) < min_separation:
+                                logger.info(
+                                    f"🛡️ [PRICE SEPARATION GUARD] User {cid} holds open trade near ${ot_entry:.2f}. "
+                                    f"New entry ${current_price:.2f} within ${min_separation:.2f} buffer. Skipping cluster duplicate."
+                                )
+                                return 0
 
                     # ── STEP C: DAILY CAPITAL GOVERNOR CHECK ──
                     if not is_admin:
@@ -1244,10 +1270,12 @@ class QuantGoldExecutionEngine:
 
                         for bp in broker_gold:
                             p_sub = bp.get("position", bp)
-                            bp_lvl = float(p_sub.get("level") or p_sub.get("openLevel") or current_price)
-                            if abs(bp_lvl - current_price) < min_separation:
-                                logger.debug(f"User {cid} holds broker position near ${bp_lvl:.2f}. Skipping cluster duplicate.")
-                                return 0
+                            bp_dir = str(p_sub.get("direction", "")).upper()
+                            if bp_dir == action:
+                                bp_lvl = float(p_sub.get("level") or p_sub.get("openLevel") or current_price)
+                                if abs(bp_lvl - current_price) < min_separation:
+                                    logger.debug(f"User {cid} holds broker {bp_dir} position near ${bp_lvl:.2f}. Skipping cluster duplicate.")
+                                    return 0
                     except Exception as e_chk_pos:
                         logger.debug(f"Pre-flight broker check note for {cid}: {e_chk_pos}")
 
@@ -1309,7 +1337,22 @@ class QuantGoldExecutionEngine:
         dispatched_count = sum(r for r in results if isinstance(r, int))
 
         sent_count = 0
-        if broadcast_telegram and dispatched_count > 0:
+        now_broadcast = time.time()
+        last_bc_ts = getattr(self, "_last_broadcast_signal_ts", 0.0)
+        last_bc_action = getattr(self, "_last_broadcast_action", None)
+        
+        # High-Fidelity Signal Broadcast: Always broadcast to VIP users on Reversal, Pyramid, Order Fill,
+        # or when a new setup appears that hasn't been broadcast within 60s
+        should_broadcast = broadcast_telegram and (
+            is_reversal_flip or
+            is_pyramid or
+            dispatched_count > 0 or
+            action != last_bc_action or
+            (now_broadcast - last_bc_ts) >= 60.0
+        )
+        if should_broadcast:
+            self._last_broadcast_signal_ts = now_broadcast
+            self._last_broadcast_action = action
             c_type = "REVERSAL" if is_reversal_flip else ("PYRAMID" if is_pyramid else "SIGNAL")
             tr_num = len(self.get_active_gold_trades_list()) if is_pyramid else 1
             vip_card = format_gold_signal_card(
@@ -1570,10 +1613,10 @@ class QuantGoldExecutionEngine:
                             )
                             markup = get_gold_signal_reply_markup()
                             await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
-                        self._clear_active_trade(deal_id, cooldown=300.0)
+                        self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
                     else:
                         logger.info(f"Gold trade {deal_id} closed at loss (${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
-                        self._clear_active_trade(deal_id, cooldown=300.0)
+                        self._clear_active_trade(deal_id, cooldown=45.0, direction=dir_side)
                     continue
 
                 # Step 2: Entry price sanity & price jump anomaly guard
@@ -1658,7 +1701,7 @@ class QuantGoldExecutionEngine:
                         )
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_shock, app=app, reply_markup=markup)
-                        self._clear_active_trade(deal_key, cooldown=300.0)
+                        self._clear_active_trade(deal_key, cooldown=20.0, direction=dir_side)
                         continue
                     except Exception as e_shk:
                         logger.debug(f"Flash shock harvest note: {e_shk}")
@@ -1761,7 +1804,7 @@ class QuantGoldExecutionEngine:
                             await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
-                        self._clear_active_trade(deal_id, cooldown=300.0)
+                        self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
                     except Exception as e_c3:
                         logger.debug(f"TP3 close note: {e_c3}")
                     continue
@@ -1786,11 +1829,11 @@ class QuantGoldExecutionEngine:
                             )
                             markup = get_gold_signal_reply_markup()
                             await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
-                            self._clear_active_trade(deal_id, cooldown=300.0)
+                            self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
                         else:
                             # Closed at loss: NEVER SEND TO VIP USERS!
                             logger.info(f"Gold trade {deal_id} hit SL @ ${curr_p:.2f} (Loss: ${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
-                            self._clear_active_trade(deal_id, cooldown=900.0)
+                            self._clear_active_trade(deal_id, cooldown=45.0, direction=dir_side)
                     continue
 
         except Exception as e_audit:
