@@ -57,6 +57,13 @@ if _WORKSPACE_ROOT not in sys.path:
 
 import database as db
 import capital_engine
+try:
+    import ui_standards
+except ImportError:
+    class _FallbackUIStandards:
+        DIVIDER_HEAVY = "══════════════════════════════════════"
+        DIVIDER_LIGHT = "──────────────────────────────────────"
+    ui_standards = _FallbackUIStandards()
 from quant_gold_security import get_quant_gold_security_citadel
 from capital_gold_bridge import get_quant_gold_capital_bridge
 from execution_engine import (
