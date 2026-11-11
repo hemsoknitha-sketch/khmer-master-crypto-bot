@@ -96,14 +96,16 @@ def format_gold_signal_card(
 
     divider = "───────────────"
 
+    tier_spec = get_gold_position_tier_spec(tranche_num - 1 if card_type == "PYRAMID" else 0)
+
     if card_type == "REVERSAL":
         header = "<b>Angkor Quant Gold (Trend Reversal Flip)</b> 🔄"
         action_line = f"🔄 <b>Trend Reversal Flip :</b> <code>{dir_icon} {dir_str}</code> (Opposing Harvested)\n"
     elif card_type == "PYRAMID":
-        header = f"<b>Angkor Quant Gold (Agile Pyramid #{tranche_num})</b> ⚡"
-        action_line = f"⚡ <b>Pyramid Scale-In :</b> <code>{dir_icon} {dir_str}</code> (Protected Risk)\n"
+        header = f"<b>Angkor Quant Gold ({tier_spec['name']})</b> ⚡"
+        action_line = f"⚡ <b>Pyramid Scale-In :</b> <code>{dir_icon} {dir_str}</code> ({tier_spec['desc']})\n"
     else:
-        header = "<b>Angkor Quant Gold</b>"
+        header = f"<b>Angkor Quant Gold ({tier_spec['name']})</b>"
         action_line = f"{dir_icon} <b>Single Direction :</b> <code>{dir_str}</code>\n"
 
     return (
@@ -124,6 +126,7 @@ def format_gold_signal_card(
 def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: float) -> str:
     """
     Renders institutional Angkor Quant Gold Take Profit Card.
+    Supports SCALP (Pos 1 Fast Harvester), TP1 (Breakeven Armor), TP2 (Cash Floor), and TP3 (Moonshot).
     """
     is_buy = str(direction).upper() == "BUY"
     dir_str = "BUY" if is_buy else "SELL"
@@ -133,7 +136,10 @@ def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: floa
     # Institutional Sanity Clamping: Prevent runaway/corrupted pip display
     safe_pips = max(10, min(int(pips), 350))
 
-    if "TP1" in st:
+    if "SCALP" in st or "POS1" in st:
+        disp_pips = min(safe_pips, 25) if safe_pips >= 12 else 15
+        stage_desc = f"Pos 1 Scalp Harvested (+{disp_pips} pips) | យកលឿនចូលហោប៉ៅ!"
+    elif "TP1" in st:
         disp_pips = min(safe_pips, 100) if safe_pips >= 73 else 73
         stage_desc = f"TP1 Hit (+{disp_pips} pips) | TP Lock (Breakeven Armor 0.0R)!"
     elif "TP2" in st:
@@ -175,31 +181,104 @@ def _check_network_online() -> bool:
         return False
 
 
+def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
+    """
+    Returns the exact 5-tier multi-horizon specification:
+    - Pos 1: M1 - M5 Scalp Fast Harvester (+10 to +20 pips យកលឿនចូលហោប៉ៅ)
+    - Pos 2: M15 Intraday FVG Retest (TP1: +2.0R -> ជាប់ Breakeven Armor ភ្លាម)
+    - Pos 3: M15 Structural Swing (TP2: +3.5R -> ចាក់សោរប្រាក់ចំណេញរឹងមាំ)
+    - Pos 4: H1 Trend Pyramiding (ចូលបន្ថែមលុះត្រាតែ Pos 1,2,3 ចំណេញ & Free Roll)
+    - Pos 5: H4 Moonshot Super Runner (+5.0R ដល់ +10.0R អូសតាម EMA Confluence)
+    """
+    tier_index = min(5, max(1, int(active_trades_count) + 1))
+    specs = {
+        1: {
+            "tier": 1,
+            "label": "POS1_M1_M5_SCALP",
+            "name": "Position 1: M1-M5 Scalp Fast Harvester",
+            "pips_target": 15,
+            "tp_r": 1.20,
+            "desc": "+10 to +20 pips យកលឿនចូលហោប៉ៅ"
+        },
+        2: {
+            "tier": 2,
+            "label": "POS2_M15_FVG_RETEST",
+            "name": "Position 2: M15 Intraday FVG Retest",
+            "pips_target": 73,
+            "tp_r": 2.00,
+            "desc": "TP1: +2.0R -> ជាប់ Breakeven Armor ភ្លាម"
+        },
+        3: {
+            "tier": 3,
+            "label": "POS3_M15_STRUCTURAL_SWING",
+            "name": "Position 3: M15 Structural Swing",
+            "pips_target": 152,
+            "tp_r": 3.50,
+            "desc": "TP2: +3.5R -> ចាក់សោរប្រាក់ចំណេញរឹងមាំ"
+        },
+        4: {
+            "tier": 4,
+            "label": "POS4_H1_TREND_PYRAMID",
+            "name": "Position 4: H1 Trend Pyramiding",
+            "pips_target": 200,
+            "tp_r": 4.50,
+            "desc": "H1 Trend Pyramiding (Pos 1,2,3 ចំណេញ & Free Roll)"
+        },
+        5: {
+            "tier": 5,
+            "label": "POS5_H4_MOONSHOT_RUNNER",
+            "name": "Position 5: H4 Moonshot Super Runner",
+            "pips_target": 350,
+            "tp_r": 8.00,
+            "desc": "+5.0R ដល់ +10.0R អូសតាម EMA Confluence"
+        }
+    }
+    return specs.get(tier_index, specs[1])
+
+
 def calculate_capital_gold_lot_size(
     budget: float,
     current_price: float = 4071.78,
     confidence: float = 50.0,
-    leverage: float = 500.0
+    leverage: float = 500.0,
+    min_deal_size: float = 0.25
 ) -> float:
     """
     Computes Capital.com Gold (XAUUSD) order size in Troy Ounces.
     - Contract Unit: Troy Ounces (oz)
-    - Minimum Deal Size: 0.5 Troy Ounce (Margin required = ~$4.07 at 500:1 leverage)
-    - Maximum Margin Cap: Clamped at <= 20% of account budget under supreme conviction (>=90%)
+    - Single Compact Order Standard: Baseline minimum is 0.5 Troy Ounce (Margin required = ~$4.07 at 500:1 leverage).
+    - Isolated Small Capital Sizing: If user's 20% budget is less than $4.07 (e.g. $10 - $20 account),
+      allows a standalone micro order of 0.25 oz (~$2.03 margin, or 0.10 oz) independently for that user,
+      WITHOUT dragging down or capping larger capital users!
+    - Conviction Scaling for Standard/Large Accounts: Higher conviction unlocks larger position sizes up to 20% margin ceiling.
     """
     margin_per_oz = max(1.0, current_price / max(1.0, leverage))  # ~$8.14 per oz at 500:1
-    max_margin_allowed = max(4.07, budget * 0.20)
-    max_size_allowed = max(0.5, round(max_margin_allowed / margin_per_oz, 1))
+    margin_budget_20pct = max(0.0, float(budget or 50.0) * 0.20)
+    margin_for_half_oz = 0.5 * margin_per_oz  # ~$4.07 at $4071.78
+    margin_for_quarter_oz = 0.25 * margin_per_oz  # ~$2.03
 
-    # Dynamic conviction scaling
+    # Tier 1: Small Capital Isolated Floor (20% budget < $4.07)
+    if margin_budget_20pct < margin_for_half_oz:
+        # Isolated sizing: Only affects this small account, zero drag on large users
+        if margin_budget_20pct >= margin_for_quarter_oz or float(budget or 0.0) >= 10.0:
+            return 0.25
+        elif float(budget or 0.0) >= 5.0:
+            return max(0.10, min_deal_size)
+        else:
+            return min_deal_size
+
+    # Tier 2: Standard and Large Capital Accounts (20% margin >= $4.07, e.g. budget >= $25)
+    max_size_allowed = max(0.5, round(margin_budget_20pct / margin_per_oz, 1))
+
+    # Dynamic conviction scaling: Higher conviction -> Larger positions
     if confidence >= 90.0:
-        # Supreme Conviction (90% - 99.99%): Scale up to 20% margin ceiling
+        # Supreme Conviction (90% - 99.99%): Scale up to full 20% margin ceiling
         calculated_size = max_size_allowed
     elif confidence >= 80.0:
         # High Conviction: Scale to ~10% margin (~50% of ceiling)
         calculated_size = max(0.5, round(max_size_allowed * 0.5, 1))
     else:
-        # Baseline / Standard: Pure minimum 0.5 Troy Ounces ($4.07 margin)
+        # Baseline / Standard: Pure Single Compact 0.5 Troy Ounces ($4.07 margin)
         calculated_size = 0.5
 
     return max(0.5, min(max_size_allowed, calculated_size))
@@ -1052,13 +1131,17 @@ class QuantGoldExecutionEngine:
                                 "entry_price": self._active_gold_entry_price
                             }
                     else:
-                        # Same Direction -> Evaluate Agile Pyramiding (Scale-In)
+                        # Same Direction -> Evaluate 5-Tier Gold Fleet Pyramiding
+                        pos_count = len(active_gold_trades)
+                        tier_spec = get_gold_position_tier_spec(pos_count)
+                        tier_num = tier_spec["tier"]
                         min_sep = max(1.50, sl_dist * 0.35)
-                        any_protected = any(
+
+                        all_prior_protected = all(
                             int(t.get("scale_tier", 0) or 0) >= 1
                             or (
-                                (existing_dir == "BUY" and current_price - float(t.get("entry_price", current_price) or current_price) >= max(2.50, sl_dist * 0.40))
-                                or (existing_dir == "SELL" and float(t.get("entry_price", current_price) or current_price) - current_price >= max(2.50, sl_dist * 0.40))
+                                (existing_dir == "BUY" and current_price - float(t.get("entry_price", current_price) or current_price) >= max(2.00, sl_dist * 0.35))
+                                or (existing_dir == "SELL" and float(t.get("entry_price", current_price) or current_price) - current_price >= max(2.00, sl_dist * 0.35))
                             )
                             for t in active_gold_trades
                         )
@@ -1066,17 +1149,24 @@ class QuantGoldExecutionEngine:
                             abs(current_price - float(t.get("entry_price", 0.0) or 0.0)) < min_sep
                             for t in active_gold_trades
                         )
-                        if any_protected and not too_close and (confidence >= 65.0 or abs(weighted_score) >= 25.0):
+
+                        # Strict prerequisite for Tier 4 (H1 Trend) & Tier 5 (H4 Moonshot):
+                        # Enters ONLY when Pos 1, 2, 3 are in profit & Free Roll!
+                        if tier_num >= 4 and not all_prior_protected:
+                            can_pyramid = False
+                        else:
+                            can_pyramid = all_prior_protected and not too_close and (confidence >= 65.0 or abs(weighted_score) >= 25.0)
+
+                        if can_pyramid:
                             is_pyramid = True
                             logger.info(
-                                f"⚡ [AGILE PYRAMIDING APPROVED] Existing {existing_dir} is protected. "
-                                f"Adding pyramiding tranche #{len(active_gold_trades)+1} in direction {action} @ ${current_price:.2f} "
-                                f"(Separation: ${min_sep:.2f}, Confidence: {confidence:.1f}%)"
+                                f"⚡ [AGILE PYRAMIDING APPROVED] {tier_spec['name']} approved in direction {action} @ ${current_price:.2f} "
+                                f"(Tranche #{tier_num}, Separation: ${min_sep:.2f}, Confidence: {confidence:.1f}%)"
                             )
                         else:
                             logger.debug(
-                                f"🛡️ [PYRAMIDING HOLD] Protected={any_protected}, TooClose={too_close}, Conf={confidence:.1f}%. "
-                                f"Continuing to manage existing {existing_dir} position."
+                                f"🛡️ [PYRAMIDING HOLD] Protected={all_prior_protected}, TooClose={too_close}, Conf={confidence:.1f}%. "
+                                f"Continuing to manage existing {existing_dir} positions ({pos_count})."
                             )
                             return {
                                 "status": "MANAGING_ACTIVE_TRADE",
@@ -1086,7 +1176,10 @@ class QuantGoldExecutionEngine:
                                 "entry_price": self._active_gold_entry_price
                             }
 
-                logger.info(f"🥇 [QUANT GOLD EXECUTION] Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {confidence:.1f}%, Reversal={is_reversal_flip}, Pyramid={is_pyramid})")
+                active_tier = get_gold_position_tier_spec(len(active_gold_trades))
+                eff_setup_type = "QUANT_GOLD_REVERSAL_FLIP" if is_reversal_flip else (active_tier["label"] if is_pyramid else "POS1_M1_M5_SCALP")
+
+                logger.info(f"🥇 [QUANT GOLD EXECUTION] Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {confidence:.1f}%, Reversal={is_reversal_flip}, Pyramid={is_pyramid}, Setup={eff_setup_type})")
 
                 # High-Throughput Concurrent Fan-Out Dispatch & Broadcast
                 fleet_res = await self.dispatch_gold_signal_to_fleet(
@@ -1097,7 +1190,7 @@ class QuantGoldExecutionEngine:
                     tp2=signal_data["tp2"],
                     tp3=signal_data["tp3"],
                     app=app,
-                    setup_type="QUANT_GOLD_REVERSAL_FLIP" if is_reversal_flip else ("QUANT_GOLD_PYRAMID" if is_pyramid else "QUANT_GOLD_19TF_VIP"),
+                    setup_type=eff_setup_type,
                     confidence=confidence,
                     is_reversal_flip=is_reversal_flip,
                     is_pyramid=is_pyramid
@@ -1369,7 +1462,8 @@ class QuantGoldExecutionEngine:
                         bypass_citadel=True,
                         setup_type=setup_type,
                         max_positions=max_user_pos,
-                        allow_pyramiding=True
+                        allow_pyramiding=True,
+                        single_compact=True
                     )
                     if order_res.get("success"):
                         deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
@@ -1382,7 +1476,8 @@ class QuantGoldExecutionEngine:
                         self._active_gold_tp3 = tp3
                         self._active_gold_stage = "ACTIVE"
 
-                        tranche_label = f"PYRAMID_{len(open_gold_trades)+1}" if is_pyramid else ("REVERSAL_FLIP" if is_reversal_flip else "SINGLE")
+                        tier_spec = get_gold_position_tier_spec(len(open_gold_trades))
+                        tranche_label = tier_spec["label"] if is_pyramid else ("REVERSAL_FLIP" if is_reversal_flip else "POS1_M1_M5_SCALP")
                         db.record_capital_auto_trade(
                             chat_id=cid,
                             deal_id=str(deal_id),
@@ -1464,10 +1559,16 @@ class QuantGoldExecutionEngine:
         Default minimum size: 0.5 Troy Ounce (Margin required = ~$4.07 at 500:1 leverage).
         """
         try:
-            size = max(0.5, float(size or 0.5))
             u_eng = capital_engine.get_user_capital_engine(chat_id)
             bid, ask, spread = self.get_live_gold_price_quote()
             curr_p = (bid + ask) / 2.0
+
+            if size is None or float(size or 0.0) <= 0:
+                b_info = u_eng.get_account_balance() if u_eng else {}
+                u_budget = float(b_info.get("balance", 50.0) or 50.0)
+                size = calculate_capital_gold_lot_size(budget=u_budget, current_price=curr_p, confidence=75.0)
+            else:
+                size = max(0.25, float(size or 0.5))
 
             # Symmetrical tight structural SL ($6.08) and 3-stage targets (+73, +152, +243 pips)
             sl_dist = 6.08
@@ -1519,6 +1620,9 @@ class QuantGoldExecutionEngine:
             except Exception as e_bclose:
                 logger.debug(f"Manual reversal broker sweep note: {e_bclose}")
 
+            tier_spec = get_gold_position_tier_spec(len(gold_trades))
+            eff_setup_type = "QUANT_GOLD_REVERSAL_FLIP" if is_manual_reversal else (tier_spec["label"] if is_manual_pyramid else "VIP_1TAP_GOLD")
+
             order_res = await asyncio.to_thread(
                 u_eng.execute_smart_tradfi_order,
                 epic="GOLD",
@@ -1528,16 +1632,17 @@ class QuantGoldExecutionEngine:
                 tp=tp1,
                 bypass_quant_eval=True,
                 bypass_citadel=True,
-                setup_type="QUANT_GOLD_REVERSAL_FLIP" if is_manual_reversal else ("QUANT_GOLD_PYRAMID" if is_manual_pyramid else "VIP_1TAP_GOLD"),
+                setup_type=eff_setup_type,
                 max_positions=max_pos,
-                allow_pyramiding=True
+                allow_pyramiding=True,
+                single_compact=True
             )
 
             if order_res.get("success"):
                 deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
                 entry_price = float(order_res.get("entry_price") or order_res.get("price") or curr_p)
 
-                tranche_label = f"PYRAMID_{len(gold_trades)+1}" if is_manual_pyramid else ("REVERSAL_FLIP" if is_manual_reversal else "SINGLE")
+                tranche_label = tier_spec["label"] if is_manual_pyramid else ("REVERSAL_FLIP" if is_manual_reversal else "POS1_M1_M5_SCALP")
                 db.record_capital_auto_trade(
                     chat_id=chat_id,
                     deal_id=str(deal_id),
@@ -1780,6 +1885,31 @@ class QuantGoldExecutionEngine:
                         continue
                     except Exception as e_shk:
                         logger.debug(f"Flash shock harvest note: {e_shk}")
+
+                # Check Position 1: M1 - M5 Scalp Fast Harvester (+10 to +20 pips / $1.00 to $2.00 move)
+                tranche_lbl = str(tr.get("tranche_id", "") or "")
+                is_pos1 = (tranche_lbl == "POS1_M1_M5_SCALP" or (idx == 0 and "POS" not in tranche_lbl and scale_tier == 0))
+                if is_pos1 and (1.00 <= pnl_pts <= 4.00 or 10 <= pips <= 35) and not is_manual_trade:
+                    logger.info(f"⚡ [POS 1 SCALP HARVEST] Gold trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}). Banking quick scalp into pocket!")
+                    try:
+                        if cid:
+                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                        if hasattr(db, "update_capital_auto_trade_close"):
+                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+
+                        card_scalp = format_gold_tp_card(
+                            stage="SCALP",
+                            pips=pips,
+                            direction=dir_side,
+                            entry_price=entry_p
+                        )
+                        markup = get_gold_signal_reply_markup()
+                        await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
+                        self._clear_active_trade(deal_key, cooldown=15.0, direction=dir_side)
+                        continue
+                    except Exception as e_sc:
+                        logger.debug(f"Pos 1 scalp harvest note: {e_sc}")
 
                 # Check TP1 Hit (+73 pips / $7.30 move) - bounded to legitimate range ($7.30 to $60.00)
                 is_tp1 = (7.30 <= pnl_pts <= 60.0) or (

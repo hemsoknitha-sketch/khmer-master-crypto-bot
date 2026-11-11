@@ -4520,7 +4520,9 @@ class TradFiMultiTargetScaleOutManager:
         tp2_price: Optional[float] = None,
         tp3_price: Optional[float] = None,
         atr_15m: Optional[float] = None,
-        min_deal_size: float = 0.01
+        min_deal_size: float = 0.01,
+        single_compact: bool = False,
+        **kwargs: Any
     ) -> Dict[str, Any]:
         """
         Calculates 3-stage scale-out target prices and tranche lot sizes.
@@ -4553,7 +4555,11 @@ class TradFiMultiTargetScaleOutManager:
             tp2_floor_sl = round(entry_price - (2.0 * sl_dist), prec)
 
         # Tranche lot calculation: splittable only if total_size >= 3 * min_deal_size
-        can_split = total_size >= (min_deal_size * 3.0)
+        # Single Compact Order Directive: When single_compact=True, preserve as a single order
+        if single_compact:
+            can_split = False
+        else:
+            can_split = total_size >= (min_deal_size * 3.0)
         s_min = str(min_deal_size)
         lot_prec = len(s_min.split('.')[1]) if '.' in s_min else 2
 

@@ -2266,9 +2266,9 @@ class QuantGoldBot:
             card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
             return await self.safe_reply(update, card, reply_markup=kb)
 
-        # 4. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
+        # 4. Input Sanitization & Bounds Clamping (0.25 to 50.0 oz)
         raw_arg = context.args[0] if context.args else 0.5
-        lot = self.citadel.sanitize_lot_size(raw_arg, default_lot=0.5, min_lot=0.5, max_lot=50.0)
+        lot = self.citadel.sanitize_lot_size(raw_arg, default_lot=0.5, min_lot=0.25, max_lot=50.0)
 
         await self.bridge.handle_telegram_gold_subcommand(update, context, ["BUY", str(lot)])
 
@@ -2299,9 +2299,9 @@ class QuantGoldBot:
             card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
             return await self.safe_reply(update, card, reply_markup=kb)
 
-        # 4. Input Sanitization & Bounds Clamping (0.5 to 50.0 oz)
+        # 4. Input Sanitization & Bounds Clamping (0.25 to 50.0 oz)
         raw_arg = context.args[0] if context.args else 0.5
-        lot = self.citadel.sanitize_lot_size(raw_arg, default_lot=0.5, min_lot=0.5, max_lot=50.0)
+        lot = self.citadel.sanitize_lot_size(raw_arg, default_lot=0.5, min_lot=0.25, max_lot=50.0)
 
         await self.bridge.handle_telegram_gold_subcommand(update, context, ["SELL", str(lot)])
 
@@ -2774,8 +2774,8 @@ class QuantGoldBot:
             )
 
         warn_note = ""
-        if new_st and live_avail < 4.07 and not (is_admin and live_bal < 10.0):
-            warn_note = "\n⚠️ <i>ចំណាំ៖ Free Margin ទាបជាង $4.07 (ទំហំ Margin អប្បបរមា 0.5 oz Gold)។ ប្រព័ន្ធរង់ចាំការដាក់ប្រាក់បន្ថែម ឬប្តូរទៅ Demo!</i>\n"
+        if new_st and live_avail < 2.02 and not (is_admin and live_bal < 10.0):
+            warn_note = "\n⚠️ <i>ចំណាំ៖ Free Margin ទាបជាង $2.02 (ទំហំ Margin អប្បបរមា 0.25 oz Gold)។ ប្រព័ន្ធរង់ចាំការដាក់ប្រាក់បន្ថែម ឬប្តូរទៅ Demo!</i>\n"
 
         budget_suffix = " (Demo Mirror | កែប្រែតាម <code>/capital on &lt;budget&gt;</code>)" if (is_admin and live_bal < 10.0) else ""
 

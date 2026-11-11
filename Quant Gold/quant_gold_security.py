@@ -179,12 +179,12 @@ class QuantGoldSecurityCitadel:
         self,
         raw_val: Any,
         default_lot: float = 0.5,
-        min_lot: float = 0.5,
+        min_lot: float = 0.25,
         max_lot: float = 50.0
     ) -> float:
         """
         Sanitizes and bounds trade lot size strictly against NaN, Inf, negative,
-        or extreme leverage attacks. Default minimum is 0.5 Troy Ounce.
+        or extreme leverage attacks. Default standard is 0.5 Troy Ounce, with minimum floor 0.25 oz for small capital.
         """
         try:
             val = float(raw_val)

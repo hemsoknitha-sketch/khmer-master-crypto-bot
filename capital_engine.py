@@ -3147,6 +3147,10 @@ class CapitalComEngine:
         # Pillar 4: Institutional 3-Stage Multi-Target Scale-Out Plan (TP1 50%, TP2 30%, Runner 20%)
         import super_smart_capital_citadel as sscc
         scale_mgr = sscc.get_tradfi_scale_out_manager()
+        is_gold_epic = "GOLD" in resolved_epic or "XAU" in resolved_epic
+        is_qg_setup = any(x in str(kwargs.get("setup_type", "")).upper() for x in ["QUANT_GOLD", "VIP_1TAP", "POS1_", "POS2_", "POS3_", "POS4_", "POS5_"])
+        is_compact_gold = bool(kwargs.get("single_compact", False)) or (is_gold_epic and (size <= 0.75 or is_qg_setup))
+
         scale_plan = scale_mgr.calculate_scale_out_plan(
             epic=resolved_epic,
             direction=dir_u,
@@ -3160,7 +3164,8 @@ class CapitalComEngine:
             runner_r=10.00,
             tp1_price=analysis.get("tp1"),
             tp2_price=analysis.get("tp2"),
-            tp3_price=analysis.get("tp3")
+            tp3_price=analysis.get("tp3"),
+            single_compact=is_compact_gold
         )
 
         # 4. Transmit Protected Position (Multi-Tranche Scale-Out or Single Dynamic Order)
