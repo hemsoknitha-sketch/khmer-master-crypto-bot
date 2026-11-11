@@ -364,11 +364,11 @@ def get_fresh_cached_market(epic: str, max_age_seconds: float = 5.0) -> Optional
 
 # In-Memory Cross-Engine Asset Execution Mutex Locks (Zero Concurrent Order Double-Fill)
 _ASSET_EXECUTION_MUTEX = threading.Lock()
-_ASSET_LOCKS: Dict[str, threading.Lock] = {}
+_ASSET_LOCKS: Dict[str, Any] = {}
 
-def _get_asset_lock(epic: str, account_key: str = "") -> threading.Lock:
+def _get_asset_lock(epic: str, account_key: str = "") -> threading.RLock:
     """
-    Returns a thread lock dedicated to a specific (account, asset epic) pair.
+    Returns a thread re-entrant lock dedicated to a specific (account, asset epic) pair.
     Scoping by account preserves double-fill protection per broker account while
     letting different VIP accounts execute the same epic (e.g. GOLD) concurrently.
     """
@@ -376,7 +376,7 @@ def _get_asset_lock(epic: str, account_key: str = "") -> threading.Lock:
     lock_key = f"{account_key}|{resolved}" if account_key else resolved
     with _ASSET_EXECUTION_MUTEX:
         if lock_key not in _ASSET_LOCKS:
-            _ASSET_LOCKS[lock_key] = threading.Lock()
+            _ASSET_LOCKS[lock_key] = threading.RLock()
         return _ASSET_LOCKS[lock_key]
 
 
@@ -1467,11 +1467,23 @@ class CapitalComEngine:
         Guarantees cross-engine mutex isolation against concurrent double execution on the same epic.
         """
         resolved_epic = EPIC_MAP.get(str(epic).upper(), str(epic).upper())
-        _acct_id = str(getattr(self, "identifier", "") or getattr(self, "api_key", "") or "")
-        _acct_key = f"{_acct_id}|{'DEMO' if getattr(self, 'is_demo', False) else 'LIVE'}"
+        _user_id = str(
+            getattr(self, "active_account_id", "")
+            or getattr(self, "desired_account_id", "")
+            or getattr(self, "_custom_chat_id", "")
+            or getattr(self, "chat_id", "")
+            or getattr(self, "identifier", "")
+            or getattr(self, "api_key", "")
+            or "DEFAULT"
+        )
+        _mode = "DEMO" if getattr(self, "is_demo", False) else "LIVE"
+        _acct_key = f"{_user_id}|{_mode}"
         asset_lock = _get_asset_lock(resolved_epic, _acct_key)
-        if not asset_lock.acquire(blocking=False):
-            logger.warning(f"🛑 [MUTEX ORDER LOCK] Concurrent order rejected: Another order is in-flight for {resolved_epic} on this account")
+        acquired = asset_lock.acquire(blocking=True, timeout=5.0)
+        if not acquired:
+            logger.warning(
+                f"🛑 [MUTEX ORDER LOCK] Concurrent order rejected: Another order is in-flight for {resolved_epic} on account {_acct_key} (timeout 5.0s)"
+            )
             return {
                 "success": False,
                 "error": f"CONCURRENT_ORDER_LOCK: Another order is currently being executed on {resolved_epic}."
@@ -1565,9 +1577,29 @@ class CapitalComEngine:
                 p.get("epic") or p.get("market", {}).get("epic")
                 for p in open_pos if (p.get("epic") or p.get("market", {}).get("epic"))
             ]
+            
+            # Determine maximum asset capacity for pyramiding / multi-position scaling
+            eff_max_pos = 1
+            if kwargs.get("max_positions"):
+                eff_max_pos = int(kwargs.get("max_positions"))
+            elif kwargs.get("allow_pyramiding"):
+                eff_max_pos = 5
+            elif resolved_epic == "GOLD" or "PYRAMID" in str(kwargs.get("setup_type", "")).upper():
+                try:
+                    import database as db
+                    target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
+                    if target_cid:
+                        u_cfg = db.get_user_capital_auto_config(target_cid)
+                        eff_max_pos = int(u_cfg.get("max_positions", 5) or 5)
+                    else:
+                        eff_max_pos = 5
+                except Exception:
+                    eff_max_pos = 5
+
             is_corr_ok, corr_reason, corr_diag = portfolio_circuit_breaker.validate_cross_asset_portfolio_exposure(
                 proposed_epic=resolved_epic,
-                open_epics=current_open_epics
+                open_epics=current_open_epics,
+                max_asset_positions=eff_max_pos
             )
             if not is_corr_ok:
                 now_ts = time.time()
@@ -3138,6 +3170,22 @@ class CapitalComEngine:
         }
         max_spread = max_spreads.get(resolved_epic, 5.0)
 
+        # Forward pyramiding and position settings
+        eff_max_pos = kwargs.get("max_positions")
+        if eff_max_pos is None and (resolved_epic == "GOLD" or "PYRAMID" in str(kwargs.get("setup_type", "")).upper()):
+            try:
+                import database as db
+                target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
+                if target_cid:
+                    u_cfg = db.get_user_capital_auto_config(target_cid)
+                    eff_max_pos = int(u_cfg.get("max_positions", 5) or 5)
+                else:
+                    eff_max_pos = 5
+            except Exception:
+                eff_max_pos = 5
+        allow_pyr = kwargs.get("allow_pyramiding", True if (eff_max_pos and eff_max_pos > 1) else False)
+        extra_fwd = {k: v for k, v in kwargs.items() if k not in ["max_positions", "allow_pyramiding", "setup_type", "strategy_regime"]}
+
         if scale_plan.get("can_split"):
             tranches_res = []
             for tr_spec in scale_plan["tranches"]:
@@ -3153,7 +3201,10 @@ class CapitalComEngine:
                     max_allowed_spread=max_spread,
                     bypass_citadel=bypass_citadel,
                     setup_type=(analysis.get("trigger_type") or kwargs.get("setup_type", "")),
-                    strategy_regime=(analysis.get("strategy_regime") or kwargs.get("strategy_regime", "AUTO"))
+                    strategy_regime=(analysis.get("strategy_regime") or kwargs.get("strategy_regime", "AUTO")),
+                    max_positions=eff_max_pos,
+                    allow_pyramiding=allow_pyr,
+                    **extra_fwd
                 )
                 if t_res.get("success"):
                     t_res["tranche_id"] = t_id
@@ -3188,7 +3239,10 @@ class CapitalComEngine:
             max_allowed_spread=max_spread,
             bypass_citadel=bypass_citadel,
             setup_type=(analysis.get("trigger_type") or kwargs.get("setup_type", "")),
-            strategy_regime=(analysis.get("strategy_regime") or kwargs.get("strategy_regime", "AUTO"))
+            strategy_regime=(analysis.get("strategy_regime") or kwargs.get("strategy_regime", "AUTO")),
+            max_positions=eff_max_pos,
+            allow_pyramiding=allow_pyr,
+            **extra_fwd
         )
 
         if res.get("success"):

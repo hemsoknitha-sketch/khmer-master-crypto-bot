@@ -1344,7 +1344,9 @@ class QuantGoldExecutionEngine:
                         tp=tp1,
                         bypass_quant_eval=True,
                         bypass_citadel=True,
-                        setup_type=setup_type
+                        setup_type=setup_type,
+                        max_positions=max_user_pos,
+                        allow_pyramiding=True
                     )
                     if order_res.get("success"):
                         deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
@@ -1503,7 +1505,9 @@ class QuantGoldExecutionEngine:
                 tp=tp1,
                 bypass_quant_eval=True,
                 bypass_citadel=True,
-                setup_type="QUANT_GOLD_REVERSAL_FLIP" if is_manual_reversal else ("QUANT_GOLD_PYRAMID" if is_manual_pyramid else "VIP_1TAP_GOLD")
+                setup_type="QUANT_GOLD_REVERSAL_FLIP" if is_manual_reversal else ("QUANT_GOLD_PYRAMID" if is_manual_pyramid else "VIP_1TAP_GOLD"),
+                max_positions=max_pos,
+                allow_pyramiding=True
             )
 
             if order_res.get("success"):

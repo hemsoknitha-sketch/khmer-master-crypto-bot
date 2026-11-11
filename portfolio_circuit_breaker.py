@@ -211,31 +211,38 @@ CORRELATION_GROUP_LIMITS = {
 MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS = 4
 
 
-def validate_cross_asset_portfolio_exposure(proposed_epic: str, open_epics: List[str]) -> Tuple[bool, str, Dict[str, Any]]:
+def validate_cross_asset_portfolio_exposure(
+    proposed_epic: str,
+    open_epics: List[str],
+    max_asset_positions: int = 1
+) -> Tuple[bool, str, Dict[str, Any]]:
     """
     Validates cross-asset portfolio exposure to prevent correlated liquidation cascades:
-    1. Duplicate Epic Lock: Blocks opening if proposed asset already has an active position.
+    1. Duplicate Epic Lock / Pyramiding Cap: Blocks opening if proposed asset already reached max_asset_positions.
     2. Tech/Equities Basket: Max 2 simultaneous open positions (e.g. US100 + NVDA).
-    3. Precious Metals Basket: Max 1 simultaneous open position (Gold OR Silver).
+    3. Precious Metals Basket: Max 1 simultaneous open asset (Gold OR Silver) unless pyramiding on Gold.
     4. Energy Basket: Max 1 simultaneous open position.
-    5. Global TradFi Cap: Max 4 simultaneous open positions across all assets.
+    5. Global TradFi Cap: Max 4 simultaneous open positions across all assets (or max_asset_positions if higher).
     """
     prop_u = str(proposed_epic or "").upper().strip()
     existing_u = [str(e or "").upper().strip() for e in open_epics if e]
+    max_pos = max(1, int(max_asset_positions or 1))
 
     diag: Dict[str, Any] = {
         "proposed_epic": prop_u,
         "open_count": len(existing_u),
         "existing_epics": existing_u,
+        "max_asset_positions": max_pos,
         "group_matched": None,
         "current_group_count": 0,
         "limit": None
     }
 
-    # 1. Total TradFi position cap
+    # 1. Total TradFi position cap (Dynamically scaled if user configuration permits higher positions e.g. Gold Pyramiding)
     now_ts = time.time()
-    if len(existing_u) >= MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS:
-        reason = f"Global TradFi position limit reached ({len(existing_u)}/{MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS} active). Cannot add {prop_u}."
+    effective_total_cap = max(MAX_TOTAL_CONCURRENT_TRADFI_POSITIONS, max_pos)
+    if len(existing_u) >= effective_total_cap:
+        reason = f"Global TradFi position limit reached ({len(existing_u)}/{effective_total_cap} active). Cannot add {prop_u}."
         if (now_ts - _LAST_RISK_WARN_LOG.get("total_limit", 0.0)) >= 300.0:
             _LAST_RISK_WARN_LOG["total_limit"] = now_ts
             logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
@@ -243,16 +250,20 @@ def validate_cross_asset_portfolio_exposure(proposed_epic: str, open_epics: List
             logger.debug(f"🛑 [PORTFOLIO RISK] {reason}")
         return False, reason, diag
 
-    # 2. Duplicate Asset Lock (Universal deduplication)
-    for held in existing_u:
-        if prop_u == held or (prop_u in held and len(prop_u) >= 4) or (held in prop_u and len(held) >= 4):
-            reason = f"Duplicate asset protection: Already holding open position on {held}."
-            if (now_ts - _LAST_RISK_WARN_LOG.get(f"dup:{held}", 0.0)) >= 300.0:
-                _LAST_RISK_WARN_LOG[f"dup:{held}"] = now_ts
-                logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
-            else:
-                logger.debug(f"🛑 [PORTFOLIO RISK] {reason}")
-            return False, reason, diag
+    # 2. Duplicate Asset Lock (Universal deduplication / Agile Pyramiding Cap)
+    # Allows multiple positions on the same asset up to max_asset_positions (e.g. Agile Pyramiding / Scale-out Tranches)
+    matching_held_count = sum(
+        1 for held in existing_u
+        if prop_u == held or (prop_u in held and len(prop_u) >= 4) or (held in prop_u and len(held) >= 4)
+    )
+    if matching_held_count >= max_pos:
+        reason = f"Duplicate asset protection: Already holding {matching_held_count}/{max_pos} open position(s) on {prop_u}."
+        if (now_ts - _LAST_RISK_WARN_LOG.get(f"dup:{prop_u}", 0.0)) >= 300.0:
+            _LAST_RISK_WARN_LOG[f"dup:{prop_u}"] = now_ts
+            logger.warning(f"🛑 [PORTFOLIO RISK] {reason}")
+        else:
+            logger.debug(f"🛑 [PORTFOLIO RISK] {reason}")
+        return False, reason, diag
 
     # 3. Correlated Group Exposure Limits
     for grp_key, grp_cfg in CORRELATION_GROUP_LIMITS.items():
@@ -265,8 +276,9 @@ def validate_cross_asset_portfolio_exposure(proposed_epic: str, open_epics: List
         if not is_prop_in_basket:
             continue
 
+        effective_grp_max = max(max_allowed, max_pos) if max_pos > 1 else max_allowed
         diag["group_matched"] = grp_key
-        diag["limit"] = max_allowed
+        diag["limit"] = effective_grp_max
 
         # Count currently open assets in this basket
         held_in_group = []
@@ -277,9 +289,9 @@ def validate_cross_asset_portfolio_exposure(proposed_epic: str, open_epics: List
         diag["current_group_count"] = len(held_in_group)
         diag["held_in_group"] = held_in_group
 
-        if len(held_in_group) >= max_allowed:
+        if len(held_in_group) >= effective_grp_max:
             reason = (
-                f"{grp_name} correlation exposure cap reached ({len(held_in_group)}/{max_allowed} active: "
+                f"{grp_name} correlation exposure cap reached ({len(held_in_group)}/{effective_grp_max} active: "
                 f"{', '.join(held_in_group)}). Entry on {prop_u} blocked to prevent systemic liquidation contagion."
             )
             if (now_ts - _LAST_RISK_WARN_LOG.get(f"grp:{grp_key}", 0.0)) >= 300.0:
