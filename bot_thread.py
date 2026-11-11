@@ -27638,7 +27638,10 @@ class TelegramBotThread(BaseThread):
                     import capital_market_report_engine
                     target_epic = str(args[1]).upper().strip() if len(args) > 1 else "GOLD"
                     norm_key = capital_market_report_engine.CapitalMarketReportEngine.normalize_epic_key(target_epic)
-                    rep_data = capital_market_report_engine.CapitalMarketReportEngine.get_market_report_data(norm_key)
+                    rep_data = (
+                        capital_market_report_engine.CapitalMarketReportEngine.get_nov11_2026_report_data(norm_key) or
+                        capital_market_report_engine.CapitalMarketReportEngine.get_market_report_data(norm_key, report_date="2026-11-11")
+                    )
                     sent_data = capital_market_report_engine.CapitalMarketReportEngine.fetch_live_client_sentiment(norm_key)
                     c_long = sent_data.get("client_long_pct", 50.0)
                     c_short = sent_data.get("client_short_pct", 50.0)

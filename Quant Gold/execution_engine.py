@@ -29,6 +29,11 @@ import database as db
 import capital_engine
 
 try:
+    from capital_market_report_engine import CapitalMarketReportEngine
+except (ImportError, ValueError):
+    CapitalMarketReportEngine = None
+
+try:
     from .timeframes import get_gold_mtf_engine
     from .mathematical_engine import get_gold_math_core
     from .ai_models import get_gold_ai_swarm
@@ -634,6 +639,35 @@ class QuantGoldExecutionEngine:
                     "primary_reason": algo_res.get("key_reason", "")
                 }
 
+        # 3.5 Monte Safieddine Daily Market Report Benchmark Confluence & Contrarian Traps (Invariant 99)
+        monte_rep = {}
+        if CapitalMarketReportEngine:
+            try:
+                monte_rep = (
+                    CapitalMarketReportEngine.get_nov11_2026_report_data("GOLD") or
+                    CapitalMarketReportEngine.get_market_report_data("GOLD", current_price=curr_p, report_date="2026-11-11")
+                )
+                monte_res1 = float(monte_rep.get("res1", 4084.28))
+                monte_sup1 = float(monte_rep.get("sup1", 3993.28))
+                c_long = float(monte_rep.get("client_long_pct", 80.0))
+                # Check A: Extreme Retail Crowd Long Trap at Resistance 1 ($4084.28)
+                if c_long >= 75.0 and curr_p >= (monte_res1 - 2.50):
+                    if mtf_action == "BUY" or ai_action == "BUY":
+                        # FOMO buy into 80% retail herd trap is prohibited
+                        mtf_data["action"] = "HOLD"
+                        ai_data["action"] = "HOLD"
+                    # Smart money distribution short bias boost
+                    weighted_score = min(weighted_score - 15.0, -12.0)
+                # Check B: Contrarian Support Rebound at Support 1 ($3993.28)
+                elif curr_p <= (monte_sup1 + 2.50):
+                    if mtf_action == "SELL" or ai_action == "SELL":
+                        mtf_data["action"] = "HOLD"
+                        ai_data["action"] = "HOLD"
+                    # Smart money accumulation long bounce boost
+                    weighted_score = max(weighted_score + 15.0, 12.0)
+            except Exception as e:
+                logger.debug("Monte Safieddine report evaluation exception: %s", e)
+
         # 4. Synthesize Definitive Signal
         mtf_action = mtf_data.get("action", "HOLD")
         ai_action = ai_data.get("action", "HOLD")
@@ -789,6 +823,19 @@ class QuantGoldExecutionEngine:
             "ai_summary": {
                 "consensus_confidence": ai_data.get("consensus_confidence", 50.0),
                 "model_tally": ai_data.get("model_tally", {})
+            },
+            "monte_summary": {
+                "starting_point": monte_rep.get("starting_point", 4038.78),
+                "delta": monte_rep.get("delta", 45.50),
+                "res1": monte_rep.get("res1", 4084.28),
+                "sl_res1": monte_rep.get("sl_res1", 4107.03),
+                "sup1": monte_rep.get("sup1", 3993.28),
+                "sl_sup1": monte_rep.get("sl_sup1", 3970.53),
+                "daily_regime": monte_rep.get("daily_regime", "Consolidation - Volatile"),
+                "weekly_regime": monte_rep.get("weekly_regime", "Bear Average"),
+                "client_long_pct": monte_rep.get("client_long_pct", 80.0),
+                "client_short_pct": monte_rep.get("client_short_pct", 20.0),
+                "institutional_long_pct": monte_rep.get("institutional_long_pct", 84.0)
             }
         }
         self._last_signal_data = res
