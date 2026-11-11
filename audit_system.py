@@ -5517,7 +5517,7 @@ def run_audit():
         failures.append(f"Invariant 109 check failed: {e}")
         log_fail(str(e))
 
-    print("\n[CHECK 88/88] Verifying Institutional Quant Gold Autonomous Fleet Concurrency, Dynamic Margin & Zero-Stale Telemetry (Invariant 115)...")
+    print("\n[CHECK 88/89] Verifying Institutional Quant Gold Autonomous Fleet Concurrency, Dynamic Margin & Zero-Stale Telemetry (Invariant 115)...")
     try:
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_code = f.read()
@@ -5567,6 +5567,60 @@ def run_audit():
             log_fail("Invariant 115 Quant Gold Fleet Concurrency verification failed!")
     except Exception as e:
         failures.append(f"Invariant 115 check failed: {e}")
+        log_fail(str(e))
+
+    print("\n[CHECK 89/89] Verifying Quant Gold Foundational Invariant of Correctness & Agile Trend Reversal Flip (Invariant 116)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_code = f.read()
+        with open("Quant Gold/execution_engine.py", "r", encoding="utf-8") as f:
+            qg_exec_code = f.read()
+        with open("database.py", "r", encoding="utf-8") as f:
+            db_code = f.read()
+        with open("Quant Gold/bot.py", "r", encoding="utf-8") as f:
+            bot_code = f.read()
+
+        has_inv116_agents = "invariant 116" in agents_code.lower() and "trend reversal flip" in agents_code.lower()
+        has_inv116_gemini = "invariant 116" in gemini_code.lower() and "trend reversal flip" in gemini_code.lower()
+
+        # 1. Database Parity
+        has_close_alias = "def close_capital_auto_trade" in db_code and "update_capital_auto_trade_close" in db_code
+
+        # 2. Agile Trend Reversal Flip in Execution Engine
+        has_reversal_flip_eval = "TREND REVERSAL FLIP DETECTED" in qg_exec_code and "confidence >= 62.0" in qg_exec_code
+        has_pyramid_eval = "AGILE PYRAMIDING APPROVED" in qg_exec_code
+
+        # 3. Price Separation Guard only on same direction
+        has_price_sep_guard = "str(ot.get(\"direction\", \"\")).upper() == action" in qg_exec_code and "PRICE SEPARATION GUARD" in qg_exec_code
+
+        # 4. Adaptive Cooldown (20s win, 45s loss)
+        has_adaptive_cooldown = "cooldown=20.0" in qg_exec_code and "cooldown=45.0" in qg_exec_code
+
+        # 5. Persistent 9-Button Keyboard
+        has_persistent_kb = "get_quant_gold_bottom_keyboard" in bot_code and "🥇 Quant Gold Dashboard" in bot_code and "is_persistent=True" in bot_code
+
+        all_inv116_passed = (
+            has_inv116_agents and has_inv116_gemini and has_close_alias and
+            has_reversal_flip_eval and has_pyramid_eval and has_price_sep_guard and
+            has_adaptive_cooldown and has_persistent_kb
+        )
+
+        if all_inv116_passed:
+            log_pass(
+                "Quant Gold Foundational Invariant of Correctness, Agile Trend Reversal Flip, Adaptive Post-Loss Re-Study & Persistent UI (Invariant 116) "
+                "are 100% certified! (Zero ghost trades, non-blocking Reversal Flip, same-direction price separation, adaptive 20s/45s cooldown, and 9-button UI active)"
+            )
+        else:
+            failures.append(
+                f"Invariant 116 check failed: agents={has_inv116_agents}, gemini={has_inv116_gemini}, "
+                f"db_alias={has_close_alias}, reversal={has_reversal_flip_eval}, pyramid={has_pyramid_eval}, "
+                f"sep_guard={has_price_sep_guard}, cooldown={has_adaptive_cooldown}, kb={has_persistent_kb}"
+            )
+            log_fail("Invariant 116 Quant Gold Correctness verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 116 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

@@ -2182,5 +2182,44 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
      * All pip displays are clamped via `safe_pips = max(10, min(int(pips), 350))` eradicating wild numbers like `+13612 pips`.
 5. **Strict Sequential Lifecycle & Broker Reconciliation:**
    - **Sequential Trade Lifecycle:** The system manages current open trades to completion before entertaining new signals, eliminating over-leveraged duplicate stacking.
-   - **Server-Side Broker Reconciliation:** Detects broker SL/TP closures automatically, updating SQLite WAL and resetting in-memory lifecycle state with 300s post-win / 900s post-loss cooldown.
+   - **Server-Side Broker Reconciliation:** Detects broker SL/TP closures automatically, updating SQLite WAL and resetting in-memory lifecycle state with adaptive 20s post-win / 45s post-loss cooldown.
    - **Fiduciary Profit-Only Alerting:** Celebratory Telegram cards are broadcast ONLY for profitable milestones (TP1, TP2, TP3, Breakeven Close). Losses are audited strictly in internal logs and DB to preserve investor composure.
+
+---
+
+### 1.1.24 THE SACRED FOUNDATIONAL PILLARS OF MATHEMATICAL CORRECTNESS & FIDUCIARY EXECUTION FOR QUANT GOLD & CAPITAL.COM (AQ116 INVARIANT 116)
+**(គ្រឹះចងចាំនៃភាពត្រឹមត្រូវ គ្មានកំហុសបច្ចេកទេស និងប្រតិបត្តិការប្រកបដោយប្រៀបឈ្នះគណិតវិទ្យាសម្រាប់ Quant Gold & Capital.com - Invariant 116)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+1. **The Principle of Absolute Mathematical Correctness & Zero Technical Negligence (គ្រឹះភាពត្រឹមត្រូវ ១០០% គ្មានចន្លោះប្រហោងបច្ចេកទេស):**
+   - Every AI model, subagent, and engineering component is permanently bound to ensure that Angkor Quant Gold operates with absolute mathematical correctness.
+   - Financial capital and trading opportunities must NEVER be lost due to silent vetoes, stale state variables, missing database method aliases, blind cooldown comas, or artificial range dead zones.
+2. **Agile Multi-Position Pyramiding & Decisive Trend Reversal Flip (ការប្តូរទិសដៅ Reversal Flip ភ្លាមៗ & Pyramiding កើបចំណេញ):**
+   - **Zero Reversal Paralysis:** When the 19-Timeframe Confluence Engine, AI Swarm, and Kalman Velocity produce an opposing high-conviction signal ($action \neq \text{existing\_dir}$) with $confidence \ge 62.0\%$ or $|weighted\_score| \ge 25.0$, the engine immediately executes the **Trend Reversal Flip Protocol**.
+   - **Immediate Dual-Action Harvest & Flip:** In microsecond concurrency, the engine closes/harvests all opposing trades on both Capital.com broker and SQLite database (`status = 'CLOSED'`, `exit_reason = 'TREND_REVERSAL_FLIP'`), and immediately enters the new high-conviction directional wave with structural SL and 3-stage targets.
+   - **Price Separation Guard Exemption:** The Price Separation Guard ($min\_separation \ge \max(\$1.50, 0.35\times\text{SL})$) strictly enforces spacing **ONLY for same-direction trades** (`ot_dir == action`) to prevent cluster stacking at the same tick. It is **permanently forbidden** from ever blocking an opposing Trend Reversal Flip.
+   - **Agile Pyramiding (Scale-In):** Adding tranches in the same direction is permitted only when existing trade is protected (Breakeven Armor locked or profit $\ge +1.5R$), price separation $\ge min\_separation$, and confidence $\ge 65.0\%$.
+3. **Adaptive Post-Loss Re-Study Protocol & Cooldown Optimization (របបសិក្សាឡើងវិញក្រោយ SL & លុបបំបាត់ការកកស្ទះ Cooldown):**
+   - **Expunging Blind Comas:** Blind 300-second (5m) and 900-second (15m) system freezes are permanently eliminated.
+   - **Post-Profit Settling:** Following a profitable close (TP1/TP2/TP3 or Shock Early Harvest), cooldown is clamped to $\le 20$ seconds strictly for broker transaction settlement.
+   - **Post-Loss Anti-Revenge:** Following a Stop-Loss hit, cooldown is set to 45 seconds strictly against **same-direction revenge chasing** (`action == last_closed_dir`).
+   - **Reversal & Liquidity Hunt Bypass:** If the market produces an opposing reversal signal or confirms an institutional liquidity hunt wick rejection, the cooldown is **IMMEDIATELY BYPASSED**, permitting instant precision re-entry with structural stop behind the sweep wick.
+4. **Unconditional High-Fidelity VIP Telegram Signal Broadcast (ការផ្តល់ Signal ដល់ VIP ឥតរាំងស្ទះ):**
+   - High-conviction signals ($action \in [BUY, SELL]$) and Trend Reversal Flips MUST be broadcast to VIP Telegram users **regardless of whether `dispatched_count > 0`**.
+   - Even if auto-trade accounts have reached maximum position capacity or are undergoing margin verification, manual and prop-firm traders on Telegram must receive definitive single-directional signal cards with Entry, SL, TP1 (+73 pips), TP2 (+152 pips), and TP3 (+243 pips) in real time.
+   - Throttled by an institutional 60-second anti-spam deduplication window for identical price levels.
+5. **Dealing Range Equilibrium & Momentum Breakthrough Calibration (កម្ចាត់ Dead Zone នៅកណ្តាល Range):**
+   - While the middle 30% of the Dealing Range (35% - 65% equilibrium) is protected against low-volume sideways noise, confirmed directional momentum thrust ($|weighted\_score| \ge 28.0$ or latent Kalman velocity $|v| \ge 0.03$) is recognized as an institutional breakout/impulse and is **APPROVED** for market entry.
+   - Minimum win probability hurdle is calibrated at $\ge 60.0\%$ with $|weighted\_score| \ge 28.0$.
+6. **Guaranteed Database Parity & Zero Ghost Trades (ការបិទ Position ក្នុង Database ស្អាតស្អំ ១០០%):**
+   - `database.close_capital_auto_trade` is permanently unified with `database.update_capital_auto_trade_close`.
+   - Every closed trade (broker SL/TP, manual button, panic close all, shock harvest, or reversal flip) is immediately marked `status = 'CLOSED'` with exit timestamp and exit price, permanently preventing ghost records from inflating position capacity counters.
+7. **Super Admin Auto-Tradings Guarantee & Multi-Account Isolation:**
+   - Super Admin (`859271875`) is permanently guaranteed inclusion in active auto-trading fleet dispatch by default.
+   - Broker account switching gracefully handles multi-user credentials, preventing invalid account ID errors from ever polluting broker logs or stalling the execution pipeline.
+8. **1-Tap Persistent Keyboard Integrity (ផ្ទាំងប៊ូតុងបញ្ជា 1-Tap បាតអេក្រង់ជាប់អចិន្ត្រៃយ៍):**
+   - The 4-row, 9-button Persistent Bottom Keyboard is permanently locked:
+     `[ 🥇 Quant Gold Dashboard ] [ 🎯 Gold Signal ]`
+     `[ 🟢 BUY GOLD (0.5 oz) ] [ 🔴 SELL GOLD (0.5 oz) ]`
+     `[ 📊 Open Positions ] [ 🤖 Auto-Trade (ON/OFF) ]`
+     `[ 💵 Status ] [ 👑 VIP License ] [ 📖 Help ]`
+   - Every button is wired to sub-millisecond execution with rate-limiting protection, user authorization gates, and instant Telegram card replies.
