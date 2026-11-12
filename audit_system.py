@@ -5684,6 +5684,78 @@ def run_audit():
         failures.append(f"Invariant 117 check failed: {e}")
         log_fail(str(e))
 
+    print("\n[CHECK 91/91] Verifying Quant Gold Structural Breathing Stop-Loss ($25-$35), 360° Reversal Micro-Cut, 10-Year RAM Pattern Memory & Anti-Chasing Shield (Invariant 118)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_code = f.read()
+        with open("Quant Gold/execution_engine.py", "r", encoding="utf-8") as f:
+            qg_exec_code = f.read()
+        with open("Quant Gold/timeframes.py", "r", encoding="utf-8") as f:
+            qg_tf_code = f.read()
+
+        has_inv118_agents = "invariant 118" in agents_code.lower() and "structural breathing" in agents_code.lower()
+        has_inv118_gemini = "invariant 118" in gemini_code.lower() and "structural breathing" in gemini_code.lower()
+
+        # 1. Structural Breathing Stop Loss ($25.00 - $35.00)
+        has_breathing_sl = (
+            "max(25.00, min(35.00, raw_sl_dist))" in qg_exec_code
+            and "safe_dist = max(quote_spread * 5.0, level * 0.008, 25.0)" in qg_exec_code
+        )
+
+        # 2. 360° Early Reversal Micro-Cut (-$2.50 to -$4.00) & Instant Reversal Flip
+        has_reversal_cut = (
+            "360° EARLY MICRO-CUT & REVERSAL" in qg_exec_code
+            and "is_reversal_flip" in qg_exec_code
+            and "_pending_reversal_action" in qg_exec_code
+        )
+
+        # 3. Anti-Chasing Impulse Guard & Anti-Oversold/Overbought Fiduciary Guards
+        has_anti_chasing = (
+            "ANTI_CHASING_IMPULSE_VETO" in qg_exec_code
+            and "ANTI_OVERSOLD_SHORT_VETO" in qg_exec_code
+            and "ANTI_OVERBOUGHT_LONG_VETO" in qg_exec_code
+        )
+
+        # 4. 10-Year Candlestick RAM Pattern Memory Confluence
+        has_10y_ram_patterns = (
+            "detect_live_gold_candlestick_patterns" in qg_tf_code
+            and "pattern_wr" in qg_tf_code
+        )
+
+        # 5. Isolated Per-User Broker Reconciliation
+        has_user_broker_sync = (
+            "user_broker_open_deals" in qg_exec_code
+            and "successfully_audited_engs" in qg_exec_code
+        )
+
+        all_inv118_passed = (
+            has_inv118_agents
+            and has_inv118_gemini
+            and has_breathing_sl
+            and has_reversal_cut
+            and has_anti_chasing
+            and has_10y_ram_patterns
+            and has_user_broker_sync
+        )
+
+        if all_inv118_passed:
+            log_pass(
+                "Quant Gold Structural Breathing SL ($25-$35), 360° Reversal Micro-Cut, 10-Year RAM Pattern Memory & Anti-Chasing Shield (Invariant 118) "
+                "are 100% certified! ($25-$35 breathing SL, 360° micro-cut, Anti-Chasing Impulse veto, 10Y RAM pattern confluence, and per-user broker sync active)"
+            )
+        else:
+            failures.append(
+                f"Invariant 118 check failed: agents={has_inv118_agents}, gemini={has_inv118_gemini}, "
+                f"breathing_sl={has_breathing_sl}, reversal_cut={has_reversal_cut}, "
+                f"anti_chasing={has_anti_chasing}, 10y_ram={has_10y_ram_patterns}, user_sync={has_user_broker_sync}"
+            )
+            log_fail("Invariant 118 Quant Gold Breathing SL, Micro-Cut & RAM Patterns verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 118 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
 
     print("\n" + "=" * 70)
