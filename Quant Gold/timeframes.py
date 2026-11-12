@@ -37,6 +37,29 @@ import pandas as pd
 
 logger = logging.getLogger("QUANT_GOLD_TIMEFRAMES")
 
+_NET_CHECK_CACHE: Tuple[float, bool] = (0.0, False)
+
+def _check_network_online() -> bool:
+    """Fast non-blocking pre-check for network reachability with 10s caching."""
+    global _NET_CHECK_CACHE
+    import os
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return False
+    now = time.time()
+    if (now - _NET_CHECK_CACHE[0]) < 10.0:
+        return _NET_CHECK_CACHE[1]
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.3)
+        s.connect(('1.1.1.1', 80))
+        s.close()
+        _NET_CHECK_CACHE = (now, True)
+        return True
+    except Exception:
+        _NET_CHECK_CACHE = (now, False)
+        return False
+
 TIMEFRAMES_19 = [
     # 10 Minutes
     "M1", "M2", "M3", "M4", "M5", "M10", "M15", "M20", "M30", "M45",
@@ -130,6 +153,9 @@ class GoldMultiTimeframeEngine:
         Fetches live historical OHLCV candles for Gold from Capital.com broker API.
         Caches in RAM for 30s to prevent spamming broker API.
         """
+        if not _check_network_online():
+            return None
+
         now = time.time()
         cached = self._real_candle_cache.get(resolution)
         if cached and (now - cached[0]) < 30.0 and cached[1] is not None and len(cached[1]) >= 10:
@@ -202,7 +228,7 @@ class GoldMultiTimeframeEngine:
         })
         return df
 
-    def compute_timeframe_indicators(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def compute_timeframe_indicators(self, df: pd.DataFrame, tf_name: str = "M15") -> Dict[str, Any]:
         """
         Computes 360° Technical, Volatility, SMC, and Pattern features for a single timeframe.
         """
@@ -308,25 +334,42 @@ class GoldMultiTimeframeEngine:
             elif lows[-1] < prior_low and closes[-1] > prior_low:
                 sweep_type = "BULLISH_SWEEP"
 
-        # 8. Candlestick Pattern Detection
+        # 8. Candlestick Pattern Detection (Augmented with 10-Year RAM Pattern Memory)
         pattern = "NONE"
-        c_body = abs(closes[-1] - opens[-1])
-        c_range = max(0.001, highs[-1] - lows[-1])
-        lower_wick = min(opens[-1], closes[-1]) - lows[-1]
-        upper_wick = highs[-1] - max(opens[-1], closes[-1])
+        pattern_wr = 50.0
+        pattern_pf = 1.0
 
-        # Pinbar / Hammer
-        if lower_wick >= 2.0 * c_body and upper_wick <= 0.5 * c_body:
-            pattern = "BULLISH_PINBAR_HAMMER"
-        elif upper_wick >= 2.0 * c_body and lower_wick <= 0.5 * c_body:
-            pattern = "BEARISH_PINBAR_STAR"
-        # Engulfing
-        elif n >= 2:
-            prev_body = abs(closes[-2] - opens[-2])
-            if closes[-1] > opens[-1] and closes[-2] < opens[-2] and closes[-1] >= opens[-2] and opens[-1] <= closes[-2]:
-                pattern = "BULLISH_ENGULFING"
-            elif closes[-1] < opens[-1] and closes[-2] > opens[-2] and closes[-1] <= opens[-2] and opens[-1] >= closes[-2]:
-                pattern = "BEARISH_ENGULFING"
+        # Try 10-Year Institutional RAM Pattern Memory Engine (Nanosecond speed on supported timeframes)
+        if tf_name.upper() in ["M15", "M30", "H1", "H4", "D1"]:
+            try:
+                from gold_candlestick_pattern_memory import detect_live_gold_candlestick_patterns
+                ram_res = detect_live_gold_candlestick_patterns(df, timeframe=tf_name, current_price=curr_p)
+                if ram_res.get("has_pattern"):
+                    pattern = str(ram_res.get("highest_conviction_pattern") or "NONE")
+                    pattern_wr = float(ram_res.get("win_rate_confluence", 75.0) or 75.0)
+                    pattern_pf = float(ram_res.get("profit_factor", 1.8) or 1.8)
+            except Exception:
+                pass
+
+        # Fallback to local heuristic detection if RAM pattern engine returned NONE
+        if pattern == "NONE":
+            c_body = abs(closes[-1] - opens[-1])
+            c_range = max(0.001, highs[-1] - lows[-1])
+            lower_wick = min(opens[-1], closes[-1]) - lows[-1]
+            upper_wick = highs[-1] - max(opens[-1], closes[-1])
+
+            # Pinbar / Hammer
+            if lower_wick >= 2.0 * c_body and upper_wick <= 0.5 * c_body:
+                pattern = "BULLISH_PINBAR_HAMMER"
+            elif upper_wick >= 2.0 * c_body and lower_wick <= 0.5 * c_body:
+                pattern = "BEARISH_PINBAR_STAR"
+            # Engulfing
+            elif n >= 2:
+                prev_body = abs(closes[-2] - opens[-2])
+                if closes[-1] > opens[-1] and closes[-2] < opens[-2] and closes[-1] >= opens[-2] and opens[-1] <= closes[-2]:
+                    pattern = "BULLISH_ENGULFING"
+                elif closes[-1] < opens[-1] and closes[-2] > opens[-2] and closes[-1] <= opens[-2] and opens[-1] >= closes[-2]:
+                    pattern = "BEARISH_ENGULFING"
 
         # 9. Compute Directional Score (-100 to +100)
         score = 0.0
@@ -371,11 +414,13 @@ class GoldMultiTimeframeEngine:
         elif fvg_type == "BEARISH_FVG":
             score -= 15.0
 
-        # Candlestick Pattern Boost
-        if "BULLISH" in pattern:
-            score += 20.0
-        elif "BEARISH" in pattern:
-            score -= 20.0
+        # Candlestick Pattern Boost (Calibrated with Empirical Confluence Win Rate)
+        if "BULLISH" in pattern or "HAMMER" in pattern or "WHITE_SOLDIERS" in pattern or "MORNING_STAR" in pattern or "TWEEZER_BOTTOM" in pattern:
+            boost = 25.0 if pattern_wr >= 80.0 else 20.0
+            score += boost
+        elif "BEARISH" in pattern or "STAR" in pattern or "BLACK_CROWS" in pattern or "EVENING_STAR" in pattern or "TWEEZER_TOP" in pattern or "DARK_CLOUD" in pattern:
+            boost = 25.0 if pattern_wr >= 80.0 else 20.0
+            score -= boost
 
         # Equilibrium Chop Dampener: If in middle chop, scale score towards 0
         if is_chop_zone:
@@ -508,7 +553,7 @@ class GoldMultiTimeframeEngine:
 
         for tf in TIMEFRAMES_19:
             df_tf = timeframe_dfs.get(tf)
-            analysis = self.compute_timeframe_indicators(df_tf)
+            analysis = self.compute_timeframe_indicators(df_tf, tf_name=tf)
             tf_results[tf] = analysis
             w = TIMEFRAME_WEIGHTS.get(tf, 1.0 / 19.0)
             weighted_score += analysis["score"] * w

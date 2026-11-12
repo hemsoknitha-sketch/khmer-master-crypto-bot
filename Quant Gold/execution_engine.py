@@ -196,9 +196,9 @@ def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
             "tier": 1,
             "label": "POS1_M1_M5_SCALP",
             "name": "Position 1: M1-M5 Scalp Fast Harvester",
-            "pips_target": 15,
-            "tp_r": 1.20,
-            "desc": "+10 to +20 pips យកលឿនចូលហោប៉ៅ"
+            "pips_target": 73,
+            "tp_r": 1.50,
+            "desc": "TP1: +73 pips -> ជាប់ Breakeven Armor ភ្លាម (0.00R Free Roll)"
         },
         2: {
             "tier": 2,
@@ -458,9 +458,9 @@ class QuantGoldExecutionEngine:
                     )
                     is_naked_sl = (sl <= 0.0)
 
-                    # Dynamic breathing SL distance: max(spread * 3.5, level * 0.008, 16.0)
+                    # Dynamic breathing SL distance: max(spread * 5.0, level * 0.008, 25.0)
                     _, _, quote_spread = self.get_live_gold_price_quote()
-                    safe_dist = max(quote_spread * 3.5, level * 0.008, 16.0)
+                    safe_dist = max(quote_spread * 5.0, level * 0.008, 25.0)
 
                     if (is_naked_sl or is_suicidal_sl) and level > 0.0:
                         emergency_sl = round((level - safe_dist) if direction == "BUY" else (level + safe_dist), 2)
@@ -1827,33 +1827,36 @@ class QuantGoldExecutionEngine:
                         active_trades.extend(db.get_capital_auto_trades(cid, status="OPEN"))
 
             # Broker reconciliation: interrogate broker open positions per user & mode
-            broker_open_deal_ids = set()
+            # Broker reconciliation: interrogate broker open positions per user & mode
+            user_broker_open_deals: Dict[Tuple[int, bool], set] = {}
+            successfully_audited_engs: set = set()
             try:
-                checked_engs = set()
                 for tr in active_trades:
                     c_id = tr.get("chat_id") or 859271875
                     t_demo = bool(tr.get("is_demo", False))
                     eng_k = (c_id, t_demo)
-                    if eng_k in checked_engs:
+                    if eng_k in successfully_audited_engs:
                         continue
-                    checked_engs.add(eng_k)
                     try:
                         u_eng = capital_engine.get_user_capital_engine(c_id, is_demo=t_demo)
                         if u_eng:
                             pos_list = await asyncio.to_thread(u_eng.get_open_positions)
-                            if pos_list:
+                            if pos_list is not None:
+                                d_set = set()
                                 for p_item in pos_list:
                                     pos = p_item.get("position", p_item)
                                     d_id = str(pos.get("dealId") or pos.get("deal_id") or "")
                                     epic = str(p_item.get("market", {}).get("epic") or pos.get("epic") or "").upper()
                                     if d_id and epic == "GOLD":
-                                        broker_open_deal_ids.add(d_id)
+                                        d_set.add(d_id)
+                                user_broker_open_deals[eng_k] = d_set
+                                successfully_audited_engs.add(eng_k)
                     except Exception as e_b_usr:
                         logger.debug(f"User broker position audit note for {c_id}: {e_b_usr}")
             except Exception as e_bpos:
                 logger.debug(f"Broker open positions check note: {e_bpos}")
 
-            for tr in active_trades:
+            for idx, tr in enumerate(active_trades):
                 if str(tr.get("epic", "")).upper() != "GOLD":
                     continue
                 status = str(tr.get("status", "OPEN")).upper()
@@ -1879,30 +1882,32 @@ class QuantGoldExecutionEngine:
                 deal_key = str(deal_id)
 
                 # Step 1: Broker Server-Side Closure Check
-                # If broker accounts were audited and this deal is not in broker_open_deal_ids, it is closed!
-                user_audited = (cid, is_demo) in checked_engs or (859271875, is_demo) in checked_engs or len(checked_engs) > 0
-                if user_audited and deal_id not in broker_open_deal_ids and deal_id != "OK":
-                    logger.info(f"🏛️ [BROKER SYNC] Gold trade {deal_id} was closed on Capital.com broker.")
-                    if hasattr(db, "update_capital_auto_trade_close"):
-                        db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
-                    
-                    if upl > 0 or pips > 0 or scale_tier >= 1:
-                        key_close = f"{deal_id}:CLOSED"
-                        if key_close not in self._notified_milestones:
-                            self._notified_milestones.add(key_close)
-                            card_close_win = format_gold_tp_card(
-                                stage="CLOSE",
-                                pips=max(pips, 73 if scale_tier >= 1 else 10),
-                                direction=dir_side,
-                                entry_price=entry_p
-                            )
-                            markup = get_gold_signal_reply_markup()
-                            await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
-                        self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
-                    else:
-                        logger.info(f"Gold trade {deal_id} closed at loss (${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
-                        self._clear_active_trade(deal_id, cooldown=45.0, direction=dir_side)
-                    continue
+                # If THIS specific user's broker was successfully queried and this deal is not in user's broker positions, it is closed!
+                user_eng_k = (cid, is_demo)
+                if user_eng_k in successfully_audited_engs:
+                    user_deals = user_broker_open_deals.get(user_eng_k, set())
+                    if str(deal_id) not in user_deals and deal_id != "OK":
+                        logger.info(f"🏛️ [BROKER SYNC] Gold trade {deal_id} was closed on Capital.com broker for user {cid}.")
+                        if hasattr(db, "update_capital_auto_trade_close"):
+                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                        
+                        if upl > 0 or pips > 0 or scale_tier >= 1:
+                            key_close = f"{deal_id}:CLOSED"
+                            if key_close not in self._notified_milestones:
+                                self._notified_milestones.add(key_close)
+                                card_close_win = format_gold_tp_card(
+                                    stage="CLOSE",
+                                    pips=max(pips, 73 if scale_tier >= 1 else 10),
+                                    direction=dir_side,
+                                    entry_price=entry_p
+                                )
+                                markup = get_gold_signal_reply_markup()
+                                await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
+                            self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
+                        else:
+                            logger.info(f"Gold trade {deal_id} closed at loss (${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
+                            self._clear_active_trade(deal_id, cooldown=45.0, direction=dir_side)
+                        continue
 
                 # Step 2: Entry price sanity & price jump anomaly guard
                 if entry_p < 3500.0 or entry_p > 6000.0:
@@ -2045,11 +2050,12 @@ class QuantGoldExecutionEngine:
                     except Exception as e_rev_cut:
                         logger.debug(f"360 reversal check note: {e_rev_cut}")
 
-                # Check Position 1: M1 - M5 Scalp Fast Harvester (+10 to +20 pips / $1.00 to $2.00 move)
+                # Check Position 1: M1 - M5 Scalp Fast Harvester (+73 pips / $7.30 move)
                 tranche_lbl = str(tr.get("tranche_id", "") or "")
+                tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 73))
                 is_pos1 = (tranche_lbl == "POS1_M1_M5_SCALP" or (idx == 0 and "POS" not in tranche_lbl and scale_tier == 0))
-                if is_pos1 and (1.00 <= pnl_pts <= 4.00 or 10 <= pips <= 35) and not is_manual_trade:
-                    logger.info(f"⚡ [POS 1 SCALP HARVEST] Gold trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}). Banking quick scalp into pocket!")
+                if is_pos1 and (pnl_pts >= 7.30 or pips >= tier_pips_target) and not is_manual_trade:
+                    logger.info(f"⚡ [POS 1 SCALP HARVEST] Gold trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}) target {tier_pips_target} pips. Banking TP1 into pocket!")
                     try:
                         if cid:
                             u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)

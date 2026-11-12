@@ -27,6 +27,29 @@ import pandas as pd
 
 logger = logging.getLogger("QUANT_GOLD_MATH")
 
+_NET_CHECK_CACHE: Tuple[float, bool] = (0.0, False)
+
+def _check_network_online() -> bool:
+    """Fast non-blocking pre-check for network reachability with 10s caching."""
+    global _NET_CHECK_CACHE
+    import os
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return False
+    now = time.time()
+    if (now - _NET_CHECK_CACHE[0]) < 10.0:
+        return _NET_CHECK_CACHE[1]
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.3)
+        s.connect(('1.1.1.1', 80))
+        s.close()
+        _NET_CHECK_CACHE = (now, True)
+        return True
+    except Exception:
+        _NET_CHECK_CACHE = (now, False)
+        return False
+
 
 class GoldKalmanFilter2D:
     """
@@ -71,7 +94,11 @@ class GoldKalmanFilter2D:
         # Update
         y = z - (self.H @ x_pred)
         S = self.H @ P_pred @ self.H.T + self.R
-        K = P_pred @ self.H.T @ np.linalg.inv(S)
+        s_val = float(S[0, 0])
+        if abs(s_val) < 1e-9:
+            K = np.zeros((2, 1), dtype=np.float64)
+        else:
+            K = (P_pred @ self.H.T) / s_val
 
         self.x = x_pred + (K @ y)
         self.P = (np.eye(2) - (K @ self.H)) @ P_pred
@@ -112,8 +139,9 @@ def compute_hurst_exponent(series: np.ndarray, min_lags: int = 4, max_lags: int 
                 if s > 1e-9:
                     rs_list.append(r / s)
             if rs_list:
+                m_rs = max(1e-9, float(np.mean(rs_list)))
                 lags.append(np.log(lag))
-                rs_vals.append(np.log(np.mean(rs_list)))
+                rs_vals.append(np.log(m_rs))
 
         if len(lags) >= 3:
             poly = np.polyfit(lags, rs_vals, 1)
@@ -266,6 +294,17 @@ class GoldMathematicalCore:
         sge_premium_usd = 18.50
         us_tips_10y_real_yield = 1.82  # In %
         dxy_dollar_index = 104.20
+        vix_level = 18.50
+
+        if _check_network_online():
+            try:
+                from capital_meta_labeling_engine import CapitalMetaLabelingEngine
+                macro_feed = CapitalMetaLabelingEngine.get_live_macro_features()
+                if macro_feed:
+                    us_tips_10y_real_yield = float(macro_feed.get("tips_real_yield", 1.82) or 1.82)
+                    vix_level = float(macro_feed.get("vix", 18.50) or 18.50)
+            except Exception:
+                pass
 
         # Real Yield Pressure: Rising TIPS yields put downward pressure on Gold
         yield_momentum = "NEUTRAL"
@@ -300,6 +339,8 @@ class GoldMathematicalCore:
             bayes_prob += 6.0  # Volume confirms institutional participation
         if yield_momentum == "BULLISH_FOR_GOLD" and velocity > 0:
             bayes_prob += 5.0
+        if vix_level >= 22.0:
+            bayes_prob += 3.0  # Safe-haven volatility demand
 
         bayes_prob = float(np.clip(bayes_prob, 35.0, 94.0))
 
@@ -325,6 +366,7 @@ class GoldMathematicalCore:
                 "sge_premium_usd": round(sge_premium_usd, 2),
                 "us_tips_10y": round(us_tips_10y_real_yield, 2),
                 "dxy_index": round(dxy_dollar_index, 2),
+                "vix": round(vix_level, 2),
                 "yield_impact": yield_momentum
             },
             "conformal_prediction_90": {

@@ -32,6 +32,9 @@ except ImportError:
     InferenceClient = None
 
 try:
+    import warnings
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    warnings.filterwarnings("ignore", category=UserWarning)
     import google.generativeai as genai
 except ImportError:
     genai = None
@@ -172,8 +175,7 @@ TASK: Provide JSON output only:
                 return parsed
             except Exception as e:
                 logger.debug(f"DeepSeek R1 {model} query note: {e}")
-                self._network_offline_until = time.time() + 60.0
-                break
+                continue
         return None
 
     def _query_llama_70b_hf(self, prompt: str) -> Optional[Dict[str, Any]]:
@@ -205,8 +207,7 @@ TASK: Provide JSON output only:
                 return parsed
             except Exception as e:
                 logger.debug(f"Llama HF {model} query note: {e}")
-                self._network_offline_until = time.time() + 60.0
-                break
+                continue
         return None
 
     def _query_gemini_flash(self, prompt: str) -> Optional[Dict[str, Any]]:
@@ -240,8 +241,7 @@ TASK: Provide JSON output only:
                 return parsed
             except Exception as e:
                 logger.debug(f"Gemini {m_name} query note: {e}")
-                self._network_offline_until = time.time() + 60.0
-                break
+                continue
         return None
 
     def _vectorized_algorithmic_fallback(
