@@ -718,7 +718,17 @@ class QuantGoldExecutionEngine:
                     "primary_reason": algo_res.get("key_reason", "")
                 }
 
-        # 3.5 Monte Safieddine Daily Market Report Benchmark Confluence & Contrarian Traps (Invariant 99)
+        # 4. Extract Metrics & Synthesize Definitive Signal
+        mtf_action = mtf_data.get("action", "HOLD")
+        ai_action = ai_data.get("action", "HOLD")
+        weighted_score = mtf_data.get("weighted_score", 0.0)
+        win_prob = mtf_data.get("win_probability", 50.0)
+        counts = mtf_data.get("counts", {})
+        kalman = math_data.get("kalman", {})
+        hurst = math_data.get("hurst_surface", {})
+        regime = hurst.get("regime", "RANDOM_WALK")
+
+        # 4.1 Monte Safieddine Daily Market Report Benchmark Confluence & Contrarian Traps (Invariant 99)
         monte_rep = {}
         if CapitalMarketReportEngine:
             try:
@@ -733,6 +743,8 @@ class QuantGoldExecutionEngine:
                 if c_long >= 75.0 and curr_p >= (monte_res1 - 2.50):
                     if mtf_action == "BUY" or ai_action == "BUY":
                         # FOMO buy into 80% retail herd trap is prohibited
+                        mtf_action = "HOLD"
+                        ai_action = "HOLD"
                         mtf_data["action"] = "HOLD"
                         ai_data["action"] = "HOLD"
                     # Smart money distribution short bias boost
@@ -740,22 +752,14 @@ class QuantGoldExecutionEngine:
                 # Check B: Contrarian Support Rebound at Support 1 ($3993.28)
                 elif curr_p <= (monte_sup1 + 2.50):
                     if mtf_action == "SELL" or ai_action == "SELL":
+                        mtf_action = "HOLD"
+                        ai_action = "HOLD"
                         mtf_data["action"] = "HOLD"
                         ai_data["action"] = "HOLD"
                     # Smart money accumulation long bounce boost
                     weighted_score = max(weighted_score + 15.0, 12.0)
             except Exception as e:
                 logger.debug("Monte Safieddine report evaluation exception: %s", e)
-
-        # 4. Synthesize Definitive Signal
-        mtf_action = mtf_data.get("action", "HOLD")
-        ai_action = ai_data.get("action", "HOLD")
-        weighted_score = mtf_data.get("weighted_score", 0.0)
-        win_prob = mtf_data.get("win_probability", 50.0)
-        counts = mtf_data.get("counts", {})
-        kalman = math_data.get("kalman", {})
-        hurst = math_data.get("hurst_surface", {})
-        regime = hurst.get("regime", "RANDOM_WALK")
 
         # Dealing Range Chop Filter Check
         m15_tf = mtf_data.get("timeframes", {}).get("M15", {})
@@ -778,6 +782,17 @@ class QuantGoldExecutionEngine:
             if is_chop_zone and abs(weighted_score) < 28.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.03:
                 final_action = "HOLD"
                 reason = f"BLOCKED_CHOP_ZONE: Price is in middle dealing range ({smc_m15.get('range_pct', 0.5):.2f}) with low momentum."
+            # Gate 2.5: Anti-Chasing Momentum Overextension & Spread Drag Guard (Invariant 92 Pillar 1)
+            # Chasing an extended impulse candle (> 1.85x ATR from EMA21) forces retail to buy the top wick
+            # or sell the bottom wick right before a mean-reverting pullback.
+            m15_ema21 = float(m15_tf.get("ema21", 0.0) or m15_tf.get("ema20", 0.0) or curr_p)
+            m15_atr_gate = float(m15_tf.get("atr", 6.5) or 6.5)
+            if cand_action == "BUY" and (curr_p - m15_ema21) > (1.85 * m15_atr_gate):
+                final_action = "HOLD"
+                reason = f"ANTI_CHASING_IMPULSE_VETO: Price {curr_p:.2f} is {((curr_p - m15_ema21)/m15_atr_gate):.2f}x ATR above 15m EMA21 ({m15_ema21:.2f}). Chasing extended top wick is blocked."
+            elif cand_action == "SELL" and (m15_ema21 - curr_p) > (1.85 * m15_atr_gate):
+                final_action = "HOLD"
+                reason = f"ANTI_CHASING_IMPULSE_VETO: Price {curr_p:.2f} is {((m15_ema21 - curr_p)/m15_atr_gate):.2f}x ATR below 15m EMA21 ({m15_ema21:.2f}). Shorting extended bottom wick is blocked."
             # Gate 3: Anti-Oversold Short Guard & Anti-Overbought Long Guard (Invariant 1.1 Fiduciary Oath)
             elif cand_action == "SELL" and m15_tf.get("rsi", 50.0) <= 38.0:
                 final_action = "HOLD"
