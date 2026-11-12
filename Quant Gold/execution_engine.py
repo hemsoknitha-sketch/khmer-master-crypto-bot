@@ -819,24 +819,38 @@ class QuantGoldExecutionEngine:
                 final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
-        # Dynamic Breathing Stop Loss & Institutional Targets (Invariant 35 & 98):
-        # Strict Standard: SL Distance >= max(2.50 * ATR_15m, 3.5 * Spread, 0.0035 * Price)
-        m15_tf = mtf_data.get("timeframes", {}).get("M15", {})
+        # Dynamic Breathing Stop Loss & H1/H4 Institutional Structural Invalidation Anchor (Invariant 35 & 98):
+        # Strict Standard: SL Distance >= max(1.80 * H1_ATR, 1.15 * H4_ATR, 3.60 * ATR_15m, spread * 5.0, 0.0065 * Price)
+        m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
+        h1_tf = mtf_data.get("timeframes", {}).get("H1", {}) if isinstance(mtf_data, dict) else {}
+        h4_tf = mtf_data.get("timeframes", {}).get("H4", {}) if isinstance(mtf_data, dict) else {}
         m15_atr = float(m15_tf.get("atr", 6.5) or 6.5)
+        h1_atr = float(h1_tf.get("atr", 14.0) or 14.0)
+        h4_atr = float(h4_tf.get("atr", 26.0) or 26.0)
         if m15_atr < 2.0 or m15_atr > 35.0:
             m15_atr = 6.5  # Sane default for Gold (XAUUSD)
+        if h1_atr < 4.0 or h1_atr > 50.0:
+            h1_atr = 14.0
+        if h4_atr < 8.0 or h4_atr > 80.0:
+            h4_atr = 26.0
 
-        raw_sl_dist = max(2.50 * m15_atr, spread * 3.50, 0.0035 * curr_p)
-        # Breathing room: dynamically clamped between $14.50 and $24.00 (145 - 240 pips)
-        sl_distance = round(max(14.50, min(24.0, raw_sl_dist)), 2)
+        raw_sl_dist = max(
+            1.80 * h1_atr,
+            1.15 * h4_atr,
+            3.60 * m15_atr,
+            spread * 5.00,
+            0.0065 * curr_p
+        )
+        # Institutional Breathing Room: clamped dynamically between $25.00 and $35.00 (250 - 350 pips)
+        sl_distance = round(max(25.00, min(35.00, raw_sl_dist)), 2)
 
-        # Multi-Tier Asymmetric Targets (R:R >= 1:1.50 to 1:4.00):
-        # TP1 (+1.5R): High hit-rate -> shifts SL to Breakeven Armor, locking trade at 0.00R Free Roll
-        tp1_distance = round(max(sl_distance * 1.50, 22.0), 2)
-        # TP2 (+2.5R): Guaranteed Cash Profit Floor
-        tp2_distance = round(max(sl_distance * 2.50, 38.0), 2)
-        # TP3 (+4.0R): Institutional Moonshot Runner
-        tp3_distance = round(max(sl_distance * 4.00, 65.0), 2)
+        # Multi-Tier Asymmetric Targets (R:R >= 1:1.25 to 1:3.50):
+        # TP1 (+1.25R / $32-$43): High hit-rate -> shifts SL to Breakeven Armor, locking trade at 0.00R Free Roll
+        tp1_distance = round(max(sl_distance * 1.25, 32.0), 2)
+        # TP2 (+2.20R / $55-$77): Guaranteed Cash Profit Floor (Banks 50% lot cash profit)
+        tp2_distance = round(max(sl_distance * 2.20, 55.0), 2)
+        # TP3 (+3.50R / $90-$125): Institutional Moonshot Runner
+        tp3_distance = round(max(sl_distance * 3.50, 90.0), 2)
 
         prospective_buy = {
             "entry": round(curr_p, 2),
@@ -1126,8 +1140,31 @@ class QuantGoldExecutionEngine:
             sl_val = float(signal_data.get("sl", 0.0) or 0.0)
             sl_dist = abs(current_price - sl_val)
 
+            # Check if an immediate Agile Reversal Flip was triggered by 360° Surveillance
+            pending_rev = getattr(self, "_pending_reversal_action", None)
+            is_reversal_flip_trigger = False
+            if pending_rev in ["BUY", "SELL"]:
+                action = pending_rev
+                self._pending_reversal_action = None
+                confidence = 88.0
+                is_reversal_flip_trigger = True
+                # Recalculate prospective SL/TP for the reversal direction
+                if action == "BUY":
+                    signal_data["sl"] = signal_data.get("prospective_buy", {}).get("sl", current_price - 25.0)
+                    signal_data["tp1"] = signal_data.get("prospective_buy", {}).get("tp1", current_price + 32.0)
+                    signal_data["tp2"] = signal_data.get("prospective_buy", {}).get("tp2", current_price + 55.0)
+                    signal_data["tp3"] = signal_data.get("prospective_buy", {}).get("tp3", current_price + 90.0)
+                else:
+                    signal_data["sl"] = signal_data.get("prospective_sell", {}).get("sl", current_price + 25.0)
+                    signal_data["tp1"] = signal_data.get("prospective_sell", {}).get("tp1", current_price - 32.0)
+                    signal_data["tp2"] = signal_data.get("prospective_sell", {}).get("tp2", current_price - 55.0)
+                    signal_data["tp3"] = signal_data.get("prospective_sell", {}).get("tp3", current_price - 90.0)
+                sl_val = float(signal_data["sl"])
+                sl_dist = abs(current_price - sl_val)
+                logger.info(f"🔄 [360° AGILE REVERSAL FLIP ENGAGED] Instant flip into {action} @ ${current_price:.2f} (SL: ${sl_val:.2f})!")
+
             # Prevent same-direction revenge chasing within post-loss cooldown
-            if action in ["BUY", "SELL"] and not has_existing:
+            if action in ["BUY", "SELL"] and not has_existing and not is_reversal_flip_trigger:
                 if action == last_closed_dir and time_since_close < getattr(self, "_trade_cooldown_seconds", 45.0):
                     logger.debug(f"🛡️ [POST-LOSS COOLDOWN] Same-direction {action} suppressed for {round(self._trade_cooldown_seconds - time_since_close, 1)}s to prevent revenge chase.")
                     return {
@@ -1141,6 +1178,7 @@ class QuantGoldExecutionEngine:
             last_unf_price = getattr(self, "_last_unfilled_price", 0.0)
             if (
                 action in ["BUY", "SELL"]
+                and not is_reversal_flip_trigger
                 and action == last_unf_action
                 and (now - last_unf_ts) < 45.0
                 and abs(current_price - last_unf_price) < 2.50
@@ -1153,7 +1191,7 @@ class QuantGoldExecutionEngine:
 
             dispatched_count = 0
             if action in ["BUY", "SELL"]:
-                is_reversal_flip = False
+                is_reversal_flip = is_reversal_flip_trigger
                 is_pyramid = False
 
                 if has_existing:
@@ -1952,6 +1990,46 @@ class QuantGoldExecutionEngine:
                         continue
                     except Exception as e_shk:
                         logger.debug(f"Flash shock harvest note: {e_shk}")
+
+                # 360° Real-Time Market Invalidation & Early Reversal Surveillance (News & Buy/Sell Order Flow):
+                # "បើសិនជាលទ្ធផលបញ្ជ្រាសទិសខ្លាំងរហូតអត្រាប៉ះ SL ខ្ពស់បំផុត នោះត្រូវផ្តាច់ការខាតបង់បន្តិចបន្តួចភ្លាមៗ
+                # ដើម្បី Flip position កើបចំណេញបានទាន់ពេលវេលា មិនដេកត្រាំត្រែងរង់ចាំ SL ខាតបង់ធំនោះទេ"
+                is_floating_loss = (upl < -1.50 or pnl_pts <= -3.00)
+                if is_floating_loss and not is_manual_trade:
+                    try:
+                        from quant_gold_security import get_quant_gold_security_citadel
+                        mtf_snap = self.mtf_engine.analyze_all_19_timeframes(current_price=curr_p)
+                        candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
+                        candles_m15 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
+                        math_snap = self.math_core.analyze_mathematical_edge(
+                            current_price=curr_p,
+                            candles_m1=candles_m1,
+                            candles_m15=candles_m15
+                        )
+                        inv_check = get_quant_gold_security_citadel().evaluate_360_market_invalidation(
+                            current_price=curr_p,
+                            position_direction=dir_side,
+                            mtf_data=mtf_snap,
+                            math_data=math_snap
+                        )
+                        if inv_check.get("is_invalidated") and inv_check.get("reversal_direction"):
+                            opp_dir = inv_check["reversal_direction"]
+                            logger.info(
+                                f"🔄 [360° EARLY MICRO-CUT & REVERSAL] Gold trade {deal_id} ({dir_side}) "
+                                f"severely invalidated by {inv_check.get('reason')}. "
+                                f"Cutting loss early @ ${curr_p:.2f} (Loss: ${upl:.2f}) to Flip into {opp_dir} immediately!"
+                            )
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                            if hasattr(db, "update_capital_auto_trade_close"):
+                                db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+
+                            self._pending_reversal_action = opp_dir
+                            self._clear_active_trade(deal_key, cooldown=0.0, direction=dir_side)
+                            continue
+                    except Exception as e_rev_cut:
+                        logger.debug(f"360 reversal check note: {e_rev_cut}")
 
                 # Check Position 1: M1 - M5 Scalp Fast Harvester (+10 to +20 pips / $1.00 to $2.00 move)
                 tranche_lbl = str(tr.get("tranche_id", "") or "")

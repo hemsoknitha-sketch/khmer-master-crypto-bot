@@ -256,6 +256,60 @@ class QuantGoldSecurityCitadel:
         return True
 
     # --------------------------------------------------------------------------
+    # 6. 360° Real-Time Market Surveillance & Order Flow Invalidation (AQ84)
+    # --------------------------------------------------------------------------
+    def evaluate_360_market_invalidation(
+        self,
+        current_price: float,
+        position_direction: str,
+        mtf_data: Dict[str, Any],
+        math_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        360-Degree Real-Time Market Invalidation & Order Flow Surveillance:
+        Monitors 19-TF structural alignment, Kalman velocity, and Order Flow momentum.
+        If market exhibits confirmed high-conviction opposing thrust against an active trade,
+        signals an Agile Early Micro-Cut to avoid waiting for the full SL distance.
+        """
+        pos_dir = str(position_direction or "").upper()
+        summary = mtf_data.get("summary", {}) if isinstance(mtf_data, dict) else {}
+        w_score = float(summary.get("weighted_score", 0.0) or 0.0)
+        counts = summary.get("counts", {}) if isinstance(summary, dict) else {}
+        bull_cnt = int(counts.get("bullish", 0) or 0)
+        bear_cnt = int(counts.get("bearish", 0) or 0)
+
+        kalman = math_data.get("kalman", {}) if isinstance(math_data, dict) else {}
+        vel = float(kalman.get("latent_velocity", 0.0) or 0.0)
+
+        is_invalidated = False
+        reversal_dir = None
+        confidence = 0.0
+        reason = ""
+
+        if pos_dir == "SELL":
+            # Opposing bullish thrust detected:
+            if bull_cnt >= 13 or w_score >= 18.0 or (vel >= 0.06 and w_score >= 12.0):
+                is_invalidated = True
+                reversal_dir = "BUY"
+                confidence = min(95.0, max(75.0, 60.0 + (bull_cnt * 2.0)))
+                reason = f"Bullish Order Flow Surge: {bull_cnt}/19 Bullish TF, Score {w_score:+.1f}, Kalman Vel {vel:+.4f}"
+        elif pos_dir == "BUY":
+            # Opposing bearish thrust detected:
+            if bear_cnt >= 13 or w_score <= -18.0 or (vel <= -0.06 and w_score <= -12.0):
+                is_invalidated = True
+                reversal_dir = "SELL"
+                confidence = min(95.0, max(75.0, 60.0 + (bear_cnt * 2.0)))
+                reason = f"Bearish Order Flow Surge: {bear_cnt}/19 Bearish TF, Score {w_score:+.1f}, Kalman Vel {vel:+.4f}"
+
+        return {
+            "is_invalidated": is_invalidated,
+            "should_reversal_flip": is_invalidated,
+            "reversal_direction": reversal_dir,
+            "confidence": confidence,
+            "reason": reason
+        }
+
+    # --------------------------------------------------------------------------
     # 6. Memory & OOM Protection Shield
     # --------------------------------------------------------------------------
     def check_memory_shield(self) -> Dict[str, Any]:

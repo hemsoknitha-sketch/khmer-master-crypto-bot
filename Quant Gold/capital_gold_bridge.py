@@ -790,17 +790,20 @@ class QuantGoldCapitalBridge:
             p_buy = sig.get("prospective_buy", {})
             p_sell = sig.get("prospective_sell", {})
             if sub_action == "BUY":
-                sl = p_buy.get("sl", round(curr_p - 6.08, 2))
-                tp1 = p_buy.get("tp1", round(curr_p + 7.30, 2))
+                sl = p_buy.get("sl", round(curr_p - 25.0, 2))
+                tp1 = p_buy.get("tp1", round(curr_p + 32.0, 2))
             else:
-                sl = p_sell.get("sl", round(curr_p + 6.08, 2))
-                tp1 = p_sell.get("tp1", round(curr_p - 7.30, 2))
+                sl = p_sell.get("sl", round(curr_p + 25.0, 2))
+                tp1 = p_sell.get("tp1", round(curr_p - 32.0, 2))
+
+            sl_pips_disp = abs(curr_p - sl) * 10
+            tp1_pips_disp = abs(tp1 - curr_p) * 10
 
             await self._safe_send(
                 update,
                 f"⚡ <b>[EXECUTING 1-TAP QUANT GOLD {sub_action}]</b> 🥇\n"
-                f"• Size: <code>{lot} oz (Troy Ounces)</code> | Invalidation SL: <code>${sl:.2f}</code> (-60.8 p)\n"
-                f"• TP1 (+73 pips): <code>${tp1:.2f}</code> (Breakeven Armor Armed)\n"
+                f"• Size: <code>{lot} oz (Troy Ounces)</code> | Invalidation SL: <code>${sl:.2f}</code> (-{sl_pips_disp:.0f} pips)\n"
+                f"• TP1 (+{tp1_pips_disp:.0f} pips): <code>${tp1:.2f}</code> (Breakeven Armor Armed)\n"
                 f"<i>Dispatching order to Capital.com via Sub-Millisecond Bridge...</i>"
             )
 
@@ -821,8 +824,8 @@ class QuantGoldCapitalBridge:
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"• Instrument: <code>GOLD (XAUUSD)</code>\n"
                     f"• Direction: <code>{sub_action}</code> | Size: <code>{lot} Lot</code>\n"
-                    f"• Invalidation SL: <code>${sl:.2f}</code>\n"
-                    f"• Target TP1: <code>${tp1:.2f}</code> (Breakeven Armor Armed)\n"
+                    f"• Invalidation SL: <code>${sl:.2f}</code> (-{sl_pips_disp:.0f} pips)\n"
+                    f"• Target TP1: <code>${tp1:.2f}</code> (+{tp1_pips_disp:.0f} pips | Breakeven Armor Armed)\n"
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"🛡️ <i>Trade is protected by Dynamic Trailing Ratchet & Shock Early Harvest!</i>"
                 )
