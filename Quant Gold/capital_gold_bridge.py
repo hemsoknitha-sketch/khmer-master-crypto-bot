@@ -827,7 +827,7 @@ class QuantGoldCapitalBridge:
                     f"🛡️ <i>Trade is protected by Dynamic Trailing Ratchet & Shock Early Harvest!</i>"
                 )
             else:
-                raw_msg = str(res.get('message', 'Broker error'))
+                raw_msg = str(res.get('message') or res.get('error') or 'Broker error')
                 scrubbed_msg = self.citadel.scrub_sensitive_data(raw_msg)
                 await self._safe_send(
                     update,

@@ -3298,6 +3298,8 @@ def get_capital_auto_config(chat_id: int) -> dict:
                 conn.close()
     return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0, "is_demo": False, "schedule_mode": "SMART_SESSION_TIMED"}
 
+get_user_capital_auto_config = get_capital_auto_config
+
 def is_capital_auto_enabled(chat_id: int) -> bool:
     """Fast check if a user has enabled Capital.com Autonomous Trading."""
     cfg = get_capital_auto_config(chat_id)

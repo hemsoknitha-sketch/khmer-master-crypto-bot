@@ -1567,7 +1567,8 @@ class QuantGoldExecutionEngine:
         sl: float = 0.0,
         tp: float = 0.0,
         broadcast_vip: bool = False,
-        app = None
+        app = None,
+        max_positions: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Executes a 1-tap manual or VIP Gold order for a specific user on Capital.com
@@ -1639,6 +1640,16 @@ class QuantGoldExecutionEngine:
             tier_spec = get_gold_position_tier_spec(len(gold_trades))
             eff_setup_type = "QUANT_GOLD_REVERSAL_FLIP" if is_manual_reversal else (tier_spec["label"] if is_manual_pyramid else "VIP_1TAP_GOLD")
 
+            # Determine user's max_positions configuration
+            if max_positions is not None and max_positions > 0:
+                max_pos = int(max_positions)
+            else:
+                try:
+                    auto_cfg = db.get_capital_auto_config(chat_id) or {}
+                    max_pos = int(auto_cfg.get("max_positions", 5) or 5)
+                except Exception:
+                    max_pos = 5
+
             order_res = await asyncio.to_thread(
                 u_eng.execute_smart_tradfi_order,
                 epic="GOLD",
@@ -1698,7 +1709,7 @@ class QuantGoldExecutionEngine:
             return order_res
         except Exception as e:
             logger.error(f"❌ [1-TAP GOLD] Error placing Gold order for {chat_id}: {e}", exc_info=True)
-            return {"success": False, "message": str(e)}
+            return {"success": False, "message": str(e), "error": str(e)}
 
     async def _audit_and_protect_open_gold_positions(self, app=None):
         """

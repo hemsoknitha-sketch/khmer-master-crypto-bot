@@ -1589,7 +1589,7 @@ class CapitalComEngine:
                     import database as db
                     target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
                     if target_cid:
-                        u_cfg = db.get_user_capital_auto_config(target_cid)
+                        u_cfg = db.get_capital_auto_config(target_cid)
                         eff_max_pos = int(u_cfg.get("max_positions", 5) or 5)
                     else:
                         eff_max_pos = 5
@@ -3182,7 +3182,7 @@ class CapitalComEngine:
                 import database as db
                 target_cid = getattr(self, "chat_id", None) or getattr(self, "_custom_chat_id", None)
                 if target_cid:
-                    u_cfg = db.get_user_capital_auto_config(target_cid)
+                    u_cfg = db.get_capital_auto_config(target_cid)
                     eff_max_pos = int(u_cfg.get("max_positions", 5) or 5)
                 else:
                     eff_max_pos = 5
