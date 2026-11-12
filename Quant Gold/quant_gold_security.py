@@ -281,6 +281,21 @@ class QuantGoldSecurityCitadel:
         kalman = math_data.get("kalman", {}) if isinstance(math_data, dict) else {}
         vel = float(kalman.get("latent_velocity", 0.0) or 0.0)
 
+        # Anti-Whipsaw Chop Zone Injunction (Invariant 76):
+        # Flipping back-and-forth in the middle 35% - 65% dealing range is STRICTLY VETOED
+        # to prevent death-by-whipsaw in sideways equilibrium.
+        smc = mtf_data.get("smc", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
+        range_pct = float(smc.get("range_pct", 0.50) or 0.50)
+        is_middle_chop = (0.35 <= range_pct <= 0.65)
+        if is_middle_chop and abs(w_score) < 24.0:
+            return {
+                "is_invalidated": False,
+                "should_reversal_flip": False,
+                "reversal_direction": None,
+                "confidence": 0.0,
+                "reason": f"BLOCK_CHOP_ZONE_REVERSAL: Price in middle equilibrium ({range_pct:.2f}) with score {w_score:+.1f} < 24.0."
+            }
+
         is_invalidated = False
         reversal_dir = None
         confidence = 0.0

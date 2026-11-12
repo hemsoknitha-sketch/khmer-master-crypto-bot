@@ -1992,10 +1992,23 @@ class QuantGoldExecutionEngine:
                         logger.debug(f"Flash shock harvest note: {e_shk}")
 
                 # 360° Real-Time Market Invalidation & Early Reversal Surveillance (News & Buy/Sell Order Flow):
-                # "បើសិនជាលទ្ធផលបញ្ជ្រាសទិសខ្លាំងរហូតអត្រាប៉ះ SL ខ្ពស់បំផុត នោះត្រូវផ្តាច់ការខាតបង់បន្តិចបន្តួចភ្លាមៗ
-                # ដើម្បី Flip position កើបចំណេញបានទាន់ពេលវេលា មិនដេកត្រាំត្រែងរង់ចាំ SL ខាតបង់ធំនោះទេ"
-                is_floating_loss = (upl < -1.50 or pnl_pts <= -3.00)
-                if is_floating_loss and not is_manual_trade:
+                # ANTI-WHIPSAW FLIP COVENANT (AQ84 Invariant 116):
+                # 1. HARD QUOTA: Maximum 1 Reversal Flip per swing cycle! If already a REVERSAL_FLIP, NEVER flip again!
+                # 2. ANTI-CHOP LOCKOUT: Reversal Flip is strictly blocked in middle 35%-65% Dealing Range.
+                # 3. REVERSAL COOLDOWN: 30-minute lockout after any flip to let the new trade run to its profit targets.
+                # 4. DEPTH FILTER: Requires genuine structural floating loss (upl <= -$2.50 / pnl_pts <= -4.00 pts)
+                #    to prevent jitter on small spread noise.
+                now_curr = time.time()
+                tranche_lbl = str(tr.get("tranche_id", "") or "")
+                trade_setup = str(tr.get("setup_type", "") or "")
+                is_already_flipped = (
+                    "REVERSAL" in tranche_lbl or
+                    "REVERSAL" in trade_setup or
+                    (now_curr - getattr(self, "_last_reversal_flip_ts", 0.0)) < 1800.0  # 30-min anti-whipsaw cooldown
+                )
+
+                is_floating_loss = (upl <= -2.50 or pnl_pts <= -4.00)
+                if is_floating_loss and not is_manual_trade and not is_already_flipped:
                     try:
                         from quant_gold_security import get_quant_gold_security_citadel
                         mtf_snap = self.mtf_engine.analyze_all_19_timeframes(current_price=curr_p)
@@ -2025,6 +2038,7 @@ class QuantGoldExecutionEngine:
                             if hasattr(db, "update_capital_auto_trade_close"):
                                 db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
 
+                            self._last_reversal_flip_ts = now_curr
                             self._pending_reversal_action = opp_dir
                             self._clear_active_trade(deal_key, cooldown=0.0, direction=dir_side)
                             continue
