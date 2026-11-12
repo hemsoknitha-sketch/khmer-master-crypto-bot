@@ -1135,6 +1135,22 @@ class QuantGoldExecutionEngine:
                         "remaining_seconds": round(self._trade_cooldown_seconds - time_since_close, 1)
                     }
 
+            # Throttle repetitive signal dispatch when previous identical signal had 0 fills (fleet busy/locked)
+            last_unf_action = getattr(self, "_last_unfilled_action", None)
+            last_unf_ts = getattr(self, "_last_unfilled_ts", 0.0)
+            last_unf_price = getattr(self, "_last_unfilled_price", 0.0)
+            if (
+                action in ["BUY", "SELL"]
+                and action == last_unf_action
+                and (now - last_unf_ts) < 45.0
+                and abs(current_price - last_unf_price) < 2.50
+            ):
+                return {
+                    "status": "SIGNAL_THROTTLED",
+                    "action": action,
+                    "remaining_cooldown": round(45.0 - (now - last_unf_ts), 1)
+                }
+
             dispatched_count = 0
             if action in ["BUY", "SELL"]:
                 is_reversal_flip = False
@@ -1227,6 +1243,15 @@ class QuantGoldExecutionEngine:
                     is_pyramid=is_pyramid
                 )
                 dispatched_count = fleet_res.get("dispatched_count", 0)
+
+                if dispatched_count == 0:
+                    self._last_unfilled_action = action
+                    self._last_unfilled_ts = now
+                    self._last_unfilled_price = current_price
+                else:
+                    self._last_unfilled_action = None
+                    self._last_unfilled_ts = 0.0
+                    self._last_unfilled_price = 0.0
 
                 # Send detailed telemetry to Super Admin
                 if app and dispatched_count > 0:
