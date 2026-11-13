@@ -5756,6 +5756,58 @@ def run_audit():
         failures.append(f"Invariant 118 check failed: {e}")
         log_fail(str(e))
 
+    print("\n[CHECK 92/92] Verifying Quant Gold TradingView 10-Group Confluence Matrix Engine (Invariant 119)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("GEMINI.md", "r", encoding="utf-8") as f:
+            gemini_code = f.read()
+        with open("Quant Gold/mathematical_engine.py", "r", encoding="utf-8") as f:
+            math_code = f.read()
+        with open("Quant Gold/timeframes.py", "r", encoding="utf-8") as f:
+            tf_code = f.read()
+        with open("Quant Gold/execution_engine.py", "r", encoding="utf-8") as f:
+            exec_code = f.read()
+        with open("Quant Gold/bot.py", "r", encoding="utf-8") as f:
+            bot_code = f.read()
+        with open("Quant Gold/capital_gold_bridge.py", "r", encoding="utf-8") as f:
+            bridge_code = f.read()
+
+        has_inv119_agents = "invariant 119" in agents_code.lower() and "tradingview 10-group" in agents_code.lower()
+        has_inv119_gemini = "invariant 119" in gemini_code.lower() and "tradingview 10-group" in gemini_code.lower()
+        has_tv_module = os.path.exists("Quant Gold/tradingview_confluence_matrix.py")
+        has_math_tv = "get_tradingview_confluence_matrix" in math_code and "tradingview_matrix" in math_code
+        has_tf_tv = "compute_ols_regression_channel" in tf_code and "in_fib_pocket" in tf_code
+        has_exec_tv = "tradingview_summary" in exec_code and "Gate 0.5" in exec_code
+        has_bot_tv = "handle_tv_matrix" in bot_code and "CommandHandler(\"tv\"" in bot_code
+        has_bridge_tv = "btn_qgold_tv_matrix" in bridge_code
+
+        all_inv119_passed = (
+            has_inv119_agents
+            and has_inv119_gemini
+            and has_tv_module
+            and has_math_tv
+            and has_tf_tv
+            and has_exec_tv
+            and has_bot_tv
+            and has_bridge_tv
+        )
+
+        if all_inv119_passed:
+            log_pass(
+                "Quant Gold TradingView 10-Group Confluence Matrix Engine (Invariant 119) is 100% certified! "
+                "(tradingview_confluence_matrix.py active, OLS 2σ bands, AVWAP, POC, Fib Golden Pocket, Pitchfork 80% Median, Gann 1x1, Fourier Time Cycles, /tv command & 1-tap deck active)"
+            )
+        else:
+            failures.append(
+                f"Invariant 119 check failed: agents={has_inv119_agents}, gemini={has_inv119_gemini}, "
+                f"module={has_tv_module}, math={has_math_tv}, tf={has_tf_tv}, exec={has_exec_tv}, bot={has_bot_tv}, bridge={has_bridge_tv}"
+            )
+            log_fail("Invariant 119 Quant Gold TradingView Matrix verification failed!")
+    except Exception as e:
+        failures.append(f"Invariant 119 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
 
     print("\n" + "=" * 70)

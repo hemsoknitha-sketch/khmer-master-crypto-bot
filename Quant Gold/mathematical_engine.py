@@ -342,6 +342,19 @@ class GoldMathematicalCore:
         if vix_level >= 22.0:
             bayes_prob += 3.0  # Safe-haven volatility demand
 
+        # 3.5. TradingView 10-Group Quantitative Confluence Matrix
+        tv_matrix_data = {}
+        try:
+            from tradingview_confluence_matrix import get_tradingview_confluence_matrix
+            tv_engine = get_tradingview_confluence_matrix()
+            tv_matrix_data = tv_engine.compute_confluence(candles_m15, current_price, candles_h1)
+            tv_score = float(tv_matrix_data.get("score", 0.0) or 0.0)
+            if abs(tv_score) >= 25.0:
+                # Modulate Bayesian win probability with multi-dimensional geometric confluence
+                bayes_prob += (tv_score / 100.0) * 8.0
+        except Exception as e_tv:
+            logger.debug("TradingView confluence calculation note: %s", e_tv)
+
         bayes_prob = float(np.clip(bayes_prob, 35.0, 94.0))
 
         result = {
@@ -360,6 +373,7 @@ class GoldMathematicalCore:
                 "composite": round(composite_hurst, 3),
                 "regime": market_regime
             },
+            "tradingview_matrix": tv_matrix_data,
             "ornstein_uhlenbeck": ou_params,
             "hawkes_intensity": round(hawkes_intensity, 2),
             "macro_satellite": {

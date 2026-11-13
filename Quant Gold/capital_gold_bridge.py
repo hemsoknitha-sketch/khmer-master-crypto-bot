@@ -290,6 +290,7 @@ class QuantGoldCapitalBridge:
             f"🥇 <b>Spot Gold (XAUUSD) Real-Time Snapshot ៖</b>\n"
             f"• តម្លៃបច្ចុប្បន្ន ៖ <code>${curr_p:.2f}</code> | Spread ៖ <code>${spread:.2f}</code>\n"
             f"• សកម្មភាព AI ៖ <code>{action_icon}</code> (Edge: <code>{conf:.1f}%</code>)\n"
+            f"• TV 10-Matrix ៖ <code>{tv_dir} ({tv_score:+.0f})</code> (Win: <code>{tv_wr:.1f}%</code>)\n"
             f"• 19-TF Confluence Score ៖ <code>{weighted_score:+.1f} / 100</code> "
             f"(🟢 {counts.get('bullish', 0)} | 🔴 {counts.get('bearish', 0)} | ⚪ {counts.get('neutral', 0)})\n"
             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -423,6 +424,7 @@ class QuantGoldCapitalBridge:
             f"🥇 <b>Spot Gold (XAUUSD) Real-Time Spectrum ៖</b>\n"
             f"• តម្លៃបច្ចុប្បន្ន ៖ <code>${curr_p:.2f}</code> | Spread ៖ <code>${spread:.2f}</code>\n"
             f"• សកម្មភាព AI ៖ <code>{action_icon}</code> (Edge: <code>{conf:.1f}%</code>)\n"
+            f"• TV 10-Matrix ៖ <code>{tv_dir} ({tv_score:+.0f})</code> (Win: <code>{tv_wr:.1f}%</code>)\n"
             f"• វិសាលគម 19 TFs ៖ 🟢 {counts.get('bullish', 0)} | 🔴 {counts.get('bearish', 0)} | ⚪ {counts.get('neutral', 0)} "
             f"(Score: <code>{mtf.get('weighted_score', 0):+.1f}/100</code>)\n"
             f"{ui_standards.DIVIDER_LIGHT}\n"
@@ -607,6 +609,10 @@ class QuantGoldCapitalBridge:
         sig = await self.exec_engine.evaluate_gold_master_signal()
         action = sig.get("action", "HOLD")
         conf = sig.get("confidence", 78.5)
+        tv_matrix = sig.get("tradingview_summary", {})
+        tv_dir = tv_matrix.get("direction", "NEUTRAL")
+        tv_score = float(tv_matrix.get("score", 0.0) or 0.0)
+        tv_wr = float(tv_matrix.get("estimated_win_rate", 50.0) or 50.0)
 
         action_icon = "🟢 STRONG BUY" if action == "BUY" else ("🔴 STRONG SELL" if action == "SELL" else "⚪ HOLD / CHOP FILTER")
 
@@ -657,6 +663,7 @@ class QuantGoldCapitalBridge:
             f"🥇 <b>Spot Gold (XAUUSD) Real-Time ៖</b>\n"
             f"• តម្លៃបច្ចុប្បន្ន ៖ <code>${curr_p:.2f}</code> | Spread ៖ <code>${spread:.2f}</code>\n"
             f"• សកម្មភាព AI ៖ <code>{action_icon}</code> (Edge: <code>{conf:.1f}%</code>)\n"
+            f"• TV 10-Matrix ៖ <code>{tv_dir} ({tv_score:+.0f})</code> (Win: <code>{tv_wr:.1f}%</code>)\n"
             f"{ui_standards.DIVIDER_HEAVY}\n"
             f"👇 <i>ជ្រើសរើសមុខងារបញ្ជាជួញដូររហ័ស 1-Tap ខាងក្រោម ៖</i>"
         )
@@ -687,10 +694,13 @@ class QuantGoldCapitalBridge:
             ],
             [
                 InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
-                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status")
+                InlineKeyboardButton("📐 TV 10-Matrix (/tv)", callback_data="btn_qgold_tv_matrix")
             ],
             [
-                InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_capital_menu"),
+                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status"),
+                InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_capital_menu")
+            ],
+            [
                 InlineKeyboardButton("📖 User Guide (/help)", callback_data="btn_qgold_help")
             ]
         ]

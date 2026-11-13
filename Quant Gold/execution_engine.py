@@ -770,6 +770,14 @@ class QuantGoldExecutionEngine:
         reason = "Market in consolidation or awaiting higher confluence."
 
         # STRICT QUALITY GATES (ELIMINATING >80% LOSS RATE):
+        # Gate 0.5: TradingView 10-Group Confluence Matrix Synergy
+        tv_matrix = math_data.get("tradingview_matrix", {})
+        tv_score = float(tv_matrix.get("score", 0.0) or 0.0)
+        tv_dir = tv_matrix.get("direction", "NEUTRAL")
+        if tv_dir in ["BUY", "SELL"] and abs(tv_score) >= 30.0:
+            if mtf_action == tv_dir or ai_action == tv_dir:
+                win_prob = min(94.5, win_prob + 4.0)
+
         # Gate 1: Check MTF and AI alignment or decisive weighted score
         cand_action = mtf_action if mtf_action in ["BUY", "SELL"] else (ai_action if ai_action in ["BUY", "SELL"] else None)
         has_consensus = (mtf_action in ["BUY", "SELL"] and (mtf_action == ai_action or ai_action == "HOLD" or abs(weighted_score) >= 30.0))
@@ -927,6 +935,18 @@ class QuantGoldExecutionEngine:
                 "kalman_velocity": kalman.get("latent_velocity", 0.0),
                 "composite_hurst": hurst.get("composite", 0.50),
                 "bayesian_win_probability": math_data.get("bayesian_win_probability", 50.0)
+            },
+            "tradingview_summary": {
+                "score": tv_matrix.get("score", 0.0),
+                "direction": tv_matrix.get("direction", "NEUTRAL"),
+                "estimated_win_rate": tv_matrix.get("estimated_win_rate", 50.0),
+                "reasons": tv_matrix.get("reasons", []),
+                "ols_channel": tv_matrix.get("ols_channel", {}),
+                "volume_profile": tv_matrix.get("volume_profile", {}),
+                "fibonacci": tv_matrix.get("fibonacci", {}),
+                "pitchfork": tv_matrix.get("pitchfork", {}),
+                "cycles": tv_matrix.get("cycles", {}),
+                "harmonics": tv_matrix.get("harmonics", {})
             },
             "ai_summary": {
                 "consensus_confidence": ai_data.get("consensus_confidence", 50.0),

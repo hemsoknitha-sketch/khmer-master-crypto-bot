@@ -222,6 +222,8 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("capital", self.handle_capital))
         self.app.add_handler(CommandHandler("gold", self.handle_capital))
         self.app.add_handler(CommandHandler("signal", self.handle_signal))
+        self.app.add_handler(CommandHandler("tv", self.handle_tv_matrix))
+        self.app.add_handler(CommandHandler("tradingview", self.handle_tv_matrix))
         self.app.add_handler(CommandHandler("admin_capital", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admin_gold", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admincapital", self.handle_admin_capital))
@@ -1700,6 +1702,77 @@ class QuantGoldBot:
             entry_price=curr_p
         )
         await self.safe_reply(update, msg, reply_markup=get_gold_signal_reply_markup())
+
+    async def handle_tv_matrix(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Displays the full TradingView 10-Group Mathematical Confluence Matrix for Spot Gold."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if chat_id:
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        sig = await self.exec_engine.evaluate_gold_master_signal()
+        curr_p = float(sig.get("current_price", 4000.0) or 4000.0)
+        tv = sig.get("tradingview_summary", {})
+        if not tv or not tv.get("ols_channel"):
+            try:
+                from tradingview_confluence_matrix import get_tradingview_confluence_matrix
+                m15_df = getattr(self.exec_engine.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
+                tv = get_tradingview_confluence_matrix().compute_confluence(m15_df, curr_p)
+            except Exception:
+                tv = {}
+
+        score = float(tv.get("score", 0.0) or 0.0)
+        direction = tv.get("direction", "NEUTRAL")
+        win_rate = float(tv.get("estimated_win_rate", 50.0) or 50.0)
+        reasons = tv.get("reasons", ["Awaiting market ticks"])
+        ols = tv.get("ols_channel", {})
+        vp = tv.get("volume_profile", {})
+        fib = tv.get("fibonacci", {})
+        pitchfork = tv.get("pitchfork", {})
+        gann = float(tv.get("gann_1x1", curr_p) or curr_p)
+        cycles = tv.get("cycles", {})
+        harmonics = tv.get("harmonics", {})
+
+        dir_icon = "🟢" if direction == "BUY" else ("🔴" if direction == "SELL" else "⚪")
+        reasons_str = "\n".join([f"  • <code>{r}</code>" for r in reasons[:4]]) if reasons else "  • <code>NEUTRAL_CONSOLIDATION</code>"
+
+        card = (
+            f"📐 <b>[TRADINGVIEW 10-GROUP QUANT CONFLUENCE MATRIX]</b> 🥇\n"
+            f"══════════════════════════════════════\n"
+            f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
+            f"🎯 <b>ទិសដៅរួមបញ្ចូល (Direction) ៖</b> <code>{dir_icon} {direction}</code>\n"
+            f"⚡ <b>ពិន្ទុ Confluence Score ៖</b> <code>{score:+.1f} / 100.0</code>\n"
+            f"📈 <b>ប្រូបាប៊ីលីតេឈ្នះ (Estimated Win Rate) ៖</b> <code>{win_rate:.1f}%</code>\n"
+            f"──────────────────────────────────────\n"
+            f"📊 <b>លទ្ធផលគណនាឧបករណ៍ទាំង ១០ ក្រុម ៖</b>\n"
+            f"1️⃣ <b>OLS Regression Band (2σ) ៖</b>\n"
+            f"   └ Upper: <code>${float(ols.get('upper', curr_p+5.0)):.2f}</code> | Lower: <code>${float(ols.get('lower', curr_p-5.0)):.2f}</code> (z={float(ols.get('z_score', 0.0)):+.2f})\n"
+            f"2️⃣ <b>Volume Profile & AVWAP ៖</b>\n"
+            f"   └ POC: <code>${float(vp.get('poc', curr_p)):.2f}</code> | VAH: <code>${float(vp.get('vah', curr_p+3.0)):.2f}</code> | VAL: <code>${float(vp.get('val', curr_p-3.0)):.2f}</code>\n"
+            f"   └ Anchored VWAP: <code>${float(vp.get('avwap', curr_p)):.2f}</code>\n"
+            f"3️⃣ <b>Fibonacci Golden Pocket ៖</b>\n"
+            f"   └ 0.618 Pocket: <code>${float(fib.get('fib_618', curr_p)):.2f}</code> | 0.705: <code>${float(fib.get('fib_705', curr_p)):.2f}</code>\n"
+            f"4️⃣ <b>Andrews' Pitchfork (80% Reversion) ៖</b>\n"
+            f"   └ Median Line: <code>${float(pitchfork.get('median', curr_p)):.2f}</code>\n"
+            f"5️⃣ <b>Gann 1x1 Equilibrium (45°) ៖</b> <code>${gann:.2f}</code>\n"
+            f"6️⃣ <b>Time Cycles (Fourier Wave) ៖</b> <code>{cycles.get('cycle_state', 'NEUTRAL')}</code> ({cycles.get('dominant_cycle_bars', 24)} bars)\n"
+            f"7️⃣ <b>Harmonic Patterns (XABCD) ៖</b> <code>{harmonics.get('pattern_name', 'NONE')}</code> (PRZ: <code>${float(harmonics.get('prz_price', curr_p)):.2f}</code>)\n"
+            f"──────────────────────────────────────\n"
+            f"🔍 <b>កត្តាបញ្ជាក់សញ្ញាជួញដូរ (Confluence Triggers) ៖</b>\n"
+            f"{reasons_str}\n"
+            f"══════════════════════════════════════"
+        )
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
+                InlineKeyboardButton("🏛️ Capital Deck (/capital)", callback_data="btn_capital_menu")
+            ],
+            [
+                InlineKeyboardButton("🔄 Refresh Matrix", callback_data="btn_qgold_tv_matrix")
+            ]
+        ])
+        await self.safe_reply(update, card, reply_markup=kb)
 
     async def handle_license(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays the user's personal VIP license status and Capital.com registration status."""
@@ -3664,6 +3737,13 @@ class QuantGoldBot:
             except Exception:
                 pass
             await self.handle_signal(update, context)
+
+        elif data in ["btn_qgold_tv_matrix", "btn_qgold_tv"]:
+            try:
+                await query.answer("Computing 10-Group TradingView Matrix...")
+            except Exception:
+                pass
+            await self.handle_tv_matrix(update, context)
 
         elif data == "btn_qgold_help":
             try:

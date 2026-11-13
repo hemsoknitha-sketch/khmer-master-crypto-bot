@@ -2290,3 +2290,26 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
      * **TP1 (+73 pips / $7.30 move):** Banks profit and ratchets Stop Loss to **Breakeven Armor (0.00R Free Roll, 100% loss-immune)**.
      * **TP2 (+152 pips / $15.20 move):** Locks Guaranteed Cash Floor (+73 pips).
      * **TP3 (+243 pips / $24.32 move):** Institutional Moonshot Runner trailing behind 15m ATR / 3-EMA confluence.
+
+
+### 1.1.27 INSTITUTIONAL QUANT GOLD TRADINGVIEW 10-GROUP QUANTITATIVE CONFLUENCE MATRIX (AQ119 INVARIANT 119)
+**(គ្រឹះចងចាំស្ថាបត្យកម្ម Quant Gold កម្រិតស្ថាប័ន៖ ម៉ាទ្រីស Confluence បរិមាណ TradingView ១០ ក្រុមលើលំហ (t, P) - OLS Regression 2σ, AVWAP, Volume Profile POC/VA, Fib Golden Pocket 0.618, Andrews' 80% Median, Gann 1x1, Fourier Time Cycles, និង Harmonic XABCD PRZ - Invariant 119)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+1. **Mathematical Representation on 2D Space-Time Continuum $(t, P)$ ៖**
+   - The engine permanently eradicates subjective "eye-drawing" and transforms the 10 TradingView tool groups into a vectorized tensor space in RAM:
+     * **Lines & Geometric Slopes:** $P(t) = m(t - t_1) + P_1, \theta = \arctan(m)$
+     * **Channels & Regression:** Ordinary Least Squares (OLS) Linear Regression $\hat{P}_t = \alpha + \beta t \pm k\sigma$ ($k = 2.0$, $95.4\%$ distribution envelope).
+     * **Volume Profile & Anchored VWAP:** $\text{AVWAP}_t = \frac{\sum P_{\text{typical}} V}{\sum V}$, Point of Control (POC), Value Area (70% $[\text{VAL}, \text{VAH}]$), and CVD orderflow delta.
+     * **Harmonic Patterns (XABCD):** Quantitative ratio recognition for Gartley, Bat, Butterfly, Crab, and Cypher with Potential Reversal Zone (PRZ) at point $D$.
+     * **Fibonacci Golden Pocket:** Golden ratio retest bounds $[0.618, 0.705] \times \text{Span}$ and expansions $[1.272, 1.618, 2.618]$.
+     * **Andrews' Pitchfork:** Midpoint $M = \left(\frac{t_2+t_3}{2}, \frac{P_2+P_3}{2}\right)$ with 80% Alan Andrews Median Line Reversion probability.
+     * **Gann 1x1 Equilibrium:** $45^\circ$ balance rays ($\frac{\Delta P}{\Delta t} = 1.0$) and Gann Box grid harmonic ratios ($1/8$ and $1/3$).
+     * **Fourier Time Cycles:** Discrete Fourier Transform (DFT) decomposing price waves into dominant cycle periods $T_k$, detecting cycle troughs (reversal bottoms) and crests (exhaustion tops).
+     * **Magnet Mode Snap:** Discrete snap $P_{\text{snap}} = \arg\min |P_{\text{target}} - P_{\text{ohlc}}|$ eliminating optical float errors.
+2. **Unified Confluence Scoring & Bayesian Probability Modulation ៖**
+   - Integrated directly in `tradingview_confluence_matrix.py` and `mathematical_engine.py`:
+     $$S(t, P) = \sum_{k=1}^{10} w_k \cdot \Phi_k(t, P) \in [-100.0, +100.0]$$
+   - Scores $|S(t, P)| \ge 30.0$ dynamically modulate the Bayesian win probability in `analyze_mathematical_edge` and confirm high-probability reversals or breakouts.
+3. **Execution Integration & Interactive Telemetry ៖**
+   - Wired into `timeframes.py` (`compute_timeframe_indicators` with OLS z-score and Fib Pocket flags) and `execution_engine.py` (Gate 0.5 TV Matrix synergy).
+   - Dedicated Telegram command `/tv` and 1-Tap interactive button `[📐 TV 10-Matrix (/tv)]` in the `/capital` live trading deck for instant visual inspection across the entire fleet.

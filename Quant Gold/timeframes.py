@@ -422,6 +422,25 @@ class GoldMultiTimeframeEngine:
             boost = 25.0 if pattern_wr >= 80.0 else 20.0
             score -= boost
 
+        # 8.5. TradingView Geometric & Channel Confluence (OLS Regression & Fib Golden Pocket)
+        ols_z = 0.0
+        in_fib_pocket = False
+        try:
+            from tradingview_confluence_matrix import compute_ols_regression_channel, compute_fibonacci_matrix
+            ols_data = compute_ols_regression_channel(closes[-min(40, n):], k=2.0)
+            ols_z = float(ols_data.get("z_score", 0.0) or 0.0)
+            if ols_z <= -1.80:
+                score += 15.0  # Statistical mean-reversion buy
+            elif ols_z >= 1.80:
+                score -= 15.0  # Statistical mean-reversion sell
+
+            fib_data = compute_fibonacci_matrix(range_low, range_high)
+            if fib_data["golden_pocket_low"] <= curr_p <= fib_data["golden_pocket_high"]:
+                in_fib_pocket = True
+                score += 10.0 if score >= 0 else -10.0
+        except Exception:
+            pass
+
         # Equilibrium Chop Dampener: If in middle chop, scale score towards 0
         if is_chop_zone:
             score *= 0.50
@@ -448,7 +467,9 @@ class GoldMultiTimeframeEngine:
                 "range_high": round(range_high, 2),
                 "range_low": round(range_low, 2),
                 "range_pct": round(range_pct, 2),
-                "chop_zone": is_chop_zone
+                "chop_zone": is_chop_zone,
+                "ols_z_score": round(ols_z, 2),
+                "in_fib_pocket": in_fib_pocket
             },
             "pattern": pattern
         }
