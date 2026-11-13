@@ -4523,10 +4523,11 @@ class TelegramBotThread(BaseThread):
                 await bridge.handle_telegram_gold_subcommand(update, context, ["SELL", "0.05"])
                 self.active_tasks.discard(chat_id)
                 return
-            elif any(k in clean_btn for k in ["Open Positions", "Gold Positions"]):
+            elif any(k in clean_btn for k in ["Open Positions", "Gold Positions", "Positions"]):
                 import quant_gold
                 bridge = quant_gold.get_quant_gold_capital_bridge()
-                await bridge.handle_telegram_gold_subcommand(update, context, ["POSITIONS"])
+                text, kb = await bridge.build_capital_positions_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
                 self.active_tasks.discard(chat_id)
                 return
             elif any(k in clean_btn for k in ["Auto-Trade", "Auto Gold"]):
@@ -6505,26 +6506,42 @@ class TelegramBotThread(BaseThread):
                 bridge = quant_gold.get_quant_gold_capital_bridge()
                 await bridge.handle_telegram_gold_subcommand(update, context, ["SIGNAL"])
                 return
-            elif data == "btn_qgold_positions":
-                context.args = ["POSITIONS"]
-                await capital_command(update, context)
+            elif data in ["btn_qgold_positions", "btn_cap_positions"]:
+                try:
+                    await update.callback_query.answer("📊 Loading Real-Time Live Positions...")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_capital_positions_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
                 return
             elif data == "btn_qgold_close_all":
                 context.args = ["CLOSEALL"]
                 await capital_command(update, context)
                 return
             elif data.startswith("btn_qgold_close_deal:"):
-                deal_id_to_close = data.split(":", 1)[1].strip()
-                auto_cfg = db.get_capital_auto_config(chat_id)
+                parts = data.split(":")
+                if len(parts) == 3:
+                    target_uid = int(parts[1])
+                    deal_id_to_close = parts[2]
+                else:
+                    target_uid = chat_id
+                    deal_id_to_close = parts[1]
+
+                is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+                effective_uid = target_uid if is_admin else chat_id
+
+                auto_cfg = db.get_capital_auto_config(effective_uid)
                 is_d = bool(auto_cfg.get("is_demo", False))
-                c_res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, deal_id_to_close, chat_id, is_d, context.application, "CLOSE_FLAT")
+                c_res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, deal_id_to_close, effective_uid, is_d, context.application, "CLOSE_FLAT")
                 try:
                     await update.callback_query.answer("Position Closed!")
                 except Exception:
                     pass
                 import quant_gold
                 bridge = quant_gold.get_quant_gold_capital_bridge()
-                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                text, kb = await bridge.build_capital_positions_ui(chat_id, user_lang)
                 await send_reply_or_edit(update, context, text, reply_markup=kb)
                 return
             elif data == "btn_qgold_status":
@@ -27483,6 +27500,12 @@ class TelegramBotThread(BaseThread):
                 bridge = quant_gold.get_quant_gold_capital_bridge()
                 await bridge.handle_telegram_gold_subcommand(update, context, ["TV"] + (args or []))
                 return
+            elif cmd_text in ["positions", "position", "open_positions"]:
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                p_msg, p_kb = await bridge.build_capital_positions_ui(chat_id, user_lang)
+                await update.effective_message.reply_text(p_msg, parse_mode="HTML", reply_markup=p_kb)
+                return
 
             # Subcommands routing: /capital GOLD / /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
             if args:
@@ -28900,25 +28923,10 @@ class TelegramBotThread(BaseThread):
                     return
 
                 elif action in ["POSITIONS", "OPEN"]:
-                    data = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id)
-                    positions = data.get("open_positions", [])
-                    if not positions:
-                        p_msg = (
-                            f"📊 **CAPITAL.COM ACTIVE POSITIONS**\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"ℹ️ **ស្ថានភាព ៖** គ្មាន Position កំពុងដំណើរការនៅឡើយទេ។\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💡 _ចុចប៊ូតុងខាងក្រោមដើម្បីចាប់ផ្តើមចូល Position!_"
-                        )
-                    else:
-                        lines = [f"📊 **CAPITAL.COM ACTIVE POSITIONS ({len(positions)})**", ui_standards.DIVIDER_HEAVY]
-                        for p in positions:
-                            epic_name = p.get('epic') or p.get('instrument_name') or 'CFD'
-                            lines.append(f"• **{epic_name}** ({p.get('direction', 'BUY')}) Size: `{p.get('size', 0.0)}`")
-                            lines.append(f"  Entry: `${p.get('level', 0.0):,.2f}` | PnL: `${p.get('upl', 0.0):,.2f} {p.get('currency', 'USD')}`")
-                        lines.append(ui_standards.DIVIDER_HEAVY)
-                        p_msg = "\n".join(lines)
-                    await update.effective_message.reply_text(p_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    import quant_gold
+                    bridge = quant_gold.get_quant_gold_capital_bridge()
+                    p_msg, p_kb = await bridge.build_capital_positions_ui(chat_id, user_lang)
+                    await update.effective_message.reply_text(p_msg, parse_mode="HTML", reply_markup=p_kb)
                     return
 
                 elif action in ["RESCUE", "ADOPT", "GUARDIAN", "PROTECT"]:
@@ -29965,6 +29973,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("tv_matrix", capital_command))
         self.app.add_handler(CommandHandler("tvmatrix", capital_command))
         self.app.add_handler(CommandHandler("tradingview", capital_command))
+        self.app.add_handler(CommandHandler("positions", capital_command))
+        self.app.add_handler(CommandHandler("open_positions", capital_command))
         self.app.add_handler(CommandHandler("forex", forex_command))
         self.app.add_handler(CommandHandler("forex_exchange", forex_command))
         self.app.add_handler(CommandHandler("forexexchange", forex_command))

@@ -2385,7 +2385,7 @@ class QuantGoldBot:
         await self.bridge.handle_telegram_gold_subcommand(update, context, ["SELL", str(lot)])
 
     async def handle_positions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Displays current open Gold positions with real-time Breakeven status."""
+        """Displays current open Gold positions with real-time Breakeven status (Fleet-Wide for Super Admin)."""
         chat_id = update.effective_chat.id
         if chat_id:
             allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
@@ -2397,170 +2397,14 @@ class QuantGoldBot:
                 card, kb = self.bridge.get_authorization_gate_card(chat_id, reason)
                 return await self.safe_reply(update, card, reply_markup=kb)
 
-        open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
-        gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() == "GOLD"]
+        raw_lang = db.get_user_language(chat_id) if chat_id else "km"
+        user_lang = "khmer" if raw_lang in ["km", "khmer", "0", "1", "auto"] else "english"
 
-        # Check broker live positions directly from Capital.com
-        u_eng = capital_engine.get_user_capital_engine(chat_id)
-        broker_gold = []
-        try:
-            broker_pos = u_eng.get_open_positions() if hasattr(u_eng, "get_open_positions") else []
-            broker_gold = [
-                p for p in broker_pos
-                if str(p.get("market", {}).get("epic", "")).upper() == "GOLD"
-                or str(p.get("epic", "")).upper() == "GOLD"
-            ]
-        except Exception as e_bp:
-            logger.debug(f"Broker open positions check note: {e_bp}")
-
-        bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
-        curr_p = (bid + ask) / 2.0
-
-        if not gold_trades and not broker_gold:
-            msg = (
-                f"📊 <b>[QUANT GOLD POSITIONS]</b> 🥇\n"
-                f"══════════════════════════════════════\n"
-                f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន ៖</b> <code>${curr_p:.2f}</code> (Spread: <code>${spread:.2f}</code>)\n"
-                f"ℹ️ <b>ស្ថានភាព ៖</b> គ្មាន Position កំពុងបើកនៅឡើយទេ។\n\n"
-                f"💡 <i>ចុចប៊ូតុង <b>🟢 1-Tap BUY</b> ឬ <b>🔴 1-Tap SELL</b> ដើម្បីចាប់ផ្តើមជួញដូរ!</i>"
-            )
-            kb = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🟢 1-Tap BUY Gold", callback_data="btn_qgold_buy"),
-                    InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
-                ],
-                [
-                    InlineKeyboardButton("🏛️ Capital.com Live (/capital)", callback_data="btn_capital_menu"),
-                    InlineKeyboardButton("🔄 Refresh", callback_data="btn_qgold_positions")
-                ]
-            ])
-            await self.safe_reply(update, msg, reply_markup=kb)
-            return
-
-        lines = [
-            f"📊 <b>[QUANT GOLD ACTIVE POSITIONS]</b> 🥇",
-            f"══════════════════════════════════════",
-            f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន ៖</b> <code>${curr_p:.2f}</code> (Spread: <code>${spread:.2f}</code>)\n"
-        ]
-        total_upl = 0.0
-        seen_deals = set()
-
-        # Check directional conflict against cached AI signal
-        cached_sig = self.exec_engine.get_cached_gold_signal()
-        q_act = str(cached_sig.get("action", "")).upper() if cached_sig else ""
-        q_conf = float(cached_sig.get("confidence", 50.0)) if cached_sig else 50.0
-
-        rescue_buttons = []
-        for i, t in enumerate(gold_trades, 1):
-            deal_id = str(t.get("deal_id", ""))
-            seen_deals.add(deal_id)
-            direction = str(t.get("direction", "BUY")).upper()
-            size = float(t.get("size", 0.5) or 0.5)
-            entry = float(t.get("entry_price", curr_p) or curr_p)
-            sl = float(t.get("sl", 0.0) or 0.0)
-            tp1 = float(t.get("tp1", 0.0) or 0.0)
-            be_active = bool(t.get("breakeven_activated", False))
-
-            upl = (curr_p - entry) * size if direction == "BUY" else (entry - curr_p) * size
-            total_upl += upl
-            p_icon = "🟢" if upl >= 0 else "🔴"
-            be_str = "🛡️ Breakeven Active (0.00R Risk)" if be_active else "⏳ Initial Structural SL"
-
-            conflict_line = ""
-            if direction == "BUY" and q_act in ["SELL", "SHORT"] and q_conf >= 60.0:
-                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ SELL ({q_conf:.1f}%)</i>\n"
-                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក SELL (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
-            elif direction == "SELL" and q_act in ["BUY", "LONG"] and q_conf >= 60.0:
-                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ BUY ({q_conf:.1f}%)</i>\n"
-                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក BUY (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
-            elif sl <= 0.0:
-                rescue_buttons.append([InlineKeyboardButton(f"🛡️ បំពាក់ Breakeven SL (#{deal_id})", callback_data=f"cap_protect:{deal_id}")])
-
-            lines.append(
-                f"<b>#{i} {direction} {size} oz GOLD</b>\n"
-                f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code> | TP1: <code>${tp1:.2f}</code>\n"
-                f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | {be_str}\n"
-                f"{conflict_line}"
-            )
-
-        # Append any live broker positions not tracked in local DB
-        for bp in broker_gold:
-            pos_info = bp.get("position", {}) if isinstance(bp.get("position"), dict) else bp
-            deal_id = str(pos_info.get("dealId", ""))
-            if deal_id and deal_id in seen_deals:
-                continue
-            direction = str(pos_info.get("direction", "BUY")).upper()
-            size = float(pos_info.get("size", 0.5) or 0.5)
-            entry = float(pos_info.get("level", curr_p) or curr_p)
-            sl = float(pos_info.get("stopLevel", 0.0) or 0.0)
-            upl = float(pos_info.get("upl", 0.0) or 0.0)
-            if upl == 0.0:
-                upl = (curr_p - entry) * size if direction == "BUY" else (entry - curr_p) * size
-            total_upl += upl
-            p_icon = "🟢" if upl >= 0 else "🔴"
-
-            conflict_line = ""
-            if direction == "BUY" and q_act in ["SELL", "SHORT"] and q_conf >= 60.0:
-                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ SELL ({q_conf:.1f}%)</i>\n"
-                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក SELL (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
-            elif direction == "SELL" and q_act in ["BUY", "LONG"] and q_conf >= 60.0:
-                conflict_line = f"• ⚠️ <i>ជម្លោះទិសដៅ៖ AI ណែនាំ BUY ({q_conf:.1f}%)</i>\n"
-                rescue_buttons.append([InlineKeyboardButton(f"🔄 បង្វែរមក BUY (Reverse-Flip #{deal_id})", callback_data=f"cap_flip:{deal_id}")])
-            elif sl <= 0.0:
-                rescue_buttons.append([InlineKeyboardButton(f"🛡️ បំពាក់ Breakeven SL (#{deal_id})", callback_data=f"cap_protect:{deal_id}")])
-
-            lines.append(
-                f"<b>#Broker {direction} {size} oz GOLD</b>\n"
-                f"• Entry: <code>${entry:.2f}</code> | SL: <code>${sl:.2f}</code>\n"
-                f"• UPL: <code>{p_icon} ${upl:+.2f}</code> | 🌐 Live Broker Sync\n"
-                f"{conflict_line}"
-            )
-
-        t_icon = "🟢" if total_upl >= 0 else "🔴"
-        lines.append(f"══════════════════════════════════════")
-        lines.append(f"💰 <b>Total Net UPL ៖</b> <code>{t_icon} ${total_upl:+.2f}</code>")
-
-        close_deal_btns = []
-        for t in gold_trades:
-            d_id = str(t.get("deal_id", ""))
-            d_sz = float(t.get("size", 0.5) or 0.5)
-            d_dir = str(t.get("direction", "BUY")).upper()
-            d_entry = float(t.get("entry_price", curr_p) or curr_p)
-            d_upl = (curr_p - d_entry) * d_sz if d_dir == "BUY" else (d_entry - curr_p) * d_sz
-            d_icon = "🟢" if d_upl >= 0 else "🔴"
-            if d_id and d_id != "OK":
-                close_deal_btns.append(InlineKeyboardButton(f"🚪 Close #{d_id} ({d_icon} ${d_upl:+.2f})", callback_data=f"btn_qgold_close_deal:{d_id}"))
-
-        for bp in broker_gold:
-            pos_info = bp.get("position", {}) if isinstance(bp.get("position"), dict) else bp
-            d_id = str(pos_info.get("dealId", ""))
-            d_sz = float(pos_info.get("size", 0.5) or 0.5)
-            d_dir = str(pos_info.get("direction", "BUY")).upper()
-            d_entry = float(pos_info.get("level", curr_p) or curr_p)
-            d_upl = float(pos_info.get("upl", 0.0) or 0.0)
-            if d_upl == 0.0:
-                d_upl = (curr_p - d_entry) * d_sz if d_dir == "BUY" else (d_entry - curr_p) * d_sz
-            d_icon = "🟢" if d_upl >= 0 else "🔴"
-            if d_id and d_id not in seen_deals and d_id != "OK":
-                close_deal_btns.append(InlineKeyboardButton(f"🚪 Close #{d_id} ({d_icon} ${d_upl:+.2f})", callback_data=f"btn_qgold_close_deal:{d_id}"))
-
-        kb_rows = []
-        if rescue_buttons:
-            kb_rows.extend(rescue_buttons)
-        if close_deal_btns:
-            for c_btn in close_deal_btns:
-                kb_rows.append([c_btn])
-        kb_rows.append([InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all")])
-        kb_rows.append([
-            InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions"),
-            InlineKeyboardButton("🥇 Back to Dashboard", callback_data="btn_qgold_refresh")
-        ])
-        kb = InlineKeyboardMarkup(kb_rows)
-        bottom_kb = get_quant_gold_bottom_keyboard(chat_id)
+        card, kb = await self.bridge.build_capital_positions_ui(chat_id, user_lang)
         if update.callback_query:
-            await self.safe_edit(update.callback_query, "\n".join(lines), reply_markup=kb)
+            await self.safe_edit(update.callback_query, card, reply_markup=kb)
         else:
-            await self.safe_reply(update, "\n".join(lines), reply_markup=kb)
+            await self.safe_reply(update, card, reply_markup=kb)
 
     async def handle_close_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Closes all active Gold positions immediately for user or entire fleet if admin."""
@@ -3690,12 +3534,22 @@ class QuantGoldBot:
             await self.handle_toggle_auto(update, context)
 
         elif data.startswith("btn_qgold_close_deal:"):
-            target_deal_id = data.split(":", 1)[1]
+            parts = data.split(":")
+            if len(parts) == 3:
+                target_uid = int(parts[1])
+                target_deal_id = parts[2]
+            else:
+                target_uid = chat_id
+                target_deal_id = parts[1]
+
+            is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+            effective_uid = target_uid if is_admin else chat_id
+
             try:
                 await query.answer(f"🚪 កំពុងបិទ Deal #{target_deal_id}...")
             except Exception:
                 pass
-            u_eng = capital_engine.get_user_capital_engine(chat_id)
+            u_eng = capital_engine.get_user_capital_engine(effective_uid)
             if u_eng:
                 await asyncio.to_thread(u_eng.close_position, deal_id=target_deal_id)
             if hasattr(db, "update_capital_auto_trade_close"):

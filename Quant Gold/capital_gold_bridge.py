@@ -21,6 +21,7 @@ from telegram.ext import ContextTypes
 
 import database as db
 import ui_standards
+import capital_engine
 
 try:
     from .quant_gold_security import get_quant_gold_security_citadel
@@ -744,6 +745,330 @@ class QuantGoldCapitalBridge:
 
         kb = InlineKeyboardMarkup(buttons)
         return card, kb
+
+    async def build_capital_positions_ui(
+        self,
+        chat_id: int,
+        user_lang: str = "khmer"
+    ) -> Tuple[str, InlineKeyboardMarkup]:
+        """
+        Builds real-time live positions view:
+        - Super Admin (chat_id=859271875 or is_admin): Displays ALL VIP users' open positions fleet-wide in real-time live,
+          including live broker sync, per-user attribution, deal UPL, Breakeven Armor, and 1-tap close buttons.
+        - Regular VIP User: Displays only their own open positions with full privacy protection.
+        """
+        is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+        bid, ask, spread = self.exec_engine.get_live_gold_price_quote()
+        curr_gold_p = (bid + ask) / 2.0
+
+        if is_admin:
+            # ── SUPER ADMIN FLEET-WIDE REAL-TIME LIVE VIEW ──
+            vip_users = db.get_all_capital_users_overview()
+
+            async def _fetch_user_broker(u_dict):
+                uid = u_dict.get("chat_id")
+                is_d = bool(u_dict.get("is_demo", False))
+                try:
+                    eng = capital_engine.get_user_capital_engine(uid, is_demo=is_d)
+                    if eng and hasattr(eng, "get_open_positions"):
+                        pos = await asyncio.wait_for(asyncio.to_thread(eng.get_open_positions), timeout=2.5)
+                        return uid, pos or []
+                except Exception as e_br:
+                    logger.debug(f"Fleet broker pos fetch note for {uid}: {e_br}")
+                return uid, []
+
+            broker_results = await asyncio.gather(*[_fetch_user_broker(u) for u in vip_users])
+            broker_pos_by_user = dict(broker_results)
+
+            db_trades_all = db.get_capital_auto_trades(status="OPEN", limit=100)
+            db_trades_by_user: Dict[int, list] = {}
+            for t in db_trades_all:
+                t_uid = t.get("chat_id")
+                if t_uid:
+                    db_trades_by_user.setdefault(int(t_uid), []).append(t)
+
+            total_fleet_positions = 0
+            total_fleet_upl = 0.0
+            be_protected_count = 0
+            active_users_count = 0
+
+            fleet_blocks = []
+            close_buttons = []
+
+            for u in vip_users:
+                u_cid = int(u["chat_id"])
+                u_name = u.get("username") or f"User_{u_cid}"
+                u_acc = str(u.get("account_id") or "")
+                u_acc_masked = f"#{u_acc[-6:]}" if len(u_acc) >= 6 else (f"#{u_acc}" if u_acc else "#Direct")
+                u_demo = bool(u.get("is_demo", False))
+                mode_badge = "🟡 Demo" if u_demo else "🟢 Live"
+                u_title = "👑 Super Admin" if u_cid == 859271875 else f"👤 @{u_name}"
+
+                u_gold_trades = [t for t in db_trades_by_user.get(u_cid, []) if str(t.get("epic", "")).upper() in ["GOLD", "XAUUSD"]]
+                u_broker_gold = broker_pos_by_user.get(u_cid, [])
+
+                seen_deals = set()
+                user_positions = []
+
+                # Add from DB
+                for t in u_gold_trades:
+                    d_id = str(t.get("deal_id", ""))
+                    if d_id and d_id != "OK":
+                        seen_deals.add(d_id)
+                    direction = str(t.get("direction", "BUY")).upper()
+                    size = float(t.get("size", 0.5) or 0.5)
+                    entry = float(t.get("entry_price", curr_gold_p) or curr_gold_p)
+                    sl = float(t.get("sl", 0.0) or 0.0)
+                    tp = float(t.get("tp", 0.0) or 0.0)
+                    be_active = bool(t.get("breakeven_activated", False)) or (direction == "BUY" and sl >= entry - 0.5) or (direction == "SELL" and sl <= entry + 0.5 and sl > 0)
+                    upl = (curr_gold_p - entry) * size if direction == "BUY" else (entry - curr_gold_p) * size
+                    user_positions.append({
+                        "deal_id": d_id or f"db_{t.get('id', 0)}",
+                        "direction": direction,
+                        "size": size,
+                        "entry": entry,
+                        "sl": sl,
+                        "tp": tp,
+                        "upl": upl,
+                        "be_active": be_active,
+                        "source": "DB Engine"
+                    })
+
+                # Add from Live Broker
+                for bp in u_broker_gold:
+                    p_info = bp.get("position", {}) if isinstance(bp.get("position"), dict) else bp
+                    d_id = str(p_info.get("dealId", ""))
+                    if d_id and d_id in seen_deals:
+                        continue
+                    if d_id:
+                        seen_deals.add(d_id)
+                    direction = str(p_info.get("direction", "BUY")).upper()
+                    size = float(p_info.get("size", 0.5) or 0.5)
+                    entry = float(p_info.get("level", curr_gold_p) or curr_gold_p)
+                    sl = float(p_info.get("stopLevel", 0.0) or 0.0)
+                    tp = float(p_info.get("profitLevel", 0.0) or 0.0)
+                    upl = float(p_info.get("upl", 0.0) or 0.0)
+                    if upl == 0.0:
+                        upl = (curr_gold_p - entry) * size if direction == "BUY" else (entry - curr_gold_p) * size
+                    be_active = (direction == "BUY" and sl >= entry - 0.5) or (direction == "SELL" and sl <= entry + 0.5 and sl > 0)
+                    user_positions.append({
+                        "deal_id": d_id or "LIVE_BROKER",
+                        "direction": direction,
+                        "size": size,
+                        "entry": entry,
+                        "sl": sl,
+                        "tp": tp,
+                        "upl": upl,
+                        "be_active": be_active,
+                        "source": "Live Broker"
+                    })
+
+                if user_positions:
+                    active_users_count += 1
+                    u_total_upl = sum(p["upl"] for p in user_positions)
+                    u_icon = "🟢" if u_total_upl >= 0 else "🔴"
+
+                    user_lines = [
+                        f"{u_title} (<code>{u_cid}</code> | Acc: <code>{u_acc_masked}</code> | {mode_badge})",
+                        f"  └ Net UPL: <code>{u_icon} ${u_total_upl:+.2f} USD</code> ({len(user_positions)} deals)"
+                    ]
+
+                    for p in user_positions:
+                        total_fleet_positions += 1
+                        total_fleet_upl += p["upl"]
+                        if p["be_active"]:
+                            be_protected_count += 1
+
+                        p_dir_icon = "🟢" if p["direction"] == "BUY" else "🔴"
+                        p_upl_icon = "🟢" if p["upl"] >= 0 else "🔴"
+                        be_badge = "🛡️ Breakeven (0.00R)" if p["be_active"] else "⏳ Structural SL"
+                        d_disp = f"#{p['deal_id'][-8:]}" if len(p['deal_id']) >= 8 else f"#{p['deal_id']}"
+
+                        user_lines.append(
+                            f"  • {d_disp} {p_dir_icon} <b>{p['direction']} {p['size']} oz GOLD</b>\n"
+                            f"    ├ Entry: <code>${p['entry']:.2f}</code> | SL: <code>${p['sl']:.2f}</code> | TP: <code>${p['tp']:.2f}</code>\n"
+                            f"    └ UPL: <code>{p_upl_icon} ${p['upl']:+.2f}</code> | {be_badge}"
+                        )
+
+                        if p["deal_id"] and p["deal_id"] not in ["OK", "LIVE_BROKER"]:
+                            close_buttons.append(
+                                InlineKeyboardButton(
+                                    f"🚪 Close {u_name[:8]} {d_disp} ({p_upl_icon} ${p['upl']:+.2f})",
+                                    callback_data=f"btn_qgold_close_deal:{u_cid}:{p['deal_id']}"
+                                )
+                            )
+
+                    fleet_blocks.append("\n".join(user_lines))
+
+            t_icon = "🟢" if total_fleet_upl >= 0 else "🔴"
+            if total_fleet_positions == 0:
+                card = (
+                    f"👑 <b>[SUPER ADMIN FLEET-WIDE LIVE POSITIONS]</b> 📊\n"
+                    f"══════════════════════════════════════\n"
+                    f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_gold_p:.2f}</code> (Spread: <code>${spread:.2f}</code>)\n"
+                    f"👥 <b>សមាជិក VIP ក្នុងប្រព័ន្ធ ៖</b> <code>{len(vip_users)} Accounts Monitored</code>\n"
+                    f"🌐 <b>ស្ថានភាពកងនាវា ៖</b> 🟢 <code>គ្មាន Position កំពុងបើកនៅឡើយទេ (Flat Cash Standby 100%)</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"🛡️ <i>គណនី VIP ទាំងអស់ស្ថិតក្នុងស្ថានភាពសុវត្ថិភាពដើមទុនកម្រិតខ្ពស់ (Capital Preservation Mode)។</i>"
+                )
+                kb_rows = [
+                    [
+                        InlineKeyboardButton("🟢 1-Tap BUY Gold", callback_data="btn_qgold_buy"),
+                        InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
+                    ],
+                    [
+                        InlineKeyboardButton("🔄 Refresh Fleet Live", callback_data="btn_qgold_positions"),
+                        InlineKeyboardButton("🥇 Quant Gold Dashboard", callback_data="btn_qgold_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("👑 Fleet Controller (/admin_capital)", callback_data="btn_qgold_admin_capital")
+                    ]
+                ]
+            else:
+                card = (
+                    f"👑 <b>[SUPER ADMIN FLEET-WIDE LIVE POSITIONS]</b> 📊\n"
+                    f"══════════════════════════════════════\n"
+                    f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_gold_p:.2f}</code> (Spread: <code>${spread:.2f}</code>)\n"
+                    f"🌐 <b>សរុបកិច្ចសន្យាសកម្ម ៖</b> <code>{total_fleet_positions} Positions លើ {active_users_count} គណនី VIP</code>\n"
+                    f"💰 <b>Total Fleet Net UPL ៖</b> <code>{t_icon} ${total_fleet_upl:+.2f} USD</code>\n"
+                    f"🛡️ <b>Breakeven Protected ៖</b> <code>{be_protected_count} / {total_fleet_positions} Positions (100% Loss-Immune)</code>\n"
+                    f"══════════════════════════════════════\n"
+                    + "\n\n".join(fleet_blocks) + "\n"
+                    f"══════════════════════════════════════"
+                )
+                kb_rows = []
+                for i in range(0, len(close_buttons), 2):
+                    kb_rows.append(close_buttons[i:i+2])
+                kb_rows.append([
+                    InlineKeyboardButton("🛑 បិទគ្រប់ Positions កងនាវា (Fleet Close All)", callback_data="btn_qgold_fleet_close_all")
+                ])
+                kb_rows.append([
+                    InlineKeyboardButton("🔄 Refresh Fleet Live", callback_data="btn_qgold_positions"),
+                    InlineKeyboardButton("🥇 Back to Dashboard", callback_data="btn_qgold_refresh")
+                ])
+            return card, InlineKeyboardMarkup(kb_rows)
+
+        else:
+            # ── REGULAR VIP USER PERSONAL LIVE VIEW (Zero Data Leakage) ──
+            open_trades = db.get_capital_auto_trades(chat_id, status="OPEN")
+            gold_trades = [t for t in open_trades if str(t.get("epic", "")).upper() in ["GOLD", "XAUUSD"]]
+
+            u_eng = capital_engine.get_user_capital_engine(chat_id)
+            broker_gold = []
+            try:
+                broker_pos = u_eng.get_open_positions() if hasattr(u_eng, "get_open_positions") else []
+                broker_gold = [
+                    p for p in (broker_pos or [])
+                    if str(p.get("market", {}).get("epic", "")).upper() == "GOLD"
+                    or str(p.get("epic", "")).upper() == "GOLD"
+                ]
+            except Exception as e_bp:
+                logger.debug(f"User {chat_id} broker positions check note: {e_bp}")
+
+            seen_deals = set()
+            user_positions = []
+            for t in gold_trades:
+                d_id = str(t.get("deal_id", ""))
+                if d_id and d_id != "OK":
+                    seen_deals.add(d_id)
+                direction = str(t.get("direction", "BUY")).upper()
+                size = float(t.get("size", 0.5) or 0.5)
+                entry = float(t.get("entry_price", curr_gold_p) or curr_gold_p)
+                sl = float(t.get("sl", 0.0) or 0.0)
+                tp = float(t.get("tp", 0.0) or 0.0)
+                be_active = bool(t.get("breakeven_activated", False)) or (direction == "BUY" and sl >= entry - 0.5) or (direction == "SELL" and sl <= entry + 0.5 and sl > 0)
+                upl = (curr_gold_p - entry) * size if direction == "BUY" else (entry - curr_gold_p) * size
+                user_positions.append({
+                    "deal_id": d_id or f"db_{t.get('id', 0)}",
+                    "direction": direction,
+                    "size": size,
+                    "entry": entry,
+                    "sl": sl,
+                    "tp": tp,
+                    "upl": upl,
+                    "be_active": be_active
+                })
+
+            for bp in broker_gold:
+                p_info = bp.get("position", {}) if isinstance(bp.get("position"), dict) else bp
+                d_id = str(p_info.get("dealId", ""))
+                if d_id and d_id in seen_deals:
+                    continue
+                if d_id:
+                    seen_deals.add(d_id)
+                direction = str(p_info.get("direction", "BUY")).upper()
+                size = float(p_info.get("size", 0.5) or 0.5)
+                entry = float(p_info.get("level", curr_gold_p) or curr_gold_p)
+                sl = float(p_info.get("stopLevel", 0.0) or 0.0)
+                tp = float(p_info.get("profitLevel", 0.0) or 0.0)
+                upl = float(p_info.get("upl", 0.0) or 0.0)
+                if upl == 0.0:
+                    upl = (curr_gold_p - entry) * size if direction == "BUY" else (entry - curr_gold_p) * size
+                be_active = (direction == "BUY" and sl >= entry - 0.5) or (direction == "SELL" and sl <= entry + 0.5 and sl > 0)
+                user_positions.append({
+                    "deal_id": d_id or "LIVE_BROKER",
+                    "direction": direction,
+                    "size": size,
+                    "entry": entry,
+                    "sl": sl,
+                    "tp": tp,
+                    "upl": upl,
+                    "be_active": be_active
+                })
+
+            if not user_positions:
+                card = (
+                    f"📊 <b>[QUANT GOLD ACTIVE POSITIONS]</b> 🥇\n"
+                    f"══════════════════════════════════════\n"
+                    f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន ៖</b> <code>${curr_gold_p:.2f}</code> (Spread: <code>${spread:.2f}</code>)\n"
+                    f"ℹ️ <b>ស្ថានភាព ៖</b> គ្មាន Position កំពុងបើកនៅឡើយទេ។\n\n"
+                    f"💡 <i>ចុចប៊ូតុង <b>🟢 1-Tap BUY</b> ឬ <b>🔴 1-Tap SELL</b> ដើម្បីចាប់ផ្តើមជួញដូរ!</i>"
+                )
+                kb_rows = [
+                    [
+                        InlineKeyboardButton("🟢 1-Tap BUY Gold", callback_data="btn_qgold_buy"),
+                        InlineKeyboardButton("🔴 1-Tap SELL Gold", callback_data="btn_qgold_sell")
+                    ],
+                    [
+                        InlineKeyboardButton("🏛️ Capital.com Live (/capital)", callback_data="btn_capital_menu"),
+                        InlineKeyboardButton("🔄 Refresh", callback_data="btn_qgold_positions")
+                    ]
+                ]
+            else:
+                total_upl = sum(p["upl"] for p in user_positions)
+                t_icon = "🟢" if total_upl >= 0 else "🔴"
+                lines = [
+                    f"📊 <b>[QUANT GOLD ACTIVE POSITIONS]</b> 🥇",
+                    f"══════════════════════════════════════",
+                    f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន ៖</b> <code>${curr_gold_p:.2f}</code> (Spread: <code>${spread:.2f}</code>)\n"
+                ]
+                close_deal_btns = []
+                for i, p in enumerate(user_positions, 1):
+                    p_dir_icon = "🟢" if p["direction"] == "BUY" else "🔴"
+                    p_upl_icon = "🟢" if p["upl"] >= 0 else "🔴"
+                    be_badge = "🛡️ Breakeven Active (0.00R Risk)" if p["be_active"] else "⏳ Initial Structural SL"
+                    d_disp = f"#{p['deal_id'][-8:]}" if len(p['deal_id']) >= 8 else f"#{p['deal_id']}"
+                    lines.append(
+                        f"<b>#{i} {p_dir_icon} {p['direction']} {p['size']} oz GOLD</b> ({d_disp})\n"
+                        f"• Entry: <code>${p['entry']:.2f}</code> | SL: <code>${p['sl']:.2f}</code> | TP1: <code>${p['tp']:.2f}</code>\n"
+                        f"• UPL: <code>{p_upl_icon} ${p['upl']:+.2f}</code> | {be_badge}"
+                    )
+                    if p["deal_id"] and p["deal_id"] not in ["OK", "LIVE_BROKER"]:
+                        close_deal_btns.append(InlineKeyboardButton(f"🚪 Close {d_disp} ({p_upl_icon} ${p['upl']:+.2f})", callback_data=f"btn_qgold_close_deal:{chat_id}:{p['deal_id']}"))
+
+                lines.append(f"══════════════════════════════════════")
+                lines.append(f"💰 <b>Total Net UPL ៖</b> <code>{t_icon} ${total_upl:+.2f}</code>")
+                card = "\n".join(lines)
+                kb_rows = []
+                for c_btn in close_deal_btns:
+                    kb_rows.append([c_btn])
+                kb_rows.append([InlineKeyboardButton("🛑 បិទគ្រប់ Positions (Close All)", callback_data="btn_qgold_close_all")])
+                kb_rows.append([
+                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)", callback_data="btn_qgold_positions"),
+                    InlineKeyboardButton("🥇 Back to Dashboard", callback_data="btn_qgold_refresh")
+                ])
+
+            return card, InlineKeyboardMarkup(kb_rows)
 
     async def _safe_send(self, update: Update, text: str, reply_markup=None, parse_mode="HTML"):
         """Sends a telegram message safely with HTML, falling back to plain text if needed."""
