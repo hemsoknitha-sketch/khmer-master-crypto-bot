@@ -894,7 +894,7 @@ class QuantGoldCapitalBridge:
                             close_buttons.append(
                                 InlineKeyboardButton(
                                     f"🚪 Close {u_name[:8]} {d_disp} ({p_upl_icon} ${p['upl']:+.2f})",
-                                    callback_data=f"btn_qgold_close_deal:{u_cid}:{p['deal_id']}"
+                                    callback_data=f"qg_cld:{u_cid}:{p['deal_id']}"
                                 )
                             )
 
@@ -1054,7 +1054,7 @@ class QuantGoldCapitalBridge:
                         f"• UPL: <code>{p_upl_icon} ${p['upl']:+.2f}</code> | {be_badge}"
                     )
                     if p["deal_id"] and p["deal_id"] not in ["OK", "LIVE_BROKER"]:
-                        close_deal_btns.append(InlineKeyboardButton(f"🚪 Close {d_disp} ({p_upl_icon} ${p['upl']:+.2f})", callback_data=f"btn_qgold_close_deal:{chat_id}:{p['deal_id']}"))
+                        close_deal_btns.append(InlineKeyboardButton(f"🚪 Close {d_disp} ({p_upl_icon} ${p['upl']:+.2f})", callback_data=f"qg_cld:{chat_id}:{p['deal_id']}"))
 
                 lines.append(f"══════════════════════════════════════")
                 lines.append(f"💰 <b>Total Net UPL ៖</b> <code>{t_icon} ${total_upl:+.2f}</code>")

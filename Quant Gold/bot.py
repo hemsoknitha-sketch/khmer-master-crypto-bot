@@ -283,8 +283,11 @@ class QuantGoldBot:
             try:
                 return await msg.reply_text(clean, reply_markup=reply_markup)
             except Exception as e2:
-                logger.error(f"Telegram plain text fallback also failed: {e2}")
-                return None
+                logger.error(f"Telegram plain text fallback note: {e2}. Retrying without reply_markup...")
+                try:
+                    return await msg.reply_text(clean)
+                except Exception:
+                    return None
 
     async def safe_edit(self, query, text: str, reply_markup=None, parse_mode="HTML"):
         """Edits a message safely with HTML, scrubbing sensitive tokens and falling back to plain text."""
@@ -299,8 +302,11 @@ class QuantGoldBot:
             try:
                 return await query.edit_message_text(clean, reply_markup=reply_markup)
             except Exception as e2:
-                logger.error(f"Telegram edit plain text fallback also failed: {e2}")
-                return None
+                logger.error(f"Telegram edit plain text fallback note: {e2}. Retrying without reply_markup...")
+                try:
+                    return await query.edit_message_text(clean)
+                except Exception:
+                    return None
 
     async def handle_security(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays real-time Institutional Security Citadel status & diagnostics (Super Admin Only)."""
@@ -3668,7 +3674,7 @@ class QuantGoldBot:
                 pass
             await self.handle_toggle_auto(update, context)
 
-        elif data.startswith("btn_qgold_close_deal:"):
+        elif data.startswith("qg_cld:") or data.startswith("btn_qgold_close_deal:"):
             parts = data.split(":")
             if len(parts) == 3:
                 target_uid = int(parts[1])

@@ -496,27 +496,41 @@ class QuantGoldExecutionEngine:
                     tp3 = round((level + sl_dist * 4.00) if direction == "BUY" else (level - sl_dist * 4.00), 2)
 
                     if not db.has_capital_auto_trade_record(deal_id):
-                        db.record_capital_auto_trade(
-                            chat_id=cid,
-                            deal_id=deal_id,
-                            deal_reference=deal_id,
-                            epic="GOLD",
-                            direction=direction,
-                            size=size,
-                            entry_price=level,
-                            sl=sl,
-                            tp=tp if tp > 0 else tp1,
-                            tp1=tp1,
-                            tp2=tp2,
-                            tp3=tp3,
-                            sl_dist=sl_dist,
-                            scale_tier=0,
-                            is_demo=int(is_demo)
-                        )
-                        logger.info(
-                            f"🏛️ [BROKER SYNC] Auto-adopted active GOLD position from broker: "
-                            f"Deal #{deal_id} {direction} {size} lot @ ${level:.2f} (SL: ${sl:.2f}) (User {cid}, Demo={is_demo})"
-                        )
+                        # Seamless Order Reference Promotion: Check if user has an open order ref (e.g. o_...) that matches this new fill
+                        promoted_order_ref = False
+                        user_trades = db.get_capital_auto_trades_for_user(cid) or []
+                        for ut in user_trades:
+                            ut_id = str(ut.get("deal_id", ""))
+                            ut_status = str(ut.get("status", "OPEN")).upper()
+                            ut_dir = str(ut.get("direction", "")).upper()
+                            if ut_id.startswith("o_") and ut_status == "OPEN" and ut_dir == direction:
+                                if hasattr(db, "update_capital_auto_trade_deal_id"):
+                                    if db.update_capital_auto_trade_deal_id(ut_id, deal_id):
+                                        logger.info(f"🏛️ [BROKER SYNC] Seamlessly promoted order ref {ut_id} -> live deal #{deal_id} for user {cid} @ ${level:.2f}")
+                                        promoted_order_ref = True
+                                        break
+                        if not promoted_order_ref:
+                            db.record_capital_auto_trade(
+                                chat_id=cid,
+                                deal_id=deal_id,
+                                deal_reference=deal_id,
+                                epic="GOLD",
+                                direction=direction,
+                                size=size,
+                                entry_price=level,
+                                sl=sl,
+                                tp=tp if tp > 0 else tp1,
+                                tp1=tp1,
+                                tp2=tp2,
+                                tp3=tp3,
+                                sl_dist=sl_dist,
+                                scale_tier=0,
+                                is_demo=int(is_demo)
+                            )
+                            logger.info(
+                                f"🏛️ [BROKER SYNC] Auto-adopted active GOLD position from broker: "
+                                f"Deal #{deal_id} {direction} {size} lot @ ${level:.2f} (SL: ${sl:.2f}) (User {cid}, Demo={is_demo})"
+                            )
 
                     # Bind active state in RAM memory
                     self._active_gold_deal_id = deal_id
@@ -1464,7 +1478,14 @@ class QuantGoldExecutionEngine:
             logger.info("⏸️ [FLEET TRADING PAUSED] Global Capital Auto switch is OFF. Fleet dispatch aborted.")
             return {"success": False, "dispatched_count": 0, "reason": "GLOBAL_SWITCH_OFF"}
 
-        active_users = db.get_active_capital_auto_users()
+        raw_users = db.get_active_capital_auto_users() or []
+        # Strict user deduplication by chat_id
+        deduped = {}
+        for u in raw_users:
+            u_cid = u.get("chat_id")
+            if u_cid and u_cid not in deduped:
+                deduped[u_cid] = u
+        active_users = list(deduped.values())
         if not active_users:
             sa_cfg = db.get_capital_auto_config(859271875) or {}
             if sa_cfg.get("enabled") or sa_cfg.get("is_enabled"):
@@ -1987,14 +2008,12 @@ class QuantGoldExecutionEngine:
                         matched_bp = False
                         if str(deal_id).startswith("o_") and user_deals:
                             for bp_deal in user_deals:
-                                if hasattr(db, "execute_query"):
-                                    try:
-                                        db.execute_query("UPDATE capital_auto_trades SET deal_id = ? WHERE deal_id = ?", (str(bp_deal), str(deal_id)))
+                                if hasattr(db, "update_capital_auto_trade_deal_id"):
+                                    if db.update_capital_auto_trade_deal_id(str(deal_id), str(bp_deal)):
                                         deal_id = bp_deal
                                         matched_bp = True
+                                        logger.info(f"🏛️ [BROKER SYNC] Re-mapped order ref {deal_key} -> broker deal #{bp_deal} for user {cid}")
                                         break
-                                    except Exception:
-                                        pass
                         if matched_bp:
                             continue
                         logger.info(f"🏛️ [BROKER SYNC] Gold trade {deal_id} was closed on Capital.com broker for user {cid}.")

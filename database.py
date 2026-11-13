@@ -3717,6 +3717,28 @@ def close_capital_auto_trade(deal_id: str, exit_price: float = 0.0, exit_reason:
     """Canonical alias for closing a capital auto trade in capital_auto_trades."""
     return update_capital_auto_trade_close(deal_id=deal_id, exit_price=exit_price, pnl=pnl)
 
+def update_capital_auto_trade_deal_id(old_deal_id: str, new_deal_id: str) -> bool:
+    """Updates the deal_id and deal_reference from order reference (e.g. o_...) to live broker deal ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE capital_auto_trades
+            SET deal_id = ?, deal_reference = ?
+            WHERE deal_id = ? OR deal_reference = ?
+        """, (str(new_deal_id), str(new_deal_id), str(old_deal_id), str(old_deal_id)))
+        conn.commit()
+        updated = cursor.rowcount > 0
+        conn.close()
+        return updated
+    except Exception as e:
+        logger.error(f"Error updating capital_auto_trade deal_id from {old_deal_id} to {new_deal_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
 def get_capital_auto_pnl_summary(chat_id: Optional[int] = None) -> dict:
     """
     Calculates cumulative PnL, win rate, total trades, behavioral attribution
