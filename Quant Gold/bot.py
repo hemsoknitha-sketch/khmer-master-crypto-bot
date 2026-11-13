@@ -3618,7 +3618,7 @@ class QuantGoldBot:
         data = query.data
         chat_id = update.effective_chat.id
 
-        if data in ["btn_qgold_refresh", "btn_qgold_scan"]:
+        if data in ["btn_qgold_refresh", "btn_qgold_scan", "btn_qgold_dashboard", "btn_capital_gold"]:
             try:
                 await query.answer("🥇 Refreshing Quant Gold Citadel...")
             except Exception:
@@ -4390,18 +4390,20 @@ class QuantGoldBot:
         text = update.effective_message.text.strip() if update.effective_message and update.effective_message.text else ""
         chat_id = update.effective_chat.id if update.effective_chat else None
 
-        if "Dashboard" in text or "Scan" in text:
+        if "Dashboard" in text or "Scan" in text or "🥇" in text:
             await self.handle_start(update, context)
-        elif "Signal" in text:
+        elif "Signal" in text or "🎯" in text:
             await self.handle_signal(update, context)
         elif "BUY GOLD" in text or text.startswith("🟢"):
             await self.handle_buy(update, context)
         elif "SELL GOLD" in text or text.startswith("🔴"):
             await self.handle_sell(update, context)
-        elif "Position" in text or "Positions" in text:
+        elif "Position" in text or "Positions" in text or "📊" in text:
             await self.handle_positions(update, context)
-        elif "Auto-Trade" in text or "Auto" in text:
+        elif "Auto-Trade" in text or "Auto" in text or "🤖" in text:
             await self.handle_toggle_auto(update, context)
+        elif "TV" in text or "Matrix" in text or "TradingView" in text or "📐" in text:
+            await self.handle_tv_matrix(update, context)
         elif "Reset Daily" in text or "🔓" in text:
             if chat_id:
                 import portfolio_circuit_breaker

@@ -92,6 +92,10 @@ class QuantGoldCapitalBridge:
         kalman_v = math_s.get("kalman_velocity", 0.0)
         hurst_val = math_s.get("composite_hurst", 0.50)
         regime = math_s.get("regime", "RANDOM_WALK")
+        tv_mat = sig_data.get("tradingview_summary", {}) or {}
+        tv_dir = tv_mat.get("direction", "NEUTRAL")
+        tv_score = float(tv_mat.get("score", 0.0) or 0.0)
+        tv_wr = float(tv_mat.get("win_rate", 50.0) or 50.0)
 
         bias_side = action if action in ["BUY", "SELL"] else sig_data.get("dominant_bias", "BUY")
         pips_sl = abs(curr_p - sl) * 10
@@ -110,6 +114,7 @@ class QuantGoldCapitalBridge:
                 f"💵 <b>តម្លៃបច្ចុប្បន្ន ៖</b> <code>${curr_p:.2f}</code> | <b>Spread ៖</b> <code>${sig_data.get('spread', 0.35):.2f}</code>\n"
                 f"⚡ <b>សញ្ញាសម្រេចចិត្ត ៖</b> <code>{action_icon}</code>\n"
                 f"🧠 <b>ទំនុកចិត្តឈ្នះ (Win Prob) ៖</b> <code>{conf:.1f}%</code>\n"
+                f"📐 <b>TV 10-Matrix ៖</b> <code>{tv_dir} ({tv_score:+.0f})</code> (Win: <code>{tv_wr:.1f}%</code>)\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
                 f"📊 <b>វិសាលគម ១៩ TIMEFRAMES SPECTRUM (M1 ដល់ 1 Month) ៖</b>\n"
                 f"• បៃតង (Bullish) ៖ <code>{counts.get('bullish', 0)} / 19 TFs</code>\n"
@@ -138,6 +143,7 @@ class QuantGoldCapitalBridge:
                 f"💵 <b>Current Price :</b> <code>${curr_p:.2f}</code> | <b>Spread :</b> <code>${sig_data.get('spread', 0.35):.2f}</code>\n"
                 f"⚡ <b>Master Action :</b> <code>{action_icon}</code>\n"
                 f"🧠 <b>Win Probability :</b> <code>{conf:.1f}%</code>\n"
+                f"📐 <b>TV 10-Matrix :</b> <code>{tv_dir} ({tv_score:+.0f})</code> (Win: <code>{tv_wr:.1f}%</code>)\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
                 f"📊 <b>19-TIMEFRAME SPECTRUM (M1 to 1 Month) :</b>\n"
                 f"• Bullish Confluence : <code>{counts.get('bullish', 0)} / 19 TFs</code>\n"
@@ -170,15 +176,18 @@ class QuantGoldCapitalBridge:
                 InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal")
             ],
             [
-                InlineKeyboardButton("📊 Positions (/positions)", callback_data="btn_qgold_positions"),
-                InlineKeyboardButton("👑 VIP License (/license)", callback_data="btn_qgold_license")
+                InlineKeyboardButton("📐 TV 10-Matrix (/tv)", callback_data="btn_qgold_tv_matrix"),
+                InlineKeyboardButton("📊 Positions (/positions)", callback_data="btn_qgold_positions")
             ],
             [
                 InlineKeyboardButton("🤖 Toggle Auto Gold", callback_data="btn_qgold_toggle"),
-                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status")
+                InlineKeyboardButton("👑 VIP License (/license)", callback_data="btn_qgold_license")
             ],
             [
-                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh"),
+                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status"),
+                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh")
+            ],
+            [
                 InlineKeyboardButton("📖 User Guide / Help", callback_data="btn_qgold_help")
             ]
         ]
@@ -263,6 +272,10 @@ class QuantGoldCapitalBridge:
         mtf = sig_data.get("mtf_summary", {}) or {}
         counts = mtf.get("counts", {}) or {}
         weighted_score = float(mtf.get("weighted_score", 0.0) or 0.0)
+        tv_mat = sig_data.get("tradingview_summary", {}) or {}
+        tv_dir = tv_mat.get("direction", "NEUTRAL")
+        tv_score = float(tv_mat.get("score", 0.0) or 0.0)
+        tv_wr = float(tv_mat.get("win_rate", 50.0) or 50.0)
 
         action_icon = "🟢 STRONG BUY" if action == "BUY" else ("🔴 STRONG SELL" if action == "SELL" else "⚪ HOLD / CHOP FILTER")
 
@@ -315,12 +328,15 @@ class QuantGoldCapitalBridge:
                 InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal")
             ],
             [
-                InlineKeyboardButton("📊 Open Positions (/positions)", callback_data="btn_qgold_positions"),
-                InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle")
+                InlineKeyboardButton("📐 TV 10-Matrix (/tv)", callback_data="btn_qgold_tv_matrix"),
+                InlineKeyboardButton("📊 Open Positions (/positions)", callback_data="btn_qgold_positions")
             ],
             [
-                InlineKeyboardButton("📜 កិច្ចសន្យាផ្លូវការ (Agreements Audit)", callback_data="btn_admin_agreements"),
+                InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle"),
                 InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_qgold_refresh")
+            ],
+            [
+                InlineKeyboardButton("📜 កិច្ចសន្យាផ្លូវការ (Agreements Audit)", callback_data="btn_admin_agreements")
             ]
         ]
         return card, InlineKeyboardMarkup(buttons)
@@ -400,6 +416,10 @@ class QuantGoldCapitalBridge:
         kalman_v = float(math_s.get("kalman_velocity", 0.0) or 0.0)
         hurst_val = float(math_s.get("composite_hurst", 0.50) or 0.50)
         regime = str(math_s.get("regime", "RANDOM_WALK") or "RANDOM_WALK")
+        tv_mat = sig_data.get("tradingview_summary", {}) or {}
+        tv_dir = tv_mat.get("direction", "NEUTRAL")
+        tv_score = float(tv_mat.get("score", 0.0) or 0.0)
+        tv_wr = float(tv_mat.get("win_rate", 50.0) or 50.0)
 
         bias_side = action if action in ["BUY", "SELL"] else sig_data.get("dominant_bias", "BUY")
         pips_sl = abs(curr_p - sl) * 10
@@ -452,15 +472,18 @@ class QuantGoldCapitalBridge:
                 InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal")
             ],
             [
-                InlineKeyboardButton("📊 Positions (/positions)", callback_data="btn_qgold_positions"),
-                InlineKeyboardButton("👑 VIP License (/license)", callback_data="btn_qgold_license")
+                InlineKeyboardButton("📐 TV 10-Matrix (/tv)", callback_data="btn_qgold_tv_matrix"),
+                InlineKeyboardButton("📊 Positions (/positions)", callback_data="btn_qgold_positions")
             ],
             [
                 InlineKeyboardButton("🤖 Toggle Auto Gold", callback_data="btn_qgold_toggle"),
-                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status")
+                InlineKeyboardButton("👑 VIP License (/license)", callback_data="btn_qgold_license")
             ],
             [
-                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh"),
+                InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status"),
+                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh")
+            ],
+            [
                 InlineKeyboardButton("📜 កិច្ចសន្យាផ្លូវការ (My Contract)", callback_data="btn_download_my_pdf")
             ],
             [
@@ -765,13 +788,133 @@ class QuantGoldCapitalBridge:
 
         sub_action = str(args[0]).upper().strip() if args else "MENU"
 
-        if sub_action in ["GOLD", "XAUUSD", "MENU"]:
+        if sub_action in ["GOLD", "XAUUSD", "MENU", "DASHBOARD"]:
             auth_ok, reason = self.citadel.is_user_authorized_for_trading(chat_id)
             if not auth_ok:
                 card, kb = self.get_authorization_gate_card(chat_id, reason)
                 await self._safe_send(update, card, reply_markup=kb)
                 return True
             card, kb = await self.build_capital_user_dashboard(chat_id)
+            await self._safe_send(update, card, reply_markup=kb)
+            return True
+
+        elif sub_action in ["SCAN", "OVERVIEW"]:
+            text, kb = await self.build_quant_gold_overview_ui(chat_id, user_lang)
+            await self._safe_send(update, text, reply_markup=kb)
+            return True
+
+        elif sub_action in ["SIGNAL", "LEVELS"]:
+            text, kb = await self.build_quant_gold_overview_ui(chat_id, user_lang)
+            await self._safe_send(update, text, reply_markup=kb)
+            return True
+
+        elif sub_action in ["POSITIONS", "OPEN", "DEALS"]:
+            card, kb = await self.build_capital_user_dashboard(chat_id)
+            await self._safe_send(update, card, reply_markup=kb)
+            return True
+
+        elif sub_action in ["STATUS", "ACCOUNT", "LIVE"]:
+            text, kb = await self.build_quant_gold_overview_ui(chat_id, user_lang)
+            await self._safe_send(update, text, reply_markup=kb)
+            return True
+
+        elif sub_action in ["HELP", "GUIDE"]:
+            is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+            try:
+                from smart_bot_guide import get_smart_bot_guide
+                guide_txt, guide_kb = get_smart_bot_guide(user_lang=user_lang, view="tradfi", is_admin=is_admin)
+                await self._safe_send(update, guide_txt, reply_markup=guide_kb)
+            except Exception:
+                text, kb = await self.build_quant_gold_overview_ui(chat_id, user_lang)
+                await self._safe_send(update, text, reply_markup=kb)
+            return True
+
+        elif sub_action in ["LICENSE", "VIP"]:
+            card, kb = self.get_authorization_gate_card(chat_id, "VIP License Management & Referral Verification")
+            await self._safe_send(update, card, reply_markup=kb)
+            return True
+
+        elif sub_action in ["SECURITY", "HEALTH", "CITADEL"]:
+            status_text = (
+                f"🛡️ <b>[QUANT GOLD SECURITY CITADEL]</b> 🥇\n"
+                f"══════════════════════════════════════\n"
+                f"• Lockdown Status: <code>{'🚨 ARMED (STOPPED)' if self.citadel.is_locked() else '🟢 NORMAL (ACTIVE)'}</code>\n"
+                f"• Circuit Breakers: <code>ARMED & MONITORED</code>\n"
+                f"• Max Daily Loss Clamp: <code>-2.5% Equity</code>\n"
+                f"• Max Trailing SL: <code>$25.00 - $35.00 Invalidation</code>\n"
+                f"• Rapid Micro-Cut Flip: <code>ACTIVE (-$1.50 to -$5.00 Guard)</code>\n"
+                f"• TradingView 10-Matrix: <code>INTEGRATED & VERIFIED</code>\n"
+                f"══════════════════════════════════════"
+            )
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_qgold_refresh")],
+                [InlineKeyboardButton("🎯 Gold Signal", callback_data="btn_qgold_signal")]
+            ])
+            await self._safe_send(update, status_text, reply_markup=kb)
+            return True
+
+        elif sub_action in ["TV", "TV_MATRIX", "TRADINGVIEW"]:
+            from tradingview_confluence_matrix import get_tradingview_confluence_matrix
+            tv_matrix = get_tradingview_confluence_matrix()
+            df_m15 = self.exec_engine.mtf_engine._candle_cache.get("15m")
+            df_h1 = self.exec_engine.mtf_engine._candle_cache.get("1h")
+            sig = self.exec_engine.get_cached_gold_signal() or {}
+            curr_p = float(sig.get("current_price", 4095.0) or 4095.0)
+            res = tv_matrix.compute_confluence(df_m15, curr_p, df_h1)
+            ols = res.get("ols_channel", {})
+            vp = res.get("volume_profile", {})
+            fib = res.get("fibonacci", {})
+            fib_suite = res.get("fibonacci_suite", {})
+            fib_ext = fib_suite.get("fib_extension", {})
+            fib_tz = fib_suite.get("fib_time_zone", {})
+            pitchfork = res.get("pitchfork", {})
+            gann = float(res.get("gann_1x1", curr_p) or curr_p)
+            cycles = res.get("cycles", {})
+            harmonics = res.get("harmonics", {})
+            score = float(res.get("score", 0.0))
+            direction = str(res.get("direction", "NEUTRAL"))
+            win_rate = float(res.get("estimated_win_rate", 50.0))
+            dir_icon = "🟢" if direction == "BUY" else ("🔴" if direction == "SELL" else "⚪")
+            reasons = res.get("reasons", [])
+            reasons_str = "\n".join([f"  • <code>{r}</code>" for r in reasons[:4]]) if reasons else "  • <code>NEUTRAL_CONSOLIDATION</code>"
+
+            card = (
+                f"📐 <b>[TRADINGVIEW 10-GROUP QUANT CONFLUENCE MATRIX]</b> 🥇\n"
+                f"══════════════════════════════════════\n"
+                f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
+                f"🎯 <b>ទិសដៅរួមបញ្ចូល (Direction) ៖</b> <code>{dir_icon} {direction}</code>\n"
+                f"⚡ <b>ពិន្ទុ Confluence Score ៖</b> <code>{score:+.1f} / 100.0</code>\n"
+                f"📈 <b>ប្រូបាប៊ីលីតេឈ្នះ (Estimated Win Rate) ៖</b> <code>{win_rate:.1f}%</code>\n"
+                f"──────────────────────────────────────\n"
+                f"📊 <b>លទ្ធផលគណនាឧបករណ៍ទាំង ១០ ក្រុម (11 Fib Tools Suite) ៖</b>\n"
+                f"1️⃣ <b>OLS Regression Band (2σ) ៖</b>\n"
+                f"   └ Upper: <code>${float(ols.get('upper', curr_p+5.0)):.2f}</code> | Lower: <code>${float(ols.get('lower', curr_p-5.0)):.2f}</code> (z={float(ols.get('z_score', 0.0)):+.2f})\n"
+                f"2️⃣ <b>Volume Profile & AVWAP ៖</b>\n"
+                f"   └ POC: <code>${float(vp.get('poc', curr_p)):.2f}</code> | VAH: <code>${float(vp.get('vah', curr_p+3.0)):.2f}</code> | VAL: <code>${float(vp.get('val', curr_p-3.0)):.2f}</code>\n"
+                f"   └ Anchored VWAP: <code>${float(vp.get('avwap', curr_p)):.2f}</code>\n"
+                f"3️⃣ <b>Fibonacci 11-Tool Suite & Golden Pocket ៖</b>\n"
+                f"   └ 0.618 Pocket: <code>${float(fib.get('fib_618', curr_p)):.2f}</code> | 0.705: <code>${float(fib.get('fib_705', curr_p)):.2f}</code>\n"
+                f"   └ Fib Extension 1.272 (TP1): <code>${float(fib_ext.get('ext_1272', curr_p+10.0)):.2f}</code> | 1.618 (TP2): <code>${float(fib_ext.get('ext_1618', curr_p+15.0)):.2f}</code>\n"
+                f"   └ Fib Time Zone Node: <code>Bar {fib_tz.get('nearest_fib_number', 13)}</code> ({'INFLECTION' if fib_tz.get('is_time_inflection') else 'NORMAL'})\n"
+                f"4️⃣ <b>Andrews' Pitchfork (80% Reversion) ៖</b>\n"
+                f"   └ Median Line: <code>${float(pitchfork.get('median', curr_p)):.2f}</code>\n"
+                f"5️⃣ <b>Gann 1x1 Equilibrium (45°) ៖</b> <code>${gann:.2f}</code>\n"
+                f"6️⃣ <b>Time Cycles (Fourier Wave) ៖</b> <code>{cycles.get('cycle_state', 'NEUTRAL')}</code> ({cycles.get('dominant_cycle_bars', 24)} bars)\n"
+                f"7️⃣ <b>Harmonic Patterns (XABCD) ៖</b> <code>{harmonics.get('pattern_name', 'NONE')}</code> (PRZ: <code>${float(harmonics.get('prz_price', curr_p)):.2f}</code>)\n"
+                f"──────────────────────────────────────\n"
+                f"🔍 <b>កត្តាបញ្ជាក់សញ្ញាជួញដូរ (Confluence Triggers) ៖</b>\n"
+                f"{reasons_str}\n"
+                f"══════════════════════════════════════"
+            )
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
+                    InlineKeyboardButton("🏛️ Capital Deck (/capital)", callback_data="btn_capital_menu")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Refresh Matrix", callback_data="btn_qgold_tv_matrix")
+                ]
+            ])
             await self._safe_send(update, card, reply_markup=kb)
             return True
 

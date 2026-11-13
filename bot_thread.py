@@ -4490,6 +4490,68 @@ class TelegramBotThread(BaseThread):
                 await capital_command(update, context)
                 self.active_tasks.discard(chat_id)
                 return
+            elif any(k in clean_btn for k in ["Quant Gold Dashboard", "Gold Dashboard", "Quant Gold", "🥇 Gold", "🥇"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["Gold Signal", "🎯 Gold"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["SIGNAL"])
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["TV 10-Matrix", "TV Matrix", "TradingView", "📐"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["TV"])
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["BUY GOLD", "ទិញមាស"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                context.args = ["BUY", "0.05"]
+                await bridge.handle_telegram_gold_subcommand(update, context, ["BUY", "0.05"])
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["SELL GOLD", "លក់មាស"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                context.args = ["SELL", "0.05"]
+                await bridge.handle_telegram_gold_subcommand(update, context, ["SELL", "0.05"])
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["Open Positions", "Gold Positions"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["POSITIONS"])
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["Auto-Trade", "Auto Gold"]):
+                auto_cfg = db.get_capital_auto_config(chat_id)
+                cur_st = bool(auto_cfg.get("enabled", False)) if auto_cfg else False
+                new_st = not cur_st
+                db.set_capital_auto_config(chat_id=chat_id, enabled=new_st, budget=300.0, max_positions=5, is_demo=False)
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["VIP License", "License"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["LICENSE"])
+                self.active_tasks.discard(chat_id)
+                return
+            elif any(k in clean_btn for k in ["Status", "Live Status"]):
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["STATUS"])
+                self.active_tasks.discard(chat_id)
+                return
 
             # ⚡ Instant VIP Executive Direct Reply Greeting Handler (<15ms, $0.00 Cost, Zero Prompt Leakage)
             def _check_is_greeting(raw_msg: str) -> bool:
@@ -6415,12 +6477,158 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
                 return
-            elif data in ["btn_capital_gold", "btn_qgold_refresh"]:
+            elif data in ["btn_capital_gold", "btn_qgold_refresh", "btn_qgold_dashboard", "btn_qgold_scan"]:
                 try:
                     await update.callback_query.answer("🥇 Scanning 19 Timeframes for Gold...")
                 except Exception:
                     pass
                 import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                return
+            elif data in ["btn_qgold_tv_matrix", "btn_qgold_tv"]:
+                try:
+                    await update.callback_query.answer("📐 Computing TradingView 10-Group Matrix...")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["TV"])
+                return
+            elif data in ["btn_qgold_signal", "btn_qgold_levels"]:
+                try:
+                    await update.callback_query.answer("🎯 Generating Institutional Gold Signal...")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["SIGNAL"])
+                return
+            elif data == "btn_qgold_positions":
+                context.args = ["POSITIONS"]
+                await capital_command(update, context)
+                return
+            elif data == "btn_qgold_close_all":
+                context.args = ["CLOSEALL"]
+                await capital_command(update, context)
+                return
+            elif data.startswith("btn_qgold_close_deal:"):
+                deal_id_to_close = data.split(":", 1)[1].strip()
+                auto_cfg = db.get_capital_auto_config(chat_id)
+                is_d = bool(auto_cfg.get("is_demo", False))
+                c_res = await asyncio.to_thread(capital_engine.execute_tradfi_rescue, deal_id_to_close, chat_id, is_d, context.application, "CLOSE_FLAT")
+                try:
+                    await update.callback_query.answer("Position Closed!")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                return
+            elif data == "btn_qgold_status":
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["STATUS"])
+                return
+            elif data in ["btn_qgold_license", "btn_qgold_req_license"]:
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["LICENSE"])
+                return
+            elif data == "btn_qgold_help":
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["HELP"])
+                return
+            elif data in ["btn_qgold_health", "btn_qgold_security", "btn_qgold_citadel"]:
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["SECURITY"])
+                return
+            elif data in ["btn_qgold_switch_demo", "btn_qgold_switch_live"]:
+                to_demo = (data == "btn_qgold_switch_demo")
+                auto_cfg = db.get_capital_auto_config(chat_id)
+                budget = float(auto_cfg.get("budget", 300.0)) if auto_cfg else 300.0
+                max_pos = int(auto_cfg.get("max_positions", 5)) if auto_cfg else 5
+                cur_en = bool(auto_cfg.get("enabled", False)) if auto_cfg else False
+                db.set_capital_auto_config(chat_id=chat_id, enabled=cur_en, budget=budget, max_positions=max_pos, is_demo=to_demo)
+                try:
+                    await update.callback_query.answer(f"Switched to {'DEMO ($10,000)' if to_demo else 'LIVE MAINNET'}!")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                return
+            elif data == "btn_qgold_admin_capital":
+                context.args = []
+                await capital_command(update, context)
+                return
+            elif data == "btn_qgold_fleet_close_all":
+                is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+                if not is_admin:
+                    try:
+                        await update.callback_query.answer("⛔ Admin Only!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                context.args = ["CLOSEALL"]
+                await capital_command(update, context)
+                return
+            elif data in ["btn_qgold_fleet_pause", "btn_qgold_fleet_resume"]:
+                is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+                if not is_admin:
+                    try:
+                        await update.callback_query.answer("⛔ Admin Only!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                is_on = (data == "btn_qgold_fleet_resume")
+                db.set_capital_global_trading_switch(is_on, "ALL")
+                try:
+                    await update.callback_query.answer(f"Fleet Auto-Trade: {'Resumed 🟢' if is_on else 'Paused ⏸️'}!")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                return
+            elif data == "btn_qgold_recheck_auth":
+                try:
+                    await update.callback_query.answer("🔄 Re-checking Authorization...")
+                except Exception:
+                    pass
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
+                await send_reply_or_edit(update, context, text, reply_markup=kb)
+                return
+            elif data in ["btn_qgold_lockdown", "btn_qgold_unlock"]:
+                is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+                if not is_admin:
+                    try:
+                        await update.callback_query.answer("⛔ Admin Only!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                import quant_gold
+                citadel = quant_gold.get_quant_gold_capital_bridge().citadel
+                if data == "btn_qgold_lockdown":
+                    citadel.set_emergency_lockdown(True, reason="Admin Manual Lockdown")
+                    try:
+                        await update.callback_query.answer("🚨 EMERGENCY LOCKDOWN ACTIVATED!", show_alert=True)
+                    except Exception:
+                        pass
+                else:
+                    citadel.set_emergency_lockdown(False)
+                    try:
+                        await update.callback_query.answer("🟢 Emergency Lockdown Lifted!", show_alert=True)
+                    except Exception:
+                        pass
                 bridge = quant_gold.get_quant_gold_capital_bridge()
                 text, kb = await bridge.build_quant_gold_overview_ui(chat_id, user_lang)
                 await send_reply_or_edit(update, context, text, reply_markup=kb)
@@ -27265,19 +27473,25 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_scalp", "capitalscalp"]:
                 await capital_scalp_command(update, context)
                 return
-            elif cmd_text in ["capital_gold", "capitalgold", "gold"]:
+            elif cmd_text in ["capital_gold", "capitalgold", "gold", "qgold", "quant_gold", "quantgold"]:
                 import quant_gold
                 bridge = quant_gold.get_quant_gold_capital_bridge()
                 await bridge.handle_telegram_gold_subcommand(update, context, args if args else ["MENU"])
+                return
+            elif cmd_text in ["tv", "tv_matrix", "tradingview"]:
+                import quant_gold
+                bridge = quant_gold.get_quant_gold_capital_bridge()
+                await bridge.handle_telegram_gold_subcommand(update, context, ["TV"] + (args or []))
                 return
 
             # Subcommands routing: /capital GOLD / /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
             if args:
                 first_tok = str(args[0]).strip().replace('$', '')
-                if first_tok.upper() in ["GOLD", "XAUUSD", "QUANT_GOLD", "QUANTGOLD"]:
+                if first_tok.upper() in ["GOLD", "XAUUSD", "QUANT_GOLD", "QUANTGOLD", "TV", "TV_MATRIX"]:
                     import quant_gold
                     bridge = quant_gold.get_quant_gold_capital_bridge()
-                    handled = await bridge.handle_telegram_gold_subcommand(update, context, args[1:] if len(args) > 1 else ["MENU"])
+                    gold_sub_args = args if first_tok.upper() in ["TV", "TV_MATRIX"] else (args[1:] if len(args) > 1 else ["MENU"])
+                    handled = await bridge.handle_telegram_gold_subcommand(update, context, gold_sub_args)
                     if handled:
                         return
                 is_num_cap = False
@@ -29741,6 +29955,16 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("partner", capital_ib_command))
         self.app.add_handler(CommandHandler("capital_scalp", capital_scalp_command))
         self.app.add_handler(CommandHandler("capitalscalp", capital_scalp_command))
+        self.app.add_handler(CommandHandler("capital_gold", capital_command))
+        self.app.add_handler(CommandHandler("capitalgold", capital_command))
+        self.app.add_handler(CommandHandler("gold", capital_command))
+        self.app.add_handler(CommandHandler("qgold", capital_command))
+        self.app.add_handler(CommandHandler("quant_gold", capital_command))
+        self.app.add_handler(CommandHandler("quantgold", capital_command))
+        self.app.add_handler(CommandHandler("tv", capital_command))
+        self.app.add_handler(CommandHandler("tv_matrix", capital_command))
+        self.app.add_handler(CommandHandler("tvmatrix", capital_command))
+        self.app.add_handler(CommandHandler("tradingview", capital_command))
         self.app.add_handler(CommandHandler("forex", forex_command))
         self.app.add_handler(CommandHandler("forex_exchange", forex_command))
         self.app.add_handler(CommandHandler("forexexchange", forex_command))
