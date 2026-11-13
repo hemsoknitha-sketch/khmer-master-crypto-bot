@@ -104,22 +104,35 @@ def format_gold_signal_card(
     elif card_type == "PYRAMID":
         header = f"<b>Angkor Quant Gold ({tier_spec['name']})</b> ⚡"
         action_line = f"⚡ <b>Pyramid Scale-In :</b> <code>{dir_icon} {dir_str}</code> ({tier_spec['desc']})\n"
+    elif card_type == "STANDBY":
+        header = "<b>Angkor Quant Gold (Standby / Chop Filter)</b> ⚪"
+        action_line = (
+            f"⚪ <b>ស្ថានភាព AI ៖</b> <code>HOLD / CHOP STANDBY</code> (ការពារដើមទុន)\n"
+            f"🧭 <b>ទិសដៅរលកត្រៀម ៖</b> <code>{dir_icon} {dir_str}</code> (Projected Bias)\n"
+        )
     else:
-        header = f"<b>Angkor Quant Gold ({tier_spec['name']})</b>"
+        # If TP1 is an institutional macro target (> 150 pips), use Structural Swing Setup
+        if tp1_pips > 150:
+            header = "<b>Angkor Quant Gold (Structural Swing Setup)</b> 🎯"
+        else:
+            header = f"<b>Angkor Quant Gold ({tier_spec['name']})</b>"
         action_line = f"{dir_icon} <b>Single Direction :</b> <code>{dir_str}</code>\n"
+
+    exec_title = "Execution Levels" if card_type != "STANDBY" else "Prospective Levels (ត្រៀមពេលទម្លាយព្រំដែន)"
+    footer_note = "Auto-Trading for VIP Users active 24/7!" if card_type != "STANDBY" else "ប្រព័ន្ធ AI កំពុងឃ្លាំមើល ២៤/៧! មិនចូលផ្សារនៅកណ្តាល Chop ឡើយ (AQ84 Invariant 76)។"
 
     return (
         f"{header}\n"
         f"{divider}\n"
         f"{action_line}"
-        f"💵 <b>តម្លៃចូលទីផ្សារ (Entry) ៖</b> <code>${entry_price:.2f}</code>\n"
-        f"🎯 <b>Execution Levels ៖</b>\n"
+        f"💵 <b>តម្លៃទីផ្សារ (Price) ៖</b> <code>${entry_price:.2f}</code>\n"
+        f"🎯 <b>{exec_title} ៖</b>\n"
         f"   └ <b>Tight SL:</b> <code>${sl:.2f}</code> (-{sl_pips:.1f} p)\n"
         f"   └ <b>TP1 (+{tp1_pips} pips):</b> <code>${tp1:.2f}</code> (TP Lock)\n"
         f"   └ <b>TP2 (+{tp2_pips} pips):</b> <code>${tp2:.2f}</code> (Guaranteed)\n"
         f"   └ <b>TP3 (+{tp3_pips} pips):</b> <code>${tp3:.2f}</code> (Moonshot)\n"
         f"{divider}\n"
-        f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
+        f"💡 <i>{footer_note}</i>"
     )
 
 

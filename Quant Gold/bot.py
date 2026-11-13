@@ -1579,9 +1579,13 @@ class QuantGoldBot:
 
         # Determine Definitive Single Direction (Zero Dual-Order Ambiguity):
         # 1. If Execution Engine already triggered definitive BUY/SELL, lock it.
-        # 2. Otherwise, resolve Trend Bias using 19-TF Weighted Confluence, Kalman Velocity & AI Swarm.
+        # 2. If TradingView 10-Group Matrix detected decisive boundary bounce/breakout (>= 30.0), prioritize it!
+        # 3. Otherwise, resolve Trend Bias using 19-TF Weighted Confluence, Kalman Velocity & AI Swarm.
         mtf_data = sig.get("mtf_summary", {})
         math_data = sig.get("math_summary", {})
+        tv_mat = sig.get("tradingview_summary", {}) or {}
+        tv_dir = tv_mat.get("direction", "NEUTRAL")
+        tv_score = float(tv_mat.get("score", 0.0) or 0.0)
         score = float(mtf_data.get("weighted_score", 0.0) or 0.0)
         vel = float(math_data.get("kalman_velocity", 0.0) or 0.0)
         b_cnt = int(mtf_data.get("counts", {}).get("bullish", 0) or 0)
@@ -1589,6 +1593,8 @@ class QuantGoldBot:
 
         if action in ["BUY", "SELL"]:
             resolved_dir = action
+        elif tv_dir in ["BUY", "SELL"] and abs(tv_score) >= 30.0:
+            resolved_dir = tv_dir
         elif sig.get("dominant_bias"):
             resolved_dir = sig["dominant_bias"]
         elif score < -5.0 or s_cnt > b_cnt:
@@ -1693,13 +1699,15 @@ class QuantGoldBot:
                 return await self.safe_reply(update, f"✅ <b>[ADMIN BROADCAST]</b> បានផ្ញើ Signal ទៅកាន់ VIP Users ចំនួន <code>{sent}</code> នាក់ដោយជោគជ័យ!")
 
         # Clean Single-Directional Signal Card (100% Definitive, Zero Dual Confusion)
+        is_standby = (action == "HOLD")
         msg = format_gold_signal_card(
             direction=resolved_dir,
             sl=sl_val,
             tp1=tp1_val,
             tp2=tp2_val,
             tp3=tp3_val,
-            entry_price=curr_p
+            entry_price=curr_p,
+            card_type="STANDBY" if is_standby else "SIGNAL"
         )
         await self.safe_reply(update, msg, reply_markup=get_gold_signal_reply_markup())
 
