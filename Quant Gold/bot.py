@@ -1737,6 +1737,10 @@ class QuantGoldBot:
         dir_icon = "🟢" if direction == "BUY" else ("🔴" if direction == "SELL" else "⚪")
         reasons_str = "\n".join([f"  • <code>{r}</code>" for r in reasons[:4]]) if reasons else "  • <code>NEUTRAL_CONSOLIDATION</code>"
 
+        fib_suite = tv.get("fibonacci_suite", {})
+        fib_ext = fib_suite.get("fib_extension", {})
+        fib_tz = fib_suite.get("fib_time_zone", {})
+
         card = (
             f"📐 <b>[TRADINGVIEW 10-GROUP QUANT CONFLUENCE MATRIX]</b> 🥇\n"
             f"══════════════════════════════════════\n"
@@ -1745,14 +1749,16 @@ class QuantGoldBot:
             f"⚡ <b>ពិន្ទុ Confluence Score ៖</b> <code>{score:+.1f} / 100.0</code>\n"
             f"📈 <b>ប្រូបាប៊ីលីតេឈ្នះ (Estimated Win Rate) ៖</b> <code>{win_rate:.1f}%</code>\n"
             f"──────────────────────────────────────\n"
-            f"📊 <b>លទ្ធផលគណនាឧបករណ៍ទាំង ១០ ក្រុម ៖</b>\n"
+            f"📊 <b>លទ្ធផលគណនាឧបករណ៍ទាំង ១០ ក្រុម (11 Fib Tools Suite) ៖</b>\n"
             f"1️⃣ <b>OLS Regression Band (2σ) ៖</b>\n"
             f"   └ Upper: <code>${float(ols.get('upper', curr_p+5.0)):.2f}</code> | Lower: <code>${float(ols.get('lower', curr_p-5.0)):.2f}</code> (z={float(ols.get('z_score', 0.0)):+.2f})\n"
             f"2️⃣ <b>Volume Profile & AVWAP ៖</b>\n"
             f"   └ POC: <code>${float(vp.get('poc', curr_p)):.2f}</code> | VAH: <code>${float(vp.get('vah', curr_p+3.0)):.2f}</code> | VAL: <code>${float(vp.get('val', curr_p-3.0)):.2f}</code>\n"
             f"   └ Anchored VWAP: <code>${float(vp.get('avwap', curr_p)):.2f}</code>\n"
-            f"3️⃣ <b>Fibonacci Golden Pocket ៖</b>\n"
+            f"3️⃣ <b>Fibonacci 11-Tool Suite & Golden Pocket ៖</b>\n"
             f"   └ 0.618 Pocket: <code>${float(fib.get('fib_618', curr_p)):.2f}</code> | 0.705: <code>${float(fib.get('fib_705', curr_p)):.2f}</code>\n"
+            f"   └ Fib Extension 1.272 (TP1): <code>${float(fib_ext.get('ext_1272', curr_p+10.0)):.2f}</code> | 1.618 (TP2): <code>${float(fib_ext.get('ext_1618', curr_p+15.0)):.2f}</code>\n"
+            f"   └ Fib Time Zone Node: <code>Bar {fib_tz.get('nearest_fib_number', 13)}</code> ({'INFLECTION' if fib_tz.get('is_time_inflection') else 'NORMAL'})\n"
             f"4️⃣ <b>Andrews' Pitchfork (80% Reversion) ៖</b>\n"
             f"   └ Median Line: <code>${float(pitchfork.get('median', curr_p)):.2f}</code>\n"
             f"5️⃣ <b>Gann 1x1 Equilibrium (45°) ៖</b> <code>${gann:.2f}</code>\n"

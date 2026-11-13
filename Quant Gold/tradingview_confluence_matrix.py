@@ -259,6 +259,460 @@ def compute_fibonacci_matrix(
 
 
 # ==============================================================================
+# 4.1. TREND-BASED FIB EXTENSION (3-POINT EXPANSION)
+# ==============================================================================
+def compute_trend_based_fib_extension(
+    p1: float, p2: float, p3: float, direction: str = "BULLISH"
+) -> Dict[str, float]:
+    """
+    Trend-Based Fib Extension from 3 Pivots:
+      A (origin) -> B (impulse peak) -> C (retrace base)
+      L_e = P3 + e * (P2 - P1) [Bullish]
+      L_e = P3 - e * (P1 - P2) [Bearish]
+    """
+    impulse = abs(p2 - p1)
+    sign = 1.0 if direction.upper() == "BULLISH" else -1.0
+    return {
+        "ext_0": float(p3),
+        "ext_382": float(p3 + sign * 0.382 * impulse),
+        "ext_500": float(p3 + sign * 0.500 * impulse),
+        "ext_618": float(p3 + sign * 0.618 * impulse),
+        "ext_1000": float(p3 + sign * 1.000 * impulse),
+        "ext_1272": float(p3 + sign * 1.272 * impulse),  # TP1 Milestone
+        "ext_1618": float(p3 + sign * 1.618 * impulse),  # TP2 Golden Ratio
+        "ext_2000": float(p3 + sign * 2.000 * impulse),
+        "ext_2618": float(p3 + sign * 2.618 * impulse),  # Moonshot Runner
+        "ext_3618": float(p3 + sign * 3.618 * impulse),
+        "ext_4236": float(p3 + sign * 4.236 * impulse)
+    }
+
+
+# ==============================================================================
+# 4.2. FIBONACCI CHANNEL
+# ==============================================================================
+def compute_fibonacci_channel(
+    t1: float, p1: float,
+    t2: float, p2: float,
+    t3: float, p3: float,
+    t_curr: float
+) -> Dict[str, Any]:
+    """
+    Fibonacci Channel:
+      Base trendline: P(t) = m*(t - t1) + p1 through (t1, p1) & (t2, p2)
+      Channel offset from P3: W = P3 - (m*(t3 - t1) + p1)
+      Parallel levels: P_k(t) = P(t) + k * W
+      k in [0.236, 0.382, 0.500, 0.618, 0.786, 1.000, 1.618, 2.618]
+    """
+    dt = max(1e-6, t2 - t1)
+    m = (p2 - p1) / dt
+    base_curr = m * (t_curr - t1) + p1
+    base_t3 = m * (t3 - t1) + p1
+    w = p3 - base_t3  # Signed channel width
+
+    return {
+        "base_line": float(base_curr),
+        "channel_width": float(abs(w)),
+        "fib_236": float(base_curr + 0.236 * w),
+        "fib_382": float(base_curr + 0.382 * w),
+        "fib_500": float(base_curr + 0.500 * w),
+        "fib_618": float(base_curr + 0.618 * w),
+        "fib_786": float(base_curr + 0.786 * w),
+        "fib_1000": float(base_curr + 1.000 * w),
+        "fib_1618": float(base_curr + 1.618 * w),
+        "fib_2618": float(base_curr + 2.618 * w)
+    }
+
+
+# ==============================================================================
+# 4.3. FIBONACCI TIME ZONES
+# ==============================================================================
+def compute_fibonacci_time_zones(
+    t_origin: float, t_curr: float, bar_interval: float = 1.0
+) -> Dict[str, Any]:
+    """
+    Fibonacci Time Zones:
+      Vertical lines at t_n = t_origin + F_n * bar_interval
+      F_n in [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
+    """
+    fib_seq = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
+    time_nodes = [float(t_origin + f * bar_interval) for f in fib_seq]
+
+    is_inflection = False
+    nearest_dist = 9999.0
+    active_fib = 0
+    for f, t_n in zip(fib_seq, time_nodes):
+        dist = abs(t_curr - t_n)
+        if dist < nearest_dist:
+            nearest_dist = dist
+            active_fib = f
+        if dist <= 0.65:
+            is_inflection = True
+
+    return {
+        "time_nodes": time_nodes,
+        "is_time_inflection": is_inflection,
+        "nearest_fib_number": active_fib,
+        "bars_to_nearest": float(nearest_dist)
+    }
+
+
+# ==============================================================================
+# 4.4. FIBONACCI SPEED RESISTANCE FAN
+# ==============================================================================
+def compute_fibonacci_speed_fan(
+    t0: float, p0: float,
+    t1: float, p1: float,
+    t_curr: float
+) -> Dict[str, float]:
+    """
+    Fibonacci Speed Resistance Fan:
+      Origin (t0, p0) to Extreme (t1, p1)
+      Slopes m_r = r * (p1 - p0) / (t1 - t0)
+      r in [0.236, 0.382, 0.500, 0.618, 0.786]
+    """
+    dt = max(1e-6, t1 - t0)
+    dp = p1 - p0
+    dt_curr = max(0.0, t_curr - t0)
+
+    return {
+        "fan_236": float(p0 + (0.236 * dp / dt) * dt_curr),
+        "fan_382": float(p0 + (0.382 * dp / dt) * dt_curr),
+        "fan_500": float(p0 + (0.500 * dp / dt) * dt_curr),
+        "fan_618": float(p0 + (0.618 * dp / dt) * dt_curr),  # Golden Speed Ray
+        "fan_786": float(p0 + (0.786 * dp / dt) * dt_curr),
+        "fan_1000": float(p0 + (1.000 * dp / dt) * dt_curr)
+    }
+
+
+# ==============================================================================
+# 4.5. TREND-BASED FIB TIME
+# ==============================================================================
+def compute_trend_based_fib_time(
+    t1: float, t2: float, t3: float, t_curr: float
+) -> Dict[str, Any]:
+    """
+    Trend-Based Fib Time:
+      Cycle base: Delta t = t2 - t1
+      Projected time nodes: t_e = t3 + e * Delta t
+      e in [0.382, 0.618, 1.000, 1.272, 1.618, 2.000, 2.618]
+    """
+    dt_base = max(1e-6, abs(t2 - t1))
+    ratios = [0.382, 0.618, 1.000, 1.272, 1.618, 2.000, 2.618]
+    time_nodes = {f"time_{int(r*1000)}": float(t3 + r * dt_base) for r in ratios}
+
+    is_cyclical_turn = False
+    for r, node_t in time_nodes.items():
+        if abs(t_curr - node_t) <= 0.75:
+            is_cyclical_turn = True
+            break
+
+    return {
+        "nodes": time_nodes,
+        "is_cyclical_turn": is_cyclical_turn,
+        "dt_base_bars": float(dt_base)
+    }
+
+
+# ==============================================================================
+# 4.6. FIBONACCI CIRCLES
+# ==============================================================================
+def compute_fibonacci_circles(
+    t0: float, p0: float,
+    t1: float, p1: float,
+    t_curr: float, p_curr: float,
+    scale_p_per_t: float = 1.0
+) -> Dict[str, Any]:
+    """
+    Fibonacci Circles:
+      Normalized Euclidean space:
+      R0 = sqrt((t1 - t0)^2 + ((p1 - p0)/S_p)^2)
+      Circles: R_k = k * R0 for k in [0.382, 0.618, 1.000, 1.618, 2.618]
+      D_curr = sqrt((t_curr - t0)^2 + ((p_curr - p0)/S_p)^2)
+    """
+    sp = max(1e-6, scale_p_per_t)
+    r0 = math.sqrt((t1 - t0)**2 + ((p1 - p0) / sp)**2)
+    d_curr = math.sqrt((t_curr - t0)**2 + ((p_curr - p0) / sp)**2)
+
+    ratios = [0.382, 0.618, 1.000, 1.618, 2.618]
+    radii = {f"circle_{int(k*1000)}": float(k * r0) for k in ratios}
+
+    at_circle_boundary = False
+    active_circle = ""
+    for name, r_k in radii.items():
+        if abs(d_curr - r_k) <= 0.08 * max(1.0, r_k):
+            at_circle_boundary = True
+            active_circle = name
+            break
+
+    return {
+        "base_radius": float(r0),
+        "current_distance": float(d_curr),
+        "radii": radii,
+        "at_circle_boundary": at_circle_boundary,
+        "active_circle": active_circle
+    }
+
+
+# ==============================================================================
+# 4.7. FIBONACCI SPIRAL (LOGARITHMIC GOLDEN SPIRAL)
+# ==============================================================================
+def compute_fibonacci_spiral(
+    t_c: float, p_c: float,
+    t_curr: float, p_curr: float,
+    scale_p: float = 1.0
+) -> Dict[str, Any]:
+    """
+    Logarithmic Golden Spiral:
+      r(theta) = a * exp(b * theta)
+      b = ln(phi) / (pi / 2) ~= 0.3063489 (where phi = 1.6180339887)
+    """
+    sp = max(1e-6, scale_p)
+    dx = t_curr - t_c
+    dy = (p_curr - p_c) / sp
+    r_curr = math.sqrt(dx**2 + dy**2)
+    theta = math.atan2(dy, dx)
+    if theta < 0:
+        theta += 2.0 * math.pi
+
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    b = math.log(phi) / (math.pi / 2.0)
+    a = 1.0
+    r_spiral = a * math.exp(b * theta)
+    ratio = r_curr / max(1e-6, r_spiral)
+
+    return {
+        "r_curr": float(r_curr),
+        "theta_rad": float(theta),
+        "theta_deg": float(math.degrees(theta)),
+        "spiral_ratio": float(ratio),
+        "is_golden_resonance": bool(0.85 <= (ratio % 1.0) <= 1.15 or (ratio % 1.0) <= 0.15)
+    }
+
+
+# ==============================================================================
+# 4.8. FIBONACCI SPEED RESISTANCE ARCS
+# ==============================================================================
+def compute_fibonacci_speed_resistance_arcs(
+    t0: float, p0: float,
+    t1: float, p1: float,
+    t_curr: float, p_curr: float,
+    scale_p: float = 1.0
+) -> Dict[str, Any]:
+    """
+    Fibonacci Speed Resistance Arcs:
+      Centered at (t0, p0) with radii = r * Distance(P0, P1)
+      r in [0.382, 0.500, 0.618, 0.786]
+    """
+    sp = max(1e-6, scale_p)
+    dist_base = math.sqrt((t1 - t0)**2 + ((p1 - p0) / sp)**2)
+    dist_curr = math.sqrt((t_curr - t0)**2 + ((p_curr - p0) / sp)**2)
+
+    ratios = [0.382, 0.500, 0.618, 0.786]
+    arc_radii = {f"arc_{int(r*1000)}": float(r * dist_base) for r in ratios}
+
+    on_arc = False
+    matched_arc = ""
+    for name, r_arc in arc_radii.items():
+        if abs(dist_curr - r_arc) <= 0.05 * dist_base:
+            on_arc = True
+            matched_arc = name
+            break
+
+    return {
+        "base_span": float(dist_base),
+        "current_arc_dist": float(dist_curr),
+        "arcs": arc_radii,
+        "on_arc": on_arc,
+        "active_arc": matched_arc
+    }
+
+
+# ==============================================================================
+# 4.9. FIBONACCI WEDGE
+# ==============================================================================
+def compute_fibonacci_wedge(
+    t1: float, p1: float,
+    t2: float, p2_high: float, p2_low: float,
+    t_curr: float
+) -> Dict[str, Any]:
+    """
+    Fibonacci Wedge:
+      Converging/Diverging boundaries radiating from (t1, p1)
+      Internal Fibonacci divider rays at 0.382, 0.500, 0.618
+    """
+    dt = max(1e-6, t2 - t1)
+    m_upper = (p2_high - p1) / dt
+    m_lower = (p2_low - p1) / dt
+
+    dt_curr = max(0.0, t_curr - t1)
+    p_upper_curr = p1 + m_upper * dt_curr
+    p_lower_curr = p1 + m_lower * dt_curr
+    wedge_width = abs(p_upper_curr - p_lower_curr)
+
+    return {
+        "wedge_upper": float(p_upper_curr),
+        "wedge_lower": float(p_lower_curr),
+        "wedge_618": float(min(p_upper_curr, p_lower_curr) + 0.618 * wedge_width),
+        "wedge_500": float(min(p_upper_curr, p_lower_curr) + 0.500 * wedge_width),
+        "wedge_382": float(min(p_upper_curr, p_lower_curr) + 0.382 * wedge_width),
+        "wedge_width": float(wedge_width)
+    }
+
+
+# ==============================================================================
+# 4.10. PITCHFAN (ANDREWS' PITCHFORK + FIBONACCI SPEED FAN SYNTHESIS)
+# ==============================================================================
+def compute_pitchfan(
+    t1: float, p1: float,
+    t2: float, p2: float,
+    t3: float, p3: float,
+    t_curr: float
+) -> Dict[str, Any]:
+    """
+    Pitchfan:
+      Synthesizes Andrews' Median Line with Fibonacci angular expansion rays:
+      Median: slope m_med = (M_p - p1) / (M_t - t1)
+      Prong offset: w = |p2 - p3| / 2
+      Pitchfan rays: m_k = m_med +/- k * (w / dt_m)
+      k in [0.382, 0.618, 1.000, 1.618]
+    """
+    m_t = (t2 + t3) / 2.0
+    m_p = (p2 + p3) / 2.0
+    dt_m = max(1e-6, m_t - t1)
+    m_med = (m_p - p1) / dt_m
+    w = abs(p2 - p3) / 2.0
+
+    dt_curr = t_curr - t1
+    p_med_curr = p1 + m_med * dt_curr
+    prong_spread = (w / dt_m) * dt_curr
+
+    return {
+        "median_line": float(p_med_curr),
+        "pitchfan_upper_1618": float(p_med_curr + 1.618 * prong_spread),
+        "pitchfan_upper_1000": float(p_med_curr + 1.000 * prong_spread),
+        "pitchfan_upper_618": float(p_med_curr + 0.618 * prong_spread),
+        "pitchfan_upper_382": float(p_med_curr + 0.382 * prong_spread),
+        "pitchfan_lower_382": float(p_med_curr - 0.382 * prong_spread),
+        "pitchfan_lower_618": float(p_med_curr - 0.618 * prong_spread),
+        "pitchfan_lower_1000": float(p_med_curr - 1.000 * prong_spread),
+        "pitchfan_lower_1618": float(p_med_curr - 1.618 * prong_spread)
+    }
+
+
+# ==============================================================================
+# 4.11. MASTER COMPLETE 11-TOOL FIBONACCI SUITE (TV 11-TOOL MATRIX)
+# ==============================================================================
+def compute_complete_11_fibonacci_suite(
+    highs: np.ndarray,
+    lows: np.ndarray,
+    closes: np.ndarray,
+    current_price: float
+) -> Dict[str, Any]:
+    """
+    Computes all 11 TradingView Fibonacci tools in institutional quantitative space:
+      1. Fib Retracement (Golden Pocket 0.618 - 0.705)
+      2. Trend-Based Fib Extension (1.272 TP1, 1.618 TP2, 2.618 Runner)
+      3. Fib Channel (Parallel offsets at 0.382, 0.618, 1.000, 1.618)
+      4. Fib Time Zone (Time inflection at Fibonacci sequence bars)
+      5. Fib Speed Resistance Fan (Angular velocity rays 0.382, 0.500, 0.618)
+      6. Trend-Based Fib Time (Projected cyclical turning nodes)
+      7. Fib Circles (Concentric spatio-temporal boundary zones)
+      8. Fib Spiral (Logarithmic Golden Spiral resonance)
+      9. Fib Speed Resistance Arcs (Curved elastic dynamic support/resistance)
+      10. Fib Wedge (Converging/diverging structural exhaustion)
+      11. Pitchfan (Andrews' Pitchfork + Fibonacci speed rays)
+    """
+    n = len(closes)
+    if n < 15:
+        p_curr = float(current_price)
+        return {
+            "fib_retrace": compute_fibonacci_matrix(p_curr - 5.0, p_curr + 5.0),
+            "fib_extension": compute_trend_based_fib_extension(p_curr - 10.0, p_curr, p_curr - 4.0),
+            "fib_channel": {"base_line": p_curr, "channel_width": 5.0},
+            "fib_time_zone": {"is_time_inflection": False, "nearest_fib_number": 13},
+            "fib_speed_fan": {"fan_618": p_curr},
+            "trend_based_fib_time": {"is_cyclical_turn": False},
+            "fib_circles": {"at_circle_boundary": False},
+            "fib_spiral": {"is_golden_resonance": False},
+            "fib_arcs": {"on_arc": False},
+            "fib_wedge": {"wedge_width": 5.0},
+            "pitchfan": {"median_line": p_curr}
+        }
+
+    lookback = min(40, n)
+    p_min_idx = int(np.argmin(lows[-lookback:]))
+    p_max_idx = int(np.argmax(highs[-lookback:]))
+    t_min = float(n - lookback + p_min_idx)
+    t_max = float(n - lookback + p_max_idx)
+    p_min = float(lows[-lookback + p_min_idx])
+    p_max = float(highs[-lookback + p_max_idx])
+
+    is_bull = t_max > t_min
+    p_start, p_end = (p_min, p_max) if is_bull else (p_max, p_min)
+    t_start, t_end = (t_min, t_max) if is_bull else (t_max, t_min)
+
+    lookback_mid = min(20, n)
+    p_mid_low = float(np.min(lows[-lookback_mid:]))
+    p_mid_high = float(np.max(highs[-lookback_mid:]))
+    p3 = p_mid_low if is_bull else p_mid_high
+    t3 = float(n - 5)
+
+    # 1. Fib Retracement
+    fib_retrace = compute_fibonacci_matrix(p_start, p_end, direction="BULLISH" if is_bull else "BEARISH")
+
+    # 2. Trend-Based Fib Extension
+    fib_ext = compute_trend_based_fib_extension(p_start, p_end, p3, direction="BULLISH" if is_bull else "BEARISH")
+
+    # 3. Fib Channel
+    fib_chan = compute_fibonacci_channel(t_start, p_start, t_end, p_end, t3, p3, float(n))
+
+    # 4. Fib Time Zone
+    fib_tz = compute_fibonacci_time_zones(t_start, float(n))
+
+    # 5. Fib Speed Resistance Fan
+    fib_fan = compute_fibonacci_speed_fan(t_start, p_start, t_end, p_end, float(n))
+
+    # 6. Trend-Based Fib Time
+    fib_tb_time = compute_trend_based_fib_time(t_start, t_end, t3, float(n))
+
+    # 7. Fib Circles
+    scale_p = max(0.5, float(np.std(closes[-lookback:])))
+    fib_circ = compute_fibonacci_circles(t_start, p_start, t_end, p_end, float(n), current_price, scale_p_per_t=scale_p)
+
+    # 8. Fib Spiral
+    fib_spir = compute_fibonacci_spiral(t_start, p_start, float(n), current_price, scale_p=scale_p)
+
+    # 9. Fib Speed Resistance Arcs
+    fib_arcs = compute_fibonacci_speed_resistance_arcs(t_start, p_start, t_end, p_end, float(n), current_price, scale_p=scale_p)
+
+    # 10. Fib Wedge
+    fib_wedge = compute_fibonacci_wedge(t_start, p_start, t_end, p_max, p_min, float(n))
+
+    # 11. Pitchfan
+    t1_pf = max(0.0, float(n - 30))
+    p1_pf = float(lows[int(t1_pf)]) if is_bull else float(highs[int(t1_pf)])
+    t2_pf = max(t1_pf + 1.0, float(n - 15))
+    p2_pf = float(highs[int(t2_pf)]) if is_bull else float(lows[int(t2_pf)])
+    t3_pf = max(t2_pf + 1.0, float(n - 8))
+    p3_pf = float(lows[int(t3_pf)]) if is_bull else float(highs[int(t3_pf)])
+    pitchfan = compute_pitchfan(t1_pf, p1_pf, t2_pf, p2_pf, t3_pf, p3_pf, float(n))
+
+    return {
+        "fib_retrace": fib_retrace,
+        "fib_extension": fib_ext,
+        "fib_channel": fib_chan,
+        "fib_time_zone": fib_tz,
+        "fib_speed_fan": fib_fan,
+        "trend_based_fib_time": fib_tb_time,
+        "fib_circles": fib_circ,
+        "fib_spiral": fib_spir,
+        "fib_arcs": fib_arcs,
+        "fib_wedge": fib_wedge,
+        "pitchfan": pitchfan
+    }
+
+
+# ==============================================================================
 # 5. PITCHFORKS: ANDREWS' 80% MEDIAN LINE REVERSION & PRONGS
 # ==============================================================================
 def compute_andrews_pitchfork(
@@ -540,6 +994,9 @@ class TradingViewConfluenceMatrix:
         # 7. Harmonic Patterns (XABCD / PRZ)
         harmonics = detect_harmonic_xabcd_patterns(highs, lows, closes)
 
+        # 8. Complete 11-Tool Fibonacci Suite
+        fib_11 = compute_complete_11_fibonacci_suite(highs, lows, closes, current_price)
+
         # ======================================================================
         # CONFLUENCE SCORING (-100.0 to +100.0)
         # ======================================================================
@@ -603,6 +1060,15 @@ class TradingViewConfluenceMatrix:
                 score -= 20.0
                 confluence_reasons.append(f"{harmonics['pattern_name']}_PRZ_CONFIRMED")
 
+        # H. Fibonacci 11-Suite Multi-Tool Confluence Boost
+        if fib_11["fib_time_zone"]["is_time_inflection"]:
+            score += 10.0 if score >= 0 else -10.0
+            confluence_reasons.append(f"FIB_TIME_INFLECTION_BAR_{fib_11['fib_time_zone']['nearest_fib_number']}")
+        if fib_11["fib_circles"]["at_circle_boundary"]:
+            confluence_reasons.append("AT_FIB_CIRCLE_SPATIO_TEMPORAL_BOUNDARY")
+        if fib_11["fib_spiral"]["is_golden_resonance"]:
+            confluence_reasons.append("GOLDEN_SPIRAL_LOGARITHMIC_RESONANCE")
+
         score = float(np.clip(score, -100.0, 100.0))
 
         # Overall Direction & Win Probability Estimation
@@ -646,7 +1112,8 @@ class TradingViewConfluenceMatrix:
             },
             "gann_1x1": round(gann["gann_1x1"], 2),
             "cycles": cycles,
-            "harmonics": harmonics
+            "harmonics": harmonics,
+            "fibonacci_suite": fib_11
         }
 
         self._cached_result = result
@@ -665,7 +1132,8 @@ class TradingViewConfluenceMatrix:
             "pitchfork": {"median": curr_p, "upper": curr_p + 5.0, "lower": curr_p - 5.0},
             "gann_1x1": curr_p,
             "cycles": {"dominant_cycle_bars": 24, "cycle_phase_pct": 50.0, "cycle_state": "NEUTRAL"},
-            "harmonics": {"has_pattern": False, "pattern_name": "NONE", "prz_price": curr_p, "bias": "NEUTRAL"}
+            "harmonics": {"has_pattern": False, "pattern_name": "NONE", "prz_price": curr_p, "bias": "NEUTRAL"},
+            "fibonacci_suite": {}
         }
 
 
@@ -677,3 +1145,4 @@ def get_tradingview_confluence_matrix() -> TradingViewConfluenceMatrix:
     if _GLOBAL_TV_MATRIX is None:
         _GLOBAL_TV_MATRIX = TradingViewConfluenceMatrix()
     return _GLOBAL_TV_MATRIX
+
