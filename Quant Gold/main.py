@@ -219,9 +219,9 @@ class QuantGoldSystem:
             except Exception as e_rec:
                 logger.warning(f"Telegram recovery note: {e_rec}")
 
-            # Pacing: evaluate every 6 seconds
+            # Pacing: Sub-second reactive event tick loop (1.0s vs 6.0s)
             elapsed = time.time() - t0
-            sleep_duration = max(1.0, 6.0 - elapsed)
+            sleep_duration = max(0.2, 1.0 - elapsed)
             try:
                 await asyncio.sleep(sleep_duration)
             except asyncio.CancelledError:

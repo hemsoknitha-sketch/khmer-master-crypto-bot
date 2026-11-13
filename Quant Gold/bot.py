@@ -224,6 +224,8 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("signal", self.handle_signal))
         self.app.add_handler(CommandHandler("tv", self.handle_tv_matrix))
         self.app.add_handler(CommandHandler("tradingview", self.handle_tv_matrix))
+        self.app.add_handler(CommandHandler("fib", self.handle_fib))
+        self.app.add_handler(CommandHandler("fibonacci", self.handle_fib))
         self.app.add_handler(CommandHandler("admin_capital", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admin_gold", self.handle_admin_capital))
         self.app.add_handler(CommandHandler("admincapital", self.handle_admin_capital))
@@ -1783,7 +1785,132 @@ class QuantGoldBot:
                 InlineKeyboardButton("🏛️ Capital Deck (/capital)", callback_data="btn_capital_menu")
             ],
             [
+                InlineKeyboardButton("📐 11-Tool Fib Suite (/fib)", callback_data="btn_qgold_fib"),
                 InlineKeyboardButton("🔄 Refresh Matrix", callback_data="btn_qgold_tv_matrix")
+            ]
+        ])
+        await self.safe_reply(update, card, reply_markup=kb)
+
+    async def handle_fib(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Displays the complete 11-Tool TradingView Fibonacci Suite:
+        1. Fib Retracement (Golden Pocket & OTE)
+        2. Trend-Based Fib Extension (TP1, TP2, Runner)
+        3. Fib Channel (Diagonal Corridors)
+        4. Fib Time Zone (Time Inflection Nodes)
+        5. Fib Speed Resistance Fan (Angular Velocity Rays)
+        6. Trend-Based Fib Time (Cyclical Turning Points)
+        7. Fib Circles (Spatio-Temporal Concentric Horizons)
+        8. Fib Spiral (Logarithmic Golden Spiral)
+        9. Fib Speed Resistance Arcs (Dynamic Elastic Arcs)
+        10. Fib Wedge (Structural Compression Apex)
+        11. Pitchfan (Andrews' Median + Fib Fan Synthesis)
+        """
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+
+        if not self.citadel.is_super_admin(chat_id):
+            allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+            if not allowed:
+                return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        sig = await self.exec_engine.evaluate_gold_master_signal()
+        curr_p = float(sig.get("current_price", 4000.0) or 4000.0)
+        tv = sig.get("tradingview_summary", {})
+        if not tv or not tv.get("fibonacci_suite"):
+            try:
+                from tradingview_confluence_matrix import get_tradingview_confluence_matrix
+                m15_df = getattr(self.exec_engine.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
+                tv = get_tradingview_confluence_matrix().compute_confluence(m15_df, curr_p)
+            except Exception:
+                tv = {}
+
+        direction = tv.get("direction", "NEUTRAL")
+        dir_icon = "🟢" if direction == "BUY" else ("🔴" if direction == "SELL" else "⚪")
+        fib_suite = tv.get("fibonacci_suite", {})
+        fib_retrace = fib_suite.get("fib_retrace", {})
+        fib_ext = fib_suite.get("fib_extension", {})
+        fib_chan = fib_suite.get("fib_channel", {})
+        fib_tz = fib_suite.get("fib_time_zone", {})
+        fib_fan = fib_suite.get("fib_speed_fan", {})
+        fib_tb_time = fib_suite.get("trend_based_fib_time", {})
+        fib_circ = fib_suite.get("fib_circles", {})
+        fib_spir = fib_suite.get("fib_spiral", {})
+        fib_arcs = fib_suite.get("fib_arcs", {})
+        fib_wedge = fib_suite.get("fib_wedge", {})
+        pitchfan = fib_suite.get("pitchfan", {})
+
+        # Golden Pocket & Limits
+        gp_high = float(fib_retrace.get("golden_pocket_high", curr_p + 2.0))
+        gp_low = float(fib_retrace.get("golden_pocket_low", curr_p - 2.0))
+        fib_618 = float(fib_retrace.get("fib_618", curr_p))
+        fib_705 = float(fib_retrace.get("fib_705", curr_p))
+
+        # Extensions
+        ext_1272 = float(fib_ext.get("ext_1272", curr_p + 8.0))
+        ext_1618 = float(fib_ext.get("ext_1618", curr_p + 15.0))
+        ext_2618 = float(fib_ext.get("ext_2618", curr_p + 28.0))
+
+        # Time
+        tz_node = fib_tz.get("nearest_fib_number", 13)
+        tz_state = "🔥 INFLECTION ACTIVE" if fib_tz.get("is_time_inflection") else "⏳ Normal Flow"
+        spiral_state = "🌀 RESONANCE ACTIVE" if fib_spir.get("is_golden_resonance") else "⚪ Orbiting"
+        circle_state = f"🎯 {fib_circ.get('active_circle', 'BOUNDARY')}" if fib_circ.get("at_circle_boundary") else "⚪ In-Zone"
+        arc_state = f"🛡️ {fib_arcs.get('active_arc', 'ARC')}" if fib_arcs.get("on_arc") else "⚪ Between Arcs"
+
+        card = (
+            f"📐 <b>[TRADINGVIEW 11-TOOL FIBONACCI QUANT SUITE]</b> 🥇\n"
+            f"══════════════════════════════════════\n"
+            f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
+            f"🎯 <b>ទិសដៅ Macro Trend ៖</b> <code>{dir_icon} {direction}</code>\n"
+            f"──────────────────────────────────────\n"
+            f"1️⃣ <b>Fib Retracement (Golden Pocket & OTE) ៖</b>\n"
+            f"   └ 0.382: <code>${float(fib_retrace.get('fib_382', curr_p)):.2f}</code> | 0.500: <code>${float(fib_retrace.get('fib_500', curr_p)):.2f}</code>\n"
+            f"   └ <b>0.618 Pocket:</b> <code>${fib_618:.2f}</code>\n"
+            f"   └ <b>0.705 OTE:</b> <code>${fib_705:.2f}</code> | 0.786: <code>${float(fib_retrace.get('fib_786', curr_p)):.2f}</code>\n"
+            f"   └ <i>Golden Pocket Range:</i> <code>${gp_low:.2f} - ${gp_high:.2f}</code>\n"
+            f"2️⃣ <b>Trend-Based Fib Extension (Target Ratios) ៖</b>\n"
+            f"   └ <b>TP1 (1.272):</b> <code>${ext_1272:.2f}</code> <i>(Free Roll Armor)</i>\n"
+            f"   └ <b>TP2 (1.618 Golden):</b> <code>${ext_1618:.2f}</code> <i>(+2.0R Floor)</i>\n"
+            f"   └ <b>Runner (2.618):</b> <code>${ext_2618:.2f}</code> <i>(Moonshot +5R)</i>\n"
+            f"3️⃣ <b>Fib Channel (Parallel Corridors) ៖</b>\n"
+            f"   └ Base: <code>${float(fib_chan.get('base_line', curr_p)):.2f}</code> | Width: <code>${float(fib_chan.get('channel_width', 5.0)):.2f}</code>\n"
+            f"   └ Fib 0.618 Rail: <code>${float(fib_chan.get('fib_618', curr_p)):.2f}</code>\n"
+            f"4️⃣ <b>Fib Time Zone (Bar Sequence Inflection) ៖</b>\n"
+            f"   └ Nearest Node: <code>Bar {tz_node}</code> | ស្ថានភាព: <b>{tz_state}</b>\n"
+            f"5️⃣ <b>Fib Speed Resistance Fan (Velocity Rays) ៖</b>\n"
+            f"   └ 0.500 Ray: <code>${float(fib_fan.get('fan_500', curr_p)):.2f}</code> | <b>0.618 Ray:</b> <code>${float(fib_fan.get('fan_618', curr_p)):.2f}</code>\n"
+            f"6️⃣ <b>Trend-Based Fib Time (Projected Turn) ៖</b>\n"
+            f"   └ Base Cycle: <code>{float(fib_tb_time.get('dt_base_bars', 10.0)):.0f} bars</code> | Turn: <b>{'⚡ CYCLICAL TURN' if fib_tb_time.get('is_cyclical_turn') else 'Normal'}</b>\n"
+            f"7️⃣ <b>Fib Circles (Spatio-Temporal Horizon) ៖</b>\n"
+            f"   └ Radius: <code>{float(fib_circ.get('base_radius', 10.0)):.1f}</code> | ព្រំដែន: <b>{circle_state}</b>\n"
+            f"8️⃣ <b>Fib Spiral (Logarithmic Golden Spiral) ៖</b>\n"
+            f"   └ Spiral θ: <code>{float(fib_spir.get('theta_deg', 0.0)):.1f}°</code> | រលក: <b>{spiral_state}</b>\n"
+            f"9️⃣ <b>Fib Speed Resistance Arcs (Dynamic Arcs) ៖</b>\n"
+            f"   └ Span: <code>{float(fib_arcs.get('base_span', 10.0)):.1f}</code> | ស្ថានភាព: <b>{arc_state}</b>\n"
+            f"🔟 <b>Fib Wedge (Structural Compression) ៖</b>\n"
+            f"   └ Upper: <code>${float(fib_wedge.get('wedge_upper', curr_p)):.2f}</code> | Lower: <code>${float(fib_wedge.get('wedge_lower', curr_p)):.2f}</code>\n"
+            f"   └ 0.618 Mid-Wedge: <code>${float(fib_wedge.get('wedge_618', curr_p)):.2f}</code> (Width: <code>${float(fib_wedge.get('wedge_width', 5.0)):.2f}</code>)\n"
+            f"1️⃣1️⃣ <b>Pitchfan (Andrews' Median + Fib Fan) ៖</b>\n"
+            f"   └ Median: <code>${float(pitchfan.get('median_line', curr_p)):.2f}</code>\n"
+            f"   └ Upper 0.618: <code>${float(pitchfan.get('pitchfan_upper_618', curr_p+5.0)):.2f}</code> | Lower 0.618: <code>${float(pitchfan.get('pitchfan_lower_618', curr_p-5.0)):.2f}</code>\n"
+            f"──────────────────────────────────────\n"
+            f"⚡ <b>IN-MEMORY LIMIT PENDING ORDERS (RAM PRE-SET) ៖</b>\n"
+            f"• 🟢 <b>BUY LIMIT (Golden Pocket 0.618):</b> <code>${fib_618:.2f}</code>\n"
+            f"  └ SL: <code>${fib_618 - 6.08:.2f}</code> | TP1: <code>${fib_618 + 7.30:.2f}</code> (0.00R Breakeven Armor)\n"
+            f"• 🔴 <b>SELL LIMIT (Golden Pocket / OTE 0.705):</b> <code>${fib_705:.2f}</code>\n"
+            f"  └ SL: <code>${fib_705 + 6.08:.2f}</code> | TP1: <code>${fib_705 - 7.30:.2f}</code> (0.00R Breakeven Armor)\n"
+            f"══════════════════════════════════════"
+        )
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
+                InlineKeyboardButton("📊 10-Group Matrix (/tv)", callback_data="btn_qgold_tv_matrix")
+            ],
+            [
+                InlineKeyboardButton("🔄 Refresh Fib Suite", callback_data="btn_qgold_fib"),
+                InlineKeyboardButton("🏛️ Capital Deck (/capital)", callback_data="btn_capital_menu")
             ]
         ])
         await self.safe_reply(update, card, reply_markup=kb)
@@ -3612,6 +3739,13 @@ class QuantGoldBot:
             except Exception:
                 pass
             await self.handle_tv_matrix(update, context)
+
+        elif data in ["btn_qgold_fib", "btn_qgold_fibonacci"]:
+            try:
+                await query.answer("Computing 11-Tool TradingView Fibonacci Suite...")
+            except Exception:
+                pass
+            await self.handle_fib(update, context)
 
         elif data == "btn_qgold_help":
             try:

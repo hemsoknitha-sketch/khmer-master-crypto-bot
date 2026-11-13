@@ -209,9 +209,9 @@ def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
             "tier": 1,
             "label": "POS1_M1_M5_SCALP",
             "name": "Position 1: M1-M5 Scalp Fast Harvester",
-            "pips_target": 73,
+            "pips_target": 20,
             "tp_r": 1.50,
-            "desc": "TP1: +73 pips -> ជាប់ Breakeven Armor ភ្លាម (0.00R Free Roll)"
+            "desc": "TP1: +20 pips ($2.00) -> ជាប់ Breakeven Armor ភ្លាម (0.00R Free Roll)"
         },
         2: {
             "tier": 2,
@@ -309,7 +309,7 @@ class QuantGoldExecutionEngine:
         
         # State tracking
         self._last_cycle_ts: float = 0.0
-        self._cycle_interval: float = 6.0  # Evaluates Gold every 6 seconds
+        self._cycle_interval: float = 1.0  # Evaluates Gold every 1.0s (Sub-Second Reactive Loop)
         self._active_positions_cache: List[Dict[str, Any]] = []
         self._last_post_loss_restudy_ts: float = 0.0
         self._is_evaluating: bool = False
@@ -992,7 +992,7 @@ class QuantGoldExecutionEngine:
           3. If Super Admin Live balance < $4.07, ensures Demo Fallback Mirror is active.
         """
         now = time.time()
-        if (now - getattr(self, "_last_capital_audit_ts", 0.0)) < 45.0:
+        if (now - getattr(self, "_last_capital_audit_ts", 0.0)) < 120.0:
             return {"status": "SKIPPED_THROTTLE"}
 
         self._last_capital_audit_ts = now

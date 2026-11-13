@@ -801,7 +801,7 @@ class CapitalComEngine:
                 }
             }
         now = time.time()
-        if not force_refresh and self._accounts_cache and (now - self._accounts_cache_time) < 4.0:
+        if not force_refresh and self._accounts_cache and (now - self._accounts_cache_time) < 30.0:
             return self._accounts_cache
 
         if not self.ensure_session():
