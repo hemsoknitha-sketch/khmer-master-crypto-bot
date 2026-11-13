@@ -1710,8 +1710,11 @@ class QuantGoldExecutionEngine:
                 tp = (curr_p + tp1_dist) if direction.upper() == "BUY" else (curr_p - tp1_dist)
 
             tp1 = round(tp, 2)
-            tp2 = round((curr_p + tp2_dist) if direction.upper() == "BUY" else (curr_p - tp2_dist), 2)
-            tp3 = round((curr_p + tp3_dist) if direction.upper() == "BUY" else (curr_p - tp3_dist), 2)
+            eff_tp1_dist = abs(curr_p - tp1)
+            eff_tp2_dist = max(eff_tp1_dist * 1.618, tp2_dist)
+            eff_tp3_dist = max(eff_tp2_dist * 1.618, tp3_dist)
+            tp2 = round((curr_p + eff_tp2_dist) if direction.upper() == "BUY" else (curr_p - eff_tp2_dist), 2)
+            tp3 = round((curr_p + eff_tp3_dist) if direction.upper() == "BUY" else (curr_p - eff_tp3_dist), 2)
 
             # Check existing user open trades for Agile Pyramiding or Trend Reversal Flip
             user_open_trades = db.get_capital_auto_trades_for_user(chat_id) or []
@@ -1777,14 +1780,19 @@ class QuantGoldExecutionEngine:
             )
 
             if order_res.get("success"):
-                deal_id = order_res.get("deal_reference") or order_res.get("dealId", "OK")
-                entry_price = float(order_res.get("entry_price") or order_res.get("price") or curr_p)
+                deal_id = order_res.get("dealId") or order_res.get("deal_reference", "OK")
+                deal_ref = order_res.get("deal_reference") or str(deal_id)
+                if str(deal_id).startswith("o_"):
+                    real_d = order_res.get("dealId")
+                    if real_d and not str(real_d).startswith("o_"):
+                        deal_id = real_d
 
+                entry_price = float(order_res.get("entry_price") or order_res.get("price") or curr_p)
                 tranche_label = tier_spec["label"] if is_manual_pyramid else ("REVERSAL_FLIP" if is_manual_reversal else "POS1_M1_M5_SCALP")
                 db.record_capital_auto_trade(
                     chat_id=chat_id,
                     deal_id=str(deal_id),
-                    deal_reference=str(deal_id),
+                    deal_reference=str(deal_ref),
                     epic="GOLD",
                     direction=direction.upper(),
                     size=size,
@@ -1919,7 +1927,23 @@ class QuantGoldExecutionEngine:
                 user_eng_k = (cid, is_demo)
                 if user_eng_k in successfully_audited_engs:
                     user_deals = user_broker_open_deals.get(user_eng_k, set())
+                    tr_open_ts = float(tr.get("open_time_ts") or tr.get("timestamp") or 0.0)
+                    if tr_open_ts > 0 and (now - tr_open_ts) < 25.0:
+                        continue
                     if str(deal_id) not in user_deals and deal_id != "OK":
+                        matched_bp = False
+                        if str(deal_id).startswith("o_") and user_deals:
+                            for bp_deal in user_deals:
+                                if hasattr(db, "execute_query"):
+                                    try:
+                                        db.execute_query("UPDATE capital_auto_trades SET deal_id = ? WHERE deal_id = ?", (str(bp_deal), str(deal_id)))
+                                        deal_id = bp_deal
+                                        matched_bp = True
+                                        break
+                                    except Exception:
+                                        pass
+                        if matched_bp:
+                            continue
                         logger.info(f"🏛️ [BROKER SYNC] Gold trade {deal_id} was closed on Capital.com broker for user {cid}.")
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
