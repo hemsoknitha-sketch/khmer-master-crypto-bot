@@ -1176,6 +1176,7 @@ class QuantGoldExecutionEngine:
             # Check if an immediate Agile Reversal Flip was triggered by 360° Surveillance
             pending_rev = getattr(self, "_pending_reversal_action", None)
             is_reversal_flip_trigger = False
+            in_memory_limit_setup = None
             if pending_rev in ["BUY", "SELL"]:
                 action = pending_rev
                 self._pending_reversal_action = None
@@ -1195,6 +1196,58 @@ class QuantGoldExecutionEngine:
                 sl_val = float(signal_data["sl"])
                 sl_dist = abs(current_price - sl_val)
                 logger.info(f"🔄 [360° AGILE REVERSAL FLIP ENGAGED] Instant flip into {action} @ ${current_price:.2f} (SL: ${sl_val:.2f})!")
+
+            # In-Memory Limit Working Orders & Inflection Boundary Trigger (Technology #2)
+            # «កុំរត់ដេញតាមរថភ្លើង តែត្រូវឈរចាំនៅស្ថានីយ៍»!
+            # Pre-set coordinates: 0.618 Golden Pocket & OLS 2σ Boundaries
+            if action == "HOLD" and not has_existing and not is_reversal_flip_trigger:
+                dom_bias = signal_data.get("dominant_bias", "BUY")
+                tv_sum = signal_data.get("tradingview_summary", {})
+                fib_sum = tv_sum.get("fibonacci", {})
+                ols_sum = tv_sum.get("ols_channel", {})
+                gp_618 = float(fib_sum.get("fib_618", 0.0) or 0.0)
+                ols_u = float(ols_sum.get("upper", 0.0) or 0.0)
+                ols_l = float(ols_sum.get("lower", 0.0) or 0.0)
+                spread_buf = max(1.20, float(signal_data.get("spread", 0.50)) * 2.5)
+
+                if dom_bias == "BUY":
+                    # Buy Limit Station: Price retested Golden Pocket or Lower OLS Band
+                    if gp_618 >= 3500.0 and abs(current_price - gp_618) <= spread_buf:
+                        action = "BUY"
+                        confidence = max(confidence, 80.0)
+                        in_memory_limit_setup = "LIMIT_GOLDEN_POCKET_BUY"
+                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched 0.618 Golden Pocket (${gp_618:.2f}). Instant Zero-Latency BUY Fill!")
+                    elif ols_l >= 3500.0 and abs(current_price - ols_l) <= spread_buf:
+                        action = "BUY"
+                        confidence = max(confidence, 78.0)
+                        in_memory_limit_setup = "LIMIT_OLS_LOWER_BUY"
+                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Lower OLS 2σ Band (${ols_l:.2f}). Instant Zero-Latency BUY Fill!")
+                elif dom_bias == "SELL":
+                    # Sell Limit Station: Price rallied into Upper OLS Band or Fib Resistance
+                    if ols_u >= 3500.0 and abs(current_price - ols_u) <= spread_buf:
+                        action = "SELL"
+                        confidence = max(confidence, 80.0)
+                        in_memory_limit_setup = "LIMIT_OLS_UPPER_SELL"
+                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Upper OLS 2σ Band (${ols_u:.2f}). Instant Zero-Latency SELL Fill!")
+                    elif gp_618 >= 3500.0 and abs(current_price - gp_618) <= spread_buf:
+                        action = "SELL"
+                        confidence = max(confidence, 78.0)
+                        in_memory_limit_setup = "LIMIT_FIB_RESISTANCE_SELL"
+                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Fib Retracement Resistance (${gp_618:.2f}). Instant Zero-Latency SELL Fill!")
+
+                if action in ["BUY", "SELL"]:
+                    if action == "BUY":
+                        signal_data["sl"] = signal_data.get("prospective_buy", {}).get("sl", current_price - 25.0)
+                        signal_data["tp1"] = signal_data.get("prospective_buy", {}).get("tp1", current_price + 32.0)
+                        signal_data["tp2"] = signal_data.get("prospective_buy", {}).get("tp2", current_price + 55.0)
+                        signal_data["tp3"] = signal_data.get("prospective_buy", {}).get("tp3", current_price + 90.0)
+                    else:
+                        signal_data["sl"] = signal_data.get("prospective_sell", {}).get("sl", current_price + 25.0)
+                        signal_data["tp1"] = signal_data.get("prospective_sell", {}).get("tp1", current_price - 32.0)
+                        signal_data["tp2"] = signal_data.get("prospective_sell", {}).get("tp2", current_price - 55.0)
+                        signal_data["tp3"] = signal_data.get("prospective_sell", {}).get("tp3", current_price - 90.0)
+                    sl_val = float(signal_data["sl"])
+                    sl_dist = abs(current_price - sl_val)
 
             # Prevent same-direction revenge chasing within post-loss cooldown
             if action in ["BUY", "SELL"] and not has_existing and not is_reversal_flip_trigger:
@@ -1295,7 +1348,7 @@ class QuantGoldExecutionEngine:
                             }
 
                 active_tier = get_gold_position_tier_spec(len(active_gold_trades))
-                eff_setup_type = "QUANT_GOLD_REVERSAL_FLIP" if is_reversal_flip else (active_tier["label"] if is_pyramid else "POS1_M1_M5_SCALP")
+                eff_setup_type = "QUANT_GOLD_REVERSAL_FLIP" if is_reversal_flip else (in_memory_limit_setup if in_memory_limit_setup else (active_tier["label"] if is_pyramid else "POS1_M1_M5_SCALP"))
 
                 logger.info(f"🥇 [QUANT GOLD EXECUTION] Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {confidence:.1f}%, Reversal={is_reversal_flip}, Pyramid={is_pyramid}, Setup={eff_setup_type})")
 
@@ -2107,31 +2160,69 @@ class QuantGoldExecutionEngine:
                     except Exception as e_rev_cut:
                         logger.debug(f"360 reversal check note: {e_rev_cut}")
 
-                # Check Position 1: M1 - M5 Scalp Fast Harvester (+73 pips / $7.30 move)
+                # Check Position 1: M1 - M5 Scalp Fast Harvester (+20 pips / $2.00 move)
                 tranche_lbl = str(tr.get("tranche_id", "") or "")
-                tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 73))
+                tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 20))
                 is_pos1 = (tranche_lbl == "POS1_M1_M5_SCALP" or (idx == 0 and "POS" not in tranche_lbl and scale_tier == 0))
-                if is_pos1 and (pnl_pts >= 7.30 or pips >= tier_pips_target) and not is_manual_trade:
-                    logger.info(f"⚡ [POS 1 SCALP HARVEST] Gold trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}) target {tier_pips_target} pips. Banking TP1 into pocket!")
-                    try:
-                        if cid:
-                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
-                        if hasattr(db, "update_capital_auto_trade_close"):
-                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                if is_pos1 and (pnl_pts >= 2.00 or pips >= tier_pips_target) and not is_manual_trade and scale_tier == 0:
+                    user_open_trades = [
+                        t for t in open_trades 
+                        if t.get("chat_id") == cid and str(t.get("status", "OPEN")).upper() == "OPEN"
+                    ]
+                    # If multiple positions exist (e.g. Engine A Scalp + Engine B Macro Runner),
+                    # we can close Pos 1 to bank cash into pocket, while Pos 2 continues running.
+                    # BUT if this is the ONLY open position for the user, we NEVER close it!
+                    # We ratchet SL to Breakeven Armor (Entry ± 0.5x Spread), locking 0.00R Free Roll,
+                    # and let the runner ride to TP2 (+100 pips) and TP3 (+300 pips)!
+                    if len(user_open_trades) > 1 and tranche_lbl == "POS1_M1_M5_SCALP":
+                        logger.info(f"⚡ [POS 1 SCALP HARVEST] Multi-tranche active: Gold trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}). Banking Scalp cash profit while runners continue!")
+                        try:
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                            if hasattr(db, "update_capital_auto_trade_close"):
+                                db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
 
-                        card_scalp = format_gold_tp_card(
-                            stage="SCALP",
-                            pips=pips,
-                            direction=dir_side,
-                            entry_price=entry_p
-                        )
-                        markup = get_gold_signal_reply_markup()
-                        await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
-                        self._clear_active_trade(deal_key, cooldown=15.0, direction=dir_side)
-                        continue
-                    except Exception as e_sc:
-                        logger.debug(f"Pos 1 scalp harvest note: {e_sc}")
+                            card_scalp = format_gold_tp_card(
+                                stage="SCALP",
+                                pips=pips,
+                                direction=dir_side,
+                                entry_price=entry_p
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
+                            self._clear_active_trade(deal_key, cooldown=15.0, direction=dir_side)
+                            continue
+                        except Exception as e_sc:
+                            logger.debug(f"Pos 1 scalp harvest note: {e_sc}")
+                    else:
+                        # Single Position / Macro Runner Protection (Decoupled Dual-Engine Free Roll):
+                        # Ratchet Stop-Loss to Breakeven Armor (Entry ± 0.5x Spread) -> 0.00R Free Roll!
+                        be_level = (entry_p + (spread * 0.5)) if dir_side == "BUY" else (entry_p - (spread * 0.5))
+                        logger.info(f"⚡ [DECOUPLED DUAL-ENGINE] Pos 1 reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Breakeven Armor {be_level:.2f} (0.00R Free Roll) & letting Macro Runner ride!")
+                        try:
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
+                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
+
+                            tr["scale_tier"] = 1
+                            scale_tier = 1
+                            self._active_gold_stage = "TP1_LOCKED"
+                            key_sc = f"{deal_id}:SCALP_HARVEST"
+                            if key_sc not in self._notified_milestones:
+                                self._notified_milestones.add(key_sc)
+                                card_scalp = format_gold_tp_card(
+                                    stage="SCALP",
+                                    pips=pips,
+                                    direction=dir_side,
+                                    entry_price=entry_p
+                                )
+                                markup = get_gold_signal_reply_markup()
+                                await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
+                        except Exception as e_sc_be:
+                            logger.debug(f"Dual engine breakeven shift note: {e_sc_be}")
 
                 # Check TP1 Hit (+73 pips / $7.30 move) - bounded to legitimate range ($7.30 to $60.00)
                 is_tp1 = (7.30 <= pnl_pts <= 60.0) or (

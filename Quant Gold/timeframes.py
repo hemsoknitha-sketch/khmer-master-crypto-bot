@@ -607,13 +607,40 @@ class GoldMultiTimeframeEngine:
 
         # Overall recommendation
         action = "HOLD"
-        # High-Probability Confluence Entry (Calibrated Institutional Alpha & Adaptive Agility):
-        # Require weighted_score >= 25.0 (or <= -25.0), at least 8/19 timeframes aligned, and win_prob >= 60.0%
-        # Macro check: must not directly oppose a severe macro counter-trend
-        macro_opposed = (macro_score < -25.0 and dom_dir == "BUY") or (macro_score > 25.0 and dom_dir == "SELL")
-        if (weighted_score >= 25.0 and bullish_count >= 8 and win_prob >= 60.0 and not macro_opposed) or (weighted_score >= 32.0 and not macro_opposed):
+        # Calibrated Institutional Alpha & Decoupled Dual-Engine Agility (AQ84 Invariant 95 & 100):
+        # Micro/Intermediate Momentum Impulse check: when micro/inter timeframes (M1-M30)
+        # show strong unified velocity (e.g. abs(micro_score) >= 28.0), do NOT let slow macro D1/W1 lag veto the trade.
+        has_micro_impulse = abs(micro_score) >= 28.0 or abs(inter_score) >= 20.0
+        severe_macro_block = (macro_score < -35.0 and dom_dir == "BUY") or (macro_score > 35.0 and dom_dir == "SELL")
+        macro_veto = severe_macro_block and not has_micro_impulse
+
+        # Buy Condition:
+        # Condition A: Standard high confluence (score >= 20.0, >= 7 bullish, win_prob >= 58%)
+        # Condition B: Overwhelming majority (bullish >= 9, or bullish >= 7 and bearish <= 2)
+        # Condition C: Micro impulse breakout (micro_score >= 28.0, score >= 12.0)
+        # Condition D: Super high score (score >= 30.0)
+        is_buy_confluence = (
+            (weighted_score >= 20.0 and bullish_count >= 7 and win_prob >= 58.0 and not macro_veto) or
+            (bullish_count >= 9 and bullish_count >= (bearish_count * 2) and win_prob >= 60.0 and not macro_veto) or
+            (has_micro_impulse and micro_score >= 28.0 and weighted_score >= 12.0 and not macro_veto) or
+            (weighted_score >= 30.0 and not macro_veto)
+        )
+
+        # Sell Condition:
+        # Condition A: Standard high confluence (score <= -20.0, >= 7 bearish, win_prob >= 58%)
+        # Condition B: Overwhelming majority (bearish >= 9, or bearish >= 7 and bullish <= 2)
+        # Condition C: Micro impulse breakdown (micro_score <= -28.0, score <= -12.0)
+        # Condition D: Super high score (score <= -30.0)
+        is_sell_confluence = (
+            (weighted_score <= -20.0 and bearish_count >= 7 and win_prob >= 58.0 and not macro_veto) or
+            (bearish_count >= 9 and bearish_count >= (bullish_count * 2) and win_prob >= 60.0 and not macro_veto) or
+            (has_micro_impulse and micro_score <= -28.0 and weighted_score <= -12.0 and not macro_veto) or
+            (weighted_score <= -30.0 and not macro_veto)
+        )
+
+        if is_buy_confluence and not is_sell_confluence:
             action = "BUY"
-        elif (weighted_score <= -25.0 and bearish_count >= 8 and win_prob >= 60.0 and not macro_opposed) or (weighted_score <= -32.0 and not macro_opposed):
+        elif is_sell_confluence and not is_buy_confluence:
             action = "SELL"
 
         result = {
