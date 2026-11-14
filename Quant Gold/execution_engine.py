@@ -385,19 +385,38 @@ class QuantGoldExecutionEngine:
 
     def get_active_gold_trades_list(self) -> List[Dict[str, Any]]:
         """
-        Returns all open active Gold trades currently tracked in DB.
+        Returns all open active Gold trades currently tracked in DB or in-memory RAM.
         Used for Agile Multi-Position Pyramiding and Trend Reversal Flip calculations.
         """
+        res = []
         try:
             active_trades = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
-            return [
+            res = [
                 t for t in active_trades
                 if str(t.get("epic", "")).upper() == "GOLD"
                 and str(t.get("status", "OPEN")).upper() == "OPEN"
                 and not str(t.get("deal_id", "")).startswith("MANUAL_")
             ]
         except Exception:
-            return []
+            res = []
+
+        # If DB query returned empty due to temporary sync lag, but RAM holds active trade:
+        if not res and self._active_gold_deal_id and self._active_gold_entry_price > 0.0:
+            res.append({
+                "chat_id": 859271875,
+                "deal_id": self._active_gold_deal_id,
+                "epic": "GOLD",
+                "direction": self._active_gold_direction or "BUY",
+                "entry_price": self._active_gold_entry_price,
+                "sl": getattr(self, "_active_gold_sl", 0.0),
+                "tp1": getattr(self, "_active_gold_tp1", 0.0),
+                "tp2": getattr(self, "_active_gold_tp2", 0.0),
+                "tp3": getattr(self, "_active_gold_tp3", 0.0),
+                "status": "OPEN",
+                "scale_tier": 0,
+                "is_demo": 0
+            })
+        return res
 
     async def _sync_and_adopt_broker_positions(self) -> int:
         """
@@ -1152,8 +1171,8 @@ class QuantGoldExecutionEngine:
 
             # Step 1.8: Agile Multi-Position Pyramiding & Trend Reversal Flip Gatekeeper (AQ84)
             active_gold_trades = self.get_active_gold_trades_list()
-            has_existing = len(active_gold_trades) > 0
-            existing_dir = str(active_gold_trades[0].get("direction", "BUY")).upper() if has_existing else None
+            has_existing = (len(active_gold_trades) > 0) or self.has_active_gold_trade()
+            existing_dir = str(active_gold_trades[0].get("direction", "BUY")).upper() if active_gold_trades else (self._active_gold_direction or "BUY")
 
             # Step 1.9: Adaptive Post-Trade Cooldown Gate (Invariant 88)
             time_since_close = now - self._last_trade_closed_ts
@@ -1214,7 +1233,10 @@ class QuantGoldExecutionEngine:
             # In-Memory Limit Working Orders & Inflection Boundary Trigger (Technology #2)
             # «កុំរត់ដេញតាមរថភ្លើង តែត្រូវឈរចាំនៅស្ថានីយ៍»!
             # Pre-set coordinates: 0.618 Golden Pocket & OLS 2σ Boundaries
-            if action == "HOLD" and not has_existing and not is_reversal_flip_trigger:
+            now_limit = time.time()
+            limit_throttle_ok = (now_limit - getattr(self, "_last_in_memory_limit_hit_ts", 0.0)) >= 30.0
+
+            if action == "HOLD" and not has_existing and not is_reversal_flip_trigger and limit_throttle_ok:
                 dom_bias = signal_data.get("dominant_bias", "BUY")
                 tv_sum = signal_data.get("tradingview_summary", {})
                 fib_sum = tv_sum.get("fibonacci", {})
@@ -1230,11 +1252,13 @@ class QuantGoldExecutionEngine:
                         action = "BUY"
                         confidence = max(confidence, 80.0)
                         in_memory_limit_setup = "LIMIT_GOLDEN_POCKET_BUY"
+                        self._last_in_memory_limit_hit_ts = now_limit
                         logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched 0.618 Golden Pocket (${gp_618:.2f}). Instant Zero-Latency BUY Fill!")
                     elif ols_l >= 3500.0 and abs(current_price - ols_l) <= spread_buf:
                         action = "BUY"
                         confidence = max(confidence, 78.0)
                         in_memory_limit_setup = "LIMIT_OLS_LOWER_BUY"
+                        self._last_in_memory_limit_hit_ts = now_limit
                         logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Lower OLS 2σ Band (${ols_l:.2f}). Instant Zero-Latency BUY Fill!")
                 elif dom_bias == "SELL":
                     # Sell Limit Station: Price rallied into Upper OLS Band or Fib Resistance
@@ -1242,11 +1266,13 @@ class QuantGoldExecutionEngine:
                         action = "SELL"
                         confidence = max(confidence, 80.0)
                         in_memory_limit_setup = "LIMIT_OLS_UPPER_SELL"
+                        self._last_in_memory_limit_hit_ts = now_limit
                         logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Upper OLS 2σ Band (${ols_u:.2f}). Instant Zero-Latency SELL Fill!")
                     elif gp_618 >= 3500.0 and abs(current_price - gp_618) <= spread_buf:
                         action = "SELL"
                         confidence = max(confidence, 78.0)
                         in_memory_limit_setup = "LIMIT_FIB_RESISTANCE_SELL"
+                        self._last_in_memory_limit_hit_ts = now_limit
                         logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Fib Retracement Resistance (${gp_618:.2f}). Instant Zero-Latency SELL Fill!")
 
                 if action in ["BUY", "SELL"]:
@@ -1921,6 +1947,7 @@ class QuantGoldExecutionEngine:
         try:
             bid, ask, spread = self.get_live_gold_price_quote()
             curr_p = (bid + ask) / 2.0
+            now = time.time()
             
             # Step -1: Price Sanity Veto: Abort audit cycle if quote is corrupted
             if curr_p < 3500.0 or curr_p > 6000.0:
@@ -1940,6 +1967,23 @@ class QuantGoldExecutionEngine:
                     cid = u.get("chat_id")
                     if cid:
                         active_trades.extend(db.get_capital_auto_trades(cid, status="OPEN"))
+
+            # If DB query returned empty due to temporary sync lag, but RAM holds active trade:
+            if not active_trades and self._active_gold_deal_id and self._active_gold_entry_price > 0.0:
+                active_trades = [{
+                    "chat_id": 859271875,
+                    "deal_id": self._active_gold_deal_id,
+                    "epic": "GOLD",
+                    "direction": self._active_gold_direction or "BUY",
+                    "entry_price": self._active_gold_entry_price,
+                    "sl": getattr(self, "_active_gold_sl", 0.0),
+                    "tp1": getattr(self, "_active_gold_tp1", 0.0),
+                    "tp2": getattr(self, "_active_gold_tp2", 0.0),
+                    "tp3": getattr(self, "_active_gold_tp3", 0.0),
+                    "status": "OPEN",
+                    "scale_tier": 0,
+                    "is_demo": 0
+                }]
 
             # Broker reconciliation: interrogate broker open positions per user & mode
             # Broker reconciliation: interrogate broker open positions per user & mode
@@ -2185,7 +2229,7 @@ class QuantGoldExecutionEngine:
                 is_pos1 = (tranche_lbl == "POS1_M1_M5_SCALP" or (idx == 0 and "POS" not in tranche_lbl and scale_tier == 0))
                 if is_pos1 and (pnl_pts >= 2.00 or pips >= tier_pips_target) and not is_manual_trade and scale_tier == 0:
                     user_open_trades = [
-                        t for t in open_trades 
+                        t for t in active_trades 
                         if t.get("chat_id") == cid and str(t.get("status", "OPEN")).upper() == "OPEN"
                     ]
                     # If multiple positions exist (e.g. Engine A Scalp + Engine B Macro Runner),
@@ -2248,12 +2292,12 @@ class QuantGoldExecutionEngine:
                     ((dir_side == "BUY" and curr_p >= tp1) or (dir_side == "SELL" and curr_p <= tp1))
                     and (5.0 <= pnl_pts <= 60.0)
                 )
-                if is_tp1 and scale_tier < 1:
+                if is_tp1 and scale_tier < 2:
                     key_tp1 = f"{deal_id}:TP1"
                     if key_tp1 not in self._notified_milestones:
                         self._notified_milestones.add(key_tp1)
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1)
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2)
 
                         card_tp1 = format_gold_tp_card(
                             stage="TP1",
@@ -2264,6 +2308,8 @@ class QuantGoldExecutionEngine:
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp1, app=app, reply_markup=markup)
 
+                    tr["scale_tier"] = 2
+                    scale_tier = 2
                     self._active_gold_stage = "TP1_LOCKED"
 
                     # Ratchet SL to Breakeven Armor (Entry + 0.5x Spread)
@@ -2275,7 +2321,7 @@ class QuantGoldExecutionEngine:
                                 u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
                                 await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
                             if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(be_level, 2))
                         except Exception as e_be:
                             logger.debug(f"Breakeven update note: {e_be}")
 
@@ -2284,12 +2330,12 @@ class QuantGoldExecutionEngine:
                     ((dir_side == "BUY" and curr_p >= tp2) or (dir_side == "SELL" and curr_p <= tp2))
                     and (12.0 <= pnl_pts <= 80.0)
                 )
-                if is_tp2 and scale_tier < 2:
+                if is_tp2 and scale_tier < 3:
                     key_tp2 = f"{deal_id}:TP2"
                     if key_tp2 not in self._notified_milestones:
                         self._notified_milestones.add(key_tp2)
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2)
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3)
 
                         card_tp2 = format_gold_tp_card(
                             stage="TP2",
@@ -2300,6 +2346,8 @@ class QuantGoldExecutionEngine:
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp2, app=app, reply_markup=markup)
 
+                    tr["scale_tier"] = 3
+                    scale_tier = 3
                     self._active_gold_stage = "TP2_LOCKED"
 
                     # Ratchet SL to Guaranteed Cash Profit Floor (+73 pips)
@@ -2309,7 +2357,7 @@ class QuantGoldExecutionEngine:
                             u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
                             await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(cash_floor, 2))
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(cash_floor, 2))
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3, sl=round(cash_floor, 2))
                     except Exception as e_cf:
                         logger.debug(f"Cash floor update note: {e_cf}")
 
@@ -2318,12 +2366,12 @@ class QuantGoldExecutionEngine:
                     ((dir_side == "BUY" and curr_p >= tp3) or (dir_side == "SELL" and curr_p <= tp3))
                     and (20.0 <= pnl_pts <= 120.0)
                 )
-                if is_tp3 and scale_tier < 3:
+                if is_tp3 and scale_tier < 4:
                     key_tp3 = f"{deal_id}:TP3"
                     if key_tp3 not in self._notified_milestones:
                         self._notified_milestones.add(key_tp3)
                         if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3)
+                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=4)
 
                         card_tp3 = format_gold_tp_card(
                             stage="TP3",

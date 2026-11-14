@@ -16,6 +16,7 @@ Purpose:
 
 import os
 import sys
+import re
 import time
 import html
 import asyncio
