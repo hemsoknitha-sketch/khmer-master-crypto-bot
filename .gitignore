@@ -43,3 +43,7 @@ catboost_info/
 
 # Dynamic Runtime State Files
 data/security_daily_training_state.json
+
+# Standalone Sub-Projects with their own Git Repositories
+BM AUTOMATED/
+bm_automated*.zip
