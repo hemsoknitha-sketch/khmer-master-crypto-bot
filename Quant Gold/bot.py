@@ -681,6 +681,11 @@ class QuantGoldBot:
             capital_engine.invalidate_user_capital_engine(target_chat_id)
             card, kb = await self.bridge.build_capital_user_dashboard(target_chat_id)
             return await self.safe_reply(update, f"🟢 <b>[CAPITAL LIVE MAINNET ACTIVATED]</b> 🏛️\n• បានប្តូរមកកាន់គណនី LIVE MAINNET រួចរាល់!\n\n" + card, reply_markup=kb)
+        elif sub_cmd in ["LIMIT", "LIMITS", "GOVERNOR"]:
+            if is_admin:
+                return await self.handle_admin_capital(update, context)
+            else:
+                return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
         elif sub_cmd in ["RESET", "RESET_DAILY", "UNLOCK_DAILY", "RESET_GOVERNOR"]:
             target_chat_id = chat_id
             if len(args) > 1 and is_admin:
@@ -1364,6 +1369,8 @@ class QuantGoldBot:
                 f"• <code>/capital on all 50</code> (ឬ <code>/admin_capital on all 50</code>) ➡️ បើក Auto Users ទាំងអស់ $50\n"
                 f"• <code>/capital off all</code> (ឬ <code>/admin_capital off all</code>) ➡️ ផ្អាក Auto Users ទាំងអស់\n"
                 f"• <code>/admin_capital approve all</code> ➡️ អនុម័ត Pending VIPs ទាំងអស់ 1-Click (🟢 LIVE)\n"
+                f"• <code>/admin_capital limit global off</code> ➡️ បិទ Daily Limits ទាំងអស់ (ជួញដូរបន្តគ្មានដែនកំណត់)\n"
+                f"• <code>/admin_capital reset all</code> ➡️ ដោះសោរ Daily Governor សម្រាប់កងនាវាទាំងអស់\n"
                 f"──────────────────────────────────────\n"
                 f"👤 <b>បញ្ជាគណនីទោល (Single Account Commands) ៖</b>\n"
                 f"• <code>/admin_capital inspect &lt;Account_ID_or_Chat_ID&gt;</code>\n"
@@ -1565,6 +1572,97 @@ class QuantGoldBot:
             from sync_and_audit_capital_users import ensure_database_indexes
             n = ensure_database_indexes()
             return await self.safe_reply(update, f"✅ <b>[ADMIN]</b> បានបង្កើត និងត្រួតពិនិត្យ <code>{n} Indexes</code> ក្នុង Database រួចរាល់! B-Tree O(log N) ដំណើរការ &lt;0.005ms។")
+        elif sub in ["limit", "limits", "governor", "circuit"]:
+            target_str = args[1].lower() if len(args) > 1 else "global"
+            action_str = args[2].lower() if len(args) > 2 else "off"
+
+            if target_str in ["off", "disable", "disabled"]:
+                action_str = "off"
+                target_str = "global"
+            elif target_str in ["on", "enable", "enabled"]:
+                action_str = "on"
+                target_str = "global"
+
+            dis = action_str in ["off", "disable", "disabled", "0"]
+            is_global = target_str in ["global", "all", "fleet", "system"]
+
+            import portfolio_circuit_breaker
+            if is_global:
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(0, dis, is_global=True)
+                flag_val = "1" if dis else "0"
+                db.update_system_setting("cap_daily_limits_disabled", flag_val)
+                db.update_system_setting("capital_daily_governor_disabled", flag_val)
+                # If disabling limits, also reset any active locks on all users
+                if dis:
+                    active_users = db.get_active_capital_auto_users() or []
+                    for u in active_users:
+                        u_cid = u.get("chat_id")
+                        if u_cid:
+                            portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(u_cid)
+
+                status_kh = "🔓 បិទទាំងអស់ (GLOBAL DISABLED - ជួញដូរបន្តគ្មានដែនកំណត់ប្រចាំថ្ងៃ)" if dis else "🔒 បើកទាំងអស់ (GLOBAL ENABLED - ចាក់សោរពេលដល់ +5% / -2.5%)"
+                return await self.safe_reply(
+                    update,
+                    f"✅ <b>[GLOBAL DAILY LIMITS UPDATED]</b> 🛡️\n"
+                    f"══════════════════════════════════════\n"
+                    f"⚙️ <b>ស្ថានភាពប្រព័ន្ធទាំងមូល ៖</b> <code>{status_kh}</code>\n"
+                    f"🎯 <b>Daily Profit Lock (+5%) ៖</b> <code>{'បិទ (Compounding 24/7)' if dis else 'បើក (+5% Goal Lock)'}</code>\n"
+                    f"🛑 <b>Daily Loss Floor (-2.5%) ៖</b> <code>{'បិទ (Continuous Trading)' if dis else 'បើក (-2.5% Capital Shield)'}</code>\n"
+                    f"🛡️ <b>ការការពារទុន ៖</b> <code>SL/TP, Breakeven Cash Floor & Flash Shock ការពារ ១០០% លើគ្រប់ Position!</code>\n"
+                    f"══════════════════════════════════════\n"
+                    f"🚀 <i>{'កងនាវា VIP ទាំងអស់នឹងបើកជួញដូរស្របគ្នាជាមួយ Super Admin ២៤/៧!' if dis else 'ប្រព័ន្ធនឹងការពារប្រាក់ចំណេញប្រចាំថ្ងៃជាស្វ័យប្រវត្ត។'}</i>"
+                )
+            else:
+                cid, u_info = self._resolve_target(target_str)
+                if not cid:
+                    return await self.safe_reply(update, f"⚠️ រកមិនឃើញគណនី target: <code>{target_str}</code>")
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(cid, dis, is_global=False)
+                flag_val = "1" if dis else "0"
+                db.update_system_setting(f"cap_daily_limits_disabled_{cid}", flag_val)
+                db.update_system_setting(f"cap_daily_governor_disabled_{cid}", flag_val)
+                if dis:
+                    portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(cid)
+
+                acc = u_info.get("account_id") if u_info else target_str
+                u_name = u_info.get("username") if u_info else f"User_{cid}"
+                status_kh = "🔓 បិទ (DISABLED - ជួញដូរបន្តគ្មានដែនកំណត់)" if dis else "🔒 បើក (ENABLED - ចាក់សោរពេលដល់ +5% / -2.5%)"
+                return await self.safe_reply(
+                    update,
+                    f"✅ <b>[USER DAILY LIMITS UPDATED]</b> 🛡️\n"
+                    f"══════════════════════════════════════\n"
+                    f"👤 <b>User ៖</b> @{u_name} (<code>Account: {acc}</code> | Chat ID: {cid})\n"
+                    f"⚙️ <b>ស្ថានភាព ៖</b> <code>{status_kh}</code>\n"
+                    f"🛡️ <b>ការការពារទុន ៖</b> <code>SL/TP, Breakeven Cash Floor & Flash Shock ការពារ ១០០%!</code>"
+                )
+        elif sub in ["reset", "reset_daily", "unlock_daily"]:
+            target_str = args[1].lower() if len(args) > 1 else "all"
+            import portfolio_circuit_breaker
+            if target_str in ["all", "global", "fleet"]:
+                active_users = db.get_active_capital_auto_users() or []
+                for u in active_users:
+                    u_cid = u.get("chat_id")
+                    if u_cid:
+                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(u_cid)
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(859271875)
+                return await self.safe_reply(
+                    update,
+                    "🔄 <b>[FLEET DAILY LIMITS RESET]</b> 🔓\n"
+                    "• បានដោះសោរ Daily Governor Lock សម្រាប់កងនាវាទាំងអស់រួចរាល់!\n"
+                    "• ប្រព័ន្ធដំណើរការវិនិយោគស្វ័យប្រវត្តជាធម្មតាវិញភ្លាមៗ 24/7។"
+                )
+            else:
+                cid, u_info = self._resolve_target(target_str)
+                if not cid:
+                    return await self.safe_reply(update, f"⚠️ រកមិនឃើញគណនី target: <code>{target_str}</code>")
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(cid)
+                acc = u_info.get("account_id") if u_info else target_str
+                u_name = u_info.get("username") if u_info else f"User_{cid}"
+                return await self.safe_reply(
+                    update,
+                    f"🔄 <b>[USER DAILY GOVERNOR RESET]</b> 🔓\n"
+                    f"• បានដោះសោរ Daily Governor Lock សម្រាប់ <b>@{u_name}</b> (<code>{acc}</code>) រួចរាល់!\n"
+                    f"• ប្រព័ន្ធវិនិយោគស្វ័យប្រវត្តដំណើរការវិញភ្លាមៗ 24/7។"
+                )
         else:
             return await self.handle_inspect_user(update, args[0])
 
