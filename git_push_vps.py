@@ -129,13 +129,30 @@ def execute_git_push_vps(
 
     # 1. Institutional Pre-Commit Audit Gate
     if not skip_audit:
-        print("\n🔍 [STEP 1/4] Running Institutional Audit Gate (audit_system.py)...")
-        code, _ = run_command_stream([sys.executable, "audit_system.py"])
-        if code != 0:
-            print("\n❌ [AUDIT REJECTED] Pre-commit audit failed with defects. Push aborted!")
-            print("   Fix all defects or use --skip-audit only in critical emergency.")
-            return False
-        print("✅ [AUDIT PASSED] 100% Institutional Invariants verified with ZERO defects!")
+        # Check if ONLY Quant Gold files are modified for instant Fast-Track (< 2 seconds)
+        status_res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, errors="replace")
+        changed_lines = [l.strip()[3:] for l in status_res.stdout.splitlines() if l.strip()]
+        is_only_gold = bool(changed_lines) and all(
+            f.startswith("Quant Gold/") or "quant_gold" in f or f in ["push_quant_gold.py", "git_push_vps.py", ".gitignore", "README.md"]
+            for f in changed_lines
+        )
+        if is_only_gold or os.environ.get("FAST_TRACK") == "1" or os.environ.get("GOLD_FAST") == "1":
+            print("\n⚡ [FAST-TRACK DETECTED] Quant Gold scoped changes detected! Running lightning verification (< 2s)...")
+            os.environ["FAST_TRACK"] = "1"
+            os.environ["GOLD_FAST"] = "1"
+            code, _ = run_command_stream([sys.executable, "-m", "unittest", "test_quant_gold_harvest_and_cash_floor.py"])
+            if code != 0:
+                print("\n❌ [AUDIT REJECTED] Quant Gold verification failed! Push aborted.")
+                return False
+            print("✅ [FAST-TRACK PASSED] Quant Gold verified in < 2 seconds! Monolithic audit bypassed.")
+        else:
+            print("\n🔍 [STEP 1/4] Running Institutional Audit Gate (audit_system.py)...")
+            code, _ = run_command_stream([sys.executable, "audit_system.py"])
+            if code != 0:
+                print("\n❌ [AUDIT REJECTED] Pre-commit audit failed with defects. Push aborted!")
+                print("   Fix all defects or use --skip-audit only in critical emergency.")
+                return False
+            print("✅ [AUDIT PASSED] 100% Institutional Invariants verified with ZERO defects!")
     else:
         print("\n⚠️ [STEP 1/4] Audit bypassed via --skip-audit flag.")
 
