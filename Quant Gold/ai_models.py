@@ -323,21 +323,24 @@ TASK: Provide JSON output only:
             async def _run_llama():
                 return await asyncio.to_thread(self._query_llama_70b_hf, prompt)
 
+            tasks = [
+                asyncio.create_task(_run_gemini()),
+                asyncio.create_task(_run_deepseek()),
+                asyncio.create_task(_run_llama())
+            ]
             try:
-                results = await asyncio.wait_for(
-                    asyncio.gather(
-                        _run_gemini(),
-                        _run_deepseek(),
-                        _run_llama(),
-                        return_exceptions=True
-                    ),
-                    timeout=2.0
-                )
-                gemini_res = results[0] if isinstance(results[0], dict) else None
-                deepseek_res = results[1] if isinstance(results[1], dict) else None
-                llama_res = results[2] if isinstance(results[2], dict) else None
-            except (asyncio.TimeoutError, Exception) as e_to:
-                logger.debug(f"AI Swarm gather timeout or note: {e_to}")
+                done, pending = await asyncio.wait(tasks, timeout=2.0)
+                for t in pending:
+                    t.cancel()
+                if pending:
+                    await asyncio.gather(*pending, return_exceptions=True)
+
+                gemini_task, deepseek_task, llama_task = tasks
+                gemini_res = gemini_task.result() if gemini_task in done and not gemini_task.cancelled() and not gemini_task.exception() and isinstance(gemini_task.result(), dict) else None
+                deepseek_res = deepseek_task.result() if deepseek_task in done and not deepseek_task.cancelled() and not deepseek_task.exception() and isinstance(deepseek_task.result(), dict) else None
+                llama_res = llama_task.result() if llama_task in done and not llama_task.cancelled() and not llama_task.exception() and isinstance(llama_task.result(), dict) else None
+            except Exception as e_to:
+                logger.debug(f"AI Swarm wait note: {e_to}")
                 self._network_offline_until = time.time() + 60.0
 
         votes = {

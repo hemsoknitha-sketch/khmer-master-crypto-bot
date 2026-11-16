@@ -333,14 +333,21 @@ EPIC_MAP = {
     "SOLUSD": "SOLUSD"          # Solana / US Dollar CFD
 }
 
-# Session validity duration in seconds (Capital.com sessions expire after 10 minutes)
-SESSION_EXPIRY_THRESHOLD = 500  # Refresh session after ~8.3 minutes to avoid expiration
+# Session validity duration in seconds (Capital.com sessions time out after 10 minutes of inactivity)
+# Inactivity/Idle timeout: Proactively refresh only if session has had zero activity for > 9 minutes
+SESSION_IDLE_TIMEOUT = 540.0  # 9 minutes of inactivity threshold
+SESSION_EXPIRY_THRESHOLD = SESSION_IDLE_TIMEOUT  # Backward compatibility alias
 
 # Capital.com Institutional Credentials must be loaded from Environment Variables or Secret Manager.
 # Hardcoding credentials in source code is strictly prohibited by Angkor Quant Institutional Security Policy.
 DEFAULT_CAPITAL_API_KEY = ""
 DEFAULT_CAPITAL_IDENTIFIER = ""
 DEFAULT_CAPITAL_PASSWORD = ""
+
+# Global Session & Authentication Rate Limiting
+_GLOBAL_AUTH_LOCK = threading.Lock()
+_GLOBAL_LAST_AUTH_TS: float = 0.0
+_GLOBAL_MIN_AUTH_INTERVAL: float = 4.0  # Minimum 4 seconds between POST /session calls globally across all engines
 
 
 # Global In-Memory Shared RAM Cache for TradFi Quotes (< 0.05ms)
@@ -578,6 +585,7 @@ class CapitalComEngine:
         self.cst_token: Optional[str] = None
         self.security_token: Optional[str] = None
         self.session_created_at: float = 0.0
+        self.last_activity_ts: float = 0.0
         self.active_account_id: Optional[str] = None
         self.account_currency: str = "USD"
         
@@ -608,6 +616,18 @@ class CapitalComEngine:
     def custom_chat_id(self) -> Optional[int]:
         return self._custom_chat_id
 
+    def _record_response(self, res: Optional[requests.Response]) -> None:
+        """Captures rotated CST / X-SECURITY-TOKEN headers and tracks activity time to prevent idle timeout."""
+        if res is None:
+            return
+        self.last_activity_ts = time.time()
+        cst = res.headers.get("CST")
+        sec = res.headers.get("X-SECURITY-TOKEN")
+        if cst:
+            self.cst_token = cst
+        if sec:
+            self.security_token = sec
+
     # --------------------------------------------------------------------------
     # Authentication & Session Management
     # --------------------------------------------------------------------------
@@ -621,6 +641,15 @@ class CapitalComEngine:
             self.last_auth_error = msg
             logger.error(msg)
             return False, msg
+
+        # Rate-limiter guard: Enforce global gap between POST /session calls across all engines
+        global _GLOBAL_LAST_AUTH_TS
+        with _GLOBAL_AUTH_LOCK:
+            now = time.time()
+            elapsed = now - _GLOBAL_LAST_AUTH_TS
+            if elapsed < _GLOBAL_MIN_AUTH_INTERVAL:
+                time.sleep(_GLOBAL_MIN_AUTH_INTERVAL - elapsed)
+            _GLOBAL_LAST_AUTH_TS = time.time()
 
         url = f"{self.base_url}/session"
         headers = {
@@ -639,6 +668,7 @@ class CapitalComEngine:
                 self.cst_token = res.headers.get("CST")
                 self.security_token = res.headers.get("X-SECURITY-TOKEN")
                 self.session_created_at = time.time()
+                self.last_activity_ts = time.time()
                 self.last_auth_error = ""
                 self._auth_error_logged = False
                 self._auth_backoff_until = 0.0
@@ -696,6 +726,7 @@ class CapitalComEngine:
                                 self.cst_token = res_fb.headers.get("CST")
                                 self.security_token = res_fb.headers.get("X-SECURITY-TOKEN")
                                 self.session_created_at = time.time()
+                                self.last_activity_ts = time.time()
                                 self.last_auth_error = ""
                                 self._auth_error_logged = False
                                 self._auth_backoff_until = 0.0
@@ -719,6 +750,7 @@ class CapitalComEngine:
                             self.cst_token = res_live.headers.get("CST")
                             self.security_token = res_live.headers.get("X-SECURITY-TOKEN")
                             self.session_created_at = time.time()
+                            self.last_activity_ts = time.time()
                             self.last_auth_error = ""
                             self._auth_error_logged = False
                             self._auth_backoff_until = 0.0
@@ -734,7 +766,9 @@ class CapitalComEngine:
 
                 self.last_auth_error = err_msg
                 if "error.too-many.requests" in str(err_msg):
-                    self._auth_backoff_until = time.time() + 2.0
+                    self._auth_backoff_until = time.time() + 20.0
+                    with _GLOBAL_AUTH_LOCK:
+                        _GLOBAL_LAST_AUTH_TS = max(_GLOBAL_LAST_AUTH_TS, time.time() + 15.0)
                 else:
                     self._auth_backoff_until = time.time() + 180.0  # 3-minute backoff to prevent log flooding and scheduler congestion
                 if not self._auth_error_logged:
@@ -753,18 +787,26 @@ class CapitalComEngine:
             return False, f"Connection Exception: {e}"
 
     def ensure_session(self) -> bool:
-        """Verifies session freshness and auto-refreshes if close to 10-minute expiry (Thread-safe)."""
+        """
+        Verifies session freshness (Thread-safe).
+        Capital.com sessions remain valid as long as requests occur within the 10-minute idle window.
+        Only re-authenticates if tokens are absent or idle duration exceeds SESSION_IDLE_TIMEOUT (540s).
+        """
         now = time.time()
-        if self.cst_token and self.security_token and (now - self.session_created_at) <= SESSION_EXPIRY_THRESHOLD:
-            return True
+        if self.cst_token and self.security_token:
+            last_active = self.last_activity_ts or self.session_created_at
+            if (now - last_active) < SESSION_IDLE_TIMEOUT:
+                return True
 
         if now < self._auth_backoff_until:
             return False
 
         with self._session_lock:
             now = time.time()
-            if self.cst_token and self.security_token and (now - self.session_created_at) <= SESSION_EXPIRY_THRESHOLD:
-                return True
+            if self.cst_token and self.security_token:
+                last_active = self.last_activity_ts or self.session_created_at
+                if (now - last_active) < SESSION_IDLE_TIMEOUT:
+                    return True
             if now < self._auth_backoff_until:
                 return False
             success, msg = self.authenticate()
@@ -813,6 +855,7 @@ class CapitalComEngine:
             try:
                 res = self.session.get(url, headers=self.get_auth_headers(), timeout=12)
                 if res.status_code == 200:
+                    self._record_response(res)
                     data = res.json()
                     accounts = data.get("accounts", [])
                     
@@ -882,11 +925,8 @@ class CapitalComEngine:
                 return {"success": False, "error": f"HTTP {res.status_code}: {res.text}"}
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, ConnectionResetError) as ce:
                 if attempt == 0:
-                    time.sleep(0.3)
-                    self.cst_token = None
-                    self.security_token = None
-                    if self.ensure_session():
-                        continue
+                    time.sleep(0.5)
+                    continue
                 return {"success": False, "error": f"Connection error: {ce}"}
             except Exception as e:
                 return {"success": False, "error": str(e)}
@@ -990,6 +1030,7 @@ class CapitalComEngine:
         try:
             res = self.session.put(url, headers=self.get_auth_headers(), json={"accountId": acc_str}, timeout=8)
             if res.status_code == 200:
+                self._record_response(res)
                 self.active_account_id = acc_str
                 self.invalidate_account_cache()
                 logger.info(f"🔄 [CAPITAL SWITCH] Successfully switched active account to {acc_str}")
@@ -1279,6 +1320,7 @@ class CapitalComEngine:
         try:
             res = self.session.get(url, headers=self.get_auth_headers(), timeout=8)
             if res.status_code == 200:
+                self._record_response(res)
                 data = res.json()
                 snapshot = data.get("snapshot", {})
                 dealing_rules = data.get("dealingRules", {})
@@ -1383,6 +1425,7 @@ class CapitalComEngine:
                     self.authenticate()
                     continue
                 if res.status_code == 200:
+                    self._record_response(res)
                     data = res.json()
                     prices = data.get("prices", [])
                     candles = []
@@ -1426,6 +1469,7 @@ class CapitalComEngine:
             try:
                 res = self.session.get(url, headers=self.get_auth_headers(), timeout=12)
                 if res.status_code == 200:
+                    self._record_response(res)
                     data = res.json()
                     return data.get("positions", [])
                 elif res.status_code == 401 and attempt == 0:
@@ -1436,11 +1480,8 @@ class CapitalComEngine:
                 return []
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, ConnectionResetError) as ce:
                 if attempt == 0:
-                    time.sleep(0.3)
-                    self.cst_token = None
-                    self.security_token = None
-                    if self.ensure_session():
-                        continue
+                    time.sleep(0.5)
+                    continue
                 logger.warning(f"Transient connection glitch fetching open positions ({type(ce).__name__}). Retrying on next cycle.")
                 return []
             except Exception as e:
@@ -1802,6 +1843,7 @@ class CapitalComEngine:
         try:
             res = self.session.post(url, headers=self.get_auth_headers(), json=payload, timeout=10)
             if res.status_code == 200:
+                self._record_response(res)
                 data = res.json()
                 deal_ref = data.get("dealReference")
                 logger.info(f"Order submitted successfully! Epic: {resolved_epic} | Dir: {dir_upper} | Ref: {deal_ref}")
@@ -1943,6 +1985,7 @@ class CapitalComEngine:
                 time.sleep(delay)
                 res = self.session.get(url, headers=self.get_auth_headers(), timeout=10)
                 if res.status_code == 200:
+                    self._record_response(res)
                     data = res.json()
                     deal_status = str(data.get("dealStatus", "")).upper()
                     status = str(data.get("status", "")).upper()
@@ -2023,6 +2066,7 @@ class CapitalComEngine:
         try:
             res = self.session.delete(url, headers=self.get_auth_headers(), timeout=10)
             if res.status_code == 200:
+                self._record_response(res)
                 data = res.json()
                 deal_ref = data.get("dealReference")
                 logger.info(f"Position {deal_id} closed successfully! Deal Ref: {deal_ref}")
@@ -2216,6 +2260,7 @@ class CapitalComEngine:
         try:
             res = self.session.post(url, headers=self.get_auth_headers(), json=payload, timeout=10)
             if res.status_code == 200:
+                self._record_response(res)
                 data = res.json()
                 deal_ref = data.get("dealReference")
                 logger.info(f"Working order submitted! Epic: {resolved_epic} | Dir: {dir_upper} | Type: {type_upper} | Level: {level} | Ref: {deal_ref}")
@@ -2332,6 +2377,7 @@ class CapitalComEngine:
         try:
             res = self.session.delete(url, headers=self.get_auth_headers(), timeout=10)
             if res.status_code == 200:
+                self._record_response(res)
                 data = res.json()
                 deal_ref = data.get("dealReference")
                 logger.info(f"✅ Working order {deal_id} cancelled! Deal Ref: {deal_ref}")
@@ -2368,6 +2414,7 @@ class CapitalComEngine:
         try:
             res = self.session.put(url, headers=self.get_auth_headers(), json=payload, timeout=10)
             if res.status_code == 200:
+                self._record_response(res)
                 return {"success": True, "deal_id": deal_id, "data": res.json()}
             else:
                 err_data = res.json() if res.content else {}
@@ -3388,21 +3435,13 @@ class CapitalComEngine:
 _GLOBAL_CAPITAL_LIVE_ENGINE: Optional[CapitalComEngine] = None
 _GLOBAL_CAPITAL_DEMO_ENGINE: Optional[CapitalComEngine] = None
 _user_engine_pool: Dict[str, CapitalComEngine] = {}
-_pool_lock = threading.Lock()
+_pool_lock = threading.RLock()
 
 def get_capital_engine(is_demo: Optional[bool] = None) -> CapitalComEngine:
     """Singleton getter for the global CapitalComEngine instance (Live or Demo)."""
-    global _GLOBAL_CAPITAL_LIVE_ENGINE, _GLOBAL_CAPITAL_DEMO_ENGINE
     if is_demo is None:
         is_demo = False  # Default to LIVE MAINNET for investments
-    if is_demo:
-        if _GLOBAL_CAPITAL_DEMO_ENGINE is None:
-            _GLOBAL_CAPITAL_DEMO_ENGINE = CapitalComEngine(is_demo=True)
-        return _GLOBAL_CAPITAL_DEMO_ENGINE
-    else:
-        if _GLOBAL_CAPITAL_LIVE_ENGINE is None:
-            _GLOBAL_CAPITAL_LIVE_ENGINE = CapitalComEngine(is_demo=False)
-        return _GLOBAL_CAPITAL_LIVE_ENGINE
+    return get_user_capital_engine(SUPER_ADMIN_ID, is_demo=is_demo)
 
 def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> CapitalComEngine:
     """
@@ -3485,7 +3524,28 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
                     _user_engine_pool[pool_key] = engine
                     return engine
             else:
-                # Sub-account sharing master login credentials (e.g. @chengphol with account 331963468326458564)
+                # Sub-account sharing master login credentials
+                # If target_acc matches Super Admin's account or is empty, reuse the Super Admin engine instance!
+                sa_acc = (
+                    (os.getenv("CAPITAL_DEMO_ACCOUNT_ID") or "329832717876539678").strip()
+                    if is_demo else
+                    (os.getenv("CAPITAL_ACCOUNT_ID") or "216890638652757188").strip()
+                )
+                if not target_acc or target_acc == sa_acc:
+                    sa_pool_key = f"{SUPER_ADMIN_ID}_{'demo' if is_demo else 'live'}"
+                    if sa_pool_key in _user_engine_pool:
+                        sa_engine = _user_engine_pool[sa_pool_key]
+                    else:
+                        sa_engine = CapitalComEngine(
+                            is_demo=is_demo,
+                            custom_chat_id=SUPER_ADMIN_ID,
+                            desired_account_id=sa_acc
+                        )
+                        _user_engine_pool[sa_pool_key] = sa_engine
+                    _user_engine_pool[pool_key] = sa_engine
+                    return sa_engine
+
+                # Distinct sub-account (e.g. @chengphol with account 331963468326458564)
                 engine = CapitalComEngine(
                     is_demo=is_demo,
                     custom_chat_id=chat_id,

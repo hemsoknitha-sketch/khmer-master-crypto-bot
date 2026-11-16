@@ -325,6 +325,8 @@ class QuantGoldExecutionEngine:
         self._active_gold_tp1: float = 0.0
         self._active_gold_tp2: float = 0.0
         self._active_gold_tp3: float = 0.0
+        self._active_gold_scale_tier: int = 0
+        self._be_armor_locked_deals: set = set()
         self._active_gold_stage: str = "IDLE"  # "IDLE", "ACTIVE", "TP1_LOCKED", "TP2_LOCKED", "COOLDOWN"
         self._last_trade_closed_ts: float = 0.0
         self._last_signal_broadcast_ts: float = 0.0
@@ -373,6 +375,7 @@ class QuantGoldExecutionEngine:
                     self._active_gold_tp2 = float(t.get("tp2", 0.0) or 0.0)
                     self._active_gold_tp3 = float(t.get("tp3", 0.0) or 0.0)
                     tier = int(t.get("scale_tier", 0) or 0)
+                    self._active_gold_scale_tier = tier
                     self._active_gold_stage = "TP2_LOCKED" if tier >= 2 else ("TP1_LOCKED" if tier >= 1 else "ACTIVE")
                     return True
         except Exception:
@@ -413,7 +416,7 @@ class QuantGoldExecutionEngine:
                 "tp2": getattr(self, "_active_gold_tp2", 0.0),
                 "tp3": getattr(self, "_active_gold_tp3", 0.0),
                 "status": "OPEN",
-                "scale_tier": 0,
+                "scale_tier": getattr(self, "_active_gold_scale_tier", 0),
                 "is_demo": 0
             })
         return res
@@ -587,15 +590,24 @@ class QuantGoldExecutionEngine:
 
     def _clear_active_trade(self, deal_id: Optional[str] = None, cooldown: float = 30.0, direction: Optional[str] = None):
         """Clears active trade state and activates adaptive post-trade cooldown (Invariant 88)."""
-        if deal_id is None or str(self._active_gold_deal_id) == str(deal_id):
+        if deal_id is None or not self._active_gold_deal_id or str(self._active_gold_deal_id) == str(deal_id):
             if self._active_gold_direction:
                 self._last_closed_trade_direction = self._active_gold_direction
             self._active_gold_deal_id = None
             self._active_gold_direction = None
             self._active_gold_entry_price = 0.0
+            self._active_gold_sl = 0.0
+            self._active_gold_tp1 = 0.0
+            self._active_gold_tp2 = 0.0
+            self._active_gold_tp3 = 0.0
+            self._active_gold_scale_tier = 0
             self._active_gold_stage = "IDLE"
         elif direction:
             self._last_closed_trade_direction = direction
+        if deal_id:
+            self._be_armor_locked_deals.discard(str(deal_id))
+        else:
+            self._be_armor_locked_deals.clear()
         self._last_trade_closed_ts = time.time()
         self._trade_cooldown_seconds = max(0.0, float(cooldown))
         self._cached_broker_gold_count = max(0, getattr(self, "_cached_broker_gold_count", 1) - 1)
@@ -1981,7 +1993,7 @@ class QuantGoldExecutionEngine:
                     "tp2": getattr(self, "_active_gold_tp2", 0.0),
                     "tp3": getattr(self, "_active_gold_tp3", 0.0),
                     "status": "OPEN",
-                    "scale_tier": 0,
+                    "scale_tier": getattr(self, "_active_gold_scale_tier", 0),
                     "is_demo": 0
                 }]
 
@@ -2262,30 +2274,40 @@ class QuantGoldExecutionEngine:
                         # Single Position / Macro Runner Protection (Decoupled Dual-Engine Free Roll):
                         # Ratchet Stop-Loss to Breakeven Armor (Entry ± 0.5x Spread) -> 0.00R Free Roll!
                         be_level = (entry_p + (spread * 0.5)) if dir_side == "BUY" else (entry_p - (spread * 0.5))
-                        logger.info(f"⚡ [DECOUPLED DUAL-ENGINE] Pos 1 reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Breakeven Armor {be_level:.2f} (0.00R Free Roll) & letting Macro Runner ride!")
-                        try:
-                            if cid:
-                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
-                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
+                        if deal_id not in self._be_armor_locked_deals and abs(sl - be_level) > 0.30:
+                            logger.info(f"⚡ [DECOUPLED DUAL-ENGINE] Pos 1 reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Breakeven Armor {be_level:.2f} (0.00R Free Roll) & letting Macro Runner ride!")
+                            try:
+                                if cid:
+                                    u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                    await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
+                                if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                    db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
 
-                            tr["scale_tier"] = 1
-                            scale_tier = 1
-                            self._active_gold_stage = "TP1_LOCKED"
-                            key_sc = f"{deal_id}:SCALP_HARVEST"
-                            if key_sc not in self._notified_milestones:
-                                self._notified_milestones.add(key_sc)
-                                card_scalp = format_gold_tp_card(
-                                    stage="SCALP",
-                                    pips=pips,
-                                    direction=dir_side,
-                                    entry_price=entry_p
-                                )
-                                markup = get_gold_signal_reply_markup()
-                                await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
-                        except Exception as e_sc_be:
-                            logger.debug(f"Dual engine breakeven shift note: {e_sc_be}")
+                                tr["scale_tier"] = 1
+                                tr["sl"] = round(be_level, 2)
+                                scale_tier = 1
+                                self._active_gold_scale_tier = 1
+                                self._active_gold_sl = round(be_level, 2)
+                                self._be_armor_locked_deals.add(deal_id)
+                                self._active_gold_stage = "TP1_LOCKED"
+                                key_sc = f"{deal_id}:SCALP_HARVEST"
+                                if key_sc not in self._notified_milestones:
+                                    self._notified_milestones.add(key_sc)
+                                    card_scalp = format_gold_tp_card(
+                                        stage="SCALP",
+                                        pips=pips,
+                                        direction=dir_side,
+                                        entry_price=entry_p
+                                    )
+                                    markup = get_gold_signal_reply_markup()
+                                    await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
+                            except Exception as e_sc_be:
+                                logger.debug(f"Dual engine breakeven shift note: {e_sc_be}")
+                        else:
+                            self._be_armor_locked_deals.add(deal_id)
+                            self._active_gold_scale_tier = max(getattr(self, "_active_gold_scale_tier", 0), 1)
+                            tr["scale_tier"] = max(scale_tier, 1)
+                            scale_tier = max(scale_tier, 1)
 
                 # Check TP1 Hit (+73 pips / $7.30 move) - bounded to legitimate range ($7.30 to $60.00)
                 is_tp1 = (7.30 <= pnl_pts <= 60.0) or (
