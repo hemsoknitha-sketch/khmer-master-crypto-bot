@@ -2135,31 +2135,59 @@ class QuantGoldExecutionEngine:
                     str(tr.get("source", "")).upper() == "MANUAL"
                 )
 
-                # Flash Shock Protective Early Harvest (Invariants 35 & 104):
-                # Never choke trades on micro-oscillations ($0.19 - $0.49 crumbs).
-                # 1. Price points moved >= +12.00 (+120 pips, near TP1) and retraced >= 50% (while retaining >= +5.00 pts & upl >= $2.50)
-                # 2. Dollar UPL reached >= $5.00 and retraced >= 50% from peak UPL (while retaining >= $2.50 net floor)
-                # 3. User Manual trades are 100% EXEMPT: Allowed to run to TP1/TP2 or user manual close.
+                # Flash Shock & Micro-Exhaustion Peak Protective Harvest (Invariants 35 & 104):
+                # Never choke trades on micro-oscillations ($0.19 - $0.49 crumbs), BUT never let a $2.50 - $5.00 winner
+                # retrace all the way back into scratch or small loss!
+                # 1. Price points moved >= +2.50 (+25 pips) and retraced >= 45% (while retaining >= +1.20 pts & upl >= max(1.00, spread * 1.5))
+                # 2. Dollar UPL reached >= $2.50 and retraced >= 45% from peak UPL (while retaining >= max(1.00, spread * 1.5) net floor)
+                # 3. M1/M5 Micro-Exhaustion Rejection: Reached >= $2.50 (+25 pips), retraced >= 30%, and M1 shows reversal pinbar/exhaustion wick!
+                # 4. User Manual trades are 100% EXEMPT: Allowed to run to TP1/TP2 or user manual close.
                 is_shock_pts = (
                     not is_manual_trade and
-                    current_peak_pts >= 12.00 and
+                    current_peak_pts >= 2.50 and
                     current_peak_pts <= 150.0 and
-                    pnl_pts <= (current_peak_pts * 0.50) and
-                    pnl_pts >= 5.00 and
-                    upl >= 2.50
+                    pnl_pts <= (current_peak_pts * 0.55) and  # retraced >= 45%
+                    pnl_pts >= 1.20 and
+                    upl >= max(1.00, spread * 1.5)
                 )
                 is_shock_upl = (
                     not is_manual_trade and
-                    current_peak >= 5.00 and
+                    current_peak >= 2.50 and
                     current_peak <= 150.0 and
-                    upl <= (current_peak * 0.50) and
-                    upl >= 2.50
+                    upl <= (current_peak * 0.55) and          # retraced >= 45%
+                    upl >= max(1.00, spread * 1.5)
                 )
 
-                if is_shock_pts or is_shock_upl:
+                # M1/M5 Micro-Exhaustion Peak Harvester (Invariant 104 Pillar 4):
+                # Catches sharp reversal pinbars / wicks at peak exhaustion before full 50% retrace occurs!
+                is_exhaustion_harvest = False
+                if not is_manual_trade and (current_peak >= 2.50 or current_peak_pts >= 2.50) and upl >= max(1.20, spread * 1.6):
+                    if (upl <= current_peak * 0.70) or (pnl_pts <= current_peak_pts * 0.70):  # Retraced >= 30% from peak
+                        try:
+                            candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
+                            if candles_m1 is not None and len(candles_m1) >= 2:
+                                c_last = candles_m1.iloc[-1]
+                                o_val, h_val, l_val, c_val = float(c_last['open']), float(c_last['high']), float(c_last['low']), float(c_last['close'])
+                                c_range = max(0.15, h_val - l_val)
+                                if dir_side == "BUY":
+                                    upper_wick = (h_val - max(o_val, c_val)) / c_range
+                                    if upper_wick >= 0.40 or c_val < o_val:
+                                        is_exhaustion_harvest = True
+                                else:
+                                    lower_wick = (min(o_val, c_val) - l_val) / c_range
+                                    if lower_wick >= 0.40 or c_val > o_val:
+                                        is_exhaustion_harvest = True
+                            else:
+                                if upl <= current_peak * 0.65 and upl >= max(1.50, spread * 2.0):
+                                    is_exhaustion_harvest = True
+                        except Exception as e_exh:
+                            logger.debug(f"Exhaustion check note: {e_exh}")
+
+                if is_shock_pts or is_shock_upl or is_exhaustion_harvest:
+                    harvest_tag = "MICRO-EXHAUSTION HARVEST" if is_exhaustion_harvest else "FLASH SHOCK HARVEST"
                     logger.info(
-                        f"⚡ [FLASH SHOCK HARVEST] Gold trade {deal_id} peak ({current_peak_pts:.2f} pts / ${current_peak:.2f}) "
-                        f"retraced >= 50% to ({pnl_pts:.2f} pts / ${upl:.2f}). Executing protective early harvest!"
+                        f"⚡ [{harvest_tag}] Gold trade {deal_id} peak ({current_peak_pts:.2f} pts / ${current_peak:.2f}) "
+                        f"pulled back to ({pnl_pts:.2f} pts / ${upl:.2f}). Executing protective early harvest!"
                     )
                     try:
                         if cid:
@@ -2168,8 +2196,9 @@ class QuantGoldExecutionEngine:
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
                         
+                        card_stage = "SCALP" if (current_peak < 6.0 and pips < 50) else "CLOSE"
                         card_shock = format_gold_tp_card(
-                            stage="CLOSE",
+                            stage=card_stage,
                             pips=pips,
                             direction=dir_side,
                             entry_price=entry_p
@@ -2272,10 +2301,20 @@ class QuantGoldExecutionEngine:
                             logger.debug(f"Pos 1 scalp harvest note: {e_sc}")
                     else:
                         # Single Position / Macro Runner Protection (Decoupled Dual-Engine Free Roll):
-                        # Ratchet Stop-Loss to Breakeven Armor (Entry ± 0.5x Spread) -> 0.00R Free Roll!
-                        be_level = (entry_p + (spread * 0.5)) if dir_side == "BUY" else (entry_p - (spread * 0.5))
+                        # Ratchet Stop-Loss to Guaranteed Positive Cash Floor (Invariants 35 & 104):
+                        # Upgraded from Entry ± 0.5x spread to Entry ± max(0.80, spread * 1.6).
+                        # Locks a true positive cash profit floor (+$0.40 to +$0.80 net profit after spread & slippage),
+                        # permanently preventing trades from closing at -$0.15 to -$0.50!
+                        be_buffer = max(0.80, spread * 1.6)
+                        if dir_side == "BUY":
+                            raw_be = entry_p + be_buffer
+                            be_level = min(raw_be, curr_p - max(0.80, spread * 1.5))
+                        else:
+                            raw_be = entry_p - be_buffer
+                            be_level = max(raw_be, curr_p + max(0.80, spread * 1.5))
+
                         if deal_id not in self._be_armor_locked_deals and abs(sl - be_level) > 0.30:
-                            logger.info(f"⚡ [DECOUPLED DUAL-ENGINE] Pos 1 reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Breakeven Armor {be_level:.2f} (0.00R Free Roll) & letting Macro Runner ride!")
+                            logger.info(f"⚡ [DECOUPLED DUAL-ENGINE] Pos 1 reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Guaranteed Cash Floor {be_level:.2f} & letting Macro Runner ride!")
                             try:
                                 if cid:
                                     u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
@@ -2334,10 +2373,17 @@ class QuantGoldExecutionEngine:
                     scale_tier = 2
                     self._active_gold_stage = "TP1_LOCKED"
 
-                    # Ratchet SL to Breakeven Armor (Entry + 0.5x Spread)
-                    be_level = (entry_p + (spread * 0.5)) if dir_side == "BUY" else (entry_p - (spread * 0.5))
+                    # Ratchet SL to Guaranteed Positive Cash Floor at TP1 Hit: Entry ± max(1.20, spread * 2.0)
+                    be_buffer_tp1 = max(1.20, spread * 2.0)
+                    if dir_side == "BUY":
+                        raw_be_tp1 = entry_p + be_buffer_tp1
+                        be_level = min(raw_be_tp1, curr_p - max(1.00, spread * 1.5))
+                    else:
+                        raw_be_tp1 = entry_p - be_buffer_tp1
+                        be_level = max(raw_be_tp1, curr_p + max(1.00, spread * 1.5))
+
                     if abs(sl - be_level) > 0.30:
-                        logger.info(f"🛡️ [BREAKEVEN ARMOR] TP1 Hit! Ratcheting SL to {be_level:.2f} for Gold trade {deal_id}")
+                        logger.info(f"🛡️ [GUARANTEED CASH FLOOR] TP1 Hit! Ratcheting SL to {be_level:.2f} for Gold trade {deal_id}")
                         try:
                             if cid:
                                 u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
