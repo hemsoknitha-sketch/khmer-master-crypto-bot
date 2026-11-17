@@ -2444,24 +2444,38 @@ class QuantGoldExecutionEngine:
                     upl >= max(1.00, spread * 1.5)
                 )
 
-                # M1/M5 Micro-Exhaustion Peak Harvester (Invariant 104 Pillar 4):
-                # Catches sharp reversal pinbars / wicks at peak exhaustion before full 50% retrace occurs!
+                # M1/M5 Micro-Exhaustion Peak Harvester (Invariant 104 Pillar 4 & Invariant 120):
+                # Catches sharp reversal pinbars / wicks and Net Force exhaustion at peak before full 50% retrace occurs!
                 is_exhaustion_harvest = False
                 if not is_manual_trade and (current_peak >= 2.50 or current_peak_pts >= 2.50) and upl >= max(1.20, spread * 1.6):
-                    if (upl <= current_peak * 0.70) or (pnl_pts <= current_peak_pts * 0.70):  # Retraced >= 30% from peak
+                    if (upl <= current_peak * 0.75) or (pnl_pts <= current_peak_pts * 0.75):  # Retraced >= 25% from peak
                         try:
                             candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
-                            if candles_m1 is not None and len(candles_m1) >= 2:
-                                c_last = candles_m1.iloc[-1]
+                            candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
+                            target_harvest_df = candles_m1 if (candles_m1 is not None and len(candles_m1) >= 2) else candles_m5
+                            if target_harvest_df is not None and len(target_harvest_df) >= 2:
+                                c_last = target_harvest_df.iloc[-1]
                                 o_val, h_val, l_val, c_val = float(c_last['open']), float(c_last['high']), float(c_last['low']), float(c_last['close'])
                                 c_range = max(0.15, h_val - l_val)
+
+                                # Net Order Flow Force Check
+                                try:
+                                    from mathematical_engine import compute_net_buy_sell_force
+                                    f_metrics = compute_net_buy_sell_force(target_harvest_df)
+                                    exh_state = f_metrics.get("exhaustion_state", "NEUTRAL_BALANCED")
+                                    b_force = float(f_metrics.get("buy_force_pct", 50.0))
+                                    s_force = float(f_metrics.get("sell_force_pct", 50.0))
+                                except Exception:
+                                    exh_state = "NEUTRAL_BALANCED"
+                                    b_force, s_force = 50.0, 50.0
+
                                 if dir_side == "BUY":
                                     upper_wick = (h_val - max(o_val, c_val)) / c_range
-                                    if upper_wick >= 0.40 or c_val < o_val:
+                                    if upper_wick >= 0.35 or c_val < o_val or exh_state == "BULLS_EXHAUSTED_AT_TOP" or s_force >= 60.0:
                                         is_exhaustion_harvest = True
                                 else:
                                     lower_wick = (min(o_val, c_val) - l_val) / c_range
-                                    if lower_wick >= 0.40 or c_val > o_val:
+                                    if lower_wick >= 0.35 or c_val > o_val or exh_state == "BEARS_EXHAUSTED_AT_BOTTOM" or b_force >= 60.0:
                                         is_exhaustion_harvest = True
                             else:
                                 if upl <= current_peak * 0.65 and upl >= max(1.50, spread * 2.0):
