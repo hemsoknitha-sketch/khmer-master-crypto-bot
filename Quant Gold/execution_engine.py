@@ -1000,14 +1000,13 @@ class QuantGoldExecutionEngine:
         monte_rep = {}
         if CapitalMarketReportEngine:
             try:
-                monte_rep = (
-                    CapitalMarketReportEngine.get_nov11_2026_report_data("GOLD") or
-                    CapitalMarketReportEngine.get_market_report_data("GOLD", current_price=curr_p, report_date="2026-11-11")
-                )
-                monte_res1 = float(monte_rep.get("res1", 4084.28))
-                monte_sup1 = float(monte_rep.get("sup1", 3993.28))
-                c_long = float(monte_rep.get("client_long_pct", 80.0))
-                # Check A: Extreme Retail Crowd Long Trap at Resistance 1 ($4084.28)
+                # Dynamic Volatility S/R based strictly on CURRENT live price and current ATR
+                m15_atr_calc = float(m15_tf.get("atr", 6.5) or 6.5) if isinstance(m15_tf, dict) else 6.5
+                monte_rep = CapitalMarketReportEngine.get_market_report_data("GOLD", current_price=curr_p, daily_atr=m15_atr_calc)
+                monte_res1 = float(monte_rep.get("res1", curr_p + 15.0))
+                monte_sup1 = float(monte_rep.get("sup1", curr_p - 15.0))
+                c_long = float(monte_rep.get("client_long_pct", 50.0))
+                # Check A: Extreme Retail Crowd Long Trap at Resistance 1
                 if c_long >= 75.0 and curr_p >= (monte_res1 - 2.50):
                     if mtf_action == "BUY" or ai_action == "BUY":
                         # FOMO buy into 80% retail herd trap is prohibited
@@ -1017,8 +1016,8 @@ class QuantGoldExecutionEngine:
                         ai_data["action"] = "HOLD"
                     # Smart money distribution short bias boost
                     weighted_score = min(weighted_score - 15.0, -12.0)
-                # Check B: Contrarian Support Rebound at Support 1 ($3993.28)
-                elif curr_p <= (monte_sup1 + 2.50):
+                # Check B: Contrarian Support Rebound at Support 1 ONLY IF actively bouncing with positive momentum
+                elif curr_p <= (monte_sup1 + 2.50) and kalman.get("latent_velocity", 0.0) > 0.02 and counts.get("bullish", 0) > counts.get("bearish", 0):
                     if mtf_action == "SELL" or ai_action == "SELL":
                         mtf_action = "HOLD"
                         ai_action = "HOLD"
@@ -1028,6 +1027,27 @@ class QuantGoldExecutionEngine:
                     weighted_score = max(weighted_score + 15.0, 12.0)
             except Exception as e:
                 logger.debug("Monte Safieddine report evaluation exception: %s", e)
+
+        # Macro H1 & H4 Top-Down Structural Directional Anchor (AQ88 Invariant 123)
+        h1_tf = mtf_data.get("timeframes", {}).get("H1", {}) if isinstance(mtf_data, dict) else {}
+        h4_tf = mtf_data.get("timeframes", {}).get("H4", {}) if isinstance(mtf_data, dict) else {}
+        h1_bias = str(h1_tf.get("bias", "NEUTRAL")).upper()
+        h4_bias = str(h4_tf.get("bias", "NEUTRAL")).upper()
+        h1_ema50 = float(h1_tf.get("ema50", 0.0) or 0.0)
+        h1_ema200 = float(h1_tf.get("ema200", 0.0) or 0.0)
+        bearish_tf_count = counts.get("bearish", 0)
+        bullish_tf_count = counts.get("bullish", 0)
+
+        is_macro_bear = (
+            (h1_bias == "BEARISH" and (curr_p < h1_ema50 or curr_p < h1_ema200)) or
+            (h1_bias == "BEARISH" and h4_bias == "BEARISH") or
+            (bearish_tf_count >= 10 and bullish_tf_count <= 3)
+        )
+        is_macro_bull = (
+            (h1_bias == "BULLISH" and (curr_p > h1_ema50 or curr_p > h1_ema200)) or
+            (h1_bias == "BULLISH" and h4_bias == "BULLISH") or
+            (bullish_tf_count >= 10 and bearish_tf_count <= 3)
+        )
 
         # Dealing Range Chop Filter Check
         m15_tf = mtf_data.get("timeframes", {}).get("M15", {})
@@ -1053,17 +1073,26 @@ class QuantGoldExecutionEngine:
             has_consensus = True
             cand_action = ai_action
 
+        m15_ema21 = float(m15_tf.get("ema21", 0.0) or m15_tf.get("ema20", 0.0) or curr_p)
+        m15_atr_gate = float(m15_tf.get("atr", 6.5) or 6.5)
+
         if has_consensus and cand_action in ["BUY", "SELL"]:
+            # Gate 1.5: Top-Down Macro Trend Alignment Veto (AQ88 Invariant 123)
+            # Catching falling knives in a confirmed Macro Downtrend is officially forbidden!
+            if cand_action == "BUY" and is_macro_bear:
+                final_action = "HOLD"
+                reason = f"H1_H4_MACRO_BEAR_VETO: Price ${curr_p:.2f} is in confirmed Macro Downtrend ({bearish_tf_count}/19 Bearish TFs, H1={h1_bias}, H4={h4_bias}). Buying falling knives or bear flag pullbacks is strictly forbidden."
+            elif cand_action == "SELL" and is_macro_bull:
+                final_action = "HOLD"
+                reason = f"H1_H4_MACRO_BULL_VETO: Price ${curr_p:.2f} is in confirmed Macro Uptrend ({bullish_tf_count}/19 Bullish TFs, H1={h1_bias}, H4={h4_bias}). Shorting tops or bull flags is strictly forbidden."
             # Gate 2: Chop Zone Injunction (Middle 30% Dealing Range is FORBIDDEN unless high conviction breakout)
-            if is_chop_zone and abs(weighted_score) < 28.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.03:
+            elif is_chop_zone and abs(weighted_score) < 28.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.03:
                 final_action = "HOLD"
                 reason = f"BLOCKED_CHOP_ZONE: Price is in middle dealing range ({smc_m15.get('range_pct', 0.5):.2f}) with low momentum."
             # Gate 2.5: Anti-Chasing Momentum Overextension & Spread Drag Guard (Invariant 92 Pillar 1)
             # Chasing an extended impulse candle (> 1.85x ATR from EMA21) forces retail to buy the top wick
             # or sell the bottom wick right before a mean-reverting pullback.
-            m15_ema21 = float(m15_tf.get("ema21", 0.0) or m15_tf.get("ema20", 0.0) or curr_p)
-            m15_atr_gate = float(m15_tf.get("atr", 6.5) or 6.5)
-            if cand_action == "BUY" and (curr_p - m15_ema21) > (1.85 * m15_atr_gate):
+            elif cand_action == "BUY" and (curr_p - m15_ema21) > (1.85 * m15_atr_gate):
                 final_action = "HOLD"
                 reason = f"ANTI_CHASING_IMPULSE_VETO: Price {curr_p:.2f} is {((curr_p - m15_ema21)/m15_atr_gate):.2f}x ATR above 15m EMA21 ({m15_ema21:.2f}). Chasing extended top wick is blocked."
             elif cand_action == "SELL" and (m15_ema21 - curr_p) > (1.85 * m15_atr_gate):
@@ -1095,20 +1124,20 @@ class QuantGoldExecutionEngine:
                 final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
-        # Gate 0.8: Institutional Net Order Flow Force & Climax Exhaustion Trigger (AQ88 Invariant 120)
+        # Gate 0.8: Institutional Net Order Flow Force & Climax Exhaustion Trigger (AQ88 Invariant 120 & 123)
         # Directly catches true exhausted tops to SELL and true exhausted bottoms to BUY
         nof_data = math_data.get("net_order_flow_force", {})
         ex_state = nof_data.get("exhaustion_state", "NEUTRAL_BALANCED")
         if final_action == "HOLD":
-            if ex_state == "BULLS_EXHAUSTED_AT_TOP":
+            if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_macro_bull:
                 rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                if rsi_val >= 50.0:
+                if rsi_val >= 50.0 and kalman.get("latent_velocity", 0.0) <= 0.005:
                     final_action = "SELL"
                     win_prob = max(win_prob, 85.0)
                     reason = f"EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Top (Sell Force {nof_data.get('sell_force_pct', 70)}%, Upper Wick {nof_data.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
-            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_macro_bear:
                 rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                if rsi_val <= 50.0:
+                if rsi_val <= 50.0 and kalman.get("latent_velocity", 0.0) >= 0.015:
                     final_action = "BUY"
                     win_prob = max(win_prob, 85.0)
                     reason = f"EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Bottom (Buy Force {nof_data.get('buy_force_pct', 70)}%, Lower Wick {nof_data.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."

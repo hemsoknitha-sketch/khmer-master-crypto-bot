@@ -295,6 +295,34 @@ class GoldMultiTimeframeEngine:
                 trs.append(tr)
             atr = float(np.mean(trs)) if trs else 1.50
 
+        # 3.5. ADX(14) & Directional Movement Index (+DI, -DI)
+        adx = 20.0
+        plus_di = 20.0
+        minus_di = 20.0
+        if n >= 15:
+            plus_dms = []
+            minus_dms = []
+            tr_list = []
+            for i in range(n - 14, n):
+                up_move = highs[i] - highs[i - 1]
+                down_move = lows[i - 1] - lows[i]
+                plus_dm = up_move if (up_move > down_move and up_move > 0) else 0.0
+                minus_dm = down_move if (down_move > up_move and down_move > 0) else 0.0
+                tr = max(
+                    highs[i] - lows[i],
+                    abs(highs[i] - closes[i - 1]),
+                    abs(lows[i] - closes[i - 1])
+                )
+                plus_dms.append(plus_dm)
+                minus_dms.append(minus_dm)
+                tr_list.append(tr)
+            tr_sum = max(0.01, sum(tr_list))
+            plus_di = round((sum(plus_dms) / tr_sum) * 100.0, 1)
+            minus_di = round((sum(minus_dms) / tr_sum) * 100.0, 1)
+            di_sum = plus_di + minus_di
+            dx = (abs(plus_di - minus_di) / max(0.01, di_sum)) * 100.0
+            adx = round(dx, 1)
+
         # 4. Bollinger Bands (20, 2.0)
         window = min(20, n)
         sma20 = float(np.mean(closes[-window:]))
@@ -391,17 +419,31 @@ class GoldMultiTimeframeEngine:
         else:
             score -= 15.0
 
-        # Momentum RSI
-        if 50.0 < rsi <= 68.0:
-            score += 15.0
-        elif 38.0 <= rsi < 50.0:
-            score -= 15.0
-        elif rsi > 70.0:
-            # Overbought warning: penalize chasing longs
-            score -= 10.0
-        elif rsi < 36.0:
-            # Oversold warning: penalize chasing shorts
-            score += 10.0
+        # ADX Trend Strength & Directional Regimes (AQ88 Invariant 123)
+        is_strong_trend = (adx >= 25.0)
+        is_strong_bear_trend = is_strong_trend and (minus_di > plus_di)
+        is_strong_bull_trend = is_strong_trend and (plus_di > minus_di)
+
+        if is_strong_bear_trend:
+            score -= 20.0
+            # In a strong bear trend, low RSI is pure downward momentum, NOT a buy signal!
+            if rsi < 36.0:
+                score -= 10.0
+        elif is_strong_bull_trend:
+            score += 20.0
+            # In a strong bull trend, high RSI is pure upward momentum, NOT a sell signal!
+            if rsi > 70.0:
+                score += 10.0
+        else:
+            # Ranging / Consolidation Market: Mean-reverting RSI
+            if 50.0 < rsi <= 68.0:
+                score += 15.0
+            elif 38.0 <= rsi < 50.0:
+                score -= 15.0
+            elif rsi > 70.0:
+                score -= 10.0
+            elif rsi < 36.0:
+                score += 10.0
 
         # SMC FVG & Sweep Boost
         if sweep_type == "BULLISH_SWEEP":
@@ -453,6 +495,11 @@ class GoldMultiTimeframeEngine:
             "bias": bias,
             "rsi": round(rsi, 1),
             "atr": round(atr, 2),
+            "adx": round(adx, 1),
+            "plus_di": round(plus_di, 1),
+            "minus_di": round(minus_di, 1),
+            "is_strong_bear_trend": is_strong_bear_trend,
+            "is_strong_bull_trend": is_strong_bull_trend,
             "close": round(curr_p, 2),
             "ema9": round(ema9, 2),
             "ema21": round(ema21, 2),
