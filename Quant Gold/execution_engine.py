@@ -1659,6 +1659,17 @@ class QuantGoldExecutionEngine:
                         tp2_pips_disp = abs(signal_data['tp2'] - signal_data['current_price']) * 10
                         tp3_pips_disp = abs(signal_data['tp3'] - signal_data['current_price']) * 10
                         prefix_title = "🔄 [TREND REVERSAL FLIP]" if is_reversal_flip else ("⚡ [AGILE PYRAMIDING ENTRY]" if is_pyramid else "🥇 [QUANT GOLD AUTO DISPATCH]")
+                        u_res_list = fleet_res.get("user_results", [])
+                        breakdown_lines = []
+                        for ur in u_res_list:
+                            u_cid = ur.get("chat_id")
+                            u_label = "Super Admin (859271875)" if u_cid == 859271875 else f"User {u_cid}"
+                            if ur.get("success"):
+                                breakdown_lines.append(f"   └ <b>{u_label}:</b> ✅ {ur.get('mode')} ({ur.get('lot')} lot)")
+                            else:
+                                breakdown_lines.append(f"   └ <b>{u_label}:</b> ⏸️ {ur.get('reason', 'Skipped')}")
+                        breakdown_str = "\n".join(breakdown_lines) if breakdown_lines else "   └ None"
+
                         alert_msg = (
                             f"{prefix_title} ⚡\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1669,6 +1680,9 @@ class QuantGoldExecutionEngine:
                             f"🚀 <b>Moonshot TP3 (+4.0R) :</b> <code>${signal_data['tp3']:.2f}</code> (+{tp3_pips_disp:.0f} pips | Moonshot)\n"
                             f"⚡ <b>19-TF Alignment :</b> <code>{signal_data['mtf_summary']['counts']['bullish']}B / {signal_data['mtf_summary']['counts']['bearish']}S</code>\n"
                             f"🧠 <b>Win Confidence :</b> <code>{signal_data['confidence']:.1f}%</code>\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"👥 <b>VIP Fleet Execution Breakdown ៖</b>\n"
+                            f"{breakdown_str}\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"✅ <i>Dispatched to {dispatched_count} active VIP Capital accounts!</i>"
                         )
@@ -1825,7 +1839,7 @@ class QuantGoldExecutionEngine:
 
                     if len(open_gold_trades) >= max_user_pos:
                         logger.debug(f"User {cid} already reached max Gold positions ({len(open_gold_trades)}/{max_user_pos}). Skipping.")
-                        return 0
+                        return {"chat_id": cid, "success": False, "reason": f"Max positions reached ({len(open_gold_trades)}/{max_user_pos})"}
 
                     if not is_reversal_flip and len(open_gold_trades) > 0:
                         existing = open_gold_trades[0]
@@ -1835,7 +1849,7 @@ class QuantGoldExecutionEngine:
                                 f"🛡️ [OPPOSING SIGNAL VETO] User {cid} holds open {existing_dir} trade. "
                                 f"New opposing {action} signal strictly muted to prevent hedge-lock collisions."
                             )
-                            return 0
+                            return {"chat_id": cid, "success": False, "reason": f"Opposing {existing_dir} trade held (anti-hedge lock)"}
 
                     # Price Separation Guard: Prevent duplicate order execution at exact same tick in SAME direction
                     for ot in open_gold_trades:
@@ -1846,7 +1860,7 @@ class QuantGoldExecutionEngine:
                                     f"🛡️ [PRICE SEPARATION GUARD] User {cid} holds open trade near ${ot_entry:.2f}. "
                                     f"New entry ${current_price:.2f} within ${min_separation:.2f} buffer. Skipping cluster duplicate."
                                 )
-                                return 0
+                                return {"chat_id": cid, "success": False, "reason": f"Price separation buffer (${min_separation:.2f}) - already held"}
 
                     # ── STEP C: DAILY CAPITAL GOVERNOR CHECK ──
                     if not is_admin:
@@ -1860,7 +1874,7 @@ class QuantGoldExecutionEngine:
                                         f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
                                         f"Capital strictly preserved under Invariant 52."
                                     )
-                                    return 0
+                                    return {"chat_id": cid, "success": False, "reason": f"Daily Governor paused ({lock_reason})"}
                         except Exception as e_gov:
                             logger.debug(f"Daily Governor check note for user {cid}: {e_gov}")
 
@@ -1890,7 +1904,7 @@ class QuantGoldExecutionEngine:
 
                         if len(broker_gold) >= max_user_pos:
                             logger.debug(f"User {cid} already has max GOLD positions ({len(broker_gold)}/{max_user_pos}) on broker. Skipping duplicate order placement.")
-                            return 0
+                            return {"chat_id": cid, "success": False, "reason": f"Broker max positions ({len(broker_gold)}/{max_user_pos})"}
 
                         for bp in broker_gold:
                             p_sub = bp.get("position", bp)
@@ -1899,7 +1913,7 @@ class QuantGoldExecutionEngine:
                                 bp_lvl = float(p_sub.get("level") or p_sub.get("openLevel") or current_price)
                                 if abs(bp_lvl - current_price) < min_separation:
                                     logger.debug(f"User {cid} holds broker {bp_dir} position near ${bp_lvl:.2f}. Skipping cluster duplicate.")
-                                    return 0
+                                    return {"chat_id": cid, "success": False, "reason": f"Broker position near ${bp_lvl:.2f} held"}
                     except Exception as e_chk_pos:
                         logger.debug(f"Pre-flight broker check note for {cid}: {e_chk_pos}")
 
@@ -1956,13 +1970,17 @@ class QuantGoldExecutionEngine:
                             tp3=tp3,
                             is_demo=int(effective_is_demo)
                         )
-                        return 1
+                        return {"chat_id": cid, "success": True, "mode": "LIVE" if not effective_is_demo else "DEMO", "lot": lot_size}
+                    else:
+                        err_msg = str(order_res.get("error", "Broker order rejected"))
+                        return {"chat_id": cid, "success": False, "reason": err_msg}
                 except Exception as e_ord:
                     logger.warning(f"Error placing Gold order for user {cid}: {e_ord}")
-                return 0
+                    return {"chat_id": cid, "success": False, "reason": f"Order error: {e_ord}"}
 
         results = await asyncio.gather(*[_dispatch_single_user(u) for u in active_users], return_exceptions=True)
-        dispatched_count = sum(r for r in results if isinstance(r, int))
+        dispatched_count = sum(1 for r in results if isinstance(r, dict) and r.get("success"))
+        user_results = [r for r in results if isinstance(r, dict)]
 
         sent_count = 0
         now_broadcast = time.time()
@@ -2000,7 +2018,8 @@ class QuantGoldExecutionEngine:
             "dispatched_count": dispatched_count,
             "broadcast_sent": sent_count,
             "action": action,
-            "current_price": current_price
+            "current_price": current_price,
+            "user_results": user_results
         }
 
     async def execute_smart_order_for_user(
