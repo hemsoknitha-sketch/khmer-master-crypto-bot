@@ -719,6 +719,187 @@ class QuantGoldExecutionEngine:
 
         return sent_count
 
+    def _validate_exhaustion_top_bottom(
+        self,
+        direction: str,
+        current_price: float,
+        signal_data: Dict[str, Any]
+    ) -> Tuple[bool, str, float]:
+        """
+        INSTITUTIONAL TOP/BOTTOM EXHAUSTION & CLIMAX VALIDATOR (AQ88 Invariant 120):
+        Strictly differentiates between a 'Moving Freight Train' vs 'True Exhausted Top/Bottom'.
+        Never blind-limits just because price touched a Fibonacci or OLS coordinate.
+        Requires:
+          1. Candlestick Rejection Wick (Upper wick >= 30% for SELL, Lower wick >= 30% for BUY) or Reversal pattern.
+          2. Kalman Latent Velocity Deceleration (velocity <= +0.015 for SELL, velocity >= -0.015 for BUY).
+          3. Momentum Climax & Anti-Chasing Veto (Rejects solid green bars closing near high for SELL, solid red for BUY).
+          4. RSI Extremes or Reversal Hook (RSI >= 62 for SELL, RSI <= 38 for BUY or hooking against impulse).
+        Returns:
+          (is_valid: bool, reason: str, confidence_boost: float)
+        """
+        dir_upper = str(direction).upper()
+        math_sum = signal_data.get("math_summary", {})
+        kalman_vel = float(math_sum.get("kalman_velocity", 0.0) or 0.0)
+
+        # 1. Fetch live M5 and M15 candle structures from MTF engine
+        m5_df = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
+        m15_df = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
+
+        # Candidate metrics
+        has_candle_data = False
+        upper_wick_ratio = 0.0
+        lower_wick_ratio = 0.0
+        is_green = False
+        is_red = False
+        c_body_ratio = 0.0
+        rsi_m5 = 50.0
+        rsi_m15 = 50.0
+        consecutive_same_color = 0
+
+        target_df = m5_df if (m5_df is not None and len(m5_df) >= 3) else m15_df
+        if target_df is not None and len(target_df) >= 3:
+            has_candle_data = True
+            c_high = float(target_df["high"].iloc[-1])
+            c_low = float(target_df["low"].iloc[-1])
+            c_open = float(target_df["open"].iloc[-1])
+            c_close = float(target_df["close"].iloc[-1])
+            c_range = max(c_high - c_low, 0.10)
+
+            upper_wick = max(0.0, c_high - max(c_open, c_close))
+            lower_wick = max(0.0, min(c_open, c_close) - c_low)
+            upper_wick_ratio = upper_wick / c_range
+            lower_wick_ratio = lower_wick / c_range
+            c_body_ratio = abs(c_close - c_open) / c_range
+            is_green = c_close >= c_open
+            is_red = c_close < c_open
+
+            # Check consecutive directional bars in last 3 bars
+            closes = target_df["close"].values
+            opens = target_df["open"].values
+            if is_green:
+                consecutive_same_color = sum(1 for i in range(-3, 0) if closes[i] > opens[i])
+            elif is_red:
+                consecutive_same_color = sum(1 for i in range(-3, 0) if closes[i] < opens[i])
+
+            # Check previous bar's rejection wick
+            p_high = float(target_df["high"].iloc[-2])
+            p_low = float(target_df["low"].iloc[-2])
+            p_open = float(target_df["open"].iloc[-2])
+            p_close = float(target_df["close"].iloc[-2])
+            p_range = max(p_high - p_low, 0.10)
+            p_upper_wick_ratio = max(0.0, p_high - max(p_open, p_close)) / p_range
+            p_lower_wick_ratio = max(0.0, min(p_open, p_close) - p_low) / p_range
+        else:
+            p_upper_wick_ratio = 0.0
+            p_lower_wick_ratio = 0.0
+
+        # Retrieve RSI
+        tf_dict = signal_data.get("timeframes", {})
+        if "M5" in tf_dict:
+            rsi_m5 = float(tf_dict["M5"].get("rsi", 50.0))
+        if "M15" in tf_dict:
+            rsi_m15 = float(tf_dict["M15"].get("rsi", 50.0))
+
+        # --- EVALUATE TOP EXHAUSTION FOR SELL ---
+        if dir_upper == "SELL":
+            # Veto A: Moving Freight Train - Candle is strong green with virtually no upper wick
+            if has_candle_data:
+                if is_green and upper_wick_ratio < 0.22 and kalman_vel > 0.020:
+                    return False, f"VETO_FREIGHT_TRAIN_SELL: Solid green bar (upper wick {upper_wick_ratio*100:.1f}% < 22%) with positive Kalman velocity (+{kalman_vel:.4f}). Never sell into an accelerating bull expansion!", 0.0
+                if consecutive_same_color >= 3 and is_green and upper_wick_ratio < 0.25:
+                    return False, f"VETO_CONSECUTIVE_BULL_BARS: 3 consecutive solid green bars without upper wick. Wait for top rejection wick before shorting.", 0.0
+
+            # Veto B: High upward velocity
+            if kalman_vel > 0.035:
+                return False, f"VETO_HIGH_UPWARD_VELOCITY: 2D Kalman latent velocity (+{kalman_vel:.4f} > +0.035) is charging up. Exhaustion not yet reached.", 0.0
+
+            # Confirmation Points for SELL
+            conf_score = 0.0
+            reasons = []
+
+            # 1. Rejection Wick / Pinbar Star
+            if upper_wick_ratio >= 0.30 or p_upper_wick_ratio >= 0.35:
+                conf_score += 25.0
+                reasons.append(f"Top Rejection Wick ({max(upper_wick_ratio, p_upper_wick_ratio)*100:.1f}%)")
+            elif is_red and c_body_ratio >= 0.25:
+                conf_score += 20.0
+                reasons.append("Red Reversal Bar")
+
+            # 2. Kalman Deceleration / Stall
+            if kalman_vel <= 0.010:
+                conf_score += 20.0
+                reasons.append(f"Kalman Decelerated ({kalman_vel:+.4f})")
+            if kalman_vel <= -0.005:
+                conf_score += 10.0
+                reasons.append("Kalman Rolled Negative")
+
+            # 3. RSI Overbought or Turning Down
+            if rsi_m15 >= 62.0 or rsi_m5 >= 65.0:
+                conf_score += 20.0
+                reasons.append(f"RSI Overbought ({max(rsi_m15, rsi_m5):.1f})")
+
+            # 4. Sweep / FVG resistance
+            tv_matrix = signal_data.get("tradingview_summary", {})
+            if tv_matrix.get("direction") == "SELL" or tv_matrix.get("score", 0.0) <= -20.0:
+                conf_score += 15.0
+                reasons.append("TV Confluence Sell")
+
+            if conf_score >= 35.0:
+                return True, f"EXHAUSTION_CONFIRMED_SELL: {', '.join(reasons)}", min(15.0, conf_score * 0.15)
+            else:
+                return False, f"INSUFFICIENT_EXHAUSTION_SELL: Conf score {conf_score:.1f} < 35.0. Need clearer rejection wick or momentum stall.", 0.0
+
+        # --- EVALUATE BOTTOM EXHAUSTION FOR BUY ---
+        elif dir_upper == "BUY":
+            # Veto A: Falling Knife - Candle is strong red with virtually no lower wick
+            if has_candle_data:
+                if is_red and lower_wick_ratio < 0.22 and kalman_vel < -0.020:
+                    return False, f"VETO_FALLING_KNIFE_BUY: Solid red bar (lower wick {lower_wick_ratio*100:.1f}% < 22%) with negative Kalman velocity ({kalman_vel:.4f}). Never buy into a plunging drop!", 0.0
+                if consecutive_same_color >= 3 and is_red and lower_wick_ratio < 0.25:
+                    return False, f"VETO_CONSECUTIVE_BEAR_BARS: 3 consecutive solid red bars without lower wick. Wait for bottom absorption wick before buying.", 0.0
+
+            # Veto B: High downward velocity
+            if kalman_vel < -0.035:
+                return False, f"VETO_HIGH_DOWNWARD_VELOCITY: 2D Kalman latent velocity ({kalman_vel:.4f} < -0.035) is plunging down. Exhaustion not yet reached.", 0.0
+
+            # Confirmation Points for BUY
+            conf_score = 0.0
+            reasons = []
+
+            # 1. Absorption Wick / Hammer
+            if lower_wick_ratio >= 0.30 or p_lower_wick_ratio >= 0.35:
+                conf_score += 25.0
+                reasons.append(f"Bottom Absorption Wick ({max(lower_wick_ratio, p_lower_wick_ratio)*100:.1f}%)")
+            elif is_green and c_body_ratio >= 0.25:
+                conf_score += 20.0
+                reasons.append("Green Reversal Bar")
+
+            # 2. Kalman Deceleration / Stall
+            if kalman_vel >= -0.010:
+                conf_score += 20.0
+                reasons.append(f"Kalman Decelerated ({kalman_vel:+.4f})")
+            if kalman_vel >= 0.005:
+                conf_score += 10.0
+                reasons.append("Kalman Rolled Positive")
+
+            # 3. RSI Oversold or Turning Up
+            if rsi_m15 <= 38.0 or rsi_m5 <= 35.0:
+                conf_score += 20.0
+                reasons.append(f"RSI Oversold ({min(rsi_m15, rsi_m5):.1f})")
+
+            # 4. Sweep / FVG support
+            tv_matrix = signal_data.get("tradingview_summary", {})
+            if tv_matrix.get("direction") == "BUY" or tv_matrix.get("score", 0.0) >= 20.0:
+                conf_score += 15.0
+                reasons.append("TV Confluence Buy")
+
+            if conf_score >= 35.0:
+                return True, f"EXHAUSTION_CONFIRMED_BUY: {', '.join(reasons)}", min(15.0, conf_score * 0.15)
+            else:
+                return False, f"INSUFFICIENT_EXHAUSTION_BUY: Conf score {conf_score:.1f} < 35.0. Need clearer absorption wick or momentum stall.", 0.0
+
+        return False, "UNKNOWN_DIRECTION", 0.0
+
     async def evaluate_gold_master_signal(self, fast: bool = False) -> Dict[str, Any]:
         """
         Synthesizes 19-Timeframe Confluence, Quantitative Math, and AI Swarm
@@ -1022,7 +1203,8 @@ class QuantGoldExecutionEngine:
                 "client_long_pct": monte_rep.get("client_long_pct", 80.0),
                 "client_short_pct": monte_rep.get("client_short_pct", 20.0),
                 "institutional_long_pct": monte_rep.get("institutional_long_pct", 84.0)
-            }
+            },
+            "timeframes": mtf_data.get("timeframes", {})
         }
         self._last_signal_data = res
         self._last_signal_ts = time.time()
@@ -1258,34 +1440,54 @@ class QuantGoldExecutionEngine:
                 ols_l = float(ols_sum.get("lower", 0.0) or 0.0)
                 spread_buf = max(1.20, float(signal_data.get("spread", 0.50)) * 2.5)
 
+                candidate_dir = None
+                candidate_setup = None
+                candidate_level = 0.0
+
                 if dom_bias == "BUY":
                     # Buy Limit Station: Price retested Golden Pocket or Lower OLS Band
                     if gp_618 >= 3500.0 and abs(current_price - gp_618) <= spread_buf:
-                        action = "BUY"
-                        confidence = max(confidence, 80.0)
-                        in_memory_limit_setup = "LIMIT_GOLDEN_POCKET_BUY"
-                        self._last_in_memory_limit_hit_ts = now_limit
-                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched 0.618 Golden Pocket (${gp_618:.2f}). Instant Zero-Latency BUY Fill!")
+                        candidate_dir = "BUY"
+                        candidate_setup = "LIMIT_GOLDEN_POCKET_BUY"
+                        candidate_level = gp_618
                     elif ols_l >= 3500.0 and abs(current_price - ols_l) <= spread_buf:
-                        action = "BUY"
-                        confidence = max(confidence, 78.0)
-                        in_memory_limit_setup = "LIMIT_OLS_LOWER_BUY"
-                        self._last_in_memory_limit_hit_ts = now_limit
-                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Lower OLS 2σ Band (${ols_l:.2f}). Instant Zero-Latency BUY Fill!")
+                        candidate_dir = "BUY"
+                        candidate_setup = "LIMIT_OLS_LOWER_BUY"
+                        candidate_level = ols_l
                 elif dom_bias == "SELL":
                     # Sell Limit Station: Price rallied into Upper OLS Band or Fib Resistance
                     if ols_u >= 3500.0 and abs(current_price - ols_u) <= spread_buf:
-                        action = "SELL"
-                        confidence = max(confidence, 80.0)
-                        in_memory_limit_setup = "LIMIT_OLS_UPPER_SELL"
-                        self._last_in_memory_limit_hit_ts = now_limit
-                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Upper OLS 2σ Band (${ols_u:.2f}). Instant Zero-Latency SELL Fill!")
+                        candidate_dir = "SELL"
+                        candidate_setup = "LIMIT_OLS_UPPER_SELL"
+                        candidate_level = ols_u
                     elif gp_618 >= 3500.0 and abs(current_price - gp_618) <= spread_buf:
-                        action = "SELL"
-                        confidence = max(confidence, 78.0)
-                        in_memory_limit_setup = "LIMIT_FIB_RESISTANCE_SELL"
+                        candidate_dir = "SELL"
+                        candidate_setup = "LIMIT_FIB_RESISTANCE_SELL"
+                        candidate_level = gp_618
+
+                if candidate_dir:
+                    # INSTITUTIONAL EXHAUSTION & CLIMAX GUARD (AQ88 Invariant 120):
+                    # Never blind-limit into an expanding momentum candle!
+                    # Must verify that price has exhausted (rejection wick >= 30%, Kalman deceleration, RSI extreme)
+                    is_exhausted, exhaust_reason, conf_boost = self._validate_exhaustion_top_bottom(
+                        direction=candidate_dir,
+                        current_price=current_price,
+                        signal_data=signal_data
+                    )
+                    if is_exhausted:
+                        action = candidate_dir
+                        confidence = min(94.0, max(confidence, 82.0) + conf_boost)
+                        in_memory_limit_setup = candidate_setup
                         self._last_in_memory_limit_hit_ts = now_limit
-                        logger.info(f"🎯 [IN-MEMORY LIMIT HIT] Price ${current_price:.2f} touched Fib Retracement Resistance (${gp_618:.2f}). Instant Zero-Latency SELL Fill!")
+                        logger.info(
+                            f"🎯 [IN-MEMORY LIMIT HIT: EXHAUSTION CONFIRMED] Price ${current_price:.2f} touched "
+                            f"{candidate_setup} (${candidate_level:.2f}) | {exhaust_reason} | High-Conviction {action} Fill!"
+                        )
+                    else:
+                        logger.debug(
+                            f"🛡️ [IN-MEMORY LIMIT BLOCKED BY EXHAUSTION GUARD] Price ${current_price:.2f} touched "
+                            f"{candidate_setup} (${candidate_level:.2f}), but {exhaust_reason}. Order suppressed to prevent catching knife/train."
+                        )
 
                 if action in ["BUY", "SELL"]:
                     if action == "BUY":
@@ -2306,12 +2508,13 @@ class QuantGoldExecutionEngine:
                         # Locks a true positive cash profit floor (+$0.40 to +$0.80 net profit after spread & slippage),
                         # permanently preventing trades from closing at -$0.15 to -$0.50!
                         be_buffer = max(0.80, spread * 1.6)
+                        min_breathing_buf = max(1.50, spread * 2.5)
                         if dir_side == "BUY":
                             raw_be = entry_p + be_buffer
-                            be_level = min(raw_be, curr_p - max(0.80, spread * 1.5))
+                            be_level = min(raw_be, curr_p - min_breathing_buf)
                         else:
                             raw_be = entry_p - be_buffer
-                            be_level = max(raw_be, curr_p + max(0.80, spread * 1.5))
+                            be_level = max(raw_be, curr_p + min_breathing_buf)
 
                         if deal_id not in self._be_armor_locked_deals and abs(sl - be_level) > 0.30:
                             logger.info(f"⚡ [DECOUPLED DUAL-ENGINE] Pos 1 reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Guaranteed Cash Floor {be_level:.2f} & letting Macro Runner ride!")
