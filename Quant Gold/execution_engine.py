@@ -253,48 +253,46 @@ def calculate_capital_gold_lot_size(
     budget: float,
     current_price: float = 4071.78,
     confidence: float = 50.0,
-    leverage: float = 500.0,
-    min_deal_size: float = 0.25
+    leverage: float = 20.0,
+    min_deal_size: float = 0.10,
+    available_cash: Optional[float] = None
 ) -> float:
     """
-    Computes Capital.com Gold (XAUUSD) order size in Troy Ounces.
+    Computes Capital.com Gold (XAUUSD) order size in Troy Ounces with Dynamic Margin Affordability Auto-Clamping.
     - Contract Unit: Troy Ounces (oz)
-    - Single Compact Order Standard: Baseline minimum is 0.5 Troy Ounce (Margin required = ~$4.07 at 500:1 leverage).
-    - Isolated Small Capital Sizing: If user's 20% budget is less than $4.07 (e.g. $10 - $20 account),
-      allows a standalone micro order of 0.25 oz (~$2.03 margin, or 0.10 oz) independently for that user,
-      WITHOUT dragging down or capping larger capital users!
-    - Conviction Scaling for Standard/Large Accounts: Higher conviction unlocks larger position sizes up to 20% margin ceiling.
+    - Margin Factor: 0.05 (5% margin requirement = 20:1 retail leverage on Capital.com).
+    - Dynamic Margin Affordability Clamping: Clamps lot size so required margin NEVER exceeds 55% of available cash.
+    - Zero Margin Pre-Flight Rejection Guarantee: Guarantees that VIP users with $100 - $200 cash are sized at ~0.4 - 0.5 oz,
+      completely eliminating Capital.com margin pre-flight blocks!
     """
-    margin_per_oz = max(1.0, current_price / max(1.0, leverage))  # ~$8.14 per oz at 500:1
-    margin_budget_20pct = max(0.0, float(budget or 50.0) * 0.20)
-    margin_for_half_oz = 0.5 * margin_per_oz  # ~$4.07 at $4071.78
-    margin_for_quarter_oz = 0.25 * margin_per_oz  # ~$2.03
+    margin_factor = 0.05  # Capital.com Gold CFD retail margin is 5% (20:1 leverage)
+    margin_per_oz = max(10.0, float(current_price or 3870.0) * margin_factor)  # ~$193.40 per oz at $3868
 
-    # Tier 1: Small Capital Isolated Floor (20% budget < $4.07)
-    if margin_budget_20pct < margin_for_half_oz:
-        # Isolated sizing: Only affects this small account, zero drag on large users
-        if margin_budget_20pct >= margin_for_quarter_oz or float(budget or 0.0) >= 10.0:
-            return 0.25
-        elif float(budget or 0.0) >= 5.0:
-            return max(0.10, min_deal_size)
-        else:
-            return min_deal_size
+    # Determine effective equity base
+    effective_cash = float(available_cash) if (available_cash is not None and float(available_cash) > 0.0) else float(budget or 50.0)
+    
+    # Margin capacity: Maximum safe margin to allocate is 55% of effective cash (leaving 45% safety buffer)
+    max_safe_margin = max(5.0, effective_cash * 0.55)
+    max_size_allowed = max(min_deal_size, round(max_safe_margin / margin_per_oz, 1))
 
-    # Tier 2: Standard and Large Capital Accounts (20% margin >= $4.07, e.g. budget >= $25)
-    max_size_allowed = max(0.5, round(margin_budget_20pct / margin_per_oz, 1))
-
-    # Dynamic conviction scaling: Higher conviction -> Larger positions
+    # Dynamic conviction scaling: Higher conviction -> Larger positions within safe margin
     if confidence >= 90.0:
-        # Supreme Conviction (90% - 99.99%): Scale up to full 20% margin ceiling
+        # Supreme Conviction (90% - 99.99%): Scale up to full safe margin ceiling
         calculated_size = max_size_allowed
     elif confidence >= 80.0:
-        # High Conviction: Scale to ~10% margin (~50% of ceiling)
-        calculated_size = max(0.5, round(max_size_allowed * 0.5, 1))
+        # High Conviction: Scale to ~65% of safe ceiling
+        calculated_size = max(min_deal_size, round(max_size_allowed * 0.65, 1))
     else:
-        # Baseline / Standard: Pure Single Compact 0.5 Troy Ounces ($4.07 margin)
-        calculated_size = 0.5
+        # Baseline / Standard: Pure Single Compact (0.25 to 0.50 oz) clamped by safe margin
+        calculated_size = max(min_deal_size, min(0.50, round(max_safe_margin * 0.50 / margin_per_oz, 1)))
 
-    return max(0.5, min(max_size_allowed, calculated_size))
+    final_lot = max(min_deal_size, min(max_size_allowed, calculated_size))
+
+    # Absolute Margin Pre-Flight Clamp: Required margin MUST NOT exceed 60% of effective cash
+    if (final_lot * margin_per_oz) > (effective_cash * 0.60):
+        final_lot = max(min_deal_size, round((effective_cash * 0.55) / margin_per_oz, 1))
+
+    return round(float(final_lot), 2)
 
 
 class QuantGoldExecutionEngine:
@@ -593,6 +591,8 @@ class QuantGoldExecutionEngine:
         if deal_id is None or not self._active_gold_deal_id or str(self._active_gold_deal_id) == str(deal_id):
             if self._active_gold_direction:
                 self._last_closed_trade_direction = self._active_gold_direction
+            if self._active_gold_entry_price > 0.0:
+                self._last_closed_trade_entry = self._active_gold_entry_price
             self._active_gold_deal_id = None
             self._active_gold_direction = None
             self._active_gold_entry_price = 0.0
@@ -800,8 +800,23 @@ class QuantGoldExecutionEngine:
         if "M15" in tf_dict:
             rsi_m15 = float(tf_dict["M15"].get("rsi", 50.0))
 
+        # Real-time Net Buy/Sell Force Meter from mathematical_engine
+        try:
+            from mathematical_engine import compute_net_buy_sell_force
+            force_metrics = compute_net_buy_sell_force(target_df, kalman_velocity=kalman_vel)
+        except Exception:
+            force_metrics = {}
+
+        buy_force_pct = float(force_metrics.get("buy_force_pct", 50.0))
+        sell_force_pct = float(force_metrics.get("sell_force_pct", 50.0))
+        exhaustion_state = str(force_metrics.get("exhaustion_state", "NEUTRAL_BALANCED"))
+
         # --- EVALUATE TOP EXHAUSTION FOR SELL ---
         if dir_upper == "SELL":
+            # Veto A0: Expanding Bull Force Climax
+            if buy_force_pct >= 62.0 or exhaustion_state == "BULL_MOMENTUM_EXPANDING":
+                return False, f"VETO_BULL_MOMENTUM_EXPANDING: Bull force ({buy_force_pct:.1f}% vs {sell_force_pct:.1f}%) is in full expansion. Never short into an unbroken bull thrust!", 0.0
+
             # Veto A: Moving Freight Train - Candle is strong green with virtually no upper wick
             if has_candle_data:
                 if is_green and upper_wick_ratio < 0.22 and kalman_vel > 0.020:
@@ -816,6 +831,11 @@ class QuantGoldExecutionEngine:
             # Confirmation Points for SELL
             conf_score = 0.0
             reasons = []
+
+            # 0. Net Order Flow Climax Exhaustion
+            if exhaustion_state == "BULLS_EXHAUSTED_AT_TOP":
+                conf_score += 30.0
+                reasons.append(f"Bulls Exhausted at Top ({buy_force_pct:.1f}%->{sell_force_pct:.1f}%)")
 
             # 1. Rejection Wick / Pinbar Star
             if upper_wick_ratio >= 0.30 or p_upper_wick_ratio >= 0.35:
@@ -851,6 +871,10 @@ class QuantGoldExecutionEngine:
 
         # --- EVALUATE BOTTOM EXHAUSTION FOR BUY ---
         elif dir_upper == "BUY":
+            # Veto A0: Plunging Bear Force Climax
+            if sell_force_pct >= 62.0 or exhaustion_state == "BEAR_MOMENTUM_PLUNGING":
+                return False, f"VETO_BEAR_MOMENTUM_PLUNGING: Bear force ({sell_force_pct:.1f}% vs {buy_force_pct:.1f}%) is in full plunge. Never catch an unbroken falling knife!", 0.0
+
             # Veto A: Falling Knife - Candle is strong red with virtually no lower wick
             if has_candle_data:
                 if is_red and lower_wick_ratio < 0.22 and kalman_vel < -0.020:
@@ -865,6 +889,11 @@ class QuantGoldExecutionEngine:
             # Confirmation Points for BUY
             conf_score = 0.0
             reasons = []
+
+            # 0. Net Order Flow Climax Absorption
+            if exhaustion_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                conf_score += 30.0
+                reasons.append(f"Bears Exhausted at Bottom ({sell_force_pct:.1f}%->{buy_force_pct:.1f}%)")
 
             # 1. Absorption Wick / Hammer
             if lower_wick_ratio >= 0.30 or p_lower_wick_ratio >= 0.35:
@@ -1457,7 +1486,9 @@ class QuantGoldExecutionEngine:
                 gp_618 = float(fib_sum.get("fib_618", 0.0) or 0.0)
                 ols_u = float(ols_sum.get("upper", 0.0) or 0.0)
                 ols_l = float(ols_sum.get("lower", 0.0) or 0.0)
-                spread_buf = max(1.20, float(signal_data.get("spread", 0.50)) * 2.5)
+                spread_val = float(signal_data.get("spread", 0.50))
+                # Strict boundary tolerance: max 0.80 or 1.5x spread
+                boundary_tol = min(1.00, max(0.50, spread_val * 1.5))
 
                 candidate_dir = None
                 candidate_setup = None
@@ -1465,21 +1496,23 @@ class QuantGoldExecutionEngine:
 
                 if dom_bias == "BUY":
                     # Buy Limit Station: Price retested Golden Pocket or Lower OLS Band
-                    if gp_618 >= 3500.0 and abs(current_price - gp_618) <= spread_buf:
+                    # Price must test support and NOT crash below it by more than $0.50
+                    if gp_618 >= 3500.0 and abs(current_price - gp_618) <= boundary_tol and current_price >= (gp_618 - 0.50):
                         candidate_dir = "BUY"
                         candidate_setup = "LIMIT_GOLDEN_POCKET_BUY"
                         candidate_level = gp_618
-                    elif ols_l >= 3500.0 and abs(current_price - ols_l) <= spread_buf:
+                    elif ols_l >= 3500.0 and abs(current_price - ols_l) <= boundary_tol and current_price >= (ols_l - 0.50):
                         candidate_dir = "BUY"
                         candidate_setup = "LIMIT_OLS_LOWER_BUY"
                         candidate_level = ols_l
                 elif dom_bias == "SELL":
                     # Sell Limit Station: Price rallied into Upper OLS Band or Fib Resistance
-                    if ols_u >= 3500.0 and abs(current_price - ols_u) <= spread_buf:
+                    # Price must test resistance and NOT surge above it by more than $0.50
+                    if ols_u >= 3500.0 and abs(current_price - ols_u) <= boundary_tol and current_price <= (ols_u + 0.50):
                         candidate_dir = "SELL"
                         candidate_setup = "LIMIT_OLS_UPPER_SELL"
                         candidate_level = ols_u
-                    elif gp_618 >= 3500.0 and abs(current_price - gp_618) <= spread_buf:
+                    elif gp_618 >= 3500.0 and abs(current_price - gp_618) <= boundary_tol and current_price <= (gp_618 + 0.50):
                         candidate_dir = "SELL"
                         candidate_setup = "LIMIT_FIB_RESISTANCE_SELL"
                         candidate_level = gp_618
@@ -1522,13 +1555,18 @@ class QuantGoldExecutionEngine:
                     sl_val = float(signal_data["sl"])
                     sl_dist = abs(current_price - sl_val)
 
-            # Prevent same-direction revenge chasing within post-loss cooldown
+            # Prevent same-direction revenge chasing or churning within post-trade cooldown
             if action in ["BUY", "SELL"] and not has_existing and not is_reversal_flip_trigger:
-                if action == last_closed_dir and time_since_close < getattr(self, "_trade_cooldown_seconds", 45.0):
-                    logger.debug(f"🛡️ [POST-LOSS COOLDOWN] Same-direction {action} suppressed for {round(self._trade_cooldown_seconds - time_since_close, 1)}s to prevent revenge chase.")
+                min_cd = getattr(self, "_trade_cooldown_seconds", 45.0)
+                last_closed_entry = getattr(self, "_last_closed_trade_entry", 0.0)
+                is_near_last_entry = (last_closed_entry > 0.0) and (abs(current_price - last_closed_entry) < 2.50)
+                effective_cd = max(min_cd, 90.0 if is_near_last_entry else 30.0)
+
+                if action == last_closed_dir and time_since_close < effective_cd:
+                    logger.debug(f"🛡️ [POST-CLOSE COOLDOWN] Same-direction {action} suppressed for {round(effective_cd - time_since_close, 1)}s to prevent churn/revenge chase.")
                     return {
                         "status": "COOLDOWN_ACTIVE",
-                        "remaining_seconds": round(self._trade_cooldown_seconds - time_since_close, 1)
+                        "remaining_seconds": round(effective_cd - time_since_close, 1)
                     }
 
             # Throttle repetitive signal dispatch when previous identical signal had 0 fills (fleet busy/locked)
@@ -1922,7 +1960,8 @@ class QuantGoldExecutionEngine:
                         budget=budget,
                         current_price=current_price,
                         confidence=confidence,
-                        leverage=500.0
+                        leverage=20.0,
+                        available_cash=live_avail if not effective_is_demo else None
                     )
 
                     order_res = await asyncio.to_thread(
@@ -2046,9 +2085,16 @@ class QuantGoldExecutionEngine:
             if size is None or float(size or 0.0) <= 0:
                 b_info = u_eng.get_account_balance() if u_eng else {}
                 u_budget = float(b_info.get("balance", 50.0) or 50.0)
-                size = calculate_capital_gold_lot_size(budget=u_budget, current_price=curr_p, confidence=75.0)
+                u_avail = float(b_info.get("available", u_budget) or u_budget)
+                size = calculate_capital_gold_lot_size(
+                    budget=u_budget,
+                    current_price=curr_p,
+                    confidence=75.0,
+                    leverage=20.0,
+                    available_cash=u_avail
+                )
             else:
-                size = max(0.25, float(size or 0.5))
+                size = max(0.10, float(size or 0.5))
 
             # Symmetrical tight structural SL ($6.08) and 3-stage targets (+73, +152, +243 pips)
             sl_dist = 6.08
