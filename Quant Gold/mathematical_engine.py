@@ -203,6 +203,128 @@ def fit_ornstein_uhlenbeck(series: np.ndarray, dt: float = 1.0) -> Dict[str, flo
     }
 
 
+def compute_net_buy_sell_force(
+    candles_df: Optional[pd.DataFrame],
+    kalman_velocity: float = 0.0
+) -> Dict[str, Any]:
+    """
+    INSTITUTIONAL BUY/SELL FORCE & CLIMAX EXHAUSTION CALCULATOR:
+    Synthesizes Volume Delta (CVD Proxy), Candlestick Wick Absorption,
+    Elder-Ray Bull/Bear Power, and 2D Kalman Latent Velocity into a
+    deterministic Net Force Metric (-100% to +100%).
+    
+    Identifies:
+      - BULLS_EXHAUSTED_AT_TOP: Buyers pushed price to extreme, but sellers absorbed (rejection wick >= 30%, velocity stalling/turning negative). Prime SELL trigger!
+      - BEARS_EXHAUSTED_AT_BOTTOM: Sellers dumped price to extreme, but buyers absorbed (absorption wick >= 30%, velocity stalling/turning positive). Prime BUY trigger!
+      - BULL_MOMENTUM_EXPANDING: Unbroken buying force (Do NOT short!).
+      - BEAR_MOMENTUM_PLUNGING: Unbroken selling force (Do NOT catch falling knife!).
+    """
+    if candles_df is None or len(candles_df) < 5:
+        return {
+            "buy_force_pct": 50.0,
+            "sell_force_pct": 50.0,
+            "net_force": 0.0,
+            "exhaustion_state": "NEUTRAL_BALANCED",
+            "upper_wick_ratio": 0.0,
+            "lower_wick_ratio": 0.0,
+            "elder_bull_power": 0.0,
+            "elder_bear_power": 0.0
+        }
+
+    closes = candles_df["close"].values
+    highs = candles_df["high"].values
+    lows = candles_df["low"].values
+    opens = candles_df["open"].values
+    vols = candles_df.get("volume", pd.Series(np.ones(len(candles_df)))).values
+
+    # 1. Recent Bar Geometry
+    c_close = float(closes[-1])
+    c_high = float(highs[-1])
+    c_low = float(lows[-1])
+    c_open = float(opens[-1])
+    c_range = max(0.10, c_high - c_low)
+
+    upper_wick = max(0.0, c_high - max(c_open, c_close))
+    lower_wick = max(0.0, min(c_open, c_close) - c_low)
+    upper_wick_ratio = upper_wick / c_range
+    lower_wick_ratio = lower_wick / c_range
+    body_ratio = abs(c_close - c_open) / c_range
+    is_green = c_close >= c_open
+    is_red = c_close < c_open
+
+    # 2. Cumulative Volume Delta Proxy across last 5 bars
+    deltas = []
+    n_bars = min(5, len(closes))
+    for i in range(-n_bars, 0):
+        bar_rng = max(0.10, highs[i] - lows[i])
+        vol_i = vols[i] if vols[i] > 0 else 1.0
+        delta_i = vol_i * (closes[i] - opens[i]) / bar_rng
+        deltas.append(delta_i)
+    avg_delta = float(np.mean(deltas))
+
+    # 3. Elder-Ray Bull & Bear Power (EMA 13 baseline)
+    ema13 = float(pd.Series(closes).ewm(span=13, adjust=False).mean().iloc[-1])
+    bull_power = c_high - ema13
+    bear_power = c_low - ema13
+
+    # 4. Multi-Factor Net Force Computation (Base 50/50)
+    buy_score = 50.0
+    sell_score = 50.0
+
+    # Candle body contribution
+    if is_green:
+        buy_score += min(20.0, body_ratio * 25.0)
+    else:
+        sell_score += min(20.0, body_ratio * 25.0)
+
+    # Wick Absorption contribution
+    # Large upper wick means aggressive selling pressure capping the top
+    if upper_wick_ratio >= 0.28:
+        sell_score += min(25.0, upper_wick_ratio * 35.0)
+        buy_score -= min(20.0, upper_wick_ratio * 30.0)
+    # Large lower wick means aggressive buying pressure absorbing the bottom
+    if lower_wick_ratio >= 0.28:
+        buy_score += min(25.0, lower_wick_ratio * 35.0)
+        sell_score -= min(20.0, lower_wick_ratio * 30.0)
+
+    # Kalman Latent Velocity contribution
+    if kalman_velocity > 0.015:
+        buy_score += min(20.0, kalman_velocity * 400.0)
+    elif kalman_velocity < -0.015:
+        sell_score += min(20.0, abs(kalman_velocity) * 400.0)
+
+    # Normalize to 0-100%
+    tot = max(1.0, buy_score + sell_score)
+    buy_force_pct = round(float(np.clip((buy_score / tot) * 100.0, 5.0, 95.0)), 1)
+    sell_force_pct = round(float(np.clip((sell_score / tot) * 100.0, 5.0, 95.0)), 1)
+    net_force = round(buy_force_pct - sell_force_pct, 1)
+
+    # 5. Classify Exhaustion State
+    exhaustion_state = "NEUTRAL_BALANCED"
+    if upper_wick_ratio >= 0.28 or (is_red and upper_wick_ratio >= 0.20):
+        if kalman_velocity <= 0.012:
+            exhaustion_state = "BULLS_EXHAUSTED_AT_TOP"
+    elif is_green and upper_wick_ratio < 0.20 and kalman_velocity > 0.020:
+        exhaustion_state = "BULL_MOMENTUM_EXPANDING"
+
+    if lower_wick_ratio >= 0.28 or (is_green and lower_wick_ratio >= 0.20):
+        if kalman_velocity >= -0.012:
+            exhaustion_state = "BEARS_EXHAUSTED_AT_BOTTOM"
+    elif is_red and lower_wick_ratio < 0.20 and kalman_velocity < -0.020:
+        exhaustion_state = "BEAR_MOMENTUM_PLUNGING"
+
+    return {
+        "buy_force_pct": buy_force_pct,
+        "sell_force_pct": sell_force_pct,
+        "net_force": net_force,
+        "exhaustion_state": exhaustion_state,
+        "upper_wick_ratio": round(upper_wick_ratio, 3),
+        "lower_wick_ratio": round(lower_wick_ratio, 3),
+        "elder_bull_power": round(bull_power, 2),
+        "elder_bear_power": round(bear_power, 2)
+    }
+
+
 class GoldMathematicalCore:
     """
     Unified Institutional Quantitative Mathematics Engine for Spot Gold (XAUUSD).
@@ -357,6 +479,10 @@ class GoldMathematicalCore:
 
         bayes_prob = float(np.clip(bayes_prob, 35.0, 94.0))
 
+        # 8. Net Order Flow Buy/Sell Force & Exhaustion State
+        force_candles = candles_m15 if (candles_m15 is not None and len(candles_m15) >= 5) else candles_m1
+        force_data = compute_net_buy_sell_force(force_candles, kalman_velocity=velocity)
+
         result = {
             "timestamp": now,
             "current_price": round(current_price, 2),
@@ -375,6 +501,7 @@ class GoldMathematicalCore:
             },
             "tradingview_matrix": tv_matrix_data,
             "ornstein_uhlenbeck": ou_params,
+            "net_order_flow_force": force_data,
             "hawkes_intensity": round(hawkes_intensity, 2),
             "macro_satellite": {
                 "sge_premium_usd": round(sge_premium_usd, 2),

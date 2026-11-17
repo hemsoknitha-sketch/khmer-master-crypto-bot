@@ -1066,6 +1066,24 @@ class QuantGoldExecutionEngine:
                 final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
+        # Gate 0.8: Institutional Net Order Flow Force & Climax Exhaustion Trigger (AQ88 Invariant 120)
+        # Directly catches true exhausted tops to SELL and true exhausted bottoms to BUY
+        nof_data = math_data.get("net_order_flow_force", {})
+        ex_state = nof_data.get("exhaustion_state", "NEUTRAL_BALANCED")
+        if final_action == "HOLD":
+            if ex_state == "BULLS_EXHAUSTED_AT_TOP":
+                rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
+                if rsi_val >= 50.0:
+                    final_action = "SELL"
+                    win_prob = max(win_prob, 85.0)
+                    reason = f"EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Top (Sell Force {nof_data.get('sell_force_pct', 70)}%, Upper Wick {nof_data.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
+            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
+                if rsi_val <= 50.0:
+                    final_action = "BUY"
+                    win_prob = max(win_prob, 85.0)
+                    reason = f"EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Bottom (Buy Force {nof_data.get('buy_force_pct', 70)}%, Lower Wick {nof_data.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
+
         # Dynamic Breathing Stop Loss & H1/H4 Institutional Structural Invalidation Anchor (Invariant 35 & 98):
         # Strict Standard: SL Distance >= max(1.80 * H1_ATR, 1.15 * H4_ATR, 3.60 * ATR_15m, spread * 5.0, 0.0065 * Price)
         m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
@@ -1173,7 +1191,8 @@ class QuantGoldExecutionEngine:
                 "regime": regime,
                 "kalman_velocity": kalman.get("latent_velocity", 0.0),
                 "composite_hurst": hurst.get("composite", 0.50),
-                "bayesian_win_probability": math_data.get("bayesian_win_probability", 50.0)
+                "bayesian_win_probability": math_data.get("bayesian_win_probability", 50.0),
+                "net_order_flow_force": math_data.get("net_order_flow_force", {})
             },
             "tradingview_summary": {
                 "score": tv_matrix.get("score", 0.0),
