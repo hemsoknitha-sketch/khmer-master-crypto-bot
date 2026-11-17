@@ -1425,6 +1425,22 @@ class QuantGoldExecutionEngine:
                     "remaining_seconds": round(15.0 - time_since_close, 1)
                 }
 
+            # Step 1.95: Real-World Gold Interbank Session Gatekeeper (AQ88 Invariant 122)
+            try:
+                from gold_session_planner import get_gold_session_planner
+                session_planner = get_gold_session_planner()
+                is_session_allowed, session_gate_reason = session_planner.is_trading_allowed()
+                cur_session = session_planner.get_current_session()
+                if not is_session_allowed and not has_existing:
+                    logger.debug(f"🛡️ [SESSION STANDBY] {session_gate_reason}")
+                    return {
+                        "status": "SESSION_STANDBY",
+                        "session": cur_session.get("name"),
+                        "reason": session_gate_reason
+                    }
+            except Exception as e_sess:
+                logger.debug(f"Session gatekeeper check note: {e_sess}")
+
             # Step 2: Check Active VIP Users & Super Admin Guarantee
             active_users = db.get_active_capital_auto_users() or []
             existing_cids = {u.get("chat_id") for u in active_users}
@@ -1956,12 +1972,20 @@ class QuantGoldExecutionEngine:
                         logger.debug(f"Pre-flight broker check note for {cid}: {e_chk_pos}")
 
                     # ── STEP E: ORDER EXECUTION ──
+                    # Real-World Interbank Session Sizing Multiplier (AQ88 Invariant 122)
+                    try:
+                        from gold_session_planner import get_gold_session_planner
+                        sess_mult = get_gold_session_planner().get_risk_multiplier()
+                    except Exception:
+                        sess_mult = 1.0
+
+                    effective_budget = max(10.0, budget * sess_mult)
                     lot_size = calculate_capital_gold_lot_size(
-                        budget=budget,
+                        budget=effective_budget,
                         current_price=current_price,
                         confidence=confidence,
                         leverage=20.0,
-                        available_cash=live_avail if not effective_is_demo else None
+                        available_cash=(live_avail * sess_mult) if (not effective_is_demo and live_avail is not None) else None
                     )
 
                     order_res = await asyncio.to_thread(

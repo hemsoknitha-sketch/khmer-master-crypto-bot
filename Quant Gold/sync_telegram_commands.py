@@ -86,6 +86,7 @@ async def sync_menu():
         BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
         BotCommand("signal", "🎯 View Current Super Smart Gold Signal & Levels"),
         BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
+        BotCommand("gold_plan", "📅 Real-World Gold Sessions & 24H Roadmap"),
         BotCommand("auto", "🤖 Toggle 24/7 Autonomous Gold Trading"),
         BotCommand("status", "💵 Live Gold Price, Spread & Capital Session"),
         BotCommand("help", "📖 User Guide & Fiduciary Covenant")

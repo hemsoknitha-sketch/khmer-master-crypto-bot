@@ -83,17 +83,19 @@ from execution_engine import (
 def get_quant_gold_bottom_keyboard(chat_id: Optional[int] = None) -> ReplyKeyboardMarkup:
     """
     Super Smart & Beautiful Persistent 1-Tap Bottom Keyboard for Quick Commands.
-    Institutional Gold Trading Deck (4 rows, 9 core 1-tap buttons):
+    Institutional Gold Trading Deck (5 rows, 10 core 1-tap buttons):
       Row 1: [ 🥇 Quant Gold Dashboard ]  [ 🎯 Gold Signal ]
       Row 2: [ 🟢 BUY GOLD (0.5 oz) ]     [ 🔴 SELL GOLD (0.5 oz) ]
       Row 3: [ 📊 Open Positions ]         [ 🤖 Auto-Trade (ON/OFF) ]
-      Row 4: [ 💵 Status ]                 [ 👑 VIP License ]  [ 📖 Help ]
+      Row 4: [ 📅 ផែនការម៉ោងមាស (Gold Plan) ]  [ 💵 Status ]
+      Row 5: [ 👑 VIP License ]                 [ 📖 Help ]
     """
     keyboard = [
         [KeyboardButton("🥇 Quant Gold Dashboard"), KeyboardButton("🎯 Gold Signal")],
         [KeyboardButton("🟢 BUY GOLD (0.5 oz)"), KeyboardButton("🔴 SELL GOLD (0.5 oz)")],
         [KeyboardButton("📊 Open Positions"), KeyboardButton("🤖 Auto-Trade (ON/OFF)")],
-        [KeyboardButton("💵 Status"), KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")]
+        [KeyboardButton("📅 ផែនការម៉ោងមាស (Gold Plan)"), KeyboardButton("💵 Status")],
+        [KeyboardButton("👑 VIP License"), KeyboardButton("📖 Help")]
     ]
 
     return ReplyKeyboardMarkup(
@@ -134,6 +136,7 @@ class QuantGoldBot:
                 BotCommand("start", "🥇 Open Quant Gold Dashboard & 19-TF Spectrum"),
                 BotCommand("signal", "🎯 View Current Super Smart Gold Signal & Levels"),
                 BotCommand("capital", "🏛️ Capital.com Live Gold Trading Deck"),
+                BotCommand("gold_plan", "📅 Real-World Gold Sessions & 24H Roadmap"),
                 BotCommand("auto", "🤖 Toggle 24/7 Autonomous Gold Trading"),
                 BotCommand("status", "💵 Live Gold Price, Spread & Capital Session"),
                 BotCommand("help", "📖 User Guide & Fiduciary Covenant")
@@ -255,6 +258,11 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("admin_agreements", self.handle_admin_agreements))
         self.app.add_handler(CommandHandler("backup", self.handle_backup))
         self.app.add_handler(CommandHandler("admin_backup", self.handle_backup))
+        self.app.add_handler(CommandHandler("gold_plan", self.handle_gold_plan))
+        self.app.add_handler(CommandHandler("goldplan", self.handle_gold_plan))
+        self.app.add_handler(CommandHandler("sessions", self.handle_gold_plan))
+        self.app.add_handler(CommandHandler("session", self.handle_gold_plan))
+        self.app.add_handler(CommandHandler("plan", self.handle_gold_plan))
         self.app.add_handler(CommandHandler("help", self.handle_help))
 
         # Callback query handler for 1-tap interactive buttons
@@ -2020,6 +2028,30 @@ class QuantGoldBot:
         ])
         await self.safe_reply(update, card, reply_markup=kb)
 
+    async def handle_gold_plan(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Displays the Institutional Real-World Gold Session Trading Plan & Roadmap (AQ88 Invariant 122)."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+
+        allowed, wait_sec = self.citadel.check_rate_limit(chat_id, action_type="COMMAND")
+        if not allowed:
+            return await self.safe_reply(update, f"⏳ <i>សូមរង់ចាំ <b>{wait_sec:.1f} វិនាទី</b> (Anti-Flood Protection)</i>")
+
+        from gold_session_planner import get_gold_session_planner
+        card = get_gold_session_planner().build_gold_session_plan_card(chat_id)
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🎯 Gold Signal (/signal)", callback_data="btn_qgold_signal"),
+                InlineKeyboardButton("📊 Positions (/positions)", callback_data="btn_qgold_positions")
+            ],
+            [
+                InlineKeyboardButton("🔄 Refresh ផែនការ (Live)", callback_data="btn_refresh_gold_plan"),
+                InlineKeyboardButton("🥇 ផ្ទាំងបញ្ជា (Dashboard)", callback_data="btn_qgold_dashboard")
+            ]
+        ])
+        await self.safe_reply(update, card, reply_markup=kb)
+
     async def handle_license(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays the user's personal VIP license status and Capital.com registration status."""
         chat_id = update.effective_chat.id if update.effective_chat else None
@@ -3260,12 +3292,19 @@ class QuantGoldBot:
                 )
                 account_blocks.append(block)
 
+            try:
+                from gold_session_planner import get_gold_session_planner
+                session_badge = get_gold_session_planner().format_session_badge()
+            except Exception:
+                session_badge = "🏛️ <b>វគ្គទីផ្សារ ៖</b> 🟢 Interbank 24/7 Market Active"
+
             fleet_text = "\n\n".join(account_blocks)
             msg = (
                 f"🏛️ <b>[ANGKOR QUANT - ស្ថានភាពកងនាវាមាស 24/7 FLEET STATUS]</b> 💎\n"
                 f"══════════════════════════════════════\n"
                 f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
                 f"• Bid: <code>${bid:.2f}</code> | Ask: <code>${ask:.2f}</code> | Spread: <code>${spread:.2f}</code>\n"
+                f"• {session_badge}\n"
                 f"──────────────────────────────────────\n"
                 f"📊 <b>ស្ថិតិកងនាវាសរុប (Fleet Aggregates) ៖</b>\n"
                 f"• សមតុល្យ Live សរុប ៖ <code>${total_live_balance:.2f} USD</code>\n"
@@ -3286,6 +3325,9 @@ class QuantGoldBot:
                 [
                     InlineKeyboardButton("🏛️ Admin Capital (/admin_capital)", callback_data="btn_qgold_admin_capital"),
                     InlineKeyboardButton("🎯 Gold Signal", callback_data="btn_qgold_signal")
+                ],
+                [
+                    InlineKeyboardButton("📅 ផែនការម៉ោងមាស (/gold_plan)", callback_data="btn_gold_plan")
                 ]
             ])
         else:
@@ -3335,11 +3377,18 @@ class QuantGoldBot:
 
             uname = update.effective_user.username if update.effective_user and update.effective_user.username else f"User_{chat_id}"
 
+            try:
+                from gold_session_planner import get_gold_session_planner
+                session_badge = get_gold_session_planner().format_session_badge()
+            except Exception:
+                session_badge = "🏛️ <b>វគ្គទីផ្សារ ៖</b> 🟢 Interbank 24/7 Market Active"
+
             msg = (
                 f"🏛️ <b>[ANGKOR QUANT - ស្ថានភាពគណនីជួញដូរមាស 24/7]</b> 💎\n"
                 f"══════════════════════════════════════\n"
                 f"💵 <b>តម្លៃមាសបច្ចុប្បន្ន (XAUUSD) ៖</b> <code>${curr_p:.2f}</code>\n"
                 f"• Bid: <code>${bid:.2f}</code> | Ask: <code>${ask:.2f}</code> | Spread: <code>${spread:.2f}</code>\n"
+                f"• {session_badge}\n"
                 f"──────────────────────────────────────\n"
                 f"👤 <b>គណនី Capital.com ៖</b> <code>{user_acc}</code> ({acct_mode})\n"
                 f"• ម្ចាស់គណនី ៖ <code>@{uname}</code> (👑 VIP Lifetime)\n"
@@ -3355,6 +3404,9 @@ class QuantGoldBot:
                 [
                     InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_qgold_status"),
                     InlineKeyboardButton("🎯 Gold Signal", callback_data="btn_qgold_signal")
+                ],
+                [
+                    InlineKeyboardButton("📅 ផែនការម៉ោងមាស (/gold_plan)", callback_data="btn_gold_plan")
                 ]
             ])
 
@@ -4479,6 +4531,16 @@ class QuantGoldBot:
             import legal_agreement
             await legal_agreement.handle_agreement_callback(update, context, data, chat_id)
 
+        elif data in ["btn_gold_plan", "btn_refresh_gold_plan"]:
+            try:
+                await query.answer("📅 Refreshing Gold Session Roadmap...")
+            except Exception:
+                pass
+            from gold_session_planner import get_gold_session_planner
+            planner = get_gold_session_planner()
+            text_card, kb_card = planner.build_gold_session_plan_card(chat_id)
+            await self.safe_edit(query, text_card, reply_markup=kb_card)
+
         elif data in ["btn_menu_refresh", "btn_menu_home"]:
             try:
                 await query.answer("🔄 Refreshing...")
@@ -4518,6 +4580,8 @@ class QuantGoldBot:
                 )
         elif "Status" in text:
             await self.handle_status(update, context)
+        elif "ផែនការ" in text or "Plan" in text or "📅" in text:
+            await self.handle_gold_plan(update, context)
         elif "License" in text or "VIP" in text:
             await self.handle_license(update, context)
         elif "Health" in text:

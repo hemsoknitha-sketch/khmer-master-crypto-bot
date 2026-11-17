@@ -278,6 +278,12 @@ class QuantGoldCapitalBridge:
         tv_score = float(tv_mat.get("score", 0.0) or 0.0)
         tv_wr = float(tv_mat.get("win_rate", 50.0) or 50.0)
 
+        try:
+            from gold_session_planner import get_gold_session_planner
+            session_badge = get_gold_session_planner().format_session_badge()
+        except Exception:
+            session_badge = "🏛️ <b>វគ្គទីផ្សារ ៖</b> 🟢 Interbank 24/7 Market Active"
+
         action_icon = "🟢 STRONG BUY" if action == "BUY" else ("🔴 STRONG SELL" if action == "SELL" else "⚪ HOLD / CHOP FILTER")
 
         card = (
@@ -303,6 +309,7 @@ class QuantGoldCapitalBridge:
             f"{ui_standards.DIVIDER_LIGHT}\n"
             f"🥇 <b>Spot Gold (XAUUSD) Real-Time Snapshot ៖</b>\n"
             f"• តម្លៃបច្ចុប្បន្ន ៖ <code>${curr_p:.2f}</code> | Spread ៖ <code>${spread:.2f}</code>\n"
+            f"• {session_badge}\n"
             f"• សកម្មភាព AI ៖ <code>{action_icon}</code> (Edge: <code>{conf:.1f}%</code>)\n"
             f"• TV 10-Matrix ៖ <code>{tv_dir} ({tv_score:+.0f})</code> (Win: <code>{tv_wr:.1f}%</code>)\n"
             f"• 19-TF Confluence Score ៖ <code>{weighted_score:+.1f} / 100</code> "
@@ -334,10 +341,11 @@ class QuantGoldCapitalBridge:
             ],
             [
                 InlineKeyboardButton("🤖 Toggle Auto-Trade", callback_data="btn_qgold_toggle"),
-                InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_qgold_refresh")
+                InlineKeyboardButton("📅 ផែនការម៉ោងមាស (/gold_plan)", callback_data="btn_gold_plan")
             ],
             [
-                InlineKeyboardButton("📜 កិច្ចសន្យាផ្លូវការ (Agreements Audit)", callback_data="btn_admin_agreements")
+                InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_qgold_refresh"),
+                InlineKeyboardButton("📜 កិច្ចសន្យាផ្លូវការ (Agreements)", callback_data="btn_admin_agreements")
             ]
         ]
         return card, InlineKeyboardMarkup(buttons)
@@ -428,6 +436,12 @@ class QuantGoldCapitalBridge:
         pips_tp2 = abs(tp2 - curr_p) * 10
         pips_tp3 = abs(tp3 - curr_p) * 10
 
+        try:
+            from gold_session_planner import get_gold_session_planner
+            session_badge = get_gold_session_planner().format_session_badge()
+        except Exception:
+            session_badge = "🏛️ <b>វគ្គទីផ្សារ ៖</b> 🟢 Interbank 24/7 Market Active"
+
         action_icon = "🟢 STRONG BUY" if action == "BUY" else ("🔴 STRONG SELL" if action == "SELL" else "⚪ HOLD / CHOP FILTER")
 
         card = (
@@ -444,6 +458,7 @@ class QuantGoldCapitalBridge:
             f"{ui_standards.DIVIDER_LIGHT}\n"
             f"🥇 <b>Spot Gold (XAUUSD) Real-Time Spectrum ៖</b>\n"
             f"• តម្លៃបច្ចុប្បន្ន ៖ <code>${curr_p:.2f}</code> | Spread ៖ <code>${spread:.2f}</code>\n"
+            f"• {session_badge}\n"
             f"• សកម្មភាព AI ៖ <code>{action_icon}</code> (Edge: <code>{conf:.1f}%</code>)\n"
             f"• TV 10-Matrix ៖ <code>{tv_dir} ({tv_score:+.0f})</code> (Win: <code>{tv_wr:.1f}%</code>)\n"
             f"• វិសាលគម 19 TFs ៖ 🟢 {counts.get('bullish', 0)} | 🔴 {counts.get('bearish', 0)} | ⚪ {counts.get('neutral', 0)} "
@@ -482,9 +497,10 @@ class QuantGoldCapitalBridge:
             ],
             [
                 InlineKeyboardButton("💵 Live Status (/status)", callback_data="btn_qgold_status"),
-                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh")
+                InlineKeyboardButton("📅 ផែនការម៉ោងមាស (/gold_plan)", callback_data="btn_gold_plan")
             ],
             [
+                InlineKeyboardButton("🔄 Refresh 19-TF Scan", callback_data="btn_qgold_refresh"),
                 InlineKeyboardButton("📜 កិច្ចសន្យាផ្លូវការ (My Contract)", callback_data="btn_download_my_pdf")
             ],
             [
