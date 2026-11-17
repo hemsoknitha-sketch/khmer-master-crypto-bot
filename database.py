@@ -3663,14 +3663,14 @@ def get_active_capital_auto_trades(deal_id: Optional[str] = None) -> list:
 
     if deal_id:
         cursor.execute("""
-            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id, is_demo
             FROM capital_auto_trades
             WHERE (deal_id = ? OR deal_reference = ?) AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
             ORDER BY id DESC
         """, (str(deal_id), str(deal_id)))
     else:
         cursor.execute("""
-            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id, is_demo
             FROM capital_auto_trades
             WHERE status = 'OPEN' OR status LIKE 'ACTIVE%'
             ORDER BY id DESC
@@ -3695,7 +3695,8 @@ def get_active_capital_auto_trades(deal_id: Optional[str] = None) -> list:
             "tp3": r[13],
             "sl_dist": r[14],
             "scale_tier": r[15],
-            "tranche_id": r[16]
+            "tranche_id": r[16],
+            "is_demo": bool(r[17]) if len(r) > 17 and r[17] is not None else False
         }
         for r in rows
     ]
@@ -4089,7 +4090,8 @@ def get_capital_auto_trades(chat_id: Optional[int] = None, limit: int = 50, stat
                    t.entry_price, t.exit_price, t.sl, t.tp, t.pnl, t.status, t.created_at, t.closed_at,
                    t.scale_tier, t.tranche_id,
                    COALESCE(u.username, '') as username,
-                   COALESCE(c.account_id, '') as account_id
+                   COALESCE(c.account_id, '') as account_id,
+                   COALESCE(t.is_demo, 0) as is_demo
             FROM capital_auto_trades t
             LEFT JOIN users u ON u.chat_id = t.chat_id
             LEFT JOIN user_capital_credentials c ON c.chat_id = t.chat_id
@@ -4114,7 +4116,7 @@ def get_capital_auto_trades(chat_id: Optional[int] = None, limit: int = 50, stat
         conn.close()
         cols = ["id", "chat_id", "deal_id", "deal_reference", "epic", "direction", "size",
                 "entry_price", "exit_price", "sl", "tp", "pnl", "status", "created_at", "closed_at",
-                "scale_tier", "tranche_id", "username", "account_id"]
+                "scale_tier", "tranche_id", "username", "account_id", "is_demo"]
         return [dict(zip(cols, r)) for r in rows]
     except Exception:
         try: conn.close()

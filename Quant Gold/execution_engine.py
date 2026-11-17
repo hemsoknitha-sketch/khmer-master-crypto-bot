@@ -2228,6 +2228,134 @@ class QuantGoldExecutionEngine:
             logger.error(f"❌ [1-TAP GOLD] Error placing Gold order for {chat_id}: {e}", exc_info=True)
             return {"success": False, "message": str(e), "error": str(e)}
 
+    async def _close_all_fleet_open_gold_positions(
+        self,
+        direction: str,
+        reason: str,
+        exit_price: float,
+        current_pnl_pts: float = 0.0,
+        app = None
+    ) -> int:
+        """
+        UNIVERSAL FLEET-WIDE SYNCHRONIZED CLOSE (AQ88 Invariant 121):
+        Concurrently closes ALL open Gold positions across the fleet (Super Admin Live, Super Admin Demo, and all VIPs)
+        at the exact same second, completely eliminating orphaned lagging positions!
+        """
+        dir_upper = str(direction).upper()
+        targets_to_close = []
+        seen_deals = set()
+
+        # 1. Gather all open Gold trades from database matching this direction
+        try:
+            db_trades = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
+            for t in db_trades:
+                if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("direction", "")).upper() == dir_upper:
+                    d_id = str(t.get("deal_id", ""))
+                    if d_id and d_id not in seen_deals and not d_id.startswith("MANUAL_"):
+                        seen_deals.add(d_id)
+                        targets_to_close.append({
+                            "chat_id": t.get("chat_id") or 859271875,
+                            "is_demo": bool(t.get("is_demo", False)),
+                            "deal_id": d_id,
+                            "entry_price": float(t.get("entry_price", exit_price) or exit_price),
+                            "size": float(t.get("size", 0.5) or 0.5)
+                        })
+        except Exception as e_dbt:
+            logger.debug(f"Fleet close DB query note: {e_dbt}")
+
+        # 2. Interrogate broker open positions directly across all active users
+        active_users = db.get_active_capital_auto_users() or []
+        user_targets = [
+            {"chat_id": 859271875, "is_demo": False},
+            {"chat_id": 859271875, "is_demo": True}
+        ]
+        for u in active_users:
+            cid = u.get("chat_id")
+            if cid and cid != 859271875:
+                user_targets.append({"chat_id": cid, "is_demo": bool(u.get("is_demo", False))})
+
+        seen_user_targets = {(ut["chat_id"], ut["is_demo"]) for ut in user_targets}
+        for vip_cid in [643724109, 1744387717]:
+            if (vip_cid, False) not in seen_user_targets:
+                user_targets.append({"chat_id": vip_cid, "is_demo": False})
+                seen_user_targets.add((vip_cid, False))
+
+        for ut in user_targets:
+            cid = ut["chat_id"]
+            is_demo = ut["is_demo"]
+            try:
+                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                if not u_eng:
+                    continue
+                pos_list = await asyncio.wait_for(asyncio.to_thread(u_eng.get_open_positions), timeout=3.0)
+                for p_item in (pos_list or []):
+                    pos = p_item.get("position", p_item)
+                    epic = str(p_item.get("market", {}).get("epic") or pos.get("epic") or "").upper()
+                    p_dir = str(pos.get("direction", "")).upper()
+                    d_id = str(pos.get("dealId") or pos.get("deal_id") or "")
+                    if epic == "GOLD" and p_dir == dir_upper and d_id and d_id not in seen_deals:
+                        seen_deals.add(d_id)
+                        lvl = float(pos.get("level") or pos.get("openLevel") or exit_price)
+                        sz = float(pos.get("size", 0.5) or 0.5)
+                        targets_to_close.append({
+                            "chat_id": cid,
+                            "is_demo": is_demo,
+                            "deal_id": d_id,
+                            "entry_price": lvl,
+                            "size": sz
+                        })
+            except Exception as e_b_scan:
+                logger.debug(f"Broker position scan note for user {cid} (demo={is_demo}): {e_b_scan}")
+
+        if not targets_to_close:
+            logger.info(f"🏛️ [FLEET CLOSE] Zero active {dir_upper} Gold positions found on broker or DB.")
+            self._clear_active_trade(cooldown=20.0, direction=dir_upper)
+            return 0
+
+        logger.info(f"⚡ [FLEET-WIDE SYNCHRONIZED CLOSE] Closing {len(targets_to_close)} {dir_upper} Gold positions across entire fleet ({reason}) @ ${exit_price:.2f}...")
+
+        # 3. Concurrent fan-out close across all broker sessions via asyncio.gather
+        async def _close_single_target(item: dict) -> dict:
+            c_id = item["chat_id"]
+            d_id = item["deal_id"]
+            i_demo = item["is_demo"]
+            e_price = item["entry_price"]
+            s_val = item["size"]
+            try:
+                u_eng = capital_engine.get_user_capital_engine(c_id, is_demo=i_demo)
+                c_res = await asyncio.to_thread(u_eng.close_position, deal_id=d_id) if u_eng else {"success": False}
+                pnl_pts = (exit_price - e_price) if dir_upper == "BUY" else (e_price - exit_price)
+                upl = pnl_pts * s_val
+                if hasattr(db, "update_capital_auto_trade_close"):
+                    db.update_capital_auto_trade_close(d_id, exit_price=exit_price, pnl=upl)
+                logger.info(f"✅ [FLEET CLOSE ITEM] Closed {dir_upper} deal #{d_id} for user {c_id} (Demo={i_demo}) @ ${exit_price:.2f} (PnL: ${upl:.2f})")
+                return {"deal_id": d_id, "chat_id": c_id, "success": c_res.get("success", False), "upl": upl, "pnl_pts": pnl_pts}
+            except Exception as e_close_one:
+                logger.warning(f"Error closing target deal {d_id} for user {c_id}: {e_close_one}")
+                if hasattr(db, "update_capital_auto_trade_close"):
+                    db.update_capital_auto_trade_close(d_id, exit_price=exit_price, pnl=0.0)
+                return {"deal_id": d_id, "chat_id": c_id, "success": False, "error": str(e_close_one)}
+
+        results = await asyncio.gather(*[_close_single_target(t) for t in targets_to_close], return_exceptions=True)
+
+        # 4. Broadcast ONE single consolidated profit alert card to VIP users if profitable
+        pips = int(round(current_pnl_pts * 10.0))
+        if current_pnl_pts >= 0.80 or pips >= 8:
+            card_stage = "SCALP" if (current_pnl_pts < 6.0 and pips < 50) else "CLOSE"
+            card_shock = format_gold_tp_card(
+                stage=card_stage,
+                pips=max(pips, 10),
+                direction=dir_upper,
+                entry_price=targets_to_close[0]["entry_price"]
+            )
+            markup = get_gold_signal_reply_markup()
+            await self.broadcast_to_vip_users(card_shock, app=app, reply_markup=markup)
+
+        # 5. Clear global active trade state and activate clean post-trade cooldown
+        self._clear_active_trade(cooldown=20.0, direction=dir_upper)
+        self._cached_broker_gold_count = 0
+        return len(targets_to_close)
+
     async def _audit_and_protect_open_gold_positions(self, app=None):
         """
         Continuously audits open Gold positions across all users:
@@ -2312,6 +2440,36 @@ class QuantGoldExecutionEngine:
                         logger.debug(f"User broker position audit note for {c_id}: {e_b_usr}")
             except Exception as e_bpos:
                 logger.debug(f"Broker open positions check note: {e_bpos}")
+
+            # Orphaned Fleet Harmonization & Desynchronization Armor (AQ88 Invariant 121):
+            # Check if Super Admin is flat (0 open Gold positions) while any VIP user still holds an open Gold trade.
+            sa_live_deals = user_broker_open_deals.get((859271875, False), set())
+            sa_demo_deals = user_broker_open_deals.get((859271875, True), set())
+            is_sa_flat = (len(sa_live_deals) == 0 and len(sa_demo_deals) == 0) and (
+                (859271875, False) in successfully_audited_engs or (859271875, True) in successfully_audited_engs
+            )
+
+            if is_sa_flat:
+                lingering_vip_trades = [
+                    tr for tr in active_trades
+                    if str(tr.get("epic", "")).upper() == "GOLD"
+                    and str(tr.get("status", "OPEN")).upper() == "OPEN"
+                    and tr.get("chat_id") != 859271875
+                ]
+                if lingering_vip_trades:
+                    first_dir = str(lingering_vip_trades[0].get("direction", "BUY")).upper()
+                    logger.info(
+                        f"⚡ [ORPHANED FLEET SWEEP] Super Admin is flat (0 positions), but {len(lingering_vip_trades)} VIP Gold trades "
+                        f"remain open. Auto-closing all lingering VIP positions in sync with Super Admin!"
+                    )
+                    await self._close_all_fleet_open_gold_positions(
+                        direction=first_dir,
+                        reason="ORPHANED_FLEET_SYNC_CLOSE",
+                        exit_price=curr_p,
+                        current_pnl_pts=0.0,
+                        app=app
+                    )
+                    return
 
             for idx, tr in enumerate(active_trades):
                 if str(tr.get("epic", "")).upper() != "GOLD":
@@ -2421,34 +2579,35 @@ class QuantGoldExecutionEngine:
                     str(tr.get("source", "")).upper() == "MANUAL"
                 )
 
-                # Flash Shock & Micro-Exhaustion Peak Protective Harvest (Invariants 35 & 104):
-                # Never choke trades on micro-oscillations ($0.19 - $0.49 crumbs), BUT never let a $2.50 - $5.00 winner
-                # retrace all the way back into scratch or small loss!
-                # 1. Price points moved >= +2.50 (+25 pips) and retraced >= 45% (while retaining >= +1.20 pts & upl >= max(1.00, spread * 1.5))
-                # 2. Dollar UPL reached >= $2.50 and retraced >= 45% from peak UPL (while retaining >= max(1.00, spread * 1.5) net floor)
-                # 3. M1/M5 Micro-Exhaustion Rejection: Reached >= $2.50 (+25 pips), retraced >= 30%, and M1 shows reversal pinbar/exhaustion wick!
-                # 4. User Manual trades are 100% EXEMPT: Allowed to run to TP1/TP2 or user manual close.
+                # Flash Shock & Micro-Exhaustion Peak Protective Harvest (Invariants 35, 104 & 121):
+                # 100% Size-Invariant: Governed strictly by Price Points / Pips, NOT fixed dollar thresholds!
+                # 1. Price points moved >= +2.00 (+20 pips) and retraced >= 40% from peak points
+                # 2. Retains >= max(0.80, spread * 1.5) net floor and fee-clearing proportional dollar floor
+                min_fee_upl = max(0.15, spread * sz * 1.2)
+                min_profit_pts = max(0.80, spread * 1.5)
+
                 is_shock_pts = (
                     not is_manual_trade and
-                    current_peak_pts >= 2.50 and
+                    current_peak_pts >= 2.00 and
                     current_peak_pts <= 150.0 and
-                    pnl_pts <= (current_peak_pts * 0.55) and  # retraced >= 45%
-                    pnl_pts >= 1.20 and
-                    upl >= max(1.00, spread * 1.5)
+                    pnl_pts <= (current_peak_pts * 0.60) and  # retraced >= 40% from peak points
+                    pnl_pts >= min_profit_pts and
+                    upl >= min_fee_upl
                 )
                 is_shock_upl = (
                     not is_manual_trade and
-                    current_peak >= 2.50 and
+                    current_peak >= 1.50 and
                     current_peak <= 150.0 and
-                    upl <= (current_peak * 0.55) and          # retraced >= 45%
-                    upl >= max(1.00, spread * 1.5)
+                    upl <= (current_peak * 0.60) and          # retraced >= 40% from peak UPL
+                    upl >= min_fee_upl
                 )
 
                 # M1/M5 Micro-Exhaustion Peak Harvester (Invariant 104 Pillar 4 & Invariant 120):
                 # Catches sharp reversal pinbars / wicks and Net Force exhaustion at peak before full 50% retrace occurs!
                 is_exhaustion_harvest = False
-                if not is_manual_trade and (current_peak >= 2.50 or current_peak_pts >= 2.50) and upl >= max(1.20, spread * 1.6):
-                    if (upl <= current_peak * 0.75) or (pnl_pts <= current_peak_pts * 0.75):  # Retraced >= 25% from peak
+                min_exh_pts = max(1.00, spread * 2.0)  # at least +10 pips (clears spread 2x)
+                if not is_manual_trade and (current_peak_pts >= 2.00 or current_peak >= 1.50) and pnl_pts >= min_exh_pts and upl >= min_fee_upl:
+                    if (pnl_pts <= current_peak_pts * 0.75) or (current_peak > 0 and upl <= current_peak * 0.75):  # Retraced >= 25% from peak
                         try:
                             candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
                             candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
@@ -2478,7 +2637,7 @@ class QuantGoldExecutionEngine:
                                     if lower_wick >= 0.35 or c_val > o_val or exh_state == "BEARS_EXHAUSTED_AT_BOTTOM" or b_force >= 60.0:
                                         is_exhaustion_harvest = True
                             else:
-                                if upl <= current_peak * 0.65 and upl >= max(1.50, spread * 2.0):
+                                if (pnl_pts <= current_peak_pts * 0.65) or (upl <= current_peak * 0.65):
                                     is_exhaustion_harvest = True
                         except Exception as e_exh:
                             logger.debug(f"Exhaustion check note: {e_exh}")
@@ -2487,28 +2646,16 @@ class QuantGoldExecutionEngine:
                     harvest_tag = "MICRO-EXHAUSTION HARVEST" if is_exhaustion_harvest else "FLASH SHOCK HARVEST"
                     logger.info(
                         f"⚡ [{harvest_tag}] Gold trade {deal_id} peak ({current_peak_pts:.2f} pts / ${current_peak:.2f}) "
-                        f"pulled back to ({pnl_pts:.2f} pts / ${upl:.2f}). Executing protective early harvest!"
+                        f"pulled back to ({pnl_pts:.2f} pts / ${upl:.2f}). Triggering Universal Fleet-Wide Harvest!"
                     )
-                    try:
-                        if cid:
-                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
-                        if hasattr(db, "update_capital_auto_trade_close"):
-                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
-                        
-                        card_stage = "SCALP" if (current_peak < 6.0 and pips < 50) else "CLOSE"
-                        card_shock = format_gold_tp_card(
-                            stage=card_stage,
-                            pips=pips,
-                            direction=dir_side,
-                            entry_price=entry_p
-                        )
-                        markup = get_gold_signal_reply_markup()
-                        await self.broadcast_to_vip_users(card_shock, app=app, reply_markup=markup)
-                        self._clear_active_trade(deal_key, cooldown=20.0, direction=dir_side)
-                        continue
-                    except Exception as e_shk:
-                        logger.debug(f"Flash shock harvest note: {e_shk}")
+                    await self._close_all_fleet_open_gold_positions(
+                        direction=dir_side,
+                        reason=harvest_tag,
+                        exit_price=curr_p,
+                        current_pnl_pts=pnl_pts,
+                        app=app
+                    )
+                    break
 
                 # 360° Real-Time Market Invalidation & Early Reversal Surveillance (News & Buy/Sell Order Flow):
                 # ANTI-WHIPSAW FLIP COVENANT (AQ84 Invariant 116):
@@ -2549,18 +2696,18 @@ class QuantGoldExecutionEngine:
                             logger.info(
                                 f"🔄 [360° EARLY MICRO-CUT & REVERSAL] Gold trade {deal_id} ({dir_side}) "
                                 f"severely invalidated by {inv_check.get('reason')}. "
-                                f"Cutting loss early @ ${curr_p:.2f} (Loss: ${upl:.2f}) to Flip into {opp_dir} immediately!"
+                                f"Triggering Universal Fleet-Wide Close @ ${curr_p:.2f} (Loss: ${upl:.2f}) to Flip into {opp_dir} immediately!"
                             )
-                            if cid:
-                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                                await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
-                            if hasattr(db, "update_capital_auto_trade_close"):
-                                db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
-
                             self._last_reversal_flip_ts = now_curr
                             self._pending_reversal_action = opp_dir
-                            self._clear_active_trade(deal_key, cooldown=0.0, direction=dir_side)
-                            continue
+                            await self._close_all_fleet_open_gold_positions(
+                                direction=dir_side,
+                                reason="360_MARKET_INVALIDATION_FLIP",
+                                exit_price=curr_p,
+                                current_pnl_pts=pnl_pts,
+                                app=app
+                            )
+                            break
                     except Exception as e_rev_cut:
                         logger.debug(f"360 reversal check note: {e_rev_cut}")
 
@@ -2751,17 +2898,15 @@ class QuantGoldExecutionEngine:
                         markup = get_gold_signal_reply_markup()
                         await self.broadcast_to_vip_users(card_tp3, app=app, reply_markup=markup)
 
-                    # Close remaining runner on broker
-                    try:
-                        if cid:
-                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
-                        if hasattr(db, "update_capital_auto_trade_close"):
-                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
-                        self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
-                    except Exception as e_c3:
-                        logger.debug(f"TP3 close note: {e_c3}")
-                    continue
+                    # Close remaining runner across the entire fleet
+                    await self._close_all_fleet_open_gold_positions(
+                        direction=dir_side,
+                        reason="TP3_MOONSHOT_HIT",
+                        exit_price=curr_p,
+                        current_pnl_pts=pnl_pts,
+                        app=app
+                    )
+                    break
 
                 # Check if position stopped out on broker (SL hit or closed)
                 # If stopped out in profit: notify VIP. If stopped out in loss: DO NOT NOTIFY VIP.
