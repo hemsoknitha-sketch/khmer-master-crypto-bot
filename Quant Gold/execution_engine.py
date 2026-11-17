@@ -2686,46 +2686,50 @@ class QuantGoldExecutionEngine:
 
                 # Flash Shock & Micro-Exhaustion Peak Protective Harvest (Invariants 35, 104 & 121):
                 # 100% Size-Invariant: Governed strictly by Price Points / Pips, NOT fixed dollar thresholds!
-                # 1. Price points moved >= +2.00 (+20 pips) and retraced >= 40% from peak points
-                # 2. Retains >= max(0.80, spread * 1.5) net floor and fee-clearing proportional dollar floor
-                min_fee_upl = max(0.15, spread * sz * 1.2)
-                min_profit_pts = max(0.80, spread * 1.5)
+                # Institutional Rule: Never choke trades that are already protected by Breakeven Armor!
+                # When a position has Breakeven Armor (Risk = 0.00R Free Roll), the Stop-Loss is already locking a profit floor.
+                # Prematurely cutting at +$0.80 prevents the trade from capturing institutional +50 to +150 pip repricing waves!
+                is_be_protected = (deal_id in self._be_armor_locked_deals or scale_tier >= 1)
+                min_fee_upl = max(0.50, spread * sz * 2.0)
+                min_profit_pts = max(2.50, spread * 3.0)  # At least +25 pips ($2.50)
 
+                # Flash Shock Harvest: Requires substantial peak (>= +5.00 pts / +50 pips, or UPL >= $4.00)
+                # and retraces >= 50% from that significant peak, while NOT in Breakeven Armor:
                 is_shock_pts = (
                     not is_manual_trade and
-                    current_peak_pts >= 2.00 and
+                    not is_be_protected and
+                    current_peak_pts >= 5.00 and
                     current_peak_pts <= 150.0 and
-                    pnl_pts <= (current_peak_pts * 0.60) and  # retraced >= 40% from peak points
+                    pnl_pts <= (current_peak_pts * 0.50) and  # retraced >= 50% from significant peak
                     pnl_pts >= min_profit_pts and
                     upl >= min_fee_upl
                 )
                 is_shock_upl = (
                     not is_manual_trade and
-                    current_peak >= 1.50 and
+                    not is_be_protected and
+                    current_peak >= 4.00 and
                     current_peak <= 150.0 and
-                    upl <= (current_peak * 0.60) and          # retraced >= 40% from peak UPL
-                    upl >= min_fee_upl
+                    upl <= (current_peak * 0.50) and          # retraced >= 50% from peak UPL
+                    upl >= max(2.00, min_fee_upl)
                 )
 
-                # M1/M5 Micro-Exhaustion Peak Harvester (Invariant 104 Pillar 4 & Invariant 120):
-                # Catches sharp reversal pinbars / wicks and Net Force exhaustion at peak before full 50% retrace occurs!
+                # M5 Micro-Exhaustion Peak Harvester:
+                # Strictly requires a significant peak (current_peak_pts >= 6.50 / +65 pips)
+                # and confirmed reversal pinbar on M5 (NOT M1 noise), and only if NOT in Breakeven Armor!
                 is_exhaustion_harvest = False
-                min_exh_pts = max(1.00, spread * 2.0)  # at least +10 pips (clears spread 2x)
-                if not is_manual_trade and (current_peak_pts >= 2.00 or current_peak >= 1.50) and pnl_pts >= min_exh_pts and upl >= min_fee_upl:
-                    if (pnl_pts <= current_peak_pts * 0.75) or (current_peak > 0 and upl <= current_peak * 0.75):  # Retraced >= 25% from peak
+                if not is_manual_trade and not is_be_protected and (current_peak_pts >= 6.50 or current_peak >= 5.00) and pnl_pts >= min_profit_pts and upl >= min_fee_upl:
+                    if (pnl_pts <= current_peak_pts * 0.70) or (current_peak > 0 and upl <= current_peak * 0.70):  # Retraced >= 30% from +65 pips peak
                         try:
-                            candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
                             candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
-                            target_harvest_df = candles_m1 if (candles_m1 is not None and len(candles_m1) >= 2) else candles_m5
-                            if target_harvest_df is not None and len(target_harvest_df) >= 2:
-                                c_last = target_harvest_df.iloc[-1]
+                            if candles_m5 is not None and len(candles_m5) >= 2:
+                                c_last = candles_m5.iloc[-1]
                                 o_val, h_val, l_val, c_val = float(c_last['open']), float(c_last['high']), float(c_last['low']), float(c_last['close'])
-                                c_range = max(0.15, h_val - l_val)
+                                c_range = max(0.25, h_val - l_val)
 
-                                # Net Order Flow Force Check
+                                # Net Order Flow Force Check on M5
                                 try:
                                     from mathematical_engine import compute_net_buy_sell_force
-                                    f_metrics = compute_net_buy_sell_force(target_harvest_df)
+                                    f_metrics = compute_net_buy_sell_force(candles_m5)
                                     exh_state = f_metrics.get("exhaustion_state", "NEUTRAL_BALANCED")
                                     b_force = float(f_metrics.get("buy_force_pct", 50.0))
                                     s_force = float(f_metrics.get("sell_force_pct", 50.0))
@@ -2735,15 +2739,12 @@ class QuantGoldExecutionEngine:
 
                                 if dir_side == "BUY":
                                     upper_wick = (h_val - max(o_val, c_val)) / c_range
-                                    if upper_wick >= 0.35 or c_val < o_val or exh_state == "BULLS_EXHAUSTED_AT_TOP" or s_force >= 60.0:
+                                    if (upper_wick >= 0.45 and s_force >= 65.0) or exh_state == "BULLS_EXHAUSTED_AT_TOP":
                                         is_exhaustion_harvest = True
                                 else:
                                     lower_wick = (min(o_val, c_val) - l_val) / c_range
-                                    if lower_wick >= 0.35 or c_val > o_val or exh_state == "BEARS_EXHAUSTED_AT_BOTTOM" or b_force >= 60.0:
+                                    if (lower_wick >= 0.45 and b_force >= 65.0) or exh_state == "BEARS_EXHAUSTED_AT_BOTTOM":
                                         is_exhaustion_harvest = True
-                            else:
-                                if (pnl_pts <= current_peak_pts * 0.65) or (upl <= current_peak * 0.65):
-                                    is_exhaustion_harvest = True
                         except Exception as e_exh:
                             logger.debug(f"Exhaustion check note: {e_exh}")
 
