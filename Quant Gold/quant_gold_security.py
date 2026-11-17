@@ -272,9 +272,8 @@ class QuantGoldSecurityCitadel:
         signals an Agile Early Micro-Cut to avoid waiting for the full SL distance.
         """
         pos_dir = str(position_direction or "").upper()
-        summary = mtf_data.get("summary", {}) if isinstance(mtf_data, dict) else {}
-        w_score = float(summary.get("weighted_score", 0.0) or 0.0)
-        counts = summary.get("counts", {}) if isinstance(summary, dict) else {}
+        w_score = float(mtf_data.get("weighted_score", 0.0) or (mtf_data.get("summary", {}).get("weighted_score", 0.0) if isinstance(mtf_data.get("summary"), dict) else 0.0) or 0.0)
+        counts = mtf_data.get("counts", {}) if isinstance(mtf_data.get("counts"), dict) else (mtf_data.get("summary", {}).get("counts", {}) if isinstance(mtf_data.get("summary"), dict) else {})
         bull_cnt = int(counts.get("bullish", 0) or 0)
         bear_cnt = int(counts.get("bearish", 0) or 0)
 
@@ -284,7 +283,9 @@ class QuantGoldSecurityCitadel:
         # Anti-Whipsaw Chop Zone Injunction (Invariant 76):
         # Flipping back-and-forth in the middle 35% - 65% dealing range is STRICTLY VETOED
         # to prevent death-by-whipsaw in sideways equilibrium.
-        smc = mtf_data.get("smc", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
+        tf_map = mtf_data.get("timeframes", {}) if isinstance(mtf_data.get("timeframes"), dict) else {}
+        m15_tf = tf_map.get("M15", {}) if isinstance(tf_map.get("M15"), dict) else {}
+        smc = m15_tf.get("smc", {}) if isinstance(m15_tf.get("smc"), dict) else (mtf_data.get("smc", {}).get("M15", {}) if isinstance(mtf_data.get("smc"), dict) else {})
         range_pct = float(smc.get("range_pct", 0.50) or 0.50)
         is_middle_chop = (0.35 <= range_pct <= 0.65)
         if is_middle_chop and abs(w_score) < 24.0:
@@ -296,6 +297,9 @@ class QuantGoldSecurityCitadel:
                 "reason": f"BLOCK_CHOP_ZONE_REVERSAL: Price in middle equilibrium ({range_pct:.2f}) with score {w_score:+.1f} < 24.0."
             }
 
+        h1_bias = str(tf_map.get("H1", {}).get("bias", "NEUTRAL")).upper()
+        h4_bias = str(tf_map.get("H4", {}).get("bias", "NEUTRAL")).upper()
+
         is_invalidated = False
         reversal_dir = None
         confidence = 0.0
@@ -303,14 +307,20 @@ class QuantGoldSecurityCitadel:
 
         if pos_dir == "SELL":
             # Opposing bullish thrust detected:
-            if bull_cnt >= 13 or w_score >= 18.0 or (vel >= 0.06 and w_score >= 12.0):
+            # Strictly vetoed if macro timeframes are BEARISH or score is still negative!
+            if (h1_bias == "BEARISH" and h4_bias == "BEARISH") or w_score < 0.0:
+                is_invalidated = False
+            elif (bull_cnt >= 13 and w_score >= 20.0) or (w_score >= 25.0 and vel >= 0.05):
                 is_invalidated = True
                 reversal_dir = "BUY"
                 confidence = min(95.0, max(75.0, 60.0 + (bull_cnt * 2.0)))
                 reason = f"Bullish Order Flow Surge: {bull_cnt}/19 Bullish TF, Score {w_score:+.1f}, Kalman Vel {vel:+.4f}"
         elif pos_dir == "BUY":
             # Opposing bearish thrust detected:
-            if bear_cnt >= 13 or w_score <= -18.0 or (vel <= -0.06 and w_score <= -12.0):
+            # Strictly vetoed if macro timeframes are BULLISH or score is still positive!
+            if (h1_bias == "BULLISH" and h4_bias == "BULLISH") or w_score > 0.0:
+                is_invalidated = False
+            elif (bear_cnt >= 13 and w_score <= -20.0) or (w_score <= -25.0 and vel <= -0.05):
                 is_invalidated = True
                 reversal_dir = "SELL"
                 confidence = min(95.0, max(75.0, 60.0 + (bear_cnt * 2.0)))

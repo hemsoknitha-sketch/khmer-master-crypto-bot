@@ -3663,22 +3663,32 @@ def get_active_capital_auto_trades(deal_id: Optional[str] = None) -> list:
 
     if deal_id:
         cursor.execute("""
-            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id, is_demo
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id, is_demo, created_at
             FROM capital_auto_trades
             WHERE (deal_id = ? OR deal_reference = ?) AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
             ORDER BY id DESC
         """, (str(deal_id), str(deal_id)))
     else:
         cursor.execute("""
-            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id, is_demo
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id, is_demo, created_at
             FROM capital_auto_trades
             WHERE status = 'OPEN' OR status LIKE 'ACTIVE%'
             ORDER BY id DESC
         """)
     rows = cursor.fetchall()
     conn.close()
-    return [
-        {
+    
+    trades = []
+    for r in rows:
+        c_ts = 0.0
+        if len(r) > 18 and r[18]:
+            try:
+                from datetime import timezone
+                s = str(r[18]).split(".")[0]
+                c_ts = datetime.strptime(s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+            except Exception:
+                c_ts = 0.0
+        trades.append({
             "id": r[0],
             "chat_id": r[1],
             "deal_id": r[2],
@@ -3696,10 +3706,11 @@ def get_active_capital_auto_trades(deal_id: Optional[str] = None) -> list:
             "sl_dist": r[14],
             "scale_tier": r[15],
             "tranche_id": r[16],
-            "is_demo": bool(r[17]) if len(r) > 17 and r[17] is not None else False
-        }
-        for r in rows
-    ]
+            "is_demo": bool(r[17]) if len(r) > 17 and r[17] is not None else False,
+            "created_at": str(r[18]) if len(r) > 18 and r[18] else "",
+            "created_at_ts": c_ts
+        })
+    return trades
 
 def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float):
     """Marks a TradFi trade as closed with final exit price and PnL."""

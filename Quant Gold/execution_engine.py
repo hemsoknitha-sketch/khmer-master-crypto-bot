@@ -319,6 +319,8 @@ class QuantGoldExecutionEngine:
         self._active_gold_deal_id: Optional[str] = None
         self._active_gold_direction: Optional[str] = None
         self._active_gold_entry_price: float = 0.0
+        self._active_gold_entry_ts: float = 0.0
+        self._last_reversal_flip_ts: float = 0.0
         self._active_gold_sl: float = 0.0
         self._active_gold_tp1: float = 0.0
         self._active_gold_tp2: float = 0.0
@@ -355,6 +357,7 @@ class QuantGoldExecutionEngine:
             if not real_db_trades:
                 self._active_gold_deal_id = None
                 self._active_gold_direction = None
+                self._active_gold_entry_ts = 0.0
                 self._active_gold_stage = "IDLE"
                 return False
 
@@ -368,6 +371,7 @@ class QuantGoldExecutionEngine:
                     self._active_gold_deal_id = d_id
                     self._active_gold_direction = str(t.get("direction", "BUY")).upper()
                     self._active_gold_entry_price = float(t.get("entry_price", 0.0) or 0.0)
+                    self._active_gold_entry_ts = float(t.get("created_at_ts", 0.0) or 0.0)
                     self._active_gold_sl = float(t.get("sl", 0.0) or 0.0)
                     self._active_gold_tp1 = float(t.get("tp1", 0.0) or 0.0)
                     self._active_gold_tp2 = float(t.get("tp2", 0.0) or 0.0)
@@ -1129,15 +1133,17 @@ class QuantGoldExecutionEngine:
         nof_data = math_data.get("net_order_flow_force", {})
         ex_state = nof_data.get("exhaustion_state", "NEUTRAL_BALANCED")
         if final_action == "HOLD":
-            if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_macro_bull:
+            if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_macro_bull and weighted_score <= 10.0:
                 rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                if rsi_val >= 50.0 and kalman.get("latent_velocity", 0.0) <= 0.005:
+                m15_bias = str(m15_tf.get("bias", "NEUTRAL")).upper()
+                if rsi_val >= 50.0 and kalman.get("latent_velocity", 0.0) <= 0.005 and m15_bias != "BULLISH":
                     final_action = "SELL"
                     win_prob = max(win_prob, 85.0)
                     reason = f"EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Top (Sell Force {nof_data.get('sell_force_pct', 70)}%, Upper Wick {nof_data.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
-            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_macro_bear:
+            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_macro_bear and weighted_score >= -10.0:
                 rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                if rsi_val <= 50.0 and kalman.get("latent_velocity", 0.0) >= 0.015:
+                m15_bias = str(m15_tf.get("bias", "NEUTRAL")).upper()
+                if rsi_val <= 50.0 and kalman.get("latent_velocity", 0.0) >= 0.015 and m15_bias != "BEARISH":
                     final_action = "BUY"
                     win_prob = max(win_prob, 85.0)
                     reason = f"EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Bottom (Buy Force {nof_data.get('buy_force_pct', 70)}%, Lower Wick {nof_data.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
@@ -1281,6 +1287,8 @@ class QuantGoldExecutionEngine:
                 "client_short_pct": monte_rep.get("client_short_pct", 20.0),
                 "institutional_long_pct": monte_rep.get("institutional_long_pct", 84.0)
             },
+            "is_macro_bear": is_macro_bear,
+            "is_macro_bull": is_macro_bull,
             "timeframes": mtf_data.get("timeframes", {})
         }
         self._last_signal_data = res
@@ -1492,6 +1500,8 @@ class QuantGoldExecutionEngine:
             current_price = float(signal_data.get("current_price", 4000.0) or 4000.0)
             sl_val = float(signal_data.get("sl", 0.0) or 0.0)
             sl_dist = abs(current_price - sl_val)
+            is_macro_bear = bool(signal_data.get("is_macro_bear", False))
+            is_macro_bull = bool(signal_data.get("is_macro_bull", False))
 
             # Check if an immediate Agile Reversal Flip was triggered by 360° Surveillance
             pending_rev = getattr(self, "_pending_reversal_action", None)
@@ -1638,16 +1648,57 @@ class QuantGoldExecutionEngine:
 
                 if has_existing:
                     if action != existing_dir:
-                        # Opposing Signal -> Evaluate Trend Reversal Flip (Prompt & Decisive Edge)
-                        if confidence >= 62.0 or abs(weighted_score) >= 25.0:
+                        # Opposing Signal -> Evaluate Trend Reversal Flip (Institutional Anti-Whipsaw Standard AQ88 Invariant 124)
+                        now_ts = now
+                        last_rev_ts = getattr(self, "_last_reversal_flip_ts", 0.0)
+                        rev_cooldown_left = 900.0 - (now_ts - last_rev_ts)  # 15 minutes cooldown
+
+                        first_pos_ts = 0.0
+                        if active_gold_trades:
+                            try:
+                                first_pos_ts = float(active_gold_trades[0].get("created_at_ts", 0.0) or 0.0)
+                            except Exception:
+                                first_pos_ts = 0.0
+                        if first_pos_ts <= 0.0:
+                            first_pos_ts = getattr(self, "_active_gold_entry_ts", 0.0)
+                        time_in_pos = (now_ts - first_pos_ts) if first_pos_ts > 0 else 999.0
+
+                        can_flip = False
+                        flip_veto_reason = ""
+
+                        if rev_cooldown_left > 0:
+                            flip_veto_reason = f"COOLDOWN_ACTIVE ({rev_cooldown_left:.0f}s left of 900s)"
+                        elif time_in_pos < 180.0:
+                            flip_veto_reason = f"MIN_HOLD_PROTECTION (in position {time_in_pos:.0f}s < 180s)"
+                        elif action == "BUY":
+                            if is_macro_bear:
+                                flip_veto_reason = "MACRO_BEAR_VETO (Cannot flip to BUY against H1/H4 Downtrend)"
+                            elif weighted_score < 20.0:
+                                flip_veto_reason = f"INSUFFICIENT_BUY_SCORE (Score {weighted_score:+.1f} < +20.0)"
+                            elif confidence < 75.0:
+                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 75.0%)"
+                            else:
+                                can_flip = True
+                        elif action == "SELL":
+                            if is_macro_bull:
+                                flip_veto_reason = "MACRO_BULL_VETO (Cannot flip to SELL against H1/H4 Uptrend)"
+                            elif weighted_score > -20.0:
+                                flip_veto_reason = f"INSUFFICIENT_SELL_SCORE (Score {weighted_score:+.1f} > -20.0)"
+                            elif confidence < 75.0:
+                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 75.0%)"
+                            else:
+                                can_flip = True
+
+                        if can_flip:
                             is_reversal_flip = True
+                            self._last_reversal_flip_ts = now_ts
                             logger.info(
-                                f"🔄 [TREND REVERSAL FLIP DETECTED] High-conviction {action} signal (Confidence: {confidence:.1f}%, Score: {weighted_score:+.1f}) "
-                                f"opposes current {existing_dir} position. Engaging Reversal Flip Protocol!"
+                                f"🔄 [TREND REVERSAL FLIP APPROVED] High-conviction {action} signal (Confidence: {confidence:.1f}%, Score: {weighted_score:+.1f}) "
+                                f"opposes current {existing_dir} position (held for {time_in_pos:.0f}s). Engaging Institutional Reversal Flip Protocol!"
                             )
                         else:
                             logger.info(
-                                f"🛡️ [REVERSAL FILTER] Opposing {action} signal confidence ({confidence:.1f}%) < 62.0% and score ({weighted_score:+.1f}) < 25.0. "
+                                f"🛡️ [REVERSAL FLIP BLOCKED] Opposing {action} signal rejected: {flip_veto_reason}. "
                                 f"Holding existing {existing_dir} trade."
                             )
                             return {
@@ -2036,6 +2087,7 @@ class QuantGoldExecutionEngine:
                         self._active_gold_deal_id = str(deal_id)
                         self._active_gold_direction = action
                         self._active_gold_entry_price = current_price
+                        self._active_gold_entry_ts = time.time()
                         self._active_gold_sl = sl
                         self._active_gold_tp1 = tp1
                         self._active_gold_tp2 = tp2
@@ -2720,6 +2772,8 @@ class QuantGoldExecutionEngine:
                 now_curr = time.time()
                 tranche_lbl = str(tr.get("tranche_id", "") or "")
                 trade_setup = str(tr.get("setup_type", "") or "")
+                trade_open_ts = float(tr.get("created_at_ts", 0.0) or 0.0)
+                is_held_enough = (trade_open_ts <= 0.0) or ((now_curr - trade_open_ts) >= 180.0)
                 is_already_flipped = (
                     "REVERSAL" in tranche_lbl or
                     "REVERSAL" in trade_setup or
@@ -2727,7 +2781,7 @@ class QuantGoldExecutionEngine:
                 )
 
                 is_floating_loss = (upl <= -2.50 or pnl_pts <= -4.00)
-                if is_floating_loss and not is_manual_trade and not is_already_flipped:
+                if is_floating_loss and not is_manual_trade and not is_already_flipped and is_held_enough:
                     try:
                         from quant_gold_security import get_quant_gold_security_citadel
                         mtf_snap = self.mtf_engine.analyze_all_19_timeframes(current_price=curr_p)
