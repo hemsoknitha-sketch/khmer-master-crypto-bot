@@ -380,6 +380,7 @@ class QuantGoldExecutionEngine:
         self._cached_broker_gold_count: int = 0
         self._user_standby_log_ts: Dict[int, float] = {}
         self._admin_demo_log_ts: float = 0.0
+        self._sa_flat_consecutive_cycles: int = 0
         self._last_valid_gold_quote: Tuple[float, float, float] = (4095.50, 4096.00, 0.50)
 
     def has_active_gold_trade(self) -> bool:
@@ -2479,14 +2480,17 @@ class QuantGoldExecutionEngine:
                     if d_id and d_id not in seen_deals and not d_id.startswith("MANUAL_"):
                         t_lbl = str(t.get("tranche_id", "") or "")
                         s_tier = int(t.get("scale_tier", 0) or 0)
+                        t_cid = t.get("chat_id") or 859271875
                         is_e1 = is_engine_1_scalp(t_lbl, s_tier)
                         if target_scope == "SCALP_ONLY" and not is_e1:
                             continue
                         if target_scope == "MACRO_ONLY" and is_e1:
                             continue
+                        if target_scope == "VIP_ONLY" and t_cid == 859271875:
+                            continue
                         seen_deals.add(d_id)
                         targets_to_close.append({
-                            "chat_id": t.get("chat_id") or 859271875,
+                            "chat_id": t_cid,
                             "is_demo": bool(t.get("is_demo", False)),
                             "deal_id": d_id,
                             "entry_price": float(t.get("entry_price", exit_price) or exit_price),
@@ -2535,6 +2539,8 @@ class QuantGoldExecutionEngine:
                         if target_scope == "SCALP_ONLY" and not is_e1:
                             continue
                         if target_scope == "MACRO_ONLY" and is_e1:
+                            continue
+                        if target_scope == "VIP_ONLY" and cid == 859271875:
                             continue
                         seen_deals.add(d_id)
                         lvl = float(pos.get("level") or pos.get("openLevel") or exit_price)
@@ -2672,7 +2678,8 @@ class QuantGoldExecutionEngine:
                         u_eng = capital_engine.get_user_capital_engine(c_id, is_demo=t_demo)
                         if u_eng:
                             pos_list = await asyncio.to_thread(u_eng.get_open_positions)
-                            if pos_list is not None:
+                            fetch_failed = getattr(u_eng, "_last_positions_fetch_failed", False)
+                            if pos_list is not None and not fetch_failed:
                                 d_set = set()
                                 for p_item in pos_list:
                                     pos = p_item.get("position", p_item)
@@ -2691,11 +2698,25 @@ class QuantGoldExecutionEngine:
             # Check if Super Admin is flat (0 open Gold positions) while any VIP user still holds an open Gold trade.
             sa_live_deals = user_broker_open_deals.get((859271875, False), set())
             sa_demo_deals = user_broker_open_deals.get((859271875, True), set())
-            is_sa_flat = (len(sa_live_deals) == 0 and len(sa_demo_deals) == 0) and (
+            is_sa_flat_now = (len(sa_live_deals) == 0 and len(sa_demo_deals) == 0) and (
                 (859271875, False) in successfully_audited_engs or (859271875, True) in successfully_audited_engs
             )
 
-            if is_sa_flat:
+            if is_sa_flat_now:
+                self._sa_flat_consecutive_cycles += 1
+            else:
+                self._sa_flat_consecutive_cycles = 0
+
+            # Double check database: if Super Admin still has open trades recorded in DB, do not sweep
+            sa_db_open_trades = [
+                tr for tr in active_trades
+                if str(tr.get("epic", "")).upper() == "GOLD"
+                and str(tr.get("status", "OPEN")).upper() == "OPEN"
+                and (tr.get("chat_id") == 859271875 or not tr.get("chat_id"))
+            ]
+            is_sa_truly_flat = (self._sa_flat_consecutive_cycles >= 5 and len(sa_db_open_trades) == 0)
+
+            if is_sa_truly_flat:
                 lingering_vip_trades = [
                     tr for tr in active_trades
                     if str(tr.get("epic", "")).upper() == "GOLD"
@@ -2705,15 +2726,16 @@ class QuantGoldExecutionEngine:
                 if lingering_vip_trades:
                     first_dir = str(lingering_vip_trades[0].get("direction", "BUY")).upper()
                     logger.info(
-                        f"⚡ [ORPHANED FLEET SWEEP] Super Admin is flat (0 positions), but {len(lingering_vip_trades)} VIP Gold trades "
-                        f"remain open. Auto-closing all lingering VIP positions in sync with Super Admin!"
+                        f"⚡ [ORPHANED FLEET SWEEP] Super Admin is confirmed flat (0 positions across {self._sa_flat_consecutive_cycles} cycles), but {len(lingering_vip_trades)} VIP Gold trades "
+                        f"remain open. Auto-closing lingering VIP positions in sync with Super Admin!"
                     )
                     await self._close_all_fleet_open_gold_positions(
                         direction=first_dir,
                         reason="ORPHANED_FLEET_SYNC_CLOSE",
                         exit_price=curr_p,
                         current_pnl_pts=0.0,
-                        app=app
+                        app=app,
+                        target_scope="VIP_ONLY"
                     )
                     return
 

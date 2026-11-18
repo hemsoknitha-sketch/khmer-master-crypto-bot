@@ -544,6 +544,7 @@ class CapitalComEngine:
         self.chat_id: Optional[int] = custom_chat_id
         self.last_auth_error: str = ""
         self.desired_account_id: str = str(desired_account_id or "").strip()
+        self._last_positions_fetch_failed: bool = False
 
         raw_key = (api_key or "").strip()
         raw_id = (identifier or "").strip()
@@ -1462,6 +1463,7 @@ class CapitalComEngine:
     def get_open_positions(self) -> List[Dict[str, Any]]:
         """Retrieves all currently active open positions with automatic connection recovery."""
         if getattr(self, "is_guest", False) or not self.ensure_session():
+            self._last_positions_fetch_failed = True
             return []
 
         url = f"{self.base_url}/positions"
@@ -1471,22 +1473,27 @@ class CapitalComEngine:
                 if res.status_code == 200:
                     self._record_response(res)
                     data = res.json()
+                    self._last_positions_fetch_failed = False
                     return data.get("positions", [])
                 elif res.status_code == 401 and attempt == 0:
                     self.cst_token = None
                     self.security_token = None
                     if self.ensure_session():
                         continue
+                self._last_positions_fetch_failed = True
                 return []
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, ConnectionResetError) as ce:
                 if attempt == 0:
                     time.sleep(0.5)
                     continue
                 logger.warning(f"Transient connection glitch fetching open positions ({type(ce).__name__}). Retrying on next cycle.")
+                self._last_positions_fetch_failed = True
                 return []
             except Exception as e:
                 logger.error(f"Error fetching open positions: {e}")
+                self._last_positions_fetch_failed = True
                 return []
+        self._last_positions_fetch_failed = True
         return []
 
     def place_position(
