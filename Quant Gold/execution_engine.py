@@ -276,15 +276,17 @@ def calculate_capital_gold_lot_size(
     Computes Capital.com Gold (XAUUSD) order size in Troy Ounces with Dynamic Margin Affordability Auto-Clamping.
     - Contract Unit: Troy Ounces (oz)
     - Real Broker Leverage: 500:1 (Capital.com Gold CFD retail/pro tier)
-      Actual Margin Required (empirical broker validation):
-      * 0.5 Troy Ounces: ~$0.76 USD margin
-      * 1.0 Troy Ounce:  ~$4.55 USD margin
-      * 2.0 Troy Ounces: ~$12.12 USD margin
+      Exact Margin Formula: Margin Required = (Current Price * Size) / Leverage
+      At Gold = $4,071.78 USD @ 500:1:
+      * 0.5 Troy Ounces: Margin = $4,071.78 * 0.5 / 500 = $4.07 USD
+      * 1.0 Troy Ounce:  Margin = $4,071.78 * 1.0 / 500 = $8.14 USD
+      * 1.5 Troy Ounces: Margin = $4,071.78 * 1.5 / 500 = $12.21 USD
+      * 2.0 Troy Ounces: Margin = $4,071.78 * 2.0 / 500 = $16.29 USD
     - Institutional Sizing Standard (AQ88 Invariant 126):
-      * Capital $100 -> Baseline 0.50 Troy Ounces (Margin: ~$0.76 USD, Free Cash Buffer: >99.2%)
-      * Capital $200 -> Baseline 1.00 Troy Ounce  (Margin: ~$4.55 USD, Free Cash Buffer: >97.7%)
-      * Capital $300 -> Baseline 1.50 Troy Ounces (Margin: ~$8.33 USD, Free Cash Buffer: >97.2%)
-      * Capital $400 -> Baseline 2.00 Troy Ounces (Margin: ~$12.12 USD, Free Cash Buffer: >96.9%)
+      * Capital $100 -> Baseline 0.50 Troy Ounces (Margin: $4.07 USD, Free Cash Buffer: 95.93%)
+      * Capital $200 -> Baseline 1.00 Troy Ounce  (Margin: $8.14 USD, Free Cash Buffer: 95.93%)
+      * Capital $300 -> Baseline 1.50 Troy Ounces (Margin: $12.21 USD, Free Cash Buffer: 95.93%)
+      * Capital $400 -> Baseline 2.00 Troy Ounces (Margin: $16.29 USD, Free Cash Buffer: 95.93%)
       * Capital $X   -> Base Size = round(X * 0.005, 2) Troy Ounces (min 0.50 oz for equity >= $100)
     - Dynamic Conviction Scaling (ភាពច្បាស់លាស់ខ្លាំង & ទំនុកចិត្តខ្លាំង):
       * Supreme Conviction (confidence >= 90.0%): 1.25x scaling (e.g. $100 -> 0.62 oz, $200 -> 1.25 oz, $300 -> 1.88 oz)
@@ -316,11 +318,14 @@ def calculate_capital_gold_lot_size(
     scaled_size = round(base_size * conviction_mult, 2)
 
     # 3. Dynamic Margin Safety Cap
-    # On Capital.com at 500:1 leverage, dynamic margin is ~$6.06 per oz (for 2+ oz).
-    # We enforce that total margin NEVER exceeds 15% of available cash, ensuring >= 85% free cushion.
-    est_margin_per_oz = 6.10  # Conservative estimate based on Capital.com $12.12 / 2 oz
-    max_safe_margin = max(5.0, effective_cash * 0.15)
-    max_size_allowed = max(min_deal_size, round(max_safe_margin / est_margin_per_oz, 2))
+    # Exact margin per oz = current_price / leverage = $4071.78 / 500 = $8.14 per oz
+    eff_price = float(current_price or 4071.78)
+    eff_lev = float(leverage or 500.0)
+    margin_per_oz = max(2.0, eff_price / eff_lev)
+
+    # Max safe margin allowed is 15% of available cash, ensuring >= 85% free cushion buffer
+    max_safe_margin = max(4.0, effective_cash * 0.15)
+    max_size_allowed = max(min_deal_size, round(max_safe_margin / margin_per_oz, 2))
 
     final_lot = max(min_deal_size, min(max_size_allowed, scaled_size))
     # Guarantee at least 0.50 oz for standard accounts >= $100 unless cash is critically depleted

@@ -2354,24 +2354,25 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
 **(គ្រឹះស្ថាបត្យកម្មគណនាទំហំ Position តាមសមាមាត្រដើមទុន $100 -> 0.50 oz, ផ្ទៀងផ្ទាត់ Margin ជាក់ស្តែង Leverage 500:1 & បង្កើនទំហំតាមកម្រិតភាពច្បាស់លាស់ និងទំនុកចិត្តខ្ពស់ - Invariant 126)**
 **Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
 1. **Real Broker Margin Calibration & Empirical Validation (ការផ្ទៀងផ្ទាត់ Margin ជាក់ស្តែងលើ Capital.com 500:1):**
-   - On Capital.com Gold CFD (XAUUSD) accounts operating with 500:1 leverage, the actual required margin per order size is empirically validated:
-     * **0.5 Troy Ounces:** Required margin is only **$0.76 USD** (on $100 capital, uses only 0.76% of account equity!).
-     * **1.0 Troy Ounce:** Required margin is only **$4.55 USD** (on $200 capital, uses only 2.27% of account equity!).
-     * **2.0 Troy Ounces:** Required margin is only **$12.12 USD** (on $400 capital, uses only 3.03% of account equity!).
-   - Free Cash Cushion Buffer: In all capital tiers, **$\ge 96.97\% - 99.24\%$ of equity remains completely free** as cash cushion to absorb standard volatility breathing stops without any threat of margin call.
+   - On Capital.com Gold CFD (XAUUSD) accounts operating with 500:1 leverage at current price $4,071.78 USD, the exact required margin is mathematically determined by $\text{Margin} = \frac{\text{Price} \times \text{Size}}{500}$:
+     * **0.5 Troy Ounces:** Required margin is exactly **$4.07 USD** ($\frac{4071.78 \times 0.5}{500}$, on $100 capital uses only 4.07% of account equity!).
+     * **1.0 Troy Ounce:** Required margin is exactly **$8.14 USD** ($\frac{4071.78 \times 1.0}{500}$, on $200 capital uses only 4.07% of account equity!).
+     * **1.5 Troy Ounces:** Required margin is exactly **$12.21 USD** ($\frac{4071.78 \times 1.5}{500}$, on $300 capital uses only 4.07% of account equity!).
+     * **2.0 Troy Ounces:** Required margin is exactly **$16.29 USD** ($\frac{4071.78 \times 2.0}{500}$, on $400 capital uses only 4.07% of account equity!).
+   - Free Cash Cushion Buffer: In all capital tiers, **exactly 95.93% of equity remains completely free** as cash cushion to absorb standard volatility breathing stops without any threat of margin call.
 2. **Capital-Proportional Sizing Formula ($100 per 0.50 Troy Ounces):**
    - Standard Baseline Formula:
      $$\text{Base Size} = \max\left(0.50, \text{round}\left(\text{Effective Capital} \times 0.005, 2\right)\right) \text{ oz}$$
    - Tiers Matrix:
-     * **Capital $100 USD:** Size = **0.50 Troy Ounces** (Margin: $0.76 USD, Cash Buffer: 99.24%)
-     * **Capital $200 USD:** Size = **1.00 Troy Ounce** (Margin: $4.55 USD, Cash Buffer: 97.73%)
-     * **Capital $300 USD:** Size = **1.50 Troy Ounces** (Margin: ~$8.33 USD, Cash Buffer: 97.23%)
-     * **Capital $400 USD:** Size = **2.00 Troy Ounces** (Margin: $12.12 USD, Cash Buffer: 96.97%)
-     * **Capital $500 USD:** Size = **2.50 Troy Ounces** (Margin: ~$15.15 USD, Cash Buffer: 96.97%)
-     * **Capital $1,000 USD:** Size = **5.00 Troy Ounces** (Margin: ~$30.30 USD, Cash Buffer: 96.97%)
+     * **Capital $100 USD:** Size = **0.50 Troy Ounces** (Margin: $4.07 USD, Cash Buffer: 95.93%)
+     * **Capital $200 USD:** Size = **1.00 Troy Ounce** (Margin: $8.14 USD, Cash Buffer: 95.93%)
+     * **Capital $300 USD:** Size = **1.50 Troy Ounces** (Margin: $12.21 USD, Cash Buffer: 95.93%)
+     * **Capital $400 USD:** Size = **2.00 Troy Ounces** (Margin: $16.29 USD, Cash Buffer: 95.93%)
+     * **Capital $500 USD:** Size = **2.50 Troy Ounces** (Margin: $20.36 USD, Cash Buffer: 95.93%)
+     * **Capital $1,000 USD:** Size = **5.00 Troy Ounces** (Margin: $40.72 USD, Cash Buffer: 95.93%)
    - Micro-Capital Shield ($< \$100):
-     * $\$50 - \$99$: Clamped to $0.25$ oz.
-     * $\$10 - \$49$: Clamped to $0.10$ oz (requiring ~$0.15 margin).
+     * $\$50 - \$99$: Clamped to $0.25$ oz (Margin: ~$2.04 USD).
+     * $\$10 - \$49$: Clamped to $0.10$ oz (Margin: ~$0.81 USD).
 3. **Dual-Engine Conviction & Precision Scaling (ភាពច្បាស់លាស់ខ្លាំង & ទំនុកចិត្តខ្លាំង):**
    - **Baseline / Standard (Confidence 70.0% - 79.9%):** Multiplier = $1.00\times$ (Standard Base Size).
    - **High Conviction (Confidence 80.0% - 89.9%):** Multiplier = $1.15\times$ (Machine 1 & 2 align, 19-TF Spectrum Score $\ge 20.0$, Win Prob $\ge 80\%$, Kalman Velocity acceleration, SMC FVG/OB confluence).
