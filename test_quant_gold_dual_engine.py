@@ -19,7 +19,8 @@ from execution_engine import (
     QuantGoldExecutionEngine,
     is_engine_1_scalp,
     is_engine_2_macro,
-    get_gold_position_tier_spec
+    get_gold_position_tier_spec,
+    calculate_capital_gold_lot_size
 )
 
 
@@ -104,6 +105,28 @@ class TestQuantGoldDualEngine(unittest.IsolatedAsyncioTestCase):
         # Only DEAL_MACRO_2 should be closed (count=1), DEAL_SCALP_1 remains open!
         self.assertEqual(closed_count, 1)
         mock_db.update_capital_auto_trade_close.assert_called_once_with("DEAL_MACRO_2", exit_price=3880.0, pnl=7.5)
+
+    def test_capital_gold_lot_size_tiers_and_conviction(self):
+        """Verify dynamic lot sizing across capital tiers ($100 -> 0.5 oz, $200 -> 1.0 oz, $300 -> 1.5 oz) and conviction scaling."""
+        # Baseline Sizing (Confidence 75%)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=100.0, confidence=75.0), 0.50)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=200.0, confidence=75.0), 1.00)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=300.0, confidence=75.0), 1.50)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=400.0, confidence=75.0), 2.00)
+
+        # High Conviction (Confidence 85% -> 1.15x)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=100.0, confidence=85.0), 0.57)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=200.0, confidence=85.0), 1.15)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=300.0, confidence=85.0), 1.72)
+
+        # Supreme Conviction (Confidence 95% -> 1.25x)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=100.0, confidence=95.0), 0.62)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=200.0, confidence=95.0), 1.25)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=300.0, confidence=95.0), 1.88)
+
+        # Micro-Capital Safeguard
+        self.assertEqual(calculate_capital_gold_lot_size(budget=20.0, confidence=75.0), 0.10)
+        self.assertEqual(calculate_capital_gold_lot_size(budget=50.0, confidence=75.0), 0.25)
 
 
 if __name__ == "__main__":
