@@ -2389,4 +2389,36 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
    - On a 0.50 oz trade ($100 capital), a $6.08 full stop distance is only $3.04 USD (3.04% risk), and a 360° Reversal Micro-Cut (-$2.50) is only $1.25 USD (1.25% risk).
    - A +73 pip TP1 win produces +$3.65 USD (+3.65% ROI on capital) and immediately shifts Stop-Loss to Breakeven Armor (0.00R Free Roll).
 
+### 1.1.30 INSTITUTIONAL 10-PILLAR CONSENSUS FOR TREND REVERSAL FLIP & FIDUCIARY PROFIT PROTECTION (AQ88 INVARIANT 127)
+**(គ្រឹះស្ថាបត្យកម្ម ១០ ប្រការសម្រាប់មុខងារប្តូរទិសដៅ [TREND REVERSAL FLIP] & កាតព្វកិច្ចការពារប្រាក់ចំណេញពិតប្រាកដ ១០០% មិនខ្វាក់ភ្នែក)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+1. **Fiduciary Profit Protection Shield (ហាមដាច់ខាតកាត់បិទ Positions ដែលកំពុងមានចំណេញដើម្បី Flip):**
+   - If an active Gold trade is in profit or healthy (`existing_pnl_pts > -2.50` pts, or `upl >= 0.0`, or Breakeven Armor is engaged), executing a Reversal Flip is **STRICTLY AND UNCONDITIONALLY FORBIDDEN** (`PROFIT_RUNNER_PROTECTED`).
+   - A winning trade must run freely to its Take-Profit milestones (TP1 +32 to +73 pips, TP2 +55 pips, TP3 Moonshot Runner) or be guarded by Breakeven Armor. Cutting a winning trade on counter-trend retracement noise is classified as technical sabotage.
+2. **Structural Invalidation Requirement (ដំណើរការតែលើ Trades ដែលកំពុងបរាជ័យ):**
+   - A Reversal Flip is evaluated ONLY when an active trade is in genuine structural floating loss (`existing_pnl_pts <= -2.50` pts or `upl <= -$2.50`), providing an Agile Early Micro-Cut to avoid taking a full -$30 stop-loss.
+3. **Decisive Multi-Timeframe Score & Directional Thrust Hurdle:**
+   - BUY Reversal requires `weighted_score >= +15.0` (with $\ge 10/19$ Bullish TFs) or `w_score >= +20.0`, plus `confidence >= 70.0%`.
+   - SELL Reversal requires `weighted_score <= -15.0` (with $\ge 10/19$ Bearish TFs) or `w_score <= -20.0`, plus `confidence >= 70.0%`.
+   - Weak, oscillating noise signals ($|w\_score| < 15.0$) are strictly rejected (`INSUFFICIENT_SCORE`).
+4. **Top-Down Macro Directional Anchor (H1 & H4 Alignment):**
+   - Cannot flip to BUY if H1 and H4 macro trends are both BEARISH (`MACRO_BEAR_VETO`).
+   - Cannot flip to SELL if H1 and H4 macro trends are both BULLISH (`MACRO_BULL_VETO`).
+5. **Anti-Chasing Impulse Overextension Guard (Invariant 92 Pillar 1):**
+   - Cannot flip to BUY if price is $> 1.85\times\text{ATR}$ above 15m EMA21 (`ANTI_CHASING_IMPULSE_VETO`), preventing buying the peak wick of an extended candle right before a mean-reverting pullback.
+   - Cannot flip to SELL if price is $> 1.85\times\text{ATR}$ below 15m EMA21, preventing shorting the bottom wick.
+6. **Anti-Overbought Peak Trap & Anti-Oversold Panic Guard (Invariant 1.1 Fiduciary Refusal Directive):**
+   - Cannot flip to BUY if 15m RSI $\ge 68.0$ (`ANTI_OVERBOUGHT_VETO`).
+   - Cannot flip to SELL if 15m RSI $\le 38.0$ (`ANTI_OVERSOLD_VETO`). Shorting panic oversold bottoms is permanently outlawed.
+7. **Kalman Latent Velocity Directional Agreement:**
+   - Cannot flip to BUY if Kalman latent velocity is falling negative ($\text{vel} < -0.010$).
+   - Cannot flip to SELL if Kalman latent velocity is rising positive ($\text{vel} > +0.010$).
+8. **Net Order Flow Climax Exhaustion Guard:**
+   - Cannot flip to BUY if Net Order Flow indicates `BULLS_EXHAUSTED_AT_TOP` with rejection wicks.
+   - Cannot flip to SELL if Net Order Flow indicates `BEARS_EXHAUSTED_AT_BOTTOM` with rejection wicks.
+9. **Anti-Chop Dealing Range Injunction (Invariant 76):**
+   - Reversal Flips in the middle 35% - 65% dealing range are strictly blocked unless confirmed by violent momentum thrust ($|w\_score| \ge 25.0$ and $|vel| \ge 0.03$).
+10. **Anti-Whipsaw Cooldown & Minimum Holding Period:**
+    - 180-second (3-minute) minimum lockout after any flip prevents rapid whipsawing in volatile chop. Minimum 45-second hold time ensures trades are not cut on entry spread noise.
+
 

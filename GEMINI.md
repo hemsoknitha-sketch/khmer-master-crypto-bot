@@ -232,4 +232,16 @@
   * High Conviction (Confidence 80-89%): $1.15\times$ scaling ($100 -> 0.57 oz, $200 -> 1.15 oz, $300 -> 1.72 oz)
   * Supreme Conviction (Confidence $\ge 90\%$): $1.25\times$ scaling ($100 -> 0.62 oz, $200 -> 1.25 oz, $300 -> 1.88 oz). Sizing remains strictly clamped to $\le 15\%$ maximum safe margin.
 
+### 2.8 Institutional 10-Pillar Consensus for Trend Reversal Flip & Absolute Fiduciary Profit Protection (Invariant 127)
+- **Fiduciary Profit Protection Shield:** Active trades with PnL $> -2.50$ pts (healthy/in profit or Breakeven Armor) are **100% FORBIDDEN** from flipping (`PROFIT_RUNNER_PROTECTED`). Winning trades run freely to Take-Profit milestones (+32 to +73 pips).
+- **Structural Invalidation Requirement:** Reversal Flips are evaluated ONLY when trades suffer genuine structural floating loss (PnL $\le -2.50$ pts / UPL $\le -\$2.50$), performing an Agile Early Micro-Cut instead of taking a -$30 stop-loss.
+- **Decisive MTF Spectrum Hurdle:** Opposing thrust requires $|w\_score| \ge 15.0$ to $20.0$, $\ge 10/19$ aligned TFs, and confidence $\ge 70.0\%$. Weak noise signals ($< 15.0$) are strictly vetoed.
+- **H1/H4 Macro Anchor Veto:** Cannot flip to BUY into H1/H4 Bear downtrends; cannot flip to SELL into H1/H4 Bull uptrends.
+- **Anti-Chasing Overextension Guard:** Cannot flip into moves $> 1.85\times\text{ATR}$ away from 15m EMA21 (no buying high wicks or shorting low wicks).
+- **Anti-Overbought & Anti-Oversold Guards:** Cannot flip to BUY if RSI $\ge 68.0$; cannot flip to SELL if RSI $\le 38.0$ (Invariant 1.1 Fiduciary Refusal Directive).
+- **Kalman Latent Velocity Agreement:** Cannot flip to BUY if velocity is falling negative ($< -0.010$); cannot flip to SELL if velocity is rising positive ($> +0.010$).
+- **Net Order Flow Climax Exhaustion Guard:** Cannot flip to BUY if `BULLS_EXHAUSTED_AT_TOP`; cannot flip to SELL if `BEARS_EXHAUSTED_AT_BOTTOM`.
+- **Anti-Chop Dealing Range Injunction:** Flips in middle 35%-65% dealing range are strictly blocked unless $|w\_score| \ge 25.0$ and $|vel| \ge 0.03$.
+- **Anti-Whipsaw Cooldown:** 180s (3-minute) minimum lockout after any flip prevents churn. Minimum 45s holding time guards against entry noise.
+
 

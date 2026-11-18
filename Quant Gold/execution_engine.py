@@ -1320,6 +1320,11 @@ class QuantGoldExecutionEngine:
                 "counts": counts,
                 "win_probability": win_prob
             },
+            "m15_summary": {
+                "rsi": float(m15_tf.get("rsi", 50.0) or 50.0),
+                "ema21": float(m15_tf.get("ema21", 0.0) or m15_tf.get("ema20", 0.0) or curr_p),
+                "atr": float(m15_tf.get("atr", 6.5) or 6.5),
+            },
             "math_summary": {
                 "regime": regime,
                 "kalman_velocity": kalman.get("latent_velocity", 0.0),
@@ -1717,7 +1722,7 @@ class QuantGoldExecutionEngine:
 
                 if has_existing:
                     if action != existing_dir:
-                        # Opposing Signal -> Evaluate Trend Reversal Flip (Institutional Anti-Whipsaw Standard AQ88 Invariant 124)
+                        # Opposing Signal -> Evaluate Trend Reversal Flip (Institutional 10-Pillar Consensus Standard AQ88 Invariant 127)
                         now_ts = now
                         last_rev_ts = getattr(self, "_last_reversal_flip_ts", 0.0)
 
@@ -1729,11 +1734,11 @@ class QuantGoldExecutionEngine:
                             except Exception:
                                 existing_entry_p = current_price
                         existing_pnl_pts = (current_price - existing_entry_p) if existing_dir == "BUY" else (existing_entry_p - current_price)
-                        is_existing_losing = (existing_pnl_pts <= -2.0)
+                        is_existing_losing = (existing_pnl_pts <= -2.50)
 
-                        # Dynamic anti-whipsaw cooldown: 120s (bypassable if existing trade is losing and signal is high conviction)
-                        rev_cooldown_left = 120.0 - (now_ts - last_rev_ts)
-                        min_hold_req = 45.0 if is_existing_losing else 90.0
+                        # Dynamic anti-whipsaw cooldown: 180s (3 minutes) to prevent chop churn
+                        rev_cooldown_left = 180.0 - (now_ts - last_rev_ts)
+                        min_hold_req = 45.0
 
                         first_pos_ts = 0.0
                         if active_gold_trades:
@@ -1745,29 +1750,59 @@ class QuantGoldExecutionEngine:
                             first_pos_ts = getattr(self, "_active_gold_entry_ts", 0.0)
                         time_in_pos = (now_ts - first_pos_ts) if first_pos_ts > 0 else 999.0
 
+                        # Extract Technical Indicators for Opposing Reversal Check
+                        kalman_vel = float(signal_data.get("math_summary", {}).get("kalman_velocity", 0.0) or 0.0)
+                        nof_data = signal_data.get("math_summary", {}).get("net_order_flow_force", {})
+                        ex_state = str(nof_data.get("exhaustion_state", "NEUTRAL_BALANCED"))
+                        m15_info = signal_data.get("m15_summary", {})
+                        m15_rsi = float(m15_info.get("rsi", 50.0) or 50.0)
+                        m15_ema21 = float(m15_info.get("ema21", current_price) or current_price)
+                        m15_atr = float(m15_info.get("atr", 6.5) or 6.5)
+                        if m15_atr <= 0.5:
+                            m15_atr = 6.5
+
                         can_flip = False
                         flip_veto_reason = ""
 
-                        if rev_cooldown_left > 0 and not (is_existing_losing and confidence >= 65.0):
-                            flip_veto_reason = f"COOLDOWN_ACTIVE ({rev_cooldown_left:.0f}s left of 120s)"
+                        # 1. FIDUCIARY PROFIT PROTECTION: Never flip an existing healthy/winning trade!
+                        if not is_existing_losing:
+                            flip_veto_reason = f"PROFIT_RUNNER_PROTECTED (Existing {existing_dir} healthy/profitable with {existing_pnl_pts:+.2f} pts PnL. Protected by TP/SL, flipping forbidden!)"
+                        elif rev_cooldown_left > 0:
+                            flip_veto_reason = f"COOLDOWN_ACTIVE ({rev_cooldown_left:.0f}s left of 180s)"
                         elif time_in_pos < min_hold_req:
                             flip_veto_reason = f"MIN_HOLD_PROTECTION (in position {time_in_pos:.0f}s < {min_hold_req:.0f}s)"
                         elif action == "BUY":
                             if is_macro_bear:
                                 flip_veto_reason = "MACRO_BEAR_VETO (Cannot flip to BUY against H1/H4 Downtrend)"
-                            elif weighted_score < 8.0 and not (is_existing_losing and weighted_score >= 0.0 and confidence >= 65.0):
-                                flip_veto_reason = f"INSUFFICIENT_BUY_SCORE (Score {weighted_score:+.1f} < +8.0)"
-                            elif confidence < 65.0:
-                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 65.0%)"
+                            elif weighted_score < 15.0:
+                                flip_veto_reason = f"INSUFFICIENT_BUY_SCORE (Score {weighted_score:+.1f} < +15.0)"
+                            elif confidence < 70.0:
+                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 70.0%)"
+                            elif kalman_vel < -0.010:
+                                flip_veto_reason = f"VELOCITY_DIVERGENCE (Kalman vel {kalman_vel:+.4f} is falling negative)"
+                            elif (current_price - m15_ema21) > (1.85 * m15_atr):
+                                flip_veto_reason = f"ANTI_CHASING_IMPULSE_VETO (Price {current_price:.2f} is {((current_price - m15_ema21)/m15_atr):.2f}x ATR above EMA21)"
+                            elif m15_rsi >= 68.0:
+                                flip_veto_reason = f"ANTI_OVERBOUGHT_VETO (15m RSI is {m15_rsi:.1f} >= 68.0 overbought peak trap)"
+                            elif ex_state == "BULLS_EXHAUSTED_AT_TOP":
+                                flip_veto_reason = "EXHAUSTION_VETO (Bulls exhausted at top with rejection wick)"
                             else:
                                 can_flip = True
                         elif action == "SELL":
                             if is_macro_bull:
                                 flip_veto_reason = "MACRO_BULL_VETO (Cannot flip to SELL against H1/H4 Uptrend)"
-                            elif weighted_score > -8.0 and not (is_existing_losing and weighted_score <= 0.0 and confidence >= 65.0):
-                                flip_veto_reason = f"INSUFFICIENT_SELL_SCORE (Score {weighted_score:+.1f} > -8.0)"
-                            elif confidence < 65.0:
-                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 65.0%)"
+                            elif weighted_score > -15.0:
+                                flip_veto_reason = f"INSUFFICIENT_SELL_SCORE (Score {weighted_score:+.1f} > -15.0)"
+                            elif confidence < 70.0:
+                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 70.0%)"
+                            elif kalman_vel > 0.010:
+                                flip_veto_reason = f"VELOCITY_DIVERGENCE (Kalman vel {kalman_vel:+.4f} is rising positive)"
+                            elif (m15_ema21 - current_price) > (1.85 * m15_atr):
+                                flip_veto_reason = f"ANTI_CHASING_IMPULSE_VETO (Price {current_price:.2f} is {((m15_ema21 - current_price)/m15_atr):.2f}x ATR below EMA21)"
+                            elif m15_rsi <= 38.0:
+                                flip_veto_reason = f"ANTI_OVERSOLD_VETO (15m RSI is {m15_rsi:.1f} <= 38.0 Invariant 1.1 Fiduciary Refusal Directive)"
+                            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                                flip_veto_reason = "EXHAUSTION_VETO (Bears exhausted at bottom with rejection wick)"
                             else:
                                 can_flip = True
 

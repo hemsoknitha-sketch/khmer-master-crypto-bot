@@ -292,12 +292,12 @@ class QuantGoldSecurityCitadel:
 
         # Anti-Whipsaw Chop Zone Injunction (Invariant 76 & AQ84 Invariant 116):
         # Flipping in the middle 35% - 65% dealing range is strictly vetoed for sideways chop,
-        # UNLESS confirmed by directional momentum thrust (|weighted_score| >= 20.0 or |vel| >= 0.03).
+        # UNLESS confirmed by directional momentum thrust (|weighted_score| >= 25.0 or |vel| >= 0.03).
         m15_tf = tf_map.get("M15", {}) if isinstance(tf_map.get("M15"), dict) else {}
         smc = m15_tf.get("smc", {}) if isinstance(m15_tf.get("smc"), dict) else (mtf_data.get("smc", {}).get("M15", {}) if isinstance(mtf_data.get("smc"), dict) else {})
         range_pct = float(smc.get("range_pct", 0.50) or 0.50)
         is_middle_chop = (0.35 <= range_pct <= 0.65)
-        if is_middle_chop and abs(w_score) < 20.0 and abs(vel) < 0.03:
+        if is_middle_chop and abs(w_score) < 25.0 and abs(vel) < 0.03:
             return {
                 "is_invalidated": False,
                 "should_reversal_flip": False,
@@ -309,31 +309,84 @@ class QuantGoldSecurityCitadel:
         h1_bias = str(tf_map.get("H1", {}).get("bias", "NEUTRAL")).upper()
         h4_bias = str(tf_map.get("H4", {}).get("bias", "NEUTRAL")).upper()
 
+        # Extract Key Institutional Quality Indicators (AQ88 Invariant 127)
+        m15_rsi = float(m15_tf.get("rsi", 50.0) or 50.0)
+        m15_ema21 = float(m15_tf.get("ema21", 0.0) or m15_tf.get("ema20", 0.0) or current_price)
+        m15_atr = float(m15_tf.get("atr", 6.5) or 6.5)
+        if m15_atr <= 0.5:
+            m15_atr = 6.5
+
+        nof = math_data.get("net_order_flow_force", {}) if isinstance(math_data, dict) else {}
+        ex_state = str(nof.get("exhaustion_state", "NEUTRAL_BALANCED"))
+
         is_invalidated = False
         reversal_dir = None
         confidence = 0.0
         reason = ""
 
         if pos_dir == "SELL":
-            # Opposing bullish thrust detected:
-            # Strictly vetoed if macro timeframes are BEARISH or score is still negative!
+            # Opposing bullish thrust detected (Evaluating flip into BUY):
+            # 1. Macro Trend Veto: Strictly vetoed if macro timeframes are BEARISH or score is still negative!
             if (h1_bias == "BEARISH" and h4_bias == "BEARISH") or w_score < 0.0:
                 is_invalidated = False
-            elif (bull_cnt >= 10 and w_score >= 12.0) or (w_score >= 18.0 and vel >= 0.03):
+                reason = "MACRO_BEAR_VETO: Cannot flip to BUY into H1/H4 Macro Downtrend"
+            # 2. Kalman Velocity Divergence: Cannot flip to BUY if underlying latent velocity is falling
+            elif vel < -0.010:
+                is_invalidated = False
+                reason = f"VELOCITY_DIVERGENCE_VETO: Kalman latent velocity is falling ({vel:+.4f}) for BUY flip"
+            # 3. Anti-Chasing Impulse Overextension: Cannot buy extended high wick (> 1.85x ATR above EMA21)
+            elif (current_price - m15_ema21) > (1.85 * m15_atr):
+                is_invalidated = False
+                reason = f"ANTI_CHASING_IMPULSE_VETO: Price ${current_price:.2f} is {((current_price - m15_ema21)/m15_atr):.2f}x ATR above 15m EMA21 (${m15_ema21:.2f})"
+            # 4. Anti-Overbought Peak Trap Guard: Cannot buy into overbought exhaustion zone (RSI >= 68.0)
+            elif m15_rsi >= 68.0:
+                is_invalidated = False
+                reason = f"ANTI_OVERBOUGHT_VETO: 15m RSI is {m15_rsi:.1f} >= 68.0 overbought peak trap"
+            # 5. Net Order Flow Climax Exhaustion: Cannot buy if buyers are exhausted at top
+            elif ex_state == "BULLS_EXHAUSTED_AT_TOP":
+                is_invalidated = False
+                reason = "EXHAUSTION_VETO: Net Order Flow Bulls exhausted at top with rejection wick"
+            # 6. Decisive Multi-Timeframe High-Conviction Thrust
+            elif (bull_cnt >= 10 and w_score >= 15.0 and vel >= 0.010) or (w_score >= 20.0 and vel >= 0.015):
                 is_invalidated = True
                 reversal_dir = "BUY"
                 confidence = min(95.0, max(75.0, 60.0 + (bull_cnt * 2.0)))
                 reason = f"Bullish Order Flow Surge: {bull_cnt}/19 Bullish TF, Score {w_score:+.1f}, Kalman Vel {vel:+.4f}"
+            else:
+                is_invalidated = False
+                reason = f"INSUFFICIENT_BUY_THRUST: Score {w_score:+.1f}, Bull TFs {bull_cnt}/19, Vel {vel:+.4f}"
+
         elif pos_dir == "BUY":
-            # Opposing bearish thrust detected:
-            # Strictly vetoed if macro timeframes are BULLISH or score is still positive!
+            # Opposing bearish thrust detected (Evaluating flip into SELL):
+            # 1. Macro Trend Veto: Strictly vetoed if macro timeframes are BULLISH or score is still positive!
             if (h1_bias == "BULLISH" and h4_bias == "BULLISH") or w_score > 0.0:
                 is_invalidated = False
-            elif (bear_cnt >= 10 and w_score <= -12.0) or (w_score <= -18.0 and vel <= -0.03):
+                reason = "MACRO_BULL_VETO: Cannot flip to SELL into H1/H4 Macro Uptrend"
+            # 2. Kalman Velocity Divergence: Cannot flip to SELL if underlying latent velocity is rising
+            elif vel > 0.010:
+                is_invalidated = False
+                reason = f"VELOCITY_DIVERGENCE_VETO: Kalman latent velocity is rising ({vel:+.4f}) for SELL flip"
+            # 3. Anti-Chasing Impulse Overextension: Cannot short extended low wick (> 1.85x ATR below EMA21)
+            elif (m15_ema21 - current_price) > (1.85 * m15_atr):
+                is_invalidated = False
+                reason = f"ANTI_CHASING_IMPULSE_VETO: Price ${current_price:.2f} is {((m15_ema21 - current_price)/m15_atr):.2f}x ATR below 15m EMA21 (${m15_ema21:.2f})"
+            # 4. Anti-Oversold Panic Bottom Guard: Strictly vetoed if RSI <= 38.0 (Invariant 1.1 Fiduciary Refusal Directive)
+            elif m15_rsi <= 38.0:
+                is_invalidated = False
+                reason = f"ANTI_OVERSOLD_VETO: 15m RSI is {m15_rsi:.1f} <= 38.0 Invariant 1.1 Fiduciary Refusal Directive"
+            # 5. Net Order Flow Climax Exhaustion: Cannot short if sellers are exhausted at bottom
+            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                is_invalidated = False
+                reason = "EXHAUSTION_VETO: Net Order Flow Bears exhausted at bottom with rejection wick"
+            # 6. Decisive Multi-Timeframe High-Conviction Thrust
+            elif (bear_cnt >= 10 and w_score <= -15.0 and vel <= -0.010) or (w_score <= -20.0 and vel <= -0.015):
                 is_invalidated = True
                 reversal_dir = "SELL"
                 confidence = min(95.0, max(75.0, 60.0 + (bear_cnt * 2.0)))
                 reason = f"Bearish Order Flow Surge: {bear_cnt}/19 Bearish TF, Score {w_score:+.1f}, Kalman Vel {vel:+.4f}"
+            else:
+                is_invalidated = False
+                reason = f"INSUFFICIENT_SELL_THRUST: Score {w_score:+.1f}, Bear TFs {bear_cnt}/19, Vel {vel:+.4f}"
 
         return {
             "is_invalidated": is_invalidated,

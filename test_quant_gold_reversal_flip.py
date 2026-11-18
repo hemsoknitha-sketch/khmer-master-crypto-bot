@@ -17,52 +17,109 @@ class TestQuantGoldReversalFlip(unittest.TestCase):
         self.engine = QuantGoldExecutionEngine()
 
     def test_reversal_flip_hurdle_and_score(self):
-        """Verify that high-conviction opposing signals (confidence >= 65.0%, score >= 8.0) pass reversal flip."""
+        """Verify that high-conviction opposing signals pass reversal flip on failing trades (AQ88 Invariant 127)."""
         # Setup existing SELL position
         self.engine._active_gold_deal_id = "test-deal-123"
         self.engine._active_gold_direction = "SELL"
         self.engine._active_gold_entry_price = 3870.0
-        self.engine._active_gold_entry_ts = time.time() - 100.0  # held 100s (> 90s min hold)
+        self.engine._active_gold_entry_ts = time.time() - 100.0  # held 100s (> 45s min hold)
         self.engine._last_reversal_flip_ts = 0.0
 
-        current_price = 3872.0  # existing SELL is losing 2 pts
+        current_price = 3873.0  # existing SELL is losing 3.0 pts (<= -2.50 pts)
 
-        # Opposing BUY signal with confidence 68% and score +10.0
         now_ts = time.time()
         last_rev_ts = self.engine._last_reversal_flip_ts
         existing_dir = self.engine._active_gold_direction
         action = "BUY"
-        confidence = 68.0
-        weighted_score = 10.0
+        confidence = 75.0
+        weighted_score = 18.0
         is_macro_bear = False
+        kalman_vel = 0.02
+        m15_ema21 = 3872.0
+        m15_atr = 2.5
+        m15_rsi = 55.0
+        ex_state = "NEUTRAL_BALANCED"
 
         existing_entry_p = self.engine._active_gold_entry_price
         existing_pnl_pts = (current_price - existing_entry_p) if existing_dir == "BUY" else (existing_entry_p - current_price)
-        is_existing_losing = (existing_pnl_pts <= -2.0)
+        is_existing_losing = (existing_pnl_pts <= -2.50)
         self.assertTrue(is_existing_losing)
 
-        rev_cooldown_left = 120.0 - (now_ts - last_rev_ts)
-        min_hold_req = 45.0 if is_existing_losing else 90.0
+        rev_cooldown_left = 180.0 - (now_ts - last_rev_ts)
+        min_hold_req = 45.0
         time_in_pos = now_ts - self.engine._active_gold_entry_ts
 
         can_flip = False
         flip_veto_reason = ""
-        if rev_cooldown_left > 0 and not (is_existing_losing and confidence >= 65.0):
-            flip_veto_reason = f"COOLDOWN_ACTIVE"
+        if not is_existing_losing:
+            flip_veto_reason = "PROFIT_RUNNER_PROTECTED"
+        elif rev_cooldown_left > 0:
+            flip_veto_reason = "COOLDOWN_ACTIVE"
         elif time_in_pos < min_hold_req:
-            flip_veto_reason = f"MIN_HOLD_PROTECTION"
+            flip_veto_reason = "MIN_HOLD_PROTECTION"
         elif action == "BUY":
             if is_macro_bear:
                 flip_veto_reason = "MACRO_BEAR_VETO"
-            elif weighted_score < 8.0 and not (is_existing_losing and weighted_score >= 0.0 and confidence >= 65.0):
-                flip_veto_reason = f"INSUFFICIENT_BUY_SCORE"
-            elif confidence < 65.0:
-                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE"
+            elif weighted_score < 15.0:
+                flip_veto_reason = "INSUFFICIENT_BUY_SCORE"
+            elif confidence < 70.0:
+                flip_veto_reason = "INSUFFICIENT_CONFIDENCE"
+            elif kalman_vel < -0.010:
+                flip_veto_reason = "VELOCITY_DIVERGENCE"
+            elif (current_price - m15_ema21) > (1.85 * m15_atr):
+                flip_veto_reason = "ANTI_CHASING_IMPULSE_VETO"
+            elif m15_rsi >= 68.0:
+                flip_veto_reason = "ANTI_OVERBOUGHT_VETO"
+            elif ex_state == "BULLS_EXHAUSTED_AT_TOP":
+                flip_veto_reason = "EXHAUSTION_VETO"
             else:
                 can_flip = True
 
         self.assertTrue(can_flip)
         self.assertEqual(flip_veto_reason, "")
+
+    def test_reversal_flip_profit_protection(self):
+        """Verify that profitable or healthy trades are NEVER flipped out of (Fiduciary Profit Protection)."""
+        self.engine._active_gold_deal_id = "test-deal-win-1"
+        self.engine._active_gold_direction = "SELL"
+        self.engine._active_gold_entry_price = 3880.0
+        self.engine._active_gold_entry_ts = time.time() - 200.0
+
+        current_price = 3870.0  # existing SELL is in +10 pts profit!
+        existing_dir = "SELL"
+        existing_pnl_pts = 3880.0 - current_price  # +10.0 pts
+        is_existing_losing = (existing_pnl_pts <= -2.50)
+        self.assertFalse(is_existing_losing)
+
+        # Even with high-conviction opposing BUY signal
+        action = "BUY"
+        weighted_score = 30.0
+        confidence = 90.0
+
+        can_flip = False
+        flip_veto_reason = ""
+        if not is_existing_losing:
+            flip_veto_reason = f"PROFIT_RUNNER_PROTECTED (Existing {existing_dir} healthy/profitable with {existing_pnl_pts:+.2f} pts PnL. Protected by TP/SL, flipping forbidden!)"
+
+        self.assertFalse(can_flip)
+        self.assertIn("PROFIT_RUNNER_PROTECTED", flip_veto_reason)
+
+    def test_reversal_flip_anti_chasing_veto(self):
+        """Verify that chasing overextended impulse candles (> 1.85x ATR from EMA21) vetoes reversal flip."""
+        current_price = 3885.0
+        m15_ema21 = 3875.0
+        m15_atr = 3.0  # 1.85 * 3.0 = 5.55 pts. Diff is 10.0 pts (> 1.85x ATR)!
+
+        action = "BUY"
+        is_chasing = (current_price - m15_ema21) > (1.85 * m15_atr)
+        self.assertTrue(is_chasing)
+
+    def test_reversal_flip_anti_oversold_veto(self):
+        """Verify that shorting into panic oversold bottom (RSI <= 38.0) is strictly vetoed (Invariant 1.1)."""
+        m15_rsi = 32.0  # Panic oversold
+        action = "SELL"
+        is_oversold_veto = (m15_rsi <= 38.0)
+        self.assertTrue(is_oversold_veto)
 
     def test_reversal_flip_macro_trend_protection(self):
         """Verify that opposing signals against Macro Trend are strictly vetoed (fiduciary honesty)."""
