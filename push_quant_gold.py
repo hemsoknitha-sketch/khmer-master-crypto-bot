@@ -122,7 +122,11 @@ def main():
     if code != 0:
         print(f"❌ [TEST FAILED] {err or out}")
         sys.exit(1)
-    print(f"✅ [TEST PASSED] Quant Gold verified in {d_test:.2f}s!")
+    code2, out2, err2, d_test2 = run_cmd([sys.executable, "-m", "unittest", "test_quant_gold_reversal_flip.py"], timeout=10)
+    if code2 != 0:
+        print(f"❌ [TEST FAILED] {err2 or out2}")
+        sys.exit(1)
+    print(f"✅ [TEST PASSED] Quant Gold verified in {d_test + d_test2:.2f}s!")
 
     # 3. Stage changes
     print("\n📦 [STEP 2/4] Staging files (git add -A)...")

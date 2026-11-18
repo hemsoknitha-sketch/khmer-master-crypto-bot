@@ -277,24 +277,33 @@ class QuantGoldSecurityCitadel:
         bull_cnt = int(counts.get("bullish", 0) or 0)
         bear_cnt = int(counts.get("bearish", 0) or 0)
 
-        kalman = math_data.get("kalman", {}) if isinstance(math_data, dict) else {}
-        vel = float(kalman.get("latent_velocity", 0.0) or 0.0)
-
-        # Anti-Whipsaw Chop Zone Injunction (Invariant 76):
-        # Flipping back-and-forth in the middle 35% - 65% dealing range is STRICTLY VETOED
-        # to prevent death-by-whipsaw in sideways equilibrium.
         tf_map = mtf_data.get("timeframes", {}) if isinstance(mtf_data.get("timeframes"), dict) else {}
+        if bull_cnt == 0 and bear_cnt == 0 and tf_map:
+            bull_cnt = sum(1 for tf_info in tf_map.values() if isinstance(tf_info, dict) and str(tf_info.get("bias", "")).upper() == "BULLISH")
+            bear_cnt = sum(1 for tf_info in tf_map.values() if isinstance(tf_info, dict) and str(tf_info.get("bias", "")).upper() == "BEARISH")
+
+        kalman = math_data.get("kalman", {}) if isinstance(math_data, dict) else {}
+        vel = float(
+            kalman.get("latent_velocity", 0.0)
+            or (math_data.get("latent_velocity", 0.0) if isinstance(math_data, dict) else 0.0)
+            or (math_data.get("kalman_velocity", 0.0) if isinstance(math_data, dict) else 0.0)
+            or 0.0
+        )
+
+        # Anti-Whipsaw Chop Zone Injunction (Invariant 76 & AQ84 Invariant 116):
+        # Flipping in the middle 35% - 65% dealing range is strictly vetoed for sideways chop,
+        # UNLESS confirmed by directional momentum thrust (|weighted_score| >= 20.0 or |vel| >= 0.03).
         m15_tf = tf_map.get("M15", {}) if isinstance(tf_map.get("M15"), dict) else {}
         smc = m15_tf.get("smc", {}) if isinstance(m15_tf.get("smc"), dict) else (mtf_data.get("smc", {}).get("M15", {}) if isinstance(mtf_data.get("smc"), dict) else {})
         range_pct = float(smc.get("range_pct", 0.50) or 0.50)
         is_middle_chop = (0.35 <= range_pct <= 0.65)
-        if is_middle_chop and abs(w_score) < 24.0:
+        if is_middle_chop and abs(w_score) < 20.0 and abs(vel) < 0.03:
             return {
                 "is_invalidated": False,
                 "should_reversal_flip": False,
                 "reversal_direction": None,
                 "confidence": 0.0,
-                "reason": f"BLOCK_CHOP_ZONE_REVERSAL: Price in middle equilibrium ({range_pct:.2f}) with score {w_score:+.1f} < 24.0."
+                "reason": f"BLOCK_CHOP_ZONE_REVERSAL: Price in middle equilibrium ({range_pct:.2f}) with score {w_score:+.1f} and vel {vel:+.4f}."
             }
 
         h1_bias = str(tf_map.get("H1", {}).get("bias", "NEUTRAL")).upper()
@@ -310,7 +319,7 @@ class QuantGoldSecurityCitadel:
             # Strictly vetoed if macro timeframes are BEARISH or score is still negative!
             if (h1_bias == "BEARISH" and h4_bias == "BEARISH") or w_score < 0.0:
                 is_invalidated = False
-            elif (bull_cnt >= 13 and w_score >= 20.0) or (w_score >= 25.0 and vel >= 0.05):
+            elif (bull_cnt >= 10 and w_score >= 12.0) or (w_score >= 18.0 and vel >= 0.03):
                 is_invalidated = True
                 reversal_dir = "BUY"
                 confidence = min(95.0, max(75.0, 60.0 + (bull_cnt * 2.0)))
@@ -320,7 +329,7 @@ class QuantGoldSecurityCitadel:
             # Strictly vetoed if macro timeframes are BULLISH or score is still positive!
             if (h1_bias == "BULLISH" and h4_bias == "BULLISH") or w_score > 0.0:
                 is_invalidated = False
-            elif (bear_cnt >= 13 and w_score <= -20.0) or (w_score <= -25.0 and vel <= -0.05):
+            elif (bear_cnt >= 10 and w_score <= -12.0) or (w_score <= -18.0 and vel <= -0.03):
                 is_invalidated = True
                 reversal_dir = "SELL"
                 confidence = min(95.0, max(75.0, 60.0 + (bear_cnt * 2.0)))

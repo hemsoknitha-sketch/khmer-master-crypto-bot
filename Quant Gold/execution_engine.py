@@ -321,6 +321,8 @@ class QuantGoldExecutionEngine:
         self._active_gold_entry_price: float = 0.0
         self._active_gold_entry_ts: float = 0.0
         self._last_reversal_flip_ts: float = 0.0
+        self._last_reversal_block_log_ts: float = 0.0
+        self._last_reversal_block_reason: str = ""
         self._active_gold_sl: float = 0.0
         self._active_gold_tp1: float = 0.0
         self._active_gold_tp2: float = 0.0
@@ -1651,7 +1653,20 @@ class QuantGoldExecutionEngine:
                         # Opposing Signal -> Evaluate Trend Reversal Flip (Institutional Anti-Whipsaw Standard AQ88 Invariant 124)
                         now_ts = now
                         last_rev_ts = getattr(self, "_last_reversal_flip_ts", 0.0)
-                        rev_cooldown_left = 900.0 - (now_ts - last_rev_ts)  # 15 minutes cooldown
+
+                        # Check existing trade floating pnl to protect capital
+                        existing_entry_p = self._active_gold_entry_price
+                        if existing_entry_p <= 0.0 and active_gold_trades:
+                            try:
+                                existing_entry_p = float(active_gold_trades[0].get("entry_price", current_price) or current_price)
+                            except Exception:
+                                existing_entry_p = current_price
+                        existing_pnl_pts = (current_price - existing_entry_p) if existing_dir == "BUY" else (existing_entry_p - current_price)
+                        is_existing_losing = (existing_pnl_pts <= -2.0)
+
+                        # Dynamic anti-whipsaw cooldown: 120s (bypassable if existing trade is losing and signal is high conviction)
+                        rev_cooldown_left = 120.0 - (now_ts - last_rev_ts)
+                        min_hold_req = 45.0 if is_existing_losing else 90.0
 
                         first_pos_ts = 0.0
                         if active_gold_trades:
@@ -1666,41 +1681,65 @@ class QuantGoldExecutionEngine:
                         can_flip = False
                         flip_veto_reason = ""
 
-                        if rev_cooldown_left > 0:
-                            flip_veto_reason = f"COOLDOWN_ACTIVE ({rev_cooldown_left:.0f}s left of 900s)"
-                        elif time_in_pos < 180.0:
-                            flip_veto_reason = f"MIN_HOLD_PROTECTION (in position {time_in_pos:.0f}s < 180s)"
+                        if rev_cooldown_left > 0 and not (is_existing_losing and confidence >= 65.0):
+                            flip_veto_reason = f"COOLDOWN_ACTIVE ({rev_cooldown_left:.0f}s left of 120s)"
+                        elif time_in_pos < min_hold_req:
+                            flip_veto_reason = f"MIN_HOLD_PROTECTION (in position {time_in_pos:.0f}s < {min_hold_req:.0f}s)"
                         elif action == "BUY":
                             if is_macro_bear:
                                 flip_veto_reason = "MACRO_BEAR_VETO (Cannot flip to BUY against H1/H4 Downtrend)"
-                            elif weighted_score < 20.0:
-                                flip_veto_reason = f"INSUFFICIENT_BUY_SCORE (Score {weighted_score:+.1f} < +20.0)"
-                            elif confidence < 75.0:
-                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 75.0%)"
+                            elif weighted_score < 8.0 and not (is_existing_losing and weighted_score >= 0.0 and confidence >= 65.0):
+                                flip_veto_reason = f"INSUFFICIENT_BUY_SCORE (Score {weighted_score:+.1f} < +8.0)"
+                            elif confidence < 65.0:
+                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 65.0%)"
                             else:
                                 can_flip = True
                         elif action == "SELL":
                             if is_macro_bull:
                                 flip_veto_reason = "MACRO_BULL_VETO (Cannot flip to SELL against H1/H4 Uptrend)"
-                            elif weighted_score > -20.0:
-                                flip_veto_reason = f"INSUFFICIENT_SELL_SCORE (Score {weighted_score:+.1f} > -20.0)"
-                            elif confidence < 75.0:
-                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 75.0%)"
+                            elif weighted_score > -8.0 and not (is_existing_losing and weighted_score <= 0.0 and confidence >= 65.0):
+                                flip_veto_reason = f"INSUFFICIENT_SELL_SCORE (Score {weighted_score:+.1f} > -8.0)"
+                            elif confidence < 65.0:
+                                flip_veto_reason = f"INSUFFICIENT_CONFIDENCE ({confidence:.1f}% < 65.0%)"
                             else:
                                 can_flip = True
 
                         if can_flip:
                             is_reversal_flip = True
                             self._last_reversal_flip_ts = now_ts
+                            # Ensure prospective SL/TPs are properly aligned for the reversal direction
+                            if action == "BUY":
+                                signal_data["sl"] = signal_data.get("prospective_buy", {}).get("sl", current_price - 25.0)
+                                signal_data["tp1"] = signal_data.get("prospective_buy", {}).get("tp1", current_price + 32.0)
+                                signal_data["tp2"] = signal_data.get("prospective_buy", {}).get("tp2", current_price + 55.0)
+                                signal_data["tp3"] = signal_data.get("prospective_buy", {}).get("tp3", current_price + 90.0)
+                            else:
+                                signal_data["sl"] = signal_data.get("prospective_sell", {}).get("sl", current_price + 25.0)
+                                signal_data["tp1"] = signal_data.get("prospective_sell", {}).get("tp1", current_price - 32.0)
+                                signal_data["tp2"] = signal_data.get("prospective_sell", {}).get("tp2", current_price - 55.0)
+                                signal_data["tp3"] = signal_data.get("prospective_sell", {}).get("tp3", current_price - 90.0)
+                            sl_val = float(signal_data["sl"])
+                            sl_dist = abs(current_price - sl_val)
                             logger.info(
                                 f"🔄 [TREND REVERSAL FLIP APPROVED] High-conviction {action} signal (Confidence: {confidence:.1f}%, Score: {weighted_score:+.1f}) "
-                                f"opposes current {existing_dir} position (held for {time_in_pos:.0f}s). Engaging Institutional Reversal Flip Protocol!"
+                                f"opposes current {existing_dir} position (held for {time_in_pos:.0f}s, PnL: {existing_pnl_pts:+.2f} pts). Engaging Institutional Reversal Flip Protocol!"
                             )
                         else:
-                            logger.info(
-                                f"🛡️ [REVERSAL FLIP BLOCKED] Opposing {action} signal rejected: {flip_veto_reason}. "
-                                f"Holding existing {existing_dir} trade."
-                            )
+                            now_log = time.time()
+                            last_log_ts = getattr(self, "_last_reversal_block_log_ts", 0.0)
+                            last_reason = getattr(self, "_last_reversal_block_reason", "")
+                            if (now_log - last_log_ts >= 60.0) or (flip_veto_reason != last_reason):
+                                self._last_reversal_block_log_ts = now_log
+                                self._last_reversal_block_reason = flip_veto_reason
+                                logger.info(
+                                    f"🛡️ [REVERSAL FLIP BLOCKED] Opposing {action} signal rejected: {flip_veto_reason}. "
+                                    f"Holding existing {existing_dir} trade."
+                                )
+                            else:
+                                logger.debug(
+                                    f"🛡️ [REVERSAL FLIP BLOCKED] Opposing {action} signal rejected: {flip_veto_reason}. "
+                                    f"Holding existing {existing_dir} trade."
+                                )
                             return {
                                 "status": "MANAGING_ACTIVE_TRADE",
                                 "deal_id": self._active_gold_deal_id,
@@ -1950,13 +1989,16 @@ class QuantGoldExecutionEngine:
                                     d_id = ot.get("deal_id")
                                     if d_id and d_id != "OK":
                                         try:
+                                            ot_entry = float(ot.get("entry_price", current_price) or current_price)
+                                            ot_sz = float(ot.get("size", 0.5) or 0.5)
+                                            ot_pnl = ((current_price - ot_entry) if ot_dir == "BUY" else (ot_entry - current_price)) * ot_sz
                                             if u_eng:
                                                 await asyncio.to_thread(u_eng.close_position, deal_id=d_id)
                                             if hasattr(db, "update_capital_auto_trade_close"):
-                                                db.update_capital_auto_trade_close(d_id, exit_price=current_price, pnl=0.0)
+                                                db.update_capital_auto_trade_close(d_id, exit_price=current_price, pnl=ot_pnl)
                                             elif hasattr(db, "close_capital_auto_trade"):
                                                 db.close_capital_auto_trade(d_id, exit_price=current_price, exit_reason="TREND_REVERSAL_FLIP")
-                                            logger.info(f"🔄 [REVERSAL FLIP] Closed opposing {ot_dir} trade {d_id} for user {cid} at ${current_price:.2f}")
+                                            logger.info(f"🔄 [REVERSAL FLIP] Closed opposing {ot_dir} trade {d_id} for user {cid} at ${current_price:.2f} (Realized PnL: ${ot_pnl:+.2f})")
                                         except Exception as e_rf:
                                             logger.warning(f"Error closing opposing deal {d_id}: {e_rf}")
 
@@ -2774,14 +2816,13 @@ class QuantGoldExecutionEngine:
                 tranche_lbl = str(tr.get("tranche_id", "") or "")
                 trade_setup = str(tr.get("setup_type", "") or "")
                 trade_open_ts = float(tr.get("created_at_ts", 0.0) or 0.0)
-                is_held_enough = (trade_open_ts <= 0.0) or ((now_curr - trade_open_ts) >= 180.0)
+                is_floating_loss = (upl <= -2.50 or pnl_pts <= -4.00)
+                is_held_enough = (trade_open_ts <= 0.0) or ((now_curr - trade_open_ts) >= (45.0 if is_floating_loss else 90.0))
                 is_already_flipped = (
                     "REVERSAL" in tranche_lbl or
                     "REVERSAL" in trade_setup or
-                    (now_curr - getattr(self, "_last_reversal_flip_ts", 0.0)) < 1800.0  # 30-min anti-whipsaw cooldown
+                    (now_curr - getattr(self, "_last_reversal_flip_ts", 0.0)) < 180.0  # 3-min anti-whipsaw cooldown (was 1800s / 30m)
                 )
-
-                is_floating_loss = (upl <= -2.50 or pnl_pts <= -4.00)
                 if is_floating_loss and not is_manual_trade and not is_already_flipped and is_held_enough:
                     try:
                         from quant_gold_security import get_quant_gold_security_citadel
