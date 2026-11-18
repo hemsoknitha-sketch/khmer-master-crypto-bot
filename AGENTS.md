@@ -2313,3 +2313,39 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
 3. **Execution Integration & Interactive Telemetry ៖**
    - Wired into `timeframes.py` (`compute_timeframe_indicators` with OLS z-score and Fib Pocket flags) and `execution_engine.py` (Gate 0.5 TV Matrix synergy).
    - Dedicated Telegram command `/tv` and 1-Tap interactive button `[📐 TV 10-Matrix (/tv)]` in the `/capital` live trading deck for instant visual inspection across the entire fleet.
+
+
+### 1.1.28 INSTITUTIONAL DUAL INDEPENDENT TRADING ENGINES: MACHINE 1 M1-M5 SCALP VS MACHINE 2 M15+ MACRO SWING (AQ125 INVARIANT 125)
+**(គ្រឹះស្ថាបត្យកម្មម៉ាស៊ីនជួញដូរស្វ័យប្រវត្ត ២ ឯករាជ្យដាច់ដោយឡែក៖ ម៉ាស៊ីនទី១ M1-M5 Scalping ចូលបាត/កំពូលអស់កម្លាំង & កើបលុយរហ័ស មិនបកក្បាលខាត, ម៉ាស៊ីនទី២ M15+ Institutional Macro ផែនការច្បាស់លាស់ កើបចំណេញធំ មិនកាត់កម្ទេចកម្ទី មិនប៉ះពាល់គ្នា - Invariant 125)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+1. **The Dual Independent Engine Axiom (គោលការណ៍ម៉ាស៊ីន ២ ដំណើរការឯករាជ្យដាច់ដោយឡែក មិនឈ្លោះគ្នា ១០០%):**
+   - The Angkor Quant Gold system operates two distinct, specialized quantitative engines running concurrently:
+     * **Machine 1 (ម៉ាស៊ីនទី១ - Micro/Intraday Scalping Engine M1-M5):**
+       - Primary Scope: M1 to M5 micro-swings, liquidity wicks, and order flow momentum exhaustion.
+       - Entry Principle: Enters BUY at bottoms where selling force is 100% exhausted (`BEARS_EXHAUSTED_AT_BOTTOM` on M5 with $RSI_{M5} \le 40.0$ and positive Kalman velocity $\ge 0.015$), and enters SELL at tops where buying force is 100% exhausted (`BULLS_EXHAUSTED_AT_TOP` on M5 with $RSI_{M5} \ge 60.0$ and negative/neutral Kalman velocity $\le 0.005$).
+       - Harvest & Protection Protocol: Harvests profits at the tail end of the micro impulse (+15 to +20 pips, or upon M5 order flow exhaustion). Automatically locks Breakeven Armor ($\text{Entry} \pm \text{Buffer}$, $0.00R$ Free Roll) as soon as $+12$ pips is reached, ensuring under NO circumstances does a winning trade retrace into a loss ("ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ").
+     * **Machine 2 (ម៉ាស៊ីនទី២ - Institutional Macro / Swing Trend Engine M15+):**
+       - Primary Scope: M15, M30, H1, H4, and D1 institutional structural setups (SMC FVG, Golden Pocket 0.618, Order Blocks, Liquidity Sweeps, and H4 200 EMA trend anchor).
+       - Entry Principle: Enters BUY at macro exhausted bottoms (`BEARS_EXHAUSTED_AT_BOTTOM` on M15/H1 with HTF structural support) and enters SELL at macro exhausted tops (`BULLS_EXHAUSTED_AT_TOP` on M15/H1 with HTF structural resistance).
+       - Fiduciary Profit Rule: Strictly forbidden from premature cuts or taking crumbs ($0.50$ to $5.00) ("មិនបញ្ជាកាត់ផ្តាច់ល្អិតល្អោចយកចំណេញ 0.50$ - 5$ ឡើង").
+       - Multi-Target Expansion & Climax Harvest: Targets TP1 (+73 pips / $7.30 move, locking 0.00R Breakeven Armor), TP2 (+152 pips / $15.20 move, locking +73 pips Cash Floor), TP3 (+243 pips / $24.32 move), and Moonshot Runner trailing behind 15m ATR / 3-EMA confluence. Banks institutional trend profits when capturing $\ge 12.0$ pts with M15/H1 climax exhaustion or upon a $\ge 35\%$ retrace from a peak $\ge 15.0$ pts.
+2. **Decoupled Fleet Lifecycle & Execution Scoping (`target_scope`):**
+   - Universal close routine `_close_all_fleet_open_gold_positions(target_scope: str = "ALL")` enforces strict isolation:
+     * When `target_scope == "SCALP_ONLY"`: Filters `targets_to_close` using `is_engine_1_scalp(tranche_lbl, scale_tier)`, harvesting ONLY Machine 1 scalp trades while preserving Machine 2 macro runners completely intact!
+     * When `target_scope == "MACRO_ONLY"`: Filters using `is_engine_2_macro(tranche_lbl, scale_tier)`, closing ONLY Machine 2 positions while preserving Machine 1 scalps.
+     * When `target_scope == "ALL"`: Operates only on full trend reversal flips or emergency circuit breaker events.
+   - Classification Helpers:
+     ```python
+     def is_engine_1_scalp(tranche_id: str, scale_tier: int = 0) -> bool:
+         lbl = str(tranche_id or "").upper()
+         return ("SCALP" in lbl or lbl in ["POS1_M1_M5_SCALP", "ENGINE_1_M1_M5_SCALP"] or
+                 ("POS" not in lbl and "REVERSAL" not in lbl and scale_tier == 0))
+
+     def is_engine_2_macro(tranche_id: str, scale_tier: int = 0) -> bool:
+         return not is_engine_1_scalp(tranche_id, scale_tier)
+     ```
+3. **Single Position Scalp Deadlock Eradication:**
+   - In solo position deployments (e.g. initial tranche or conservative budget), Machine 1 trades are evaluated independently:
+     * Capturing $+15$ to $+20$ pips immediately triggers fast cash harvesting (`POS1_FAST_HARVEST`), banking realized profit into the user's account and resetting for the next setup.
+     * Reaching $+12$ pips advances Stop Loss to Breakeven Armor, permanently guaranteeing a loss-free trade ($0.00R$).
+

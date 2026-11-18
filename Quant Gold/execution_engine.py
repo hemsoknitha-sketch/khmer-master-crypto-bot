@@ -194,6 +194,21 @@ def _check_network_online() -> bool:
         return False
 
 
+def is_engine_1_scalp(tranche_id: str, scale_tier: int = 0) -> bool:
+    """Returns True if the position belongs to Machine 1 (M1-M5 Scalping Engine)."""
+    lbl = str(tranche_id or "").upper()
+    return (
+        "SCALP" in lbl or
+        lbl in ["POS1_M1_M5_SCALP", "ENGINE_1_M1_M5_SCALP"] or
+        ("POS" not in lbl and "REVERSAL" not in lbl and scale_tier == 0)
+    )
+
+
+def is_engine_2_macro(tranche_id: str, scale_tier: int = 0) -> bool:
+    """Returns True if the position belongs to Machine 2 (M15+ Institutional Macro / Swing Trend Engine)."""
+    return not is_engine_1_scalp(tranche_id, scale_tier)
+
+
 def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
     """
     Returns the exact 5-tier multi-horizon specification:
@@ -1131,24 +1146,50 @@ class QuantGoldExecutionEngine:
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
         # Gate 0.8: Institutional Net Order Flow Force & Climax Exhaustion Trigger (AQ88 Invariant 120 & 123)
-        # Directly catches true exhausted tops to SELL and true exhausted bottoms to BUY
+        # Directly catches true exhausted tops to SELL and true exhausted bottoms to BUY for Machine 1 & Machine 2
         nof_data = math_data.get("net_order_flow_force", {})
         ex_state = nof_data.get("exhaustion_state", "NEUTRAL_BALANCED")
+
+        # Check M5 Net Order Flow Climax Exhaustion for Machine 1 Scalping
+        candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
+        nof_m5 = {}
+        if candles_m5 is not None and len(candles_m5) >= 5:
+            try:
+                from mathematical_engine import compute_net_buy_sell_force
+                nof_m5 = compute_net_buy_sell_force(candles_m5, kalman_velocity=kalman.get("latent_velocity", 0.0))
+            except Exception:
+                nof_m5 = {}
+        ex_state_m5 = nof_m5.get("exhaustion_state", "NEUTRAL_BALANCED")
+
         if final_action == "HOLD":
+            # 1. Higher Timeframe M15/H1 Exhaustion (Machine 2 Macro Trigger)
             if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_macro_bull and weighted_score <= 10.0:
                 rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
                 m15_bias = str(m15_tf.get("bias", "NEUTRAL")).upper()
                 if rsi_val >= 50.0 and kalman.get("latent_velocity", 0.0) <= 0.005 and m15_bias != "BULLISH":
                     final_action = "SELL"
                     win_prob = max(win_prob, 85.0)
-                    reason = f"EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Top (Sell Force {nof_data.get('sell_force_pct', 70)}%, Upper Wick {nof_data.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
+                    reason = f"MACHINE_2_EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Top on M15 (Sell Force {nof_data.get('sell_force_pct', 70)}%, Upper Wick {nof_data.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
             elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_macro_bear and weighted_score >= -10.0:
                 rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
                 m15_bias = str(m15_tf.get("bias", "NEUTRAL")).upper()
                 if rsi_val <= 50.0 and kalman.get("latent_velocity", 0.0) >= 0.015 and m15_bias != "BEARISH":
                     final_action = "BUY"
                     win_prob = max(win_prob, 85.0)
-                    reason = f"EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Bottom (Buy Force {nof_data.get('buy_force_pct', 70)}%, Lower Wick {nof_data.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
+                    reason = f"MACHINE_2_EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Bottom on M15 (Buy Force {nof_data.get('buy_force_pct', 70)}%, Lower Wick {nof_data.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
+            # 2. Lower Timeframe M1-M5 Climax Exhaustion (Machine 1 Scalp Trigger)
+            elif ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" and not is_macro_bull:
+                m5_rsi = float(mtf_data.get("timeframes", {}).get("M5", {}).get("rsi", 50.0) or 50.0)
+                if m5_rsi >= 60.0 and kalman.get("latent_velocity", 0.0) <= 0.005:
+                    final_action = "SELL"
+                    win_prob = max(win_prob, 82.0)
+                    reason = f"MACHINE_1_SCALP_EXHAUSTED_TOP_SELL: M1-M5 Buyers 100% Exhausted at Top (Sell Force {nof_m5.get('sell_force_pct', 70)}%, Upper Wick {nof_m5.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
+            elif ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_macro_bear:
+                m5_rsi = float(mtf_data.get("timeframes", {}).get("M5", {}).get("rsi", 50.0) or 50.0)
+                if m5_rsi <= 40.0 and kalman.get("latent_velocity", 0.0) >= -0.005:
+                    final_action = "BUY"
+                    win_prob = max(win_prob, 82.0)
+                    reason = f"MACHINE_1_SCALP_EXHAUSTED_BOTTOM_BUY: M1-M5 Sellers 100% Exhausted at Bottom (Buy Force {nof_m5.get('buy_force_pct', 70)}%, Lower Wick {nof_m5.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
 
         # Dynamic Breathing Stop Loss & H1/H4 Institutional Structural Invalidation Anchor (Invariant 35 & 98):
         # Strict Standard: SL Distance >= max(1.80 * H1_ATR, 1.15 * H4_ATR, 3.60 * ATR_15m, spread * 5.0, 0.0065 * Price)
@@ -2381,31 +2422,52 @@ class QuantGoldExecutionEngine:
         reason: str,
         exit_price: float,
         current_pnl_pts: float = 0.0,
-        app = None
+        app = None,
+        target_scope: str = "ALL"  # "ALL", "SCALP_ONLY", "MACRO_ONLY"
     ) -> int:
         """
-        UNIVERSAL FLEET-WIDE SYNCHRONIZED CLOSE (AQ88 Invariant 121):
-        Concurrently closes ALL open Gold positions across the fleet (Super Admin Live, Super Admin Demo, and all VIPs)
-        at the exact same second, completely eliminating orphaned lagging positions!
+        UNIVERSAL FLEET-WIDE SYNCHRONIZED CLOSE (AQ88 Invariant 121 & Dual-Engine Covenant):
+        Concurrently closes open Gold positions across the fleet (Super Admin Live, Super Admin Demo, and all VIPs)
+        at the exact same second, cleanly scoped by target_scope ("ALL", "SCALP_ONLY", or "MACRO_ONLY").
         """
         dir_upper = str(direction).upper()
         targets_to_close = []
         seen_deals = set()
 
         # 1. Gather all open Gold trades from database matching this direction
+        db_trades = []
+        db_deal_info = {}
         try:
             db_trades = db.get_active_capital_auto_trades() if hasattr(db, "get_active_capital_auto_trades") else []
+            for t in db_trades:
+                if str(t.get("epic", "")).upper() == "GOLD":
+                    d_id = str(t.get("deal_id", ""))
+                    if d_id:
+                        db_deal_info[d_id] = {
+                            "tranche_id": str(t.get("tranche_id", "") or ""),
+                            "scale_tier": int(t.get("scale_tier", 0) or 0)
+                        }
+
             for t in db_trades:
                 if str(t.get("epic", "")).upper() == "GOLD" and str(t.get("direction", "")).upper() == dir_upper:
                     d_id = str(t.get("deal_id", ""))
                     if d_id and d_id not in seen_deals and not d_id.startswith("MANUAL_"):
+                        t_lbl = str(t.get("tranche_id", "") or "")
+                        s_tier = int(t.get("scale_tier", 0) or 0)
+                        is_e1 = is_engine_1_scalp(t_lbl, s_tier)
+                        if target_scope == "SCALP_ONLY" and not is_e1:
+                            continue
+                        if target_scope == "MACRO_ONLY" and is_e1:
+                            continue
                         seen_deals.add(d_id)
                         targets_to_close.append({
                             "chat_id": t.get("chat_id") or 859271875,
                             "is_demo": bool(t.get("is_demo", False)),
                             "deal_id": d_id,
                             "entry_price": float(t.get("entry_price", exit_price) or exit_price),
-                            "size": float(t.get("size", 0.5) or 0.5)
+                            "size": float(t.get("size", 0.5) or 0.5),
+                            "tranche_id": t_lbl,
+                            "scale_tier": s_tier
                         })
         except Exception as e_dbt:
             logger.debug(f"Fleet close DB query note: {e_dbt}")
@@ -2441,6 +2503,14 @@ class QuantGoldExecutionEngine:
                     p_dir = str(pos.get("direction", "")).upper()
                     d_id = str(pos.get("dealId") or pos.get("deal_id") or "")
                     if epic == "GOLD" and p_dir == dir_upper and d_id and d_id not in seen_deals:
+                        info = db_deal_info.get(d_id, {})
+                        t_lbl = info.get("tranche_id", "")
+                        s_tier = info.get("scale_tier", 0)
+                        is_e1 = is_engine_1_scalp(t_lbl, s_tier)
+                        if target_scope == "SCALP_ONLY" and not is_e1:
+                            continue
+                        if target_scope == "MACRO_ONLY" and is_e1:
+                            continue
                         seen_deals.add(d_id)
                         lvl = float(pos.get("level") or pos.get("openLevel") or exit_price)
                         sz = float(pos.get("size", 0.5) or 0.5)
@@ -2449,17 +2519,20 @@ class QuantGoldExecutionEngine:
                             "is_demo": is_demo,
                             "deal_id": d_id,
                             "entry_price": lvl,
-                            "size": sz
+                            "size": sz,
+                            "tranche_id": t_lbl,
+                            "scale_tier": s_tier
                         })
             except Exception as e_b_scan:
                 logger.debug(f"Broker position scan note for user {cid} (demo={is_demo}): {e_b_scan}")
 
         if not targets_to_close:
-            logger.info(f"🏛️ [FLEET CLOSE] Zero active {dir_upper} Gold positions found on broker or DB.")
-            self._clear_active_trade(cooldown=20.0, direction=dir_upper)
+            logger.info(f"🏛️ [FLEET CLOSE] Zero active {dir_upper} Gold positions found matching scope={target_scope}.")
+            if target_scope == "ALL":
+                self._clear_active_trade(cooldown=20.0, direction=dir_upper)
             return 0
 
-        logger.info(f"⚡ [FLEET-WIDE SYNCHRONIZED CLOSE] Closing {len(targets_to_close)} {dir_upper} Gold positions across entire fleet ({reason}) @ ${exit_price:.2f}...")
+        logger.info(f"⚡ [FLEET-WIDE SYNCHRONIZED CLOSE] Closing {len(targets_to_close)} {dir_upper} Gold positions ({reason}, scope={target_scope}) @ ${exit_price:.2f}...")
 
         # 3. Concurrent fan-out close across all broker sessions via asyncio.gather
         async def _close_single_target(item: dict) -> dict:
@@ -2498,9 +2571,10 @@ class QuantGoldExecutionEngine:
             markup = get_gold_signal_reply_markup()
             await self.broadcast_to_vip_users(card_shock, app=app, reply_markup=markup)
 
-        # 5. Clear global active trade state and activate clean post-trade cooldown
-        self._clear_active_trade(cooldown=20.0, direction=dir_upper)
-        self._cached_broker_gold_count = 0
+        # 5. Clear global active trade state only if ALL positions were targeted
+        if target_scope == "ALL":
+            self._clear_active_trade(cooldown=20.0, direction=dir_upper)
+            self._cached_broker_gold_count = 0
         return len(targets_to_close)
 
     async def _audit_and_protect_open_gold_positions(self, app=None):
@@ -2790,20 +2864,37 @@ class QuantGoldExecutionEngine:
                         except Exception as e_exh:
                             logger.debug(f"Exhaustion check note: {e_exh}")
 
-                if is_shock_pts or is_shock_upl or is_exhaustion_harvest:
-                    harvest_tag = "MICRO-EXHAUSTION HARVEST" if is_exhaustion_harvest else "FLASH SHOCK HARVEST"
+                tranche_lbl = str(tr.get("tranche_id", "") or "")
+                is_e1 = is_engine_1_scalp(tranche_lbl, scale_tier)
+                is_e2 = not is_e1
+
+                # Flash Shock & Micro-Exhaustion Peak Protective Harvest (Invariants 35, 104 & 121):
+                # Machine 1 Scalp: Closes ONLY Machine 1 scalp position (Machine 2 Macro runners continue unimpeded!)
+                # Machine 2 Macro: Strictly immune to micro-cuts ($0.50 - $5.00) to let macro trend breathe!
+                if is_e1 and (is_shock_pts or is_shock_upl or is_exhaustion_harvest):
+                    harvest_tag = "M1_M5_SCALP_EXHAUSTION_HARVEST" if is_exhaustion_harvest else "M1_M5_SCALP_SHOCK_HARVEST"
                     logger.info(
-                        f"⚡ [{harvest_tag}] Gold trade {deal_id} peak ({current_peak_pts:.2f} pts / ${current_peak:.2f}) "
-                        f"pulled back to ({pnl_pts:.2f} pts / ${upl:.2f}). Triggering Universal Fleet-Wide Harvest!"
+                        f"⚡ [{harvest_tag}] Machine 1 Scalp trade {deal_id} peak ({current_peak_pts:.2f} pts / ${current_peak:.2f}) "
+                        f"pulled back to ({pnl_pts:.2f} pts / ${upl:.2f}). Harvesting Scalp position ONLY (Machine 2 Macro runners continue)!"
                     )
-                    await self._close_all_fleet_open_gold_positions(
-                        direction=dir_side,
-                        reason=harvest_tag,
-                        exit_price=curr_p,
-                        current_pnl_pts=pnl_pts,
-                        app=app
-                    )
-                    break
+                    try:
+                        if cid:
+                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                        if hasattr(db, "update_capital_auto_trade_close"):
+                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                        card_scalp = format_gold_tp_card(
+                            stage="SCALP",
+                            pips=pips,
+                            direction=dir_side,
+                            entry_price=entry_p
+                        )
+                        markup = get_gold_signal_reply_markup()
+                        await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
+                        self._clear_active_trade(deal_key, cooldown=15.0, direction=dir_side)
+                        continue
+                    except Exception as e_sc_close:
+                        logger.debug(f"Machine 1 scalp shock harvest close note: {e_sc_close}")
 
                 # 360° Real-Time Market Invalidation & Early Reversal Surveillance (News & Buy/Sell Order Flow):
                 # ANTI-WHIPSAW FLIP COVENANT (AQ84 Invariant 116):
@@ -2860,22 +2951,45 @@ class QuantGoldExecutionEngine:
                     except Exception as e_rev_cut:
                         logger.debug(f"360 reversal check note: {e_rev_cut}")
 
-                # Check Position 1: M1 - M5 Scalp Fast Harvester (+20 pips / $2.00 move)
-                tranche_lbl = str(tr.get("tranche_id", "") or "")
-                tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 20))
-                is_pos1 = (tranche_lbl == "POS1_M1_M5_SCALP" or (idx == 0 and "POS" not in tranche_lbl and scale_tier == 0))
-                if is_pos1 and (pnl_pts >= 2.00 or pips >= tier_pips_target) and not is_manual_trade and scale_tier == 0:
-                    user_open_trades = [
-                        t for t in active_trades 
-                        if t.get("chat_id") == cid and str(t.get("status", "OPEN")).upper() == "OPEN"
-                    ]
-                    # If multiple positions exist (e.g. Engine A Scalp + Engine B Macro Runner),
-                    # we can close Pos 1 to bank cash into pocket, while Pos 2 continues running.
-                    # BUT if this is the ONLY open position for the user, we NEVER close it!
-                    # We ratchet SL to Breakeven Armor (Entry ± 0.5x Spread), locking 0.00R Free Roll,
-                    # and let the runner ride to TP2 (+100 pips) and TP3 (+300 pips)!
-                    if len(user_open_trades) > 1 and tranche_lbl == "POS1_M1_M5_SCALP":
-                        logger.info(f"⚡ [POS 1 SCALP HARVEST] Multi-tranche active: Gold trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}). Banking Scalp cash profit while runners continue!")
+                # ── MACHINE 1: M1 - M5 SCALP FAST HARVESTER ──
+                # "ម៉ាស៊ីនទី១ ធ្វើការ Scalping M1-M5 បើក Position Buy នៅបាតដែលអស់កម្លាំងលក់ទាំងស្រុង
+                # កើបចំណេញធំនៅចុងកម្លាំង Buy ដែលខ្សោយ Super Fast ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ។"
+                if is_e1 and not is_manual_trade and scale_tier == 0:
+                    tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 20))
+
+                    # Net Order Flow Check on M5 for impulse exhaustion
+                    candles_m5_scalp = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
+                    scalp_exhausted = False
+                    if candles_m5_scalp is not None and len(candles_m5_scalp) >= 2:
+                        try:
+                            from mathematical_engine import compute_net_buy_sell_force
+                            f_m5 = compute_net_buy_sell_force(candles_m5_scalp)
+                            b_f = float(f_m5.get("buy_force_pct", 50.0))
+                            s_f = float(f_m5.get("sell_force_pct", 50.0))
+                            c_last = candles_m5_scalp.iloc[-1]
+                            o_v, h_v, l_v, c_v = float(c_last['open']), float(c_last['high']), float(c_last['low']), float(c_last['close'])
+                            rng_v = max(0.25, h_v - l_v)
+                            if dir_side == "BUY":
+                                u_wick = (h_v - max(o_v, c_v)) / rng_v
+                                scalp_exhausted = (u_wick >= 0.35 and s_f >= 55.0) or (f_m5.get("exhaustion_state") == "BULLS_EXHAUSTED_AT_TOP")
+                            else:
+                                l_wick = (min(o_v, c_v) - l_v) / rng_v
+                                scalp_exhausted = (l_wick >= 0.35 and b_f >= 55.0) or (f_m5.get("exhaustion_state") == "BEARS_EXHAUSTED_AT_BOTTOM")
+                        except Exception:
+                            scalp_exhausted = False
+
+                    # Super Fast Profit Taking: Target reached OR momentum exhausted at impulse end
+                    should_fast_harvest = (
+                        (pnl_pts >= 2.00 or pips >= tier_pips_target) or
+                        (pnl_pts >= 1.50 and scalp_exhausted) or
+                        (current_peak_pts >= 2.00 and pnl_pts <= current_peak_pts * 0.75 and pnl_pts >= 1.20)
+                    )
+
+                    if should_fast_harvest:
+                        logger.info(
+                            f"⚡ [MACHINE 1 SCALP FAST HARVEST] Gold scalp trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}) "
+                            f"(Exhausted={scalp_exhausted}). Banking Scalp cash profit immediately!"
+                        )
                         try:
                             if cid:
                                 u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
@@ -2894,15 +3008,14 @@ class QuantGoldExecutionEngine:
                             self._clear_active_trade(deal_key, cooldown=15.0, direction=dir_side)
                             continue
                         except Exception as e_sc:
-                            logger.debug(f"Pos 1 scalp harvest note: {e_sc}")
-                    else:
-                        # Single Position / Macro Runner Protection (Decoupled Dual-Engine Free Roll):
-                        # Ratchet Stop-Loss to Guaranteed Positive Cash Floor (Invariants 35 & 104):
-                        # Upgraded from Entry ± 0.5x spread to Entry ± max(0.80, spread * 1.6).
-                        # Locks a true positive cash profit floor (+$0.40 to +$0.80 net profit after spread & slippage),
-                        # permanently preventing trades from closing at -$0.15 to -$0.50!
+                            logger.debug(f"Machine 1 scalp fast harvest note: {e_sc}")
+
+                    # Breakeven Armor (Loss Immunity Guarantee):
+                    # If profit >= +1.20 pts (+12 pips), shift SL to Entry ± 0.80 Net Floor
+                    # "ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ"
+                    elif pnl_pts >= 1.20 and deal_id not in self._be_armor_locked_deals:
                         be_buffer = max(0.80, spread * 1.6)
-                        min_breathing_buf = max(1.50, spread * 2.5)
+                        min_breathing_buf = max(1.20, spread * 2.0)
                         if dir_side == "BUY":
                             raw_be = entry_p + be_buffer
                             be_level = min(raw_be, curr_p - min_breathing_buf)
@@ -2910,8 +3023,8 @@ class QuantGoldExecutionEngine:
                             raw_be = entry_p - be_buffer
                             be_level = max(raw_be, curr_p + min_breathing_buf)
 
-                        if deal_id not in self._be_armor_locked_deals and abs(sl - be_level) > 0.30:
-                            logger.info(f"⚡ [DECOUPLED DUAL-ENGINE] Pos 1 reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Guaranteed Cash Floor {be_level:.2f} & letting Macro Runner ride!")
+                        if abs(sl - be_level) > 0.30:
+                            logger.info(f"🛡️ [MACHINE 1 BREAKEVEN ARMOR] Scalp reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Guaranteed Cash Floor {be_level:.2f} (0.00R Free Roll)!")
                             try:
                                 if cid:
                                     u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
@@ -3056,6 +3169,49 @@ class QuantGoldExecutionEngine:
                         app=app
                     )
                     break
+
+                # ── MACHINE 2: M15+ INSTITUTIONAL MACRO CLIMAX HARVEST ──
+                # "ម៉ាស៊ីទី២ បំពេញតួនាទីចាប់ពី M15 ឡើងទៅ ដែលមានផែនការច្បាស់លាស់បំផុត កើបចំណេញធំខ្លាំងបំផុត មិនបញ្ជាកាត់ផ្តាច់ល្អិតល្អោចយកចំណេញ 0.50$ - 5$ ឡើង។"
+                # "កើបចំណេញធំនៅចុងកម្លាំង Buy/Sell ដែលខ្សោយ Super Fast ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ"
+                if is_e2 and pnl_pts >= 7.30 and not is_manual_trade:
+                    candles_m15_macro = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
+                    htf_exhausted = False
+                    if candles_m15_macro is not None and len(candles_m15_macro) >= 2:
+                        try:
+                            from mathematical_engine import compute_net_buy_sell_force
+                            f_m15 = compute_net_buy_sell_force(candles_m15_macro)
+                            if dir_side == "BUY" and f_m15.get("exhaustion_state") == "BULLS_EXHAUSTED_AT_TOP":
+                                htf_exhausted = True
+                            elif dir_side == "SELL" and f_m15.get("exhaustion_state") == "BEARS_EXHAUSTED_AT_BOTTOM":
+                                htf_exhausted = True
+                        except Exception:
+                            htf_exhausted = False
+
+                    # If captured >= 12.0 pts (+120 pips) and HTF exhausted, OR pulled back >= 35% from peak >= 15.0 pts:
+                    if (htf_exhausted and pnl_pts >= 12.0) or (current_peak_pts >= 15.0 and pnl_pts <= current_peak_pts * 0.65 and pnl_pts >= 7.30):
+                        logger.info(
+                            f"🏆 [MACHINE 2 MACRO CLIMAX HARVEST] Machine 2 Macro trade {deal_id} captured +{pips} pips (+${pnl_pts:.2f}) "
+                            f"(Peak: {current_peak_pts:.2f} pts, HTF Exhausted={htf_exhausted}). Banking Institutional Trend Profit!"
+                        )
+                        try:
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                            if hasattr(db, "update_capital_auto_trade_close"):
+                                db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+
+                            card_macro = format_gold_tp_card(
+                                stage="CLOSE",
+                                pips=pips,
+                                direction=dir_side,
+                                entry_price=entry_p
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_macro, app=app, reply_markup=markup)
+                            self._clear_active_trade(deal_key, cooldown=20.0, direction=dir_side)
+                            continue
+                        except Exception as e_mc:
+                            logger.debug(f"Machine 2 macro harvest note: {e_mc}")
 
                 # Check if position stopped out on broker (SL hit or closed)
                 # If stopped out in profit: notify VIP. If stopped out in loss: DO NOT NOTIFY VIP.
