@@ -65,8 +65,8 @@ class TestQuantGoldTrendAndQuarantine(unittest.TestCase):
             "win_probability": 85.0,
             "counts": {"bullish": 2, "bearish": 15},
             "timeframes": {
-                "M5": {"bias": "BEARISH", "rsi": 40.0},
-                "M15": {"bias": "BEARISH", "rsi": 39.0, "atr": 6.5, "ema21": 3730.0},
+                "M5": {"bias": "BEARISH", "rsi": 50.0},
+                "M15": {"bias": "BEARISH", "rsi": 50.0, "atr": 6.5, "ema21": 3730.0},
                 "H1": {"bias": "BEARISH", "atr": 14.0, "ema50": 3740.0, "ema200": 3750.0},
                 "H4": {"bias": "BEARISH", "atr": 26.0}
             }
@@ -77,7 +77,7 @@ class TestQuantGoldTrendAndQuarantine(unittest.TestCase):
             "hurst_surface": {"regime": "TRENDING_BEAR", "composite": 0.65},
             "net_order_flow_force": {"exhaustion_state": "NEUTRAL_BALANCED"}
         })
-        self.engine.get_live_gold_price_quote = MagicMock(return_value=(3720.0, 3720.50, 0.50))
+        self.engine.get_live_gold_price_quote = MagicMock(return_value=(3730.0, 3730.50, 0.50))
 
         # Run master signal
         import asyncio

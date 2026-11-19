@@ -224,9 +224,9 @@ def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
             "tier": 1,
             "label": "POS1_M1_M5_SCALP",
             "name": "Position 1: M1-M5 Scalp Fast Harvester",
-            "pips_target": 20,
+            "pips_target": 50,
             "tp_r": 1.50,
-            "desc": "TP1: +20 pips ($2.00) -> ជាប់ Breakeven Armor ភ្លាម (0.00R Free Roll)"
+            "desc": "TP1: +50 pips ($2.50 net) -> ជាប់ Breakeven Armor ភ្លាម (0.00R Free Roll)"
         },
         2: {
             "tier": 2,
@@ -1125,6 +1125,8 @@ class QuantGoldExecutionEngine:
             has_consensus = True
             cand_action = ai_action
 
+        m5_tf = mtf_data.get("timeframes", {}).get("M5", {}) if isinstance(mtf_data, dict) else {}
+        m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
         m15_ema21 = float(m15_tf.get("ema21", 0.0) or m15_tf.get("ema20", 0.0) or curr_p)
         m15_atr_gate = float(m15_tf.get("atr", 6.5) or 6.5)
 
@@ -1141,22 +1143,22 @@ class QuantGoldExecutionEngine:
             elif is_chop_zone and abs(weighted_score) < 28.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.03:
                 final_action = "HOLD"
                 reason = f"BLOCKED_CHOP_ZONE: Price is in middle dealing range ({smc_m15.get('range_pct', 0.5):.2f}) with low momentum."
-            # Gate 2.5: Anti-Chasing Momentum Overextension & Spread Drag Guard (Invariant 92 Pillar 1)
-            # Chasing an extended impulse candle (> 1.85x ATR from EMA21) forces retail to buy the top wick
+            # Gate 2.5: Anti-Chasing Momentum Overextension & Spread Drag Guard (Invariant 92 Pillar 1 & AQ88 Invariant 132)
+            # Chasing an extended impulse candle (> 0.65x ATR from EMA21) forces retail to buy the top wick
             # or sell the bottom wick right before a mean-reverting pullback.
-            elif cand_action == "BUY" and (curr_p - m15_ema21) > (1.85 * m15_atr_gate):
+            elif cand_action == "BUY" and (curr_p - m15_ema21) > (0.65 * m15_atr_gate):
                 final_action = "HOLD"
-                reason = f"ANTI_CHASING_IMPULSE_VETO: Price {curr_p:.2f} is {((curr_p - m15_ema21)/m15_atr_gate):.2f}x ATR above 15m EMA21 ({m15_ema21:.2f}). Chasing extended top wick is blocked."
-            elif cand_action == "SELL" and (m15_ema21 - curr_p) > (1.85 * m15_atr_gate):
+                reason = f"ANTI_CHASING_IMPULSE_VETO: Price {curr_p:.2f} is {((curr_p - m15_ema21)/m15_atr_gate):.2f}x ATR above 15m EMA21 ({m15_ema21:.2f}). Chasing extended top into premium is blocked."
+            elif cand_action == "SELL" and (m15_ema21 - curr_p) > (0.65 * m15_atr_gate):
                 final_action = "HOLD"
-                reason = f"ANTI_CHASING_IMPULSE_VETO: Price {curr_p:.2f} is {((m15_ema21 - curr_p)/m15_atr_gate):.2f}x ATR below 15m EMA21 ({m15_ema21:.2f}). Shorting extended bottom wick is blocked."
-            # Gate 3: Anti-Oversold Short Guard & Anti-Overbought Long Guard (Invariant 1.1 Fiduciary Oath)
-            elif cand_action == "SELL" and m15_tf.get("rsi", 50.0) <= 38.0:
+                reason = f"ANTI_CHASING_IMPULSE_VETO: Price {curr_p:.2f} is {((m15_ema21 - curr_p)/m15_atr_gate):.2f}x ATR below 15m EMA21 ({m15_ema21:.2f}). Shorting extended bottom into discount is blocked."
+            # Gate 3: Anti-Oversold Short Guard & Anti-Overbought Long Guard (Invariant 1.1 Fiduciary Oath & AQ88 Invariant 132)
+            elif cand_action == "SELL" and (float(m15_tf.get("rsi", 50.0) or 50.0) <= 42.0 or float(m5_tf.get("rsi", 50.0) or 50.0) <= 38.0):
                 final_action = "HOLD"
-                reason = f"ANTI_OVERSOLD_SHORT_VETO: 15m RSI is {m15_tf.get('rsi'):.1f} <= 38.0."
-            elif cand_action == "BUY" and m15_tf.get("rsi", 50.0) >= 70.0:
+                reason = f"ANTI_OVERSOLD_SHORT_VETO: M15 RSI {float(m15_tf.get('rsi', 50.0)):.1f} <= 42.0 or M5 RSI {float(m5_tf.get('rsi', 50.0)):.1f} <= 38.0. Shorting into oversold support is strictly blocked."
+            elif cand_action == "BUY" and (float(m15_tf.get("rsi", 50.0) or 50.0) >= 65.0 or float(m5_tf.get("rsi", 50.0) or 50.0) >= 68.0):
                 final_action = "HOLD"
-                reason = f"ANTI_OVERBOUGHT_LONG_VETO: 15m RSI is {m15_tf.get('rsi'):.1f} >= 70.0."
+                reason = f"ANTI_OVERBOUGHT_LONG_VETO: M15 RSI {float(m15_tf.get('rsi', 50.0)):.1f} >= 65.0 or M5 RSI {float(m5_tf.get('rsi', 50.0)):.1f} >= 68.0. Buying into overbought resistance is strictly blocked."
             # Gate 4: Random Walk Veto - Only when score is near zero and velocity is flat
             elif regime == "RANDOM_WALK" and abs(weighted_score) < 20.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.02:
                 final_action = "HOLD"
@@ -1176,7 +1178,7 @@ class QuantGoldExecutionEngine:
                 final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
-        # Gate 0.8: Institutional Net Order Flow Force & Intraday Trend Governor (AQ88 Invariant 130)
+        # Gate 0.8: Institutional Net Order Flow Force & Intraday Trend Governor (AQ88 Invariant 130 & 132)
         # Directly aligns Machine 1 (Scalp) & Machine 2 (Macro) WITH the dominant trend!
         # Counter-trend selling in an uptrend or counter-trend buying in a downtrend is 100% ELIMINATED!
         nof_data = math_data.get("net_order_flow_force", {})
@@ -1219,7 +1221,8 @@ class QuantGoldExecutionEngine:
             # 1. Trend Pullback Setups (Trading WITH the Dominant Trend):
             if is_intraday_bull and not is_macro_bear:
                 # In an UPTREND: We ONLY BUY PULLBACKS! Selling against the bull trend is 100% FORBIDDEN.
-                if ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" or ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                # Price MUST have pulled back down near/below EMA21 in Discount (not at the top)!
+                if (ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" or ex_state == "BEARS_EXHAUSTED_AT_BOTTOM") and (curr_p <= m15_ema21 + (0.35 * m15_atr_gate)):
                     m5_rsi = float(m5_tf.get("rsi", 50.0) or 50.0)
                     if m5_rsi <= 55.0 and k_vel >= -0.015:
                         final_action = "BUY"
@@ -1227,7 +1230,8 @@ class QuantGoldExecutionEngine:
                         reason = f"MACHINE_1_TREND_PULLBACK_BUY: Dip in Bull trend exhausted sellers at bottom (Buy Force {nof_m5.get('buy_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
             elif is_intraday_bear and not is_macro_bull:
                 # In a DOWNTREND: We ONLY SELL RALLIES! Buying falling knives is 100% FORBIDDEN.
-                if ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" or ex_state == "BULLS_EXHAUSTED_AT_TOP":
+                # Price MUST have rallied up near/above EMA21 in Premium (not at the bottom)!
+                if (ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" or ex_state == "BULLS_EXHAUSTED_AT_TOP") and (curr_p >= m15_ema21 - (0.35 * m15_atr_gate)):
                     m5_rsi = float(m5_tf.get("rsi", 50.0) or 50.0)
                     if m5_rsi >= 45.0 and k_vel <= 0.015:
                         final_action = "SELL"
@@ -1235,7 +1239,7 @@ class QuantGoldExecutionEngine:
                         reason = f"MACHINE_1_TREND_PULLBACK_SELL: Rally in Bear trend exhausted buyers at top (Sell Force {nof_m5.get('sell_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
             else:
                 # 2. Consolidation / Range Boundaries ONLY (Strict Exhaustion Criteria):
-                if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_intraday_bull and weighted_score <= 5.0:
+                if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_intraday_bull and weighted_score <= 5.0 and (curr_p >= m15_ema21 - (0.30 * m15_atr_gate)):
                     rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
                     s_f = float(nof_data.get("sell_force_pct", 50.0) or 50.0)
                     u_w = float(nof_data.get("upper_wick_ratio", 0.0) or 0.0)
@@ -1243,7 +1247,7 @@ class QuantGoldExecutionEngine:
                         final_action = "SELL"
                         win_prob = max(win_prob, 82.0)
                         reason = f"RANGE_BOUNDARY_EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Range Top (Sell Force {s_f:.0f}%, Upper Wick {u_w*100:.1f}%, Kalman Vel {k_vel:+.4f})."
-                elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_intraday_bear and weighted_score >= -5.0:
+                elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_intraday_bear and weighted_score >= -5.0 and (curr_p <= m15_ema21 + (0.30 * m15_atr_gate)):
                     rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
                     b_f = float(nof_data.get("buy_force_pct", 50.0) or 50.0)
                     l_w = float(nof_data.get("lower_wick_ratio", 0.0) or 0.0)
@@ -1263,38 +1267,28 @@ class QuantGoldExecutionEngine:
                 final_action = "HOLD"
                 reason = f"DIRECTIONAL_QUARANTINE_VETO: {q_dir} quarantined ({rem_sec}s remaining)."
 
-        # Dynamic Breathing Stop Loss & H1/H4 Institutional Structural Invalidation Anchor (Invariant 35 & 98):
-        # Strict Standard: SL Distance >= max(1.80 * H1_ATR, 1.15 * H4_ATR, 3.60 * ATR_15m, spread * 5.0, 0.0065 * Price)
+        # Dynamic Breathing Stop Loss & Institutional Structural Risk Clamp (AQ88 Invariant 132):
+        # Strict Standard: Stop loss is anchored to true structural level (5.00 to 6.50 points = $2.50 to $3.25 max dollar risk on 0.5 lot)
+        # Strictly eliminates -$15.13 catastrophic stop outs while giving the trade 5.0 points room to breathe without panic cuts!
         m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
-        h1_tf = mtf_data.get("timeframes", {}).get("H1", {}) if isinstance(mtf_data, dict) else {}
-        h4_tf = mtf_data.get("timeframes", {}).get("H4", {}) if isinstance(mtf_data, dict) else {}
         m15_atr = float(m15_tf.get("atr", 6.5) or 6.5)
-        h1_atr = float(h1_tf.get("atr", 14.0) or 14.0)
-        h4_atr = float(h4_tf.get("atr", 26.0) or 26.0)
         if m15_atr < 2.0 or m15_atr > 35.0:
             m15_atr = 6.5  # Sane default for Gold (XAUUSD)
-        if h1_atr < 4.0 or h1_atr > 50.0:
-            h1_atr = 14.0
-        if h4_atr < 8.0 or h4_atr > 80.0:
-            h4_atr = 26.0
 
         raw_sl_dist = max(
-            1.80 * h1_atr,
-            1.15 * h4_atr,
-            3.60 * m15_atr,
-            spread * 5.00,
-            0.0065 * curr_p
+            5.00,
+            min(6.50, 0.85 * m15_atr),
+            spread * 4.00
         )
-        # Institutional Breathing Room: clamped dynamically between $25.00 and $35.00 (250 - 350 pips)
-        sl_distance = round(max(25.00, min(35.00, raw_sl_dist)), 2)
+        sl_distance = round(raw_sl_dist, 2)
 
-        # Multi-Tier Asymmetric Targets (R:R >= 1:1.25 to 1:3.50):
-        # TP1 (+1.25R / $32-$43): High hit-rate -> shifts SL to Breakeven Armor, locking trade at 0.00R Free Roll
-        tp1_distance = round(max(sl_distance * 1.25, 32.0), 2)
-        # TP2 (+2.20R / $55-$77): Guaranteed Cash Profit Floor (Banks 50% lot cash profit)
-        tp2_distance = round(max(sl_distance * 2.20, 55.0), 2)
-        # TP3 (+3.50R / $90-$125): Institutional Moonshot Runner
-        tp3_distance = round(max(sl_distance * 3.50, 90.0), 2)
+        # Multi-Tier Asymmetric Targets (R:R >= 1:1.10 to 1:3.50):
+        # TP1 (+55 pips / +$2.75 cash on 0.5 lot): High hit-rate -> shifts SL to Breakeven Armor, locking trade at 0.00R Free Roll
+        tp1_distance = round(max(5.50, sl_distance * 1.10), 2)
+        # TP2 (+100 pips / +$5.00 cash on 0.5 lot): Guaranteed Cash Profit Floor (Banks 50% lot cash profit)
+        tp2_distance = round(max(10.00, sl_distance * 2.00), 2)
+        # TP3 (+200 pips / +$10.00 cash on 0.5 lot): Institutional Moonshot Runner
+        tp3_distance = round(max(20.00, sl_distance * 3.50), 2)
 
         prospective_buy = {
             "entry": round(curr_p, 2),
@@ -3154,32 +3148,16 @@ class QuantGoldExecutionEngine:
                     except Exception as e_rev_cut:
                         logger.debug(f"360 reversal check note: {e_rev_cut}")
 
-                # Adaptive Invalidation Micro-Cut Guard (AQ88 Invariant 128):
-                # Never allow a losing trade to bleed out to a full -30.0 pt (-$15.13) stop loss!
-                # If loss reaches -$2.25 to -$2.50 (or pnl_pts <= -4.50) and adverse order flow confirms failure,
-                # immediately micro-cut the trade to preserve capital!
-                is_adverse_order_flow = False
-                if is_floating_loss and not is_manual_trade:
-                    try:
-                        candles_m5_cut = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
-                        if candles_m5_cut is not None and len(candles_m5_cut) >= 2:
-                            from mathematical_engine import compute_net_buy_sell_force
-                            f_cut = compute_net_buy_sell_force(candles_m5_cut)
-                            b_f_cut = float(f_cut.get("buy_force_pct", 50.0))
-                            s_f_cut = float(f_cut.get("sell_force_pct", 50.0))
-                            ex_cut = f_cut.get("exhaustion_state", "NEUTRAL_BALANCED")
-                            if dir_side == "BUY" and (s_f_cut >= 62.0 or ex_cut == "BULLS_EXHAUSTED_AT_TOP"):
-                                is_adverse_order_flow = True
-                            elif dir_side == "SELL" and (b_f_cut >= 62.0 or ex_cut == "BEARS_EXHAUSTED_AT_BOTTOM"):
-                                is_adverse_order_flow = True
-                    except Exception:
-                        is_adverse_order_flow = False
-
-                if is_floating_loss and is_adverse_order_flow and not is_manual_trade and (upl <= -2.25 or pnl_pts <= -4.50):
+                # Emergency Broker SL Safety Fallback (AQ88 Invariant 132):
+                # The primary Stop Loss (5.00 to 6.50 pts = $2.50 to $3.25 max risk on 0.5 lot)
+                # is natively placed on the broker's servers upon order entry.
+                # Software panic cuts at -4.50 pts are ELIMINATED to let Gold breathe through normal noise.
+                # Emergency close ONLY triggers if broker SL failed and loss exceeds -8.00 pts (-$4.00).
+                if is_floating_loss and not is_manual_trade and (upl <= -4.00 or pnl_pts <= -8.00):
                     logger.info(
-                        f"🛡️ [ADAPTIVE INVALIDATION MICRO-CUT] Gold trade {deal_id} ({dir_side}) "
-                        f"adverse order flow confirmed at ${curr_p:.2f} (Loss: ${upl:.2f} / {pnl_pts:.2f} pts). "
-                        f"Micro-cutting trade immediately to prevent -$15.00 catastrophe!"
+                        f"🛡️ [EMERGENCY BROKER SL FALLBACK] Gold trade {deal_id} ({dir_side}) "
+                        f"exceeded structural invalidation at ${curr_p:.2f} (Loss: ${upl:.2f} / {pnl_pts:.2f} pts). "
+                        f"Emergency closing trade to enforce absolute capital ceiling!"
                     )
                     try:
                         if cid:
@@ -3196,13 +3174,13 @@ class QuantGoldExecutionEngine:
                         self._clear_active_trade(deal_key, cooldown=45.0, direction=dir_side)
                         continue
                     except Exception as e_cut:
-                        logger.debug(f"Adaptive invalidation micro-cut note: {e_cut}")
+                        logger.debug(f"Emergency SL fallback note: {e_cut}")
 
                 # ── MACHINE 1: M1 - M5 SCALP FAST HARVESTER ──
                 # "ម៉ាស៊ីនទី១ ធ្វើការ Scalping M1-M5 បើក Position Buy នៅបាតដែលអស់កម្លាំងលក់ទាំងស្រុង
                 # កើបចំណេញធំនៅចុងកម្លាំង Buy ដែលខ្សោយ Super Fast ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ។"
                 if is_e1 and not is_manual_trade and scale_tier <= 1:
-                    tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 20))
+                    tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 50))
 
                     # Net Order Flow Check on M5 for impulse exhaustion (Pillar 1 RAM Climax)
                     candles_m5_scalp = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
@@ -3246,11 +3224,12 @@ class QuantGoldExecutionEngine:
 
                     # Super Fast Profit Taking (RAM Climax Peak Harvester):
                     # Banks cash profit immediately when target is hit or momentum exhausts at the peak!
-                    # Minimum move of at least +2.80 pts (+28 pips) to prevent banking tiny pennies (+0.12, +0.25)!
+                    # Minimum move of at least +4.50 to +5.50 pts (+45 to +55 pips = +$2.25 to +$2.75 cash)
+                    # Permanently eliminates crumb harvests under $2.00!
                     should_fast_harvest = (
-                        (pnl_pts >= 3.20 or pips >= max(25, tier_pips_target) or upl >= 2.50) or
-                        ((pnl_pts >= 2.50 or upl >= 1.80) and scalp_exhausted and current_peak_pts >= 2.80) or
-                        (current_peak_pts >= 3.50 and pnl_pts <= current_peak_pts * 0.65 and pnl_pts >= 2.00)
+                        (pnl_pts >= 5.50 or upl >= 2.75 or pips >= 55) or
+                        (pnl_pts >= 4.50 and scalp_exhausted and current_peak_pts >= 4.80) or
+                        (current_peak_pts >= 6.00 and pnl_pts <= current_peak_pts * 0.70 and pnl_pts >= 3.50)
                     )
 
                     if should_fast_harvest:
@@ -3279,11 +3258,11 @@ class QuantGoldExecutionEngine:
                             logger.debug(f"Machine 1 scalp fast harvest note: {e_sc}")
 
                     # Breakeven Armor (Loss Immunity Guarantee):
-                    # Require minimum move of +3.80 pts (+38 pips) or UPL >= $2.50 before shifting SL.
+                    # Require minimum move of +5.00 pts (+50 pips) or UPL >= $2.50 before shifting SL.
                     # Provides min breathing buffer of max(2.50, spread * 3.5) so tick noise does not clip it!
-                    # Sets guaranteed floor at Entry ± max(0.80, spread * 1.8) to guarantee net profit after spread.
-                    elif (pnl_pts >= 3.80 or upl >= 2.50) and deal_id not in self._be_armor_locked_deals:
-                        be_buffer = max(0.80, spread * 1.8)
+                    # Sets guaranteed floor at Entry ± max(1.50, spread * 2.5) to guarantee net profit after spread.
+                    elif (pnl_pts >= 5.00 or upl >= 2.50) and deal_id not in self._be_armor_locked_deals:
+                        be_buffer = max(1.50, spread * 2.5)
                         min_breathing_buf = max(2.50, spread * 3.5)
                         if dir_side == "BUY":
                             raw_be = entry_p + be_buffer
@@ -3352,14 +3331,14 @@ class QuantGoldExecutionEngine:
                     scale_tier = 2
                     self._active_gold_stage = "TP1_LOCKED"
 
-                    # Ratchet SL to Guaranteed Positive Cash Floor at TP1 Hit: Entry ± max(1.20, spread * 2.0)
-                    be_buffer_tp1 = max(1.20, spread * 2.0)
+                    # Ratchet SL to Guaranteed Positive Cash Floor at TP1 Hit: Entry ± max(2.50, spread * 3.5)
+                    be_buffer_tp1 = max(2.50, spread * 3.5)
                     if dir_side == "BUY":
                         raw_be_tp1 = entry_p + be_buffer_tp1
-                        be_level = min(raw_be_tp1, curr_p - max(1.00, spread * 1.5))
+                        be_level = min(raw_be_tp1, curr_p - max(2.00, spread * 2.5))
                     else:
                         raw_be_tp1 = entry_p - be_buffer_tp1
-                        be_level = max(raw_be_tp1, curr_p + max(1.00, spread * 1.5))
+                        be_level = max(raw_be_tp1, curr_p + max(2.00, spread * 2.5))
 
                     if abs(sl - be_level) > 0.30:
                         logger.info(f"🛡️ [GUARANTEED CASH FLOOR] TP1 Hit! Ratcheting SL to {be_level:.2f} for Gold trade {deal_id}")

@@ -120,7 +120,9 @@ def main():
     print("\n🔍 [STEP 1/4] Running Scoped Quant Gold Verification...")
     test_cmd = [
         sys.executable, "-m", "unittest",
+        "test_quant_gold_anti_chasm_and_breathing_sl.py",
         "test_quant_gold_harvest_and_cash_floor.py",
+        "test_quant_gold_trend_and_quarantine.py",
         "test_quant_gold_reversal_flip.py",
         "test_quant_gold_dual_engine.py",
         "test_quant_gold_dual_engine_entry.py"

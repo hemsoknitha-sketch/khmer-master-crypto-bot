@@ -299,18 +299,26 @@ def compute_net_buy_sell_force(
     sell_force_pct = round(float(np.clip((sell_score / tot) * 100.0, 5.0, 95.0)), 1)
     net_force = round(buy_force_pct - sell_force_pct, 1)
 
-    # 5. Classify Exhaustion State (Institutional Rigor - AQ88 Invariant 130)
+    # 5. Classify Exhaustion State (Institutional Rigor - AQ88 Invariant 132)
     # A true exhausted top requires genuine rejection (red candle with >= 38% upper wick or pin bar >= 48%),
-    # stalling velocity, and confirmed selling pressure. Never flag normal rising green candles as exhausted tops!
+    # stalling velocity, and confirmed selling pressure.
+    # CRITICAL INVARIANT: The candle MUST be located in the upper 42% of the recent 10-bar dealing range (rel_pos >= 0.58)!
+    # Flagging an exhausted top when price is at the bottom of the drop is mathematically and semantically forbidden.
+    n_lookback = min(10, len(closes))
+    rec_high = float(np.max(highs[-n_lookback:]))
+    rec_low = float(np.min(lows[-n_lookback:]))
+    rec_rng = max(0.20, rec_high - rec_low)
+    rel_pos = (c_close - rec_low) / rec_rng  # 0.0 = absolute bottom, 1.0 = absolute top
+
     exhaustion_state = "NEUTRAL_BALANCED"
     if (upper_wick_ratio >= 0.38 and is_red) or (upper_wick_ratio >= 0.48):
-        if kalman_velocity <= 0.005 and sell_force_pct >= 52.0:
+        if kalman_velocity <= 0.005 and sell_force_pct >= 52.0 and rel_pos >= 0.58:
             exhaustion_state = "BULLS_EXHAUSTED_AT_TOP"
     elif is_green and upper_wick_ratio < 0.25 and kalman_velocity > 0.010:
         exhaustion_state = "BULL_MOMENTUM_EXPANDING"
 
     if (lower_wick_ratio >= 0.38 and is_green) or (lower_wick_ratio >= 0.48):
-        if kalman_velocity >= -0.005 and buy_force_pct >= 52.0:
+        if kalman_velocity >= -0.005 and buy_force_pct >= 52.0 and rel_pos <= 0.42:
             exhaustion_state = "BEARS_EXHAUSTED_AT_BOTTOM"
     elif is_red and lower_wick_ratio < 0.25 and kalman_velocity < -0.010:
         exhaustion_state = "BEAR_MOMENTUM_PLUNGING"
@@ -322,6 +330,7 @@ def compute_net_buy_sell_force(
         "exhaustion_state": exhaustion_state,
         "upper_wick_ratio": round(upper_wick_ratio, 3),
         "lower_wick_ratio": round(lower_wick_ratio, 3),
+        "relative_position_pct": round(rel_pos * 100.0, 1),
         "elder_bull_power": round(bull_power, 2),
         "elder_bear_power": round(bear_power, 2)
     }
