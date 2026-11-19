@@ -125,7 +125,8 @@ def main():
         "test_quant_gold_trend_and_quarantine.py",
         "test_quant_gold_reversal_flip.py",
         "test_quant_gold_dual_engine.py",
-        "test_quant_gold_dual_engine_entry.py"
+        "test_quant_gold_dual_engine_entry.py",
+        "test_quant_gold_daily_training_and_pyramid_guard.py"
     ]
     code, out, err, d_test = run_cmd(test_cmd, timeout=45)
     if code != 0:

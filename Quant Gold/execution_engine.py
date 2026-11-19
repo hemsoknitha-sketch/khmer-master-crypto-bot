@@ -540,9 +540,11 @@ class QuantGoldExecutionEngine:
                     )
                     is_naked_sl = (sl <= 0.0)
 
-                    # Dynamic breathing SL distance: max(spread * 5.0, level * 0.008, 25.0)
+                    # Dynamic breathing SL distance: max(5.50, min(6.50, quote_spread * 4.0)) (AQ88 Invariant 132)
+                    # Clamped strictly between 5.50 and 6.50 points ($2.75 to $3.25 max risk on 0.5 lot)
+                    # Eradicates catastrophic -$15.13 stop loss caused by legacy 25.0/30.0pt fallback!
                     _, _, quote_spread = self.get_live_gold_price_quote()
-                    safe_dist = max(quote_spread * 5.0, level * 0.008, 25.0)
+                    safe_dist = max(5.50, min(6.50, quote_spread * 4.0))
 
                     if (is_naked_sl or is_suicidal_sl) and level > 0.0:
                         emergency_sl = round((level - safe_dist) if direction == "BUY" else (level + safe_dist), 2)
@@ -1914,10 +1916,10 @@ class QuantGoldExecutionEngine:
                             target_tranche_label = tier_spec["label"]
 
                         tier_spec = get_gold_position_tier_spec(tier_num - 1)
-                        # Realistic structural price separation buffer on Gold (18 - 25 pips):
-                        # Eliminates the prohibitive $10.50 wall that previously blocked Machine 2!
+                        # Realistic structural price separation buffer on Gold (45 pips):
+                        # Prevents stacking orders into the same price noise cluster!
                         spread_val = float(signal_data.get("spread", 0.50) or 0.50)
-                        min_sep = max(1.80, spread_val * 3.0)
+                        min_sep = max(4.50, spread_val * 6.0)
 
                         too_close = any(
                             abs(current_price - float(t.get("entry_price", 0.0) or 0.0)) < min_sep
@@ -1926,13 +1928,14 @@ class QuantGoldExecutionEngine:
 
                         # Institutional Free-Roll Pyramiding Lock (AQ88 Invariant 131):
                         # Adding ANY additional position (Tier 2, 3, 4, 5) requires all existing positions
-                        # to be in SOLID PROFIT (>= +2.00 pts / 20 pips) and/or protected by Breakeven Armor (scale_tier >= 1)!
-                        # Adding positions while prior trades are floating in the red is 100% FORBIDDEN.
+                        # to ALREADY be protected by Breakeven Armor (scale_tier >= 1 locked in DB & broker SL)
+                        # AND floating in solid profit (>= +5.00 pts / +50 pips = +$2.50 cash)!
+                        # Opening a 2nd position while prior trade is unprotected or in minor noise is 100% FORBIDDEN.
                         all_prior_protected = all(
                             int(t.get("scale_tier", 0) or 0) >= 1
-                            or (
-                                (existing_dir == "BUY" and (current_price - float(t.get("entry_price", current_price) or current_price)) >= 2.00)
-                                or (existing_dir == "SELL" and (float(t.get("entry_price", current_price) or current_price) - current_price) >= 2.00)
+                            and (
+                                (existing_dir == "BUY" and (current_price - float(t.get("entry_price", current_price) or current_price)) >= 5.00)
+                                or (existing_dir == "SELL" and (float(t.get("entry_price", current_price) or current_price) - current_price) >= 5.00)
                             )
                             for t in active_gold_trades
                         )
@@ -2143,7 +2146,7 @@ class QuantGoldExecutionEngine:
             _, _, spread_val = self.get_live_gold_price_quote()
         except Exception:
             spread_val = 0.50
-        min_separation = max(1.80, spread_val * 3.0)
+        min_separation = max(4.50, spread_val * 6.0)
 
         async def _dispatch_single_user(user_dict: dict) -> int:
             cid = user_dict.get("chat_id")
@@ -2235,17 +2238,17 @@ class QuantGoldExecutionEngine:
                                 return {"chat_id": cid, "success": False, "reason": f"Price separation buffer (${min_separation:.2f}) - already held"}
 
                     # Strict Free-Roll Pyramiding Lock (AQ88 Invariant 131):
-                    # Never open a second or third position if existing positions are not yet in profit (Free Roll)!
+                    # Never open a second or third position if existing positions are not yet in Breakeven Armor (Free Roll)!
                     if len(open_gold_trades) >= 1 and not is_reversal_flip:
                         for ot in open_gold_trades:
                             ot_scale = int(ot.get("scale_tier", 0) or 0)
                             ot_entry = float(ot.get("entry_price", current_price) or current_price)
                             ot_pnl = (current_price - ot_entry) if action == "BUY" else (ot_entry - current_price)
-                            if ot_scale < 1 and ot_pnl < 2.00:
+                            if ot_scale < 1 or ot_pnl < 5.00:
                                 logger.info(
                                     f"🛡️ [FREE-ROLL PYRAMID VETO] User {cid} holds open trade at ${ot_entry:.2f} "
                                     f"not yet protected (PnL: {ot_pnl:+.2f} pts, Tier: {ot_scale}). "
-                                    f"Stacking multiple positions in drawdown is strictly forbidden under Invariant 131."
+                                    f"Stacking multiple positions in drawdown or before 0.00R Breakeven Armor is strictly forbidden under Invariant 131."
                                 )
                                 return {"chat_id": cid, "success": False, "reason": "Existing position not yet protected by Breakeven Armor (0.00R Free Roll required)"}
 

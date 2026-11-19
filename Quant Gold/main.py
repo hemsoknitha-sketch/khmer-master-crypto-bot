@@ -91,6 +91,7 @@ class QuantGoldSystem:
         self.exec_engine = None
         self.bot = None
         self.app = None
+        self.last_daily_training_date = ""
 
     def setup_signal_handlers(self):
         """Catches SIGINT and SIGTERM for graceful systemd shutdowns."""
@@ -103,6 +104,46 @@ class QuantGoldSystem:
                 signal.signal(sig, _handle_shutdown)
             except Exception:
                 pass
+
+    async def _run_daily_training_safe(self, force_telegram: bool = True):
+        """Runs the autonomous 03:00 AM ICT daily self-training safely in background."""
+        try:
+            import gold_daily_self_training_engine
+            res = await asyncio.to_thread(
+                gold_daily_self_training_engine.execute_daily_gold_self_training,
+                app=self.app,
+                force_telegram=force_telegram
+            )
+            cal_wr = res.get("calibrated_win_rate", 0.0)
+            logger.info(f"✅ [DAILY SELF-TRAINING SUCCESS] Calibrated Win Rate: {cal_wr:.1f}%")
+        except Exception as e_train:
+            logger.error(f"❌ [DAILY SELF-TRAINING FAILED] {e_train}", exc_info=True)
+
+    async def _check_and_run_startup_training(self):
+        """Runs self-training on startup if not already run today."""
+        try:
+            import json
+            from datetime import timezone, timedelta
+            state_file = os.path.join(_WORKSPACE_ROOT, "data", "gold_daily_training_state.json")
+            now_ict = datetime.now(timezone.utc) + timedelta(hours=7)
+            today_str = now_ict.strftime("%Y-%m-%d")
+            needs_run = True
+            if os.path.exists(state_file):
+                try:
+                    with open(state_file, "r", encoding="utf-8") as f:
+                        s_data = json.load(f)
+                    last_run_str = s_data.get("timestamp", "")[:10]
+                    if last_run_str == today_str:
+                        needs_run = False
+                        self.last_daily_training_date = today_str
+                except Exception:
+                    needs_run = True
+            if needs_run:
+                logger.info("🧠 [STARTUP SELF-TRAINING] Initializing fresh daily Gold self-training calibration...")
+                self.last_daily_training_date = today_str
+                await self._run_daily_training_safe(force_telegram=False)
+        except Exception as e_st:
+            logger.debug(f"Startup self-training check note: {e_st}")
 
     async def run(self):
         # 1. Load environment configuration
@@ -176,11 +217,29 @@ class QuantGoldSystem:
             logger.error(f"❌ Failed to start Telegram Bot: {e_bot}", exc_info=True)
             sys.exit(1)
 
-        # 5. Main 24/7/365 Autonomous Loop
+        # 5. Check and run daily self-training on startup if not yet trained today
+        try:
+            asyncio.create_task(self._check_and_run_startup_training())
+        except Exception as e_start_tr:
+            logger.debug(f"Startup training task launch note: {e_start_tr}")
+
+        # 6. Main 24/7/365 Autonomous Loop
         logger.info("🚀 [QUANT GOLD 24/7] System fully operational. Commencing 19-TF Autonomous Cycle...")
         while self.is_running:
             t0 = time.time()
             self.cycle_count += 1
+
+            # Daily Autonomous Self-Training at 03:00 AM ICT (20:00 UTC)
+            try:
+                from datetime import timezone, timedelta
+                now_ict = datetime.now(timezone.utc) + timedelta(hours=7)
+                today_str = now_ict.strftime("%Y-%m-%d")
+                if now_ict.hour == 3 and self.last_daily_training_date != today_str:
+                    self.last_daily_training_date = today_str
+                    logger.info(f"🧠 [DAILY 03:00 AM ICT SELF-TRAINING] Triggering autonomous Gold self-training for {today_str}...")
+                    asyncio.create_task(self._run_daily_training_safe(force_telegram=True))
+            except Exception as e_cron:
+                logger.debug(f"Daily cron trigger check note: {e_cron}")
 
             try:
                 # Execute Quant Gold Cycle (Audit + Signal + VIP Order Dispatch)

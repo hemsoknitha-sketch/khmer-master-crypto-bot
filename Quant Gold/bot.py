@@ -178,6 +178,7 @@ class QuantGoldBot:
                 # Set dedicated Admin commands for Super Admin scope ONLY (859271875 @Soknitha)
                 admin_commands = list(commands) + [
                     BotCommand("health", "🖥️ Google Cloud VPS System Health & Latency"),
+                    BotCommand("train_gold", "🧠 Daily Gold Self-Training & Calibration Report"),
                     BotCommand("security", "🛡️ View Institutional Security Citadel Status"),
                     BotCommand("admin_users", "👥 Inspect & Manage All Users Dossiers"),
                     BotCommand("admin_capital", "👑 Super Admin Capital.com Fleet Controller"),
@@ -248,6 +249,8 @@ class QuantGoldBot:
         self.app.add_handler(CommandHandler("auto", self.handle_toggle_auto))
         self.app.add_handler(CommandHandler("status", self.handle_status))
         self.app.add_handler(CommandHandler("health", self.handle_health))
+        self.app.add_handler(CommandHandler("train_gold", self.handle_train_gold))
+        self.app.add_handler(CommandHandler("traingold", self.handle_train_gold))
         self.app.add_handler(CommandHandler("security", self.handle_security))
         self.app.add_handler(CommandHandler("citadel", self.handle_security))
         self.app.add_handler(CommandHandler("emergency_stop", self.handle_emergency_stop))
@@ -3619,6 +3622,41 @@ class QuantGoldBot:
             msg += f"\n• Broker Ping: <code>{diag['ping_latency_ms']:.1f}ms (Capital.com API)</code>"
 
         await self.safe_reply(update, msg)
+
+    async def handle_train_gold(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Executes or views the autonomous daily Quant Gold self-training calibration."""
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        if not chat_id:
+            return
+
+        is_admin = self.citadel.is_super_admin(chat_id) or db.is_admin(chat_id)
+        if not is_admin:
+            return await self.safe_reply(
+                update,
+                "🔒 <b>[SUPER ADMIN ONLY]</b> 🏛️\n"
+                "──────────────────────────────────────\n"
+                "<i>មុខងារ /train_gold ត្រូវបានរក្សាទុកសម្រាប់តែ Super Admin (@Soknitha) ប៉ុណ្ណោះ។</i>"
+            )
+
+        await self.safe_reply(
+            update,
+            "⏳ <b>[QUANT GOLD SELF-TRAINING]</b>\n"
+            "──────────────────────────────────────\n"
+            "កំពុងដំណើរការសិក្សាស្រាវជ្រាវ 10-Year Candlestick Patterns, Bayesian Posterior Wins & Loss Re-study...\n"
+            "<i>(ដំណើរការប្រហែល 5 ទៅ 10 វិនាទី)</i>"
+        )
+        try:
+            import gold_daily_self_training_engine
+            res = await asyncio.to_thread(
+                gold_daily_self_training_engine.execute_daily_gold_self_training,
+                app=self.app,
+                force_telegram=False
+            )
+            card = gold_daily_self_training_engine.build_gold_daily_training_telegram_card(res)
+            await self.safe_reply(update, card)
+        except Exception as e:
+            logger.error(f"Error executing manual train_gold: {e}", exc_info=True)
+            await self.safe_reply(update, f"❌ <b>Error running self-training:</b> {e}")
 
     async def handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Displays user guide and trading handbook."""
