@@ -1269,43 +1269,53 @@ class QuantGoldExecutionEngine:
                 final_action = "HOLD"
                 reason = f"DIRECTIONAL_QUARANTINE_VETO: {q_dir} quarantined ({rem_sec}s remaining)."
 
-        # Dynamic Breathing Stop Loss & Institutional Structural Risk Clamp (AQ88 Invariant 132):
-        # Strict Standard: Stop loss is anchored to true structural level (5.00 to 6.50 points = $2.50 to $3.25 max dollar risk on 0.5 lot)
-        # Strictly eliminates -$15.13 catastrophic stop outs while giving the trade 5.0 points room to breathe without panic cuts!
+        # Super Smart Auto-Dynamic Multi-Timeframe Liquidity Stop Loss (M1 to Month 1 - AQ88 Invariant 134):
+        # Scans multi-timeframe structural swing extremes (BSL/SSL pools, Order Blocks, and rejection wicks).
+        # Eradicates fixed static points! Stop Loss is anchored safely behind the true structural boundary + volatility buffer.
         m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
         m15_atr = float(m15_tf.get("atr", 6.5) or 6.5)
         if m15_atr < 2.0 or m15_atr > 35.0:
-            m15_atr = 6.5  # Sane default for Gold (XAUUSD)
+            m15_atr = 6.5
 
-        raw_sl_dist = max(
-            5.00,
-            min(6.50, 0.85 * m15_atr),
-            spread * 4.00
-        )
-        sl_distance = round(raw_sl_dist, 2)
+        liq_bounds = {}
+        if hasattr(self.mtf_engine, "extract_multi_timeframe_liquidity_bounds"):
+            try:
+                liq_bounds = self.mtf_engine.extract_multi_timeframe_liquidity_bounds(current_price=curr_p, spread=spread)
+            except Exception as e_liq:
+                logger.debug(f"Liquidity bounds extraction note: {e_liq}")
 
-        # Multi-Tier Asymmetric Targets (R:R >= 1:1.10 to 1:3.50):
-        # TP1 (+55 pips / +$2.75 cash on 0.5 lot): High hit-rate -> shifts SL to Breakeven Armor, locking trade at 0.00R Free Roll
-        tp1_distance = round(max(5.50, sl_distance * 1.10), 2)
-        # TP2 (+100 pips / +$5.00 cash on 0.5 lot): Guaranteed Cash Profit Floor (Banks 50% lot cash profit)
-        tp2_distance = round(max(10.00, sl_distance * 2.00), 2)
-        # TP3 (+200 pips / +$10.00 cash on 0.5 lot): Institutional Moonshot Runner
-        tp3_distance = round(max(20.00, sl_distance * 3.50), 2)
+        sl_buy_price = float(liq_bounds.get("sl_buy", round(curr_p - max(5.00, min(7.50, 0.85 * m15_atr)), 2)))
+        sl_dist_buy = float(liq_bounds.get("sl_dist_buy", round(curr_p - sl_buy_price, 2)))
+        sl_sell_price = float(liq_bounds.get("sl_sell", round(curr_p + max(5.00, min(7.50, 0.85 * m15_atr)), 2)))
+        sl_dist_sell = float(liq_bounds.get("sl_dist_sell", round(sl_sell_price - curr_p, 2)))
+
+        # Multi-Tier Asymmetric Targets (R:R >= 1:1.25 to 1:4.00):
+        # TP1 (+55 to +75 pips): Opposing liquidity pool -> shifts SL to Breakeven Armor, locking trade at 0.00R Free Roll
+        tp1_dist_buy = round(max(5.50, sl_dist_buy * 1.25), 2)
+        tp2_dist_buy = round(max(11.00, sl_dist_buy * 2.50), 2)
+        tp3_dist_buy = round(max(22.00, sl_dist_buy * 4.00), 2)
+
+        tp1_dist_sell = round(max(5.50, sl_dist_sell * 1.25), 2)
+        tp2_dist_sell = round(max(11.00, sl_dist_sell * 2.50), 2)
+        tp3_dist_sell = round(max(22.00, sl_dist_sell * 4.00), 2)
 
         prospective_buy = {
             "entry": round(curr_p, 2),
-            "sl": round(curr_p - sl_distance, 2),
-            "tp1": round(curr_p + tp1_distance, 2),
-            "tp2": round(curr_p + tp2_distance, 2),
-            "tp3": round(curr_p + tp3_distance, 2),
+            "sl": sl_buy_price,
+            "sl_dist": sl_dist_buy,
+            "tp1": round(curr_p + tp1_dist_buy, 2),
+            "tp2": round(curr_p + tp2_dist_buy, 2),
+            "tp3": round(curr_p + tp3_dist_buy, 2),
         }
         prospective_sell = {
             "entry": round(curr_p, 2),
-            "sl": round(curr_p + sl_distance, 2),
-            "tp1": round(curr_p - tp1_distance, 2),
-            "tp2": round(curr_p - tp2_distance, 2),
-            "tp3": round(curr_p - tp3_distance, 2),
+            "sl": sl_sell_price,
+            "sl_dist": sl_dist_sell,
+            "tp1": round(curr_p - tp1_dist_sell, 2),
+            "tp2": round(curr_p - tp2_dist_sell, 2),
+            "tp3": round(curr_p - tp3_dist_sell, 2),
         }
+        sl_distance = sl_dist_buy if final_action == "BUY" else sl_dist_sell
 
         # Resolve Dominant Trend Bias with multi-factor confluence
         if weighted_score < -5.0 or counts.get("bearish", 0) > counts.get("bullish", 0):
@@ -1338,6 +1348,10 @@ class QuantGoldExecutionEngine:
                 tp2_price = prospective_sell["tp2"]
                 tp3_price = prospective_sell["tp3"]
 
+        active_tp1_dist = tp1_dist_buy if final_action == "BUY" else tp1_dist_sell
+        active_tp2_dist = tp2_dist_buy if final_action == "BUY" else tp2_dist_sell
+        active_tp3_dist = tp3_dist_buy if final_action == "BUY" else tp3_dist_sell
+
         res = {
             "timestamp": time.time(),
             "asset": "GOLD",
@@ -1356,7 +1370,7 @@ class QuantGoldExecutionEngine:
             "prospective_buy": prospective_buy,
             "prospective_sell": prospective_sell,
             "risk_reward_ratio": "1:1.50 / 1:2.50 / 1:4.00",
-            "targets_pips": f"+{int(tp1_distance*10)} pips / +{int(tp2_distance*10)} pips / +{int(tp3_distance*10)} pips",
+            "targets_pips": f"+{int(active_tp1_dist*10)} pips / +{int(active_tp2_dist*10)} pips / +{int(active_tp3_dist*10)} pips",
             "mtf_summary": {
                 "weighted_score": weighted_score,
                 "counts": counts,
@@ -2335,6 +2349,12 @@ class QuantGoldExecutionEngine:
                         available_cash=(live_avail * sess_mult) if (not effective_is_demo and live_avail is not None) else None
                     )
 
+                    # Dynamic Risk-Bounded Lot Sizing (AQ88 Invariant 134):
+                    # Guarantees dollar risk on accounts < $500 never exceeds $3.00 regardless of SL distance!
+                    max_allowed_dollar_risk = 3.00 if effective_budget < 500.0 else (effective_budget * 0.015)
+                    risk_clamped_lot = round(max_allowed_dollar_risk / max(1.0, sl_dist), 2)
+                    lot_size = max(0.10, min(lot_size, risk_clamped_lot))
+
                     order_res = await asyncio.to_thread(
                         u_eng.execute_smart_tradfi_order,
                         epic="GOLD",
@@ -3225,20 +3245,145 @@ class QuantGoldExecutionEngine:
                         except Exception:
                             scalp_exhausted = False
 
-                    # Super Fast Profit Taking (RAM Climax Peak Harvester):
-                    # Banks cash profit immediately when target is hit or momentum exhausts at the peak!
-                    # Minimum move of at least +4.50 to +5.50 pts (+45 to +55 pips = +$2.25 to +$2.75 cash)
-                    # Permanently eliminates crumb harvests under $2.00!
-                    should_fast_harvest = (
-                        (pnl_pts >= 5.50 or upl >= 2.75 or pips >= 55) or
-                        (pnl_pts >= 4.50 and scalp_exhausted and current_peak_pts >= 4.80) or
-                        (current_peak_pts >= 6.00 and pnl_pts <= current_peak_pts * 0.70 and pnl_pts >= 3.50)
-                    )
+                # ── MARGIN-PROPORTIONAL PROFIT LOCKING & RAM CLIMAX PEAK HARVESTER (AQ88 Invariant 134) ──
+                # Leverage on Capital.com is 500:1 (0.20% margin requirement).
+                # Example: 0.5 oz @ $4,071 = $4.07 margin used.
+                margin_used = max(1.0, (entry_p * sz) / 500.0)
 
-                    if should_fast_harvest:
+                # LEVEL 1: 50% Margin Profit Lock (0.00R Free Roll)
+                # When UPL >= 50% of Margin (+$2.03 on 0.5 oz), move SL to Entry ± spread buffer!
+                is_50pct_margin_hit = (upl >= (0.50 * margin_used)) or (pnl_pts >= 4.50)
+                if is_50pct_margin_hit and scale_tier < 1 and deal_id not in self._be_armor_locked_deals:
+                    be_buffer = max(1.00, spread * 2.0)
+                    min_breathing_buf = max(2.00, spread * 3.0)
+                    if dir_side == "BUY":
+                        raw_be = entry_p + be_buffer
+                        be_level = min(raw_be, curr_p - min_breathing_buf)
+                    else:
+                        raw_be = entry_p - be_buffer
+                        be_level = max(raw_be, curr_p + min_breathing_buf)
+
+                    if abs(sl - be_level) > 0.25:
                         logger.info(
-                            f"⚡ [MACHINE 1 SCALP FAST HARVEST] Gold scalp trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f} / ${upl:.2f}) "
-                            f"(Exhausted={scalp_exhausted}: {exhaustion_reason}). Banking Scalp cash profit immediately!"
+                            f"🛡️ [MARGIN 50% FREE-ROLL ARMOR] Profit ${upl:.2f} reached 50% of margin (${margin_used:.2f}). "
+                            f"Shifting SL to {be_level:.2f} (0.00R Free Roll)!"
+                        )
+                        try:
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
+                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
+                            tr["scale_tier"] = 1
+                            tr["sl"] = round(be_level, 2)
+                            scale_tier = 1
+                            sl = round(be_level, 2)
+                            self._be_armor_locked_deals.add(deal_id)
+                            self._active_gold_scale_tier = 1
+                            self._active_gold_sl = round(be_level, 2)
+                        except Exception as e_m50:
+                            logger.debug(f"Margin 50% SL shift note: {e_m50}")
+                    else:
+                        self._be_armor_locked_deals.add(deal_id)
+                        scale_tier = 1
+                        tr["scale_tier"] = 1
+
+                # LEVEL 2: 100% Margin Double Lock (Lock 70% of Margin Cash Profit)
+                # When UPL >= 100% of Margin (+$4.07 on 0.5 oz), lock 70% of Margin (+$2.85 cash)!
+                is_100pct_margin_hit = (upl >= (1.00 * margin_used)) or (pnl_pts >= 8.50)
+                if is_100pct_margin_hit and scale_tier < 2:
+                    cash_floor_dollar = 0.70 * margin_used
+                    dist_for_cash = cash_floor_dollar / sz
+                    if dir_side == "BUY":
+                        locked_sl = entry_p + dist_for_cash
+                    else:
+                        locked_sl = entry_p - dist_for_cash
+
+                    if abs(sl - locked_sl) > 0.25:
+                        logger.info(
+                            f"💰 [MARGIN 100% PROFIT LOCK] Profit ${upl:.2f} doubled margin (${margin_used:.2f}). "
+                            f"Locking 70% margin profit (${cash_floor_dollar:.2f}) with SL at ${locked_sl:.2f}!"
+                        )
+                        try:
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(locked_sl, 2))
+                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(locked_sl, 2))
+                            tr["scale_tier"] = 2
+                            tr["sl"] = round(locked_sl, 2)
+                            scale_tier = 2
+                            sl = round(locked_sl, 2)
+                            self._active_gold_scale_tier = 2
+                            self._active_gold_sl = round(locked_sl, 2)
+                        except Exception as e_m100:
+                            logger.debug(f"Margin 100% SL shift note: {e_m100}")
+
+                # LEVEL 3: >100% Margin Dynamic 80% Peak Trailing Ratchet in RAM
+                # When UPL > 100% of Margin, continuously trail 80% of peak profit!
+                if upl > (1.00 * margin_used) and current_peak > (1.00 * margin_used):
+                    trailing_target_cash = 0.80 * current_peak
+                    trail_dist = trailing_target_cash / sz
+                    if dir_side == "BUY":
+                        trail_sl = entry_p + trail_dist
+                    else:
+                        trail_sl = entry_p - trail_dist
+
+                    should_tighten_trail = (
+                        (dir_side == "BUY" and trail_sl > (sl + 0.30) and trail_sl < curr_p - 1.50) or
+                        (dir_side == "SELL" and trail_sl < (sl - 0.30) and trail_sl > curr_p + 1.50)
+                    )
+                    if should_tighten_trail:
+                        try:
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(trail_sl, 2))
+                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3, sl=round(trail_sl, 2))
+                            tr["sl"] = round(trail_sl, 2)
+                            tr["scale_tier"] = 3
+                            sl = round(trail_sl, 2)
+                            scale_tier = 3
+                            self._active_gold_sl = round(trail_sl, 2)
+                        except Exception as e_tr80:
+                            logger.debug(f"Trailing 80% SL shift note: {e_tr80}")
+
+                # LEVEL 4: Climax Peak Harvester (RAM Pre-emptive Market Close)
+                # When in solid profit (upl >= 50% margin or upl >= $2.00) and M1-M5 net force confirms
+                # buying/selling momentum has exhausted, bank near-peak profit (92-98%) immediately at market!
+                # Do NOT wait for price to retrace and hit the 80% trailing stop!
+                is_in_solid_profit = (upl >= 0.50 * margin_used) or (upl >= 2.00)
+                if is_in_solid_profit and not is_manual_trade and (current_peak >= 2.50 or current_peak_pts >= 5.00):
+                    climax_peak_hit = False
+                    climax_peak_reason = ""
+                    try:
+                        candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
+                        candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
+                        target_climax_df = candles_m5 if (candles_m5 is not None and len(candles_m5) >= 2) else candles_m1
+                        if target_climax_df is not None and len(target_climax_df) >= 2:
+                            from mathematical_engine import compute_net_buy_sell_force
+                            f_climax = compute_net_buy_sell_force(target_climax_df)
+                            c_state = f_climax.get("exhaustion_state", "NEUTRAL_BALANCED")
+                            b_frc = float(f_climax.get("buy_force_pct", 50.0))
+                            s_frc = float(f_climax.get("sell_force_pct", 50.0))
+                            u_wick = float(f_climax.get("upper_wick_ratio", 0.0))
+                            l_wick = float(f_climax.get("lower_wick_ratio", 0.0))
+
+                            if dir_side == "BUY":
+                                if (u_wick >= 0.38 and s_frc >= 56.0) or c_state == "BULLS_EXHAUSTED_AT_TOP":
+                                    climax_peak_hit = True
+                                    climax_peak_reason = f"BULLS_EXHAUSTED_AT_TOP (Upper Wick: {u_wick*100:.0f}%, Sell Force: {s_frc:.0f}%)"
+                            else:
+                                if (l_wick >= 0.38 and b_frc >= 56.0) or c_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                                    climax_peak_hit = True
+                                    climax_peak_reason = f"BEARS_EXHAUSTED_AT_BOTTOM (Lower Wick: {l_wick*100:.0f}%, Buy Force: {b_frc:.0f}%)"
+                    except Exception as e_climax_chk:
+                        logger.debug(f"Climax check note: {e_climax_chk}")
+
+                    if climax_peak_hit and (upl >= 0.85 * current_peak):
+                        logger.info(
+                            f"⚡ [RAM CLIMAX PEAK HARVEST] Gold trade {deal_id} banked near-peak profit (${upl:.2f} / {pnl_pts:.2f} pts) "
+                            f"at exhausted boundary ({climax_peak_reason}). Climax market close executed to avoid trailing retracement drag!"
                         )
                         try:
                             if cid:
@@ -3247,67 +3392,18 @@ class QuantGoldExecutionEngine:
                             if hasattr(db, "update_capital_auto_trade_close"):
                                 db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
 
-                            card_scalp = format_gold_tp_card(
-                                stage="SCALP",
+                            card_climax = format_gold_tp_card(
+                                stage="CLIMAX_PEAK",
                                 pips=pips,
                                 direction=dir_side,
                                 entry_price=entry_p
                             )
                             markup = get_gold_signal_reply_markup()
-                            await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
+                            await self.broadcast_to_vip_users(card_climax, app=app, reply_markup=markup)
                             self._clear_active_trade(deal_key, cooldown=15.0, direction=dir_side)
                             continue
-                        except Exception as e_sc:
-                            logger.debug(f"Machine 1 scalp fast harvest note: {e_sc}")
-
-                    # Breakeven Armor (Loss Immunity Guarantee):
-                    # Require minimum move of +5.00 pts (+50 pips) or UPL >= $2.50 before shifting SL.
-                    # Provides min breathing buffer of max(2.50, spread * 3.5) so tick noise does not clip it!
-                    # Sets guaranteed floor at Entry ± max(1.50, spread * 2.5) to guarantee net profit after spread.
-                    elif (pnl_pts >= 5.00 or upl >= 2.50) and deal_id not in self._be_armor_locked_deals:
-                        be_buffer = max(1.50, spread * 2.5)
-                        min_breathing_buf = max(2.50, spread * 3.5)
-                        if dir_side == "BUY":
-                            raw_be = entry_p + be_buffer
-                            be_level = min(raw_be, curr_p - min_breathing_buf)
-                        else:
-                            raw_be = entry_p - be_buffer
-                            be_level = max(raw_be, curr_p + min_breathing_buf)
-
-                        if abs(sl - be_level) > 0.30:
-                            logger.info(f"🛡️ [MACHINE 1 BREAKEVEN ARMOR] Scalp reached +{pips} pips (+${pnl_pts:.2f}). Shifting SL to Guaranteed Cash Floor {be_level:.2f} (0.00R Free Roll)!")
-                            try:
-                                if cid:
-                                    u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                                    await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
-                                if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                                    db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
-
-                                tr["scale_tier"] = 1
-                                tr["sl"] = round(be_level, 2)
-                                scale_tier = 1
-                                self._active_gold_scale_tier = 1
-                                self._active_gold_sl = round(be_level, 2)
-                                self._be_armor_locked_deals.add(deal_id)
-                                self._active_gold_stage = "TP1_LOCKED"
-                                key_sc = f"{deal_id}:SCALP_HARVEST"
-                                if key_sc not in self._notified_milestones:
-                                    self._notified_milestones.add(key_sc)
-                                    card_scalp = format_gold_tp_card(
-                                        stage="SCALP",
-                                        pips=pips,
-                                        direction=dir_side,
-                                        entry_price=entry_p
-                                    )
-                                    markup = get_gold_signal_reply_markup()
-                                    await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
-                            except Exception as e_sc_be:
-                                logger.debug(f"Dual engine breakeven shift note: {e_sc_be}")
-                        else:
-                            self._be_armor_locked_deals.add(deal_id)
-                            self._active_gold_scale_tier = max(getattr(self, "_active_gold_scale_tier", 0), 1)
-                            tr["scale_tier"] = max(scale_tier, 1)
-                            scale_tier = max(scale_tier, 1)
+                        except Exception as e_climax_close:
+                            logger.debug(f"Climax peak close error note: {e_climax_close}")
 
                 # Check TP1 Hit (+73 pips / $7.30 move) - bounded to legitimate range ($7.30 to $60.00)
                 is_tp1 = (7.30 <= pnl_pts <= 60.0) or (
