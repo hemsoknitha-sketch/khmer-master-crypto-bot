@@ -150,17 +150,17 @@ def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: floa
     safe_pips = max(10, min(int(pips), 350))
 
     if "SCALP" in st or "POS1" in st:
-        disp_pips = min(safe_pips, 25) if safe_pips >= 12 else 15
-        stage_desc = f"Pos 1 Scalp Harvested (+{disp_pips} pips) | យកលឿនចូលហោប៉ៅ!"
+        disp_pips = max(40, min(safe_pips, 70))
+        stage_desc = f"Machine 1 Scalp Harvested (+{disp_pips} pips) | យកចំណេញលឿនចូលហោប៉ៅ!"
     elif "TP1" in st:
-        disp_pips = min(safe_pips, 100) if safe_pips >= 73 else 73
-        stage_desc = f"TP1 Hit (+{disp_pips} pips) | TP Lock (Breakeven Armor 0.0R)!"
+        disp_pips = max(120, min(safe_pips, 180))
+        stage_desc = f"Machine 2 TP1 Hit (+{disp_pips} pips) | Cash Floor Locked!"
     elif "TP2" in st:
-        disp_pips = min(safe_pips, 190) if safe_pips >= 152 else 152
-        stage_desc = f"TP2 Hit (+{disp_pips} pips) | Guaranteed Cash Floor Locked!"
+        disp_pips = max(240, min(safe_pips, 300))
+        stage_desc = f"Machine 2 TP2 Hit (+{disp_pips} pips) | +$8.00 Cash Floor Locked!"
     elif "TP3" in st:
-        disp_pips = min(safe_pips, 280) if safe_pips >= 243 else 243
-        stage_desc = f"TP3 Hit (+{disp_pips} pips) | Moonshot Runner Harvested!"
+        disp_pips = max(300, min(safe_pips, 450))
+        stage_desc = f"Machine 2 TP3 Hit (+{disp_pips} pips) | Moonshot Runner Harvested!"
     else:
         stage_desc = f"Profit Locked (+{safe_pips} pips) | Position Harvested!"
 
@@ -212,29 +212,29 @@ def is_engine_2_macro(tranche_id: str, scale_tier: int = 0) -> bool:
 def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
     """
     Returns the exact 5-tier multi-horizon specification:
-    - Pos 1: M1 - M5 Scalp Fast Harvester (+10 to +20 pips យកលឿនចូលហោប៉ៅ)
-    - Pos 2: M15 Intraday FVG Retest (TP1: +2.0R -> ជាប់ Breakeven Armor ភ្លាម)
-    - Pos 3: M15 Structural Swing (TP2: +3.5R -> ចាក់សោរប្រាក់ចំណេញរឹងមាំ)
-    - Pos 4: H1 Trend Pyramiding (ចូលបន្ថែមលុះត្រាតែ Pos 1,2,3 ចំណេញ & Free Roll)
-    - Pos 5: H4 Moonshot Super Runner (+5.0R ដល់ +10.0R អូសតាម EMA Confluence)
+    - Pos 1: Machine 1 (M5 Scalp Fast Harvester with M15 Confluence: +$2.00 to +$3.50 / 40 to 70 pips)
+    - Pos 2: Machine 2 (M15-H1 Swing Runner: +$6.00 to +$20.00+ / 120 to 400+ pips)
+    - Pos 3: M15 Structural Swing (+150 pips)
+    - Pos 4: H1 Trend Pyramiding (+200 pips)
+    - Pos 5: H4 Moonshot Super Runner (+350 pips)
     """
     tier_index = min(5, max(1, int(active_trades_count) + 1))
     specs = {
         1: {
             "tier": 1,
             "label": "POS1_M1_M5_SCALP",
-            "name": "Position 1: M1-M5 Scalp Fast Harvester",
-            "pips_target": 50,
+            "name": "Machine 1: M5 Scalp Fast Harvester (M15 Confluence)",
+            "pips_target": 40,
             "tp_r": 1.50,
-            "desc": "TP1: +50 pips ($2.50 net) -> ជាប់ Breakeven Armor ភ្លាម (0.00R Free Roll)"
+            "desc": "TP: +$2.00 ទៅ +$3.50 (+40 ទៅ +70 pips) | Armor: +$1.00 -> Breakeven (0.00R Free Roll)"
         },
         2: {
             "tier": 2,
             "label": "POS2_M15_FVG_RETEST",
-            "name": "Position 2: M15 Intraday FVG Retest",
-            "pips_target": 73,
-            "tp_r": 2.00,
-            "desc": "TP1: +2.0R -> ជាប់ Breakeven Armor ភ្លាម"
+            "name": "Machine 2: M15-H1 Swing Runner (Institutional Session Wave)",
+            "pips_target": 120,
+            "tp_r": 2.50,
+            "desc": "TP1: +$6.00 (+120 pips) -> Cash Floor | TP2: +$12.00 | Runner: +$15.00 ទៅ +$20.00+"
         },
         3: {
             "tier": 3,
@@ -1223,24 +1223,37 @@ class QuantGoldExecutionEngine:
 
         if final_action == "HOLD":
             # 1. Trend Pullback Setups (Trading WITH the Dominant Trend):
+            # Machine 1: M5 Trigger aligned 100% with M15 Direction (Choch/BOS, EMA Confluence)
             if is_intraday_bull and not is_macro_bear:
-                # In an UPTREND: We ONLY BUY PULLBACKS! Selling against the bull trend is 100% FORBIDDEN.
-                # Price MUST have pulled back down near/below EMA21 in Discount (not at the top)!
-                if (ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" or ex_state == "BEARS_EXHAUSTED_AT_BOTTOM") and (curr_p <= m15_ema21 + (0.35 * m15_atr_gate)):
+                # In an M15 UPTREND: We ONLY BUY M5 PULLBACKS into discount! Selling against the bull trend is 100% FORBIDDEN.
+                # Price MUST have pulled back down near/below M15 EMA21 in Discount (not at the top)!
+                is_m5_dip = (curr_p <= m15_ema21 + (0.35 * m15_atr_gate))
+                is_m5_exhausted_bottom = (
+                    ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" or
+                    ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" or
+                    (float(nof_m5.get("lower_wick_ratio", 0.0) or 0.0) >= 0.35 and float(nof_m5.get("buy_force_pct", 50.0) or 50.0) >= 55.0)
+                )
+                if is_m5_dip and is_m5_exhausted_bottom:
                     m5_rsi = float(m5_tf.get("rsi", 50.0) or 50.0)
                     if m5_rsi <= 55.0 and k_vel >= -0.015:
                         final_action = "BUY"
                         win_prob = max(win_prob, 85.0)
-                        reason = f"MACHINE_1_TREND_PULLBACK_BUY: Dip in Bull trend exhausted sellers at bottom (Buy Force {nof_m5.get('buy_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
+                        reason = f"MACHINE_1_M5_PULLBACK_BUY: Dip in M15 Bull trend exhausted sellers on M5 (Buy Force {nof_m5.get('buy_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
             elif is_intraday_bear and not is_macro_bull:
-                # In a DOWNTREND: We ONLY SELL RALLIES! Buying falling knives is 100% FORBIDDEN.
-                # Price MUST have rallied up near/above EMA21 in Premium (not at the bottom)!
-                if (ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" or ex_state == "BULLS_EXHAUSTED_AT_TOP") and (curr_p >= m15_ema21 - (0.35 * m15_atr_gate)):
+                # In an M15 DOWNTREND: We ONLY SELL M5 RALLIES into premium! Buying falling knives is 100% FORBIDDEN.
+                # Price MUST have rallied up near/above M15 EMA21 in Premium (not at the bottom)!
+                is_m5_rally = (curr_p >= m15_ema21 - (0.35 * m15_atr_gate))
+                is_m5_exhausted_top = (
+                    ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" or
+                    ex_state == "BULLS_EXHAUSTED_AT_TOP" or
+                    (float(nof_m5.get("upper_wick_ratio", 0.0) or 0.0) >= 0.35 and float(nof_m5.get("sell_force_pct", 50.0) or 50.0) >= 55.0)
+                )
+                if is_m5_rally and is_m5_exhausted_top:
                     m5_rsi = float(m5_tf.get("rsi", 50.0) or 50.0)
                     if m5_rsi >= 45.0 and k_vel <= 0.015:
                         final_action = "SELL"
                         win_prob = max(win_prob, 85.0)
-                        reason = f"MACHINE_1_TREND_PULLBACK_SELL: Rally in Bear trend exhausted buyers at top (Sell Force {nof_m5.get('sell_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
+                        reason = f"MACHINE_1_M5_PULLBACK_SELL: Rally in M15 Bear trend exhausted buyers on M5 (Sell Force {nof_m5.get('sell_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
             else:
                 # 2. Consolidation / Range Boundaries ONLY (Strict Exhaustion Criteria):
                 if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_intraday_bull and weighted_score <= 5.0 and (curr_p >= m15_ema21 - (0.30 * m15_atr_gate)):
@@ -1938,10 +1951,10 @@ class QuantGoldExecutionEngine:
                             target_tranche_label = tier_spec["label"]
 
                         tier_spec = get_gold_position_tier_spec(tier_num - 1)
-                        # Realistic structural price separation buffer on Gold (45 pips):
+                        # Realistic structural price separation buffer on Gold (25 pips):
                         # Prevents stacking orders into the same price noise cluster!
                         spread_val = float(signal_data.get("spread", 0.50) or 0.50)
-                        min_sep = max(4.50, spread_val * 6.0)
+                        min_sep = max(2.50, spread_val * 4.0)
 
                         too_close = any(
                             abs(current_price - float(t.get("entry_price", 0.0) or 0.0)) < min_sep
@@ -1949,15 +1962,15 @@ class QuantGoldExecutionEngine:
                         )
 
                         # Institutional Free-Roll Pyramiding Lock (AQ88 Invariant 131):
-                        # Adding ANY additional position (Tier 2, 3, 4, 5) requires all existing positions
+                        # Adding ANY additional position (Machine 2 Macro or subsequent tranches) requires prior positions
                         # to ALREADY be protected by Breakeven Armor (scale_tier >= 1 locked in DB & broker SL)
-                        # AND floating in solid profit (>= +5.00 pts / +50 pips = +$2.50 cash)!
+                        # AND floating in solid profit (>= +2.00 pts / +20 pips = +$1.00 cash Free Roll)!
                         # Opening a 2nd position while prior trade is unprotected or in minor noise is 100% FORBIDDEN.
                         all_prior_protected = all(
                             int(t.get("scale_tier", 0) or 0) >= 1
                             and (
-                                (existing_dir == "BUY" and (current_price - float(t.get("entry_price", current_price) or current_price)) >= 5.00)
-                                or (existing_dir == "SELL" and (float(t.get("entry_price", current_price) or current_price) - current_price) >= 5.00)
+                                (existing_dir == "BUY" and (current_price - float(t.get("entry_price", current_price) or current_price)) >= 2.00)
+                                or (existing_dir == "SELL" and (float(t.get("entry_price", current_price) or current_price) - current_price) >= 2.00)
                             )
                             for t in active_gold_trades
                         )
@@ -3231,13 +3244,50 @@ class QuantGoldExecutionEngine:
                     except Exception as e_cut:
                         logger.debug(f"Emergency SL fallback note: {e_cut}")
 
-                # ── MACHINE 1: M1 - M5 SCALP FAST HARVESTER ──
-                # "ម៉ាស៊ីនទី១ ធ្វើការ Scalping M1-M5 បើក Position Buy នៅបាតដែលអស់កម្លាំងលក់ទាំងស្រុង
-                # កើបចំណេញធំនៅចុងកម្លាំង Buy ដែលខ្សោយ Super Fast ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ។"
-                if is_e1 and not is_manual_trade and scale_tier <= 1:
-                    tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 50))
+                # ── MACHINE 1: M5 SCALP FAST HARVESTER (M15 CONFLUENCE) ──
+                # Target: +$2.00 to +$3.50 (+40 to +70 pips) per trade.
+                # Armor: When profit reaches +$1.00 (+20 pips), shift SL to Breakeven Armor (Entry ± Spread Floor) immediately!
+                if is_e1 and not is_manual_trade:
+                    # STEP 1: BREAKEVEN ARMOR PROTECTION AT +$1.00 (+20 pips / 2.0 pts)
+                    # "Armor Protection: ពេលឡើងចំណេញបាន +$1.00 រុញ SL មក Breakeven Armor (Entry ± Spread) ភ្លាម ធានា Trade នោះគ្មានថ្ងៃប្រែក្លាយទៅជាខាតវិញឡើយ"
+                    is_dollar_one_armor_hit = (upl >= 1.00 or pnl_pts >= 2.00)
+                    if is_dollar_one_armor_hit and scale_tier < 1 and deal_id not in self._be_armor_locked_deals:
+                        be_buffer = max(0.50, spread * 1.5)
+                        min_breathing_buf = max(1.50, spread * 2.5)
+                        if dir_side == "BUY":
+                            raw_be = entry_p + be_buffer
+                            be_level = min(raw_be, curr_p - min_breathing_buf)
+                        else:
+                            raw_be = entry_p - be_buffer
+                            be_level = max(raw_be, curr_p + min_breathing_buf)
 
-                    # Net Order Flow Check on M5 for impulse exhaustion (Pillar 1 RAM Climax)
+                        if abs(sl - be_level) > 0.20:
+                            logger.info(
+                                f"🛡️ [SUPER SMART BREAKEVEN ARMOR] Machine 1 Scalp profit +${upl:.2f} reached +$1.00 milestone (+{pips} pips). "
+                                f"Shifted SL to {be_level:.2f} (Entry ± Spread Floor, 0.00R Free Roll)! Trade is 100% loss-immune!"
+                            )
+                            try:
+                                if cid:
+                                    u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                    await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
+                                if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                    db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
+                                tr["scale_tier"] = 1
+                                tr["sl"] = round(be_level, 2)
+                                scale_tier = 1
+                                sl = round(be_level, 2)
+                                self._be_armor_locked_deals.add(deal_id)
+                                self._active_gold_scale_tier = 1
+                                self._active_gold_sl = round(be_level, 2)
+                            except Exception as e_be1:
+                                logger.debug(f"Machine 1 $1.00 breakeven armor note: {e_be1}")
+                        else:
+                            self._be_armor_locked_deals.add(deal_id)
+                            scale_tier = 1
+                            tr["scale_tier"] = 1
+
+                    # STEP 2: TAKE PROFIT +$2.00 TO +$3.50 (+40 TO +70 PIPS)
+                    # Check M5 Net Order Flow for exhaustion
                     candles_m5_scalp = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
                     scalp_exhausted = False
                     exhaustion_reason = ""
@@ -3277,145 +3327,22 @@ class QuantGoldExecutionEngine:
                         except Exception:
                             scalp_exhausted = False
 
-                # ── MARGIN-PROPORTIONAL PROFIT LOCKING & RAM CLIMAX PEAK HARVESTER (AQ88 Invariant 134) ──
-                # Leverage on Capital.com is 500:1 (0.20% margin requirement).
-                # Example: 0.5 oz @ $4,071 = $4.07 margin used.
-                margin_used = max(1.0, (entry_p * sz) / 500.0)
-
-                # LEVEL 1: 50% Margin Profit Lock (0.00R Free Roll)
-                # When UPL >= 50% of Margin (+$2.03 on 0.5 oz), move SL to Entry ± spread buffer!
-                is_50pct_margin_hit = (upl >= (0.50 * margin_used)) or (pnl_pts >= 4.50)
-                if is_50pct_margin_hit and scale_tier < 1 and deal_id not in self._be_armor_locked_deals:
-                    be_buffer = max(1.00, spread * 2.0)
-                    min_breathing_buf = max(2.00, spread * 3.0)
-                    if dir_side == "BUY":
-                        raw_be = entry_p + be_buffer
-                        be_level = min(raw_be, curr_p - min_breathing_buf)
-                    else:
-                        raw_be = entry_p - be_buffer
-                        be_level = max(raw_be, curr_p + min_breathing_buf)
-
-                    if abs(sl - be_level) > 0.25:
-                        logger.info(
-                            f"🛡️ [MARGIN 50% FREE-ROLL ARMOR] Profit ${upl:.2f} reached 50% of margin (${margin_used:.2f}). "
-                            f"Shifting SL to {be_level:.2f} (0.00R Free Roll)!"
+                    # A. Max Scalp TP Hit (+3.50$ / +70 pips / 7.0 pts):
+                    is_max_tp_hit = (upl >= 3.50 or pnl_pts >= 7.00)
+                    # B. Fast Harvest between +$2.00 and +$3.50 (+40 to +70 pips) upon exhaustion or peak pullback:
+                    is_fast_harvest_hit = (
+                        (upl >= 2.00 or pnl_pts >= 4.00) and (
+                            scalp_exhausted or
+                            (current_peak >= 2.50 and upl <= current_peak * 0.85) or
+                            (current_peak_pts >= 5.00 and pnl_pts <= current_peak_pts * 0.85)
                         )
-                        try:
-                            if cid:
-                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
-                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=1, sl=round(be_level, 2))
-                            tr["scale_tier"] = 1
-                            tr["sl"] = round(be_level, 2)
-                            scale_tier = 1
-                            sl = round(be_level, 2)
-                            self._be_armor_locked_deals.add(deal_id)
-                            self._active_gold_scale_tier = 1
-                            self._active_gold_sl = round(be_level, 2)
-                        except Exception as e_m50:
-                            logger.debug(f"Margin 50% SL shift note: {e_m50}")
-                    else:
-                        self._be_armor_locked_deals.add(deal_id)
-                        scale_tier = 1
-                        tr["scale_tier"] = 1
-
-                # LEVEL 2: 100% Margin Double Lock (Lock 70% of Margin Cash Profit)
-                # When UPL >= 100% of Margin (+$4.07 on 0.5 oz), lock 70% of Margin (+$2.85 cash)!
-                is_100pct_margin_hit = (upl >= (1.00 * margin_used)) or (pnl_pts >= 8.50)
-                if is_100pct_margin_hit and scale_tier < 2:
-                    cash_floor_dollar = 0.70 * margin_used
-                    dist_for_cash = cash_floor_dollar / sz
-                    if dir_side == "BUY":
-                        locked_sl = entry_p + dist_for_cash
-                    else:
-                        locked_sl = entry_p - dist_for_cash
-
-                    if abs(sl - locked_sl) > 0.25:
-                        logger.info(
-                            f"💰 [MARGIN 100% PROFIT LOCK] Profit ${upl:.2f} doubled margin (${margin_used:.2f}). "
-                            f"Locking 70% margin profit (${cash_floor_dollar:.2f}) with SL at ${locked_sl:.2f}!"
-                        )
-                        try:
-                            if cid:
-                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(locked_sl, 2))
-                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(locked_sl, 2))
-                            tr["scale_tier"] = 2
-                            tr["sl"] = round(locked_sl, 2)
-                            scale_tier = 2
-                            sl = round(locked_sl, 2)
-                            self._active_gold_scale_tier = 2
-                            self._active_gold_sl = round(locked_sl, 2)
-                        except Exception as e_m100:
-                            logger.debug(f"Margin 100% SL shift note: {e_m100}")
-
-                # LEVEL 3: >100% Margin Dynamic 80% Peak Trailing Ratchet in RAM
-                # When UPL > 100% of Margin, continuously trail 80% of peak profit!
-                if upl > (1.00 * margin_used) and current_peak > (1.00 * margin_used):
-                    trailing_target_cash = 0.80 * current_peak
-                    trail_dist = trailing_target_cash / sz
-                    if dir_side == "BUY":
-                        trail_sl = entry_p + trail_dist
-                    else:
-                        trail_sl = entry_p - trail_dist
-
-                    should_tighten_trail = (
-                        (dir_side == "BUY" and trail_sl > (sl + 0.30) and trail_sl < curr_p - 1.50) or
-                        (dir_side == "SELL" and trail_sl < (sl - 0.30) and trail_sl > curr_p + 1.50)
                     )
-                    if should_tighten_trail:
-                        try:
-                            if cid:
-                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(trail_sl, 2))
-                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3, sl=round(trail_sl, 2))
-                            tr["sl"] = round(trail_sl, 2)
-                            tr["scale_tier"] = 3
-                            sl = round(trail_sl, 2)
-                            scale_tier = 3
-                            self._active_gold_sl = round(trail_sl, 2)
-                        except Exception as e_tr80:
-                            logger.debug(f"Trailing 80% SL shift note: {e_tr80}")
 
-                # LEVEL 4: Climax Peak Harvester (RAM Pre-emptive Market Close)
-                # When in solid profit (upl >= 50% margin or upl >= $2.00) and M1-M5 net force confirms
-                # buying/selling momentum has exhausted, bank near-peak profit (92-98%) immediately at market!
-                # Do NOT wait for price to retrace and hit the 80% trailing stop!
-                is_in_solid_profit = (upl >= 0.50 * margin_used) or (upl >= 2.00)
-                if is_in_solid_profit and not is_manual_trade and (current_peak >= 2.50 or current_peak_pts >= 5.00):
-                    climax_peak_hit = False
-                    climax_peak_reason = ""
-                    try:
-                        candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
-                        candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
-                        target_climax_df = candles_m5 if (candles_m5 is not None and len(candles_m5) >= 2) else candles_m1
-                        if target_climax_df is not None and len(target_climax_df) >= 2:
-                            from mathematical_engine import compute_net_buy_sell_force
-                            f_climax = compute_net_buy_sell_force(target_climax_df)
-                            c_state = f_climax.get("exhaustion_state", "NEUTRAL_BALANCED")
-                            b_frc = float(f_climax.get("buy_force_pct", 50.0))
-                            s_frc = float(f_climax.get("sell_force_pct", 50.0))
-                            u_wick = float(f_climax.get("upper_wick_ratio", 0.0))
-                            l_wick = float(f_climax.get("lower_wick_ratio", 0.0))
-
-                            if dir_side == "BUY":
-                                if (u_wick >= 0.38 and s_frc >= 56.0) or c_state == "BULLS_EXHAUSTED_AT_TOP":
-                                    climax_peak_hit = True
-                                    climax_peak_reason = f"BULLS_EXHAUSTED_AT_TOP (Upper Wick: {u_wick*100:.0f}%, Sell Force: {s_frc:.0f}%)"
-                            else:
-                                if (l_wick >= 0.38 and b_frc >= 56.0) or c_state == "BEARS_EXHAUSTED_AT_BOTTOM":
-                                    climax_peak_hit = True
-                                    climax_peak_reason = f"BEARS_EXHAUSTED_AT_BOTTOM (Lower Wick: {l_wick*100:.0f}%, Buy Force: {b_frc:.0f}%)"
-                    except Exception as e_climax_chk:
-                        logger.debug(f"Climax check note: {e_climax_chk}")
-
-                    if climax_peak_hit and (upl >= 0.85 * current_peak):
+                    if is_max_tp_hit or is_fast_harvest_hit:
+                        harvest_reason = "MAX_SCALP_TP_REACHED" if is_max_tp_hit else f"EXHAUSTION_HARVEST ({exhaustion_reason or 'Peak Retrace'})"
                         logger.info(
-                            f"⚡ [RAM CLIMAX PEAK HARVEST] Gold trade {deal_id} banked near-peak profit (${upl:.2f} / {pnl_pts:.2f} pts) "
-                            f"at exhausted boundary ({climax_peak_reason}). Climax market close executed to avoid trailing retracement drag!"
+                            f"⚡ [MACHINE 1 SCALP TAKE PROFIT] Gold scalp trade {deal_id} ({dir_side}) banked cash profit "
+                            f"+${upl:.2f} (+{pips} pips / {pnl_pts:.2f} pts) via {harvest_reason}! Banking scalp cash profit into pocket!"
                         )
                         try:
                             if cid:
@@ -3424,153 +3351,95 @@ class QuantGoldExecutionEngine:
                             if hasattr(db, "update_capital_auto_trade_close"):
                                 db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
 
-                            card_climax = format_gold_tp_card(
-                                stage="CLIMAX_PEAK",
+                            card_scalp = format_gold_tp_card(
+                                stage="SCALP",
                                 pips=pips,
                                 direction=dir_side,
                                 entry_price=entry_p
                             )
                             markup = get_gold_signal_reply_markup()
-                            await self.broadcast_to_vip_users(card_climax, app=app, reply_markup=markup)
+                            await self.broadcast_to_vip_users(card_scalp, app=app, reply_markup=markup)
                             self._clear_active_trade(deal_key, cooldown=15.0, direction=dir_side)
                             continue
-                        except Exception as e_climax_close:
-                            logger.debug(f"Climax peak close error note: {e_climax_close}")
+                        except Exception as e_sc_tp:
+                            logger.debug(f"Machine 1 scalp close error: {e_sc_tp}")
 
-                # Check TP1 Hit (+73 pips / $7.30 move) - bounded to legitimate range ($7.30 to $60.00)
-                is_tp1 = (7.30 <= pnl_pts <= 60.0) or (
-                    ((dir_side == "BUY" and curr_p >= tp1) or (dir_side == "SELL" and curr_p <= tp1))
-                    and (5.0 <= pnl_pts <= 60.0)
-                )
-                if is_tp1 and scale_tier < 2:
-                    key_tp1 = f"{deal_id}:TP1"
-                    if key_tp1 not in self._notified_milestones:
-                        self._notified_milestones.add(key_tp1)
-                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2)
-
-                        card_tp1 = format_gold_tp_card(
-                            stage="TP1",
-                            pips=pips,
-                            direction=dir_side,
-                            entry_price=entry_p
+                # ── MACHINE 2: M15-H1 INSTITUTIONAL SWING RUNNER ──
+                # Target: +$6.00 to +$20.00+ (+120 to +400+ pips)
+                # Rides the full macro session waves (London Open / NY Open). Immune to scalp cuts ($0.50 - $3.50)!
+                if is_e2 and not is_manual_trade:
+                    # LEVEL 1: TP1 Hit (+6.00$ / +120 pips / 12.0 pts) -> Ratchet SL to Guaranteed Cash Floor (+2.0R / +5.00 pts)
+                    is_m2_tp1 = (upl >= 6.00 or pnl_pts >= 12.00)
+                    if is_m2_tp1 and scale_tier < 2:
+                        cash_floor_pts = 5.00  # Guarantee at least +$2.50 cash in pocket
+                        cash_floor_sl = (entry_p + cash_floor_pts) if dir_side == "BUY" else (entry_p - cash_floor_pts)
+                        logger.info(
+                            f"💰 [MACHINE 2 TP1 CASH FLOOR] Macro swing trade {deal_id} reached +${upl:.2f} (+{pips} pips / {pnl_pts:.2f} pts). "
+                            f"Ratcheting SL to Guaranteed Cash Floor ${cash_floor_sl:.2f} (+50 pips cash floor)!"
                         )
-                        markup = get_gold_signal_reply_markup()
-                        await self.broadcast_to_vip_users(card_tp1, app=app, reply_markup=markup)
-
-                    tr["scale_tier"] = 2
-                    scale_tier = 2
-                    self._active_gold_stage = "TP1_LOCKED"
-
-                    # Ratchet SL to Guaranteed Positive Cash Floor at TP1 Hit: Entry ± max(2.50, spread * 3.5)
-                    be_buffer_tp1 = max(2.50, spread * 3.5)
-                    if dir_side == "BUY":
-                        raw_be_tp1 = entry_p + be_buffer_tp1
-                        be_level = min(raw_be_tp1, curr_p - max(2.00, spread * 2.5))
-                    else:
-                        raw_be_tp1 = entry_p - be_buffer_tp1
-                        be_level = max(raw_be_tp1, curr_p + max(2.00, spread * 2.5))
-
-                    if abs(sl - be_level) > 0.30:
-                        logger.info(f"🛡️ [GUARANTEED CASH FLOOR] TP1 Hit! Ratcheting SL to {be_level:.2f} for Gold trade {deal_id}")
                         try:
                             if cid:
                                 u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(be_level, 2))
+                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(cash_floor_sl, 2))
                             if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(be_level, 2))
-                        except Exception as e_be:
-                            logger.debug(f"Breakeven update note: {e_be}")
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=2, sl=round(cash_floor_sl, 2))
+                            tr["scale_tier"] = 2
+                            tr["sl"] = round(cash_floor_sl, 2)
+                            scale_tier = 2
+                            sl = round(cash_floor_sl, 2)
+                            self._active_gold_scale_tier = 2
+                            self._active_gold_sl = round(cash_floor_sl, 2)
 
-                # Check TP2 Hit (+152 pips / $15.20 move) - bounded to legitimate range ($15.20 to $80.00)
-                is_tp2 = (15.20 <= pnl_pts <= 80.0) or (
-                    ((dir_side == "BUY" and curr_p >= tp2) or (dir_side == "SELL" and curr_p <= tp2))
-                    and (12.0 <= pnl_pts <= 80.0)
-                )
-                if is_tp2 and scale_tier < 3:
-                    key_tp2 = f"{deal_id}:TP2"
-                    if key_tp2 not in self._notified_milestones:
-                        self._notified_milestones.add(key_tp2)
-                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3)
+                            card_tp1 = format_gold_tp_card(
+                                stage="TP1",
+                                pips=pips,
+                                direction=dir_side,
+                                entry_price=entry_p
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_tp1, app=app, reply_markup=markup)
+                        except Exception as e_m2_tp1:
+                            logger.debug(f"Machine 2 TP1 ratchet note: {e_m2_tp1}")
 
-                        card_tp2 = format_gold_tp_card(
-                            stage="TP2",
-                            pips=pips,
-                            direction=dir_side,
-                            entry_price=entry_p
-                        )
-                        markup = get_gold_signal_reply_markup()
-                        await self.broadcast_to_vip_users(card_tp2, app=app, reply_markup=markup)
-
-                    tr["scale_tier"] = 3
-                    scale_tier = 3
-                    self._active_gold_stage = "TP2_LOCKED"
-
-                    # Ratchet SL to Guaranteed Cash Profit Floor (+73 pips)
-                    cash_floor = (entry_p + 7.30) if dir_side == "BUY" else (entry_p - 7.30)
-                    try:
-                        if cid:
-                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
-                            await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(cash_floor, 2))
-                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3, sl=round(cash_floor, 2))
-                    except Exception as e_cf:
-                        logger.debug(f"Cash floor update note: {e_cf}")
-
-                # Check TP3 Hit (+243 pips Moonshot / $24.32 move) - bounded to legitimate range ($24.32 to $120.00)
-                is_tp3 = (24.32 <= pnl_pts <= 120.0) or (
-                    ((dir_side == "BUY" and curr_p >= tp3) or (dir_side == "SELL" and curr_p <= tp3))
-                    and (20.0 <= pnl_pts <= 120.0)
-                )
-                if is_tp3 and scale_tier < 4:
-                    key_tp3 = f"{deal_id}:TP3"
-                    if key_tp3 not in self._notified_milestones:
-                        self._notified_milestones.add(key_tp3)
-                        if hasattr(db, "update_capital_auto_trade_scale_tier"):
-                            db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=4)
-
-                        card_tp3 = format_gold_tp_card(
-                            stage="TP3",
-                            pips=pips,
-                            direction=dir_side,
-                            entry_price=entry_p
-                        )
-                        markup = get_gold_signal_reply_markup()
-                        await self.broadcast_to_vip_users(card_tp3, app=app, reply_markup=markup)
-
-                    # Close remaining runner across the entire fleet
-                    await self._close_all_fleet_open_gold_positions(
-                        direction=dir_side,
-                        reason="TP3_MOONSHOT_HIT",
-                        exit_price=curr_p,
-                        current_pnl_pts=pnl_pts,
-                        app=app
-                    )
-                    break
-
-                # ── MACHINE 2: M15+ INSTITUTIONAL MACRO CLIMAX HARVEST ──
-                # "ម៉ាស៊ីទី២ បំពេញតួនាទីចាប់ពី M15 ឡើងទៅ ដែលមានផែនការច្បាស់លាស់បំផុត កើបចំណេញធំខ្លាំងបំផុត មិនបញ្ជាកាត់ផ្តាច់ល្អិតល្អោចយកចំណេញ 0.50$ - 5$ ឡើង។"
-                # "កើបចំណេញធំនៅចុងកម្លាំង Buy/Sell ដែលខ្សោយ Super Fast ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ"
-                if is_e2 and pnl_pts >= 7.30 and not is_manual_trade:
-                    candles_m15_macro = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
-                    htf_exhausted = False
-                    if candles_m15_macro is not None and len(candles_m15_macro) >= 2:
-                        try:
-                            from mathematical_engine import compute_net_buy_sell_force
-                            f_m15 = compute_net_buy_sell_force(candles_m15_macro)
-                            if dir_side == "BUY" and f_m15.get("exhaustion_state") == "BULLS_EXHAUSTED_AT_TOP":
-                                htf_exhausted = True
-                            elif dir_side == "SELL" and f_m15.get("exhaustion_state") == "BEARS_EXHAUSTED_AT_BOTTOM":
-                                htf_exhausted = True
-                        except Exception:
-                            htf_exhausted = False
-
-                    # If captured >= 12.0 pts (+120 pips) and HTF exhausted, OR pulled back >= 35% from peak >= 15.0 pts:
-                    if (htf_exhausted and pnl_pts >= 12.0) or (current_peak_pts >= 15.0 and pnl_pts <= current_peak_pts * 0.65 and pnl_pts >= 7.30):
+                    # LEVEL 2: TP2 Hit (+12.00$ / +240 pips / 24.0 pts) -> Ratchet SL to +$8.00 cash floor (+16.0 pts)
+                    is_m2_tp2 = (upl >= 12.00 or pnl_pts >= 24.00)
+                    if is_m2_tp2 and scale_tier < 3:
+                        cash_floor_pts2 = 16.00  # Guarantee at least +$8.00 cash in pocket
+                        cash_floor_sl2 = (entry_p + cash_floor_pts2) if dir_side == "BUY" else (entry_p - cash_floor_pts2)
                         logger.info(
-                            f"🏆 [MACHINE 2 MACRO CLIMAX HARVEST] Machine 2 Macro trade {deal_id} captured +{pips} pips (+${pnl_pts:.2f}) "
-                            f"(Peak: {current_peak_pts:.2f} pts, HTF Exhausted={htf_exhausted}). Banking Institutional Trend Profit!"
+                            f"💰 [MACHINE 2 TP2 CASH FLOOR] Macro swing trade {deal_id} reached +${upl:.2f} (+{pips} pips / {pnl_pts:.2f} pts). "
+                            f"Ratcheting SL to lock +$8.00 cash floor (${cash_floor_sl2:.2f})!"
+                        )
+                        try:
+                            if cid:
+                                u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                                await asyncio.to_thread(u_eng.update_position_stops, deal_id=deal_id, stop_loss=round(cash_floor_sl2, 2))
+                            if hasattr(db, "update_capital_auto_trade_scale_tier"):
+                                db.update_capital_auto_trade_scale_tier(deal_id, scale_tier=3, sl=round(cash_floor_sl2, 2))
+                            tr["scale_tier"] = 3
+                            tr["sl"] = round(cash_floor_sl2, 2)
+                            scale_tier = 3
+                            sl = round(cash_floor_sl2, 2)
+                            self._active_gold_scale_tier = 3
+                            self._active_gold_sl = round(cash_floor_sl2, 2)
+
+                            card_tp2 = format_gold_tp_card(
+                                stage="TP2",
+                                pips=pips,
+                                direction=dir_side,
+                                entry_price=entry_p
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_tp2, app=app, reply_markup=markup)
+                        except Exception as e_m2_tp2:
+                            logger.debug(f"Machine 2 TP2 ratchet note: {e_m2_tp2}")
+
+                    # LEVEL 3: TP3 Moonshot Runner Harvest (+15.00$ to +20.00$+ / +300 to +400+ pips)
+                    is_m2_tp3 = (upl >= 15.00 or pnl_pts >= 30.00)
+                    if is_m2_tp3:
+                        logger.info(
+                            f"🚀 [MACHINE 2 MOONSHOT RUNNER HARVEST] Macro swing trade {deal_id} reached giant milestone "
+                            f"+${upl:.2f} (+{pips} pips / {pnl_pts:.2f} pts)! Banking institutional session runner!"
                         )
                         try:
                             if cid:
@@ -3579,18 +3448,18 @@ class QuantGoldExecutionEngine:
                             if hasattr(db, "update_capital_auto_trade_close"):
                                 db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
 
-                            card_macro = format_gold_tp_card(
-                                stage="CLOSE",
+                            card_tp3 = format_gold_tp_card(
+                                stage="TP3",
                                 pips=pips,
                                 direction=dir_side,
                                 entry_price=entry_p
                             )
                             markup = get_gold_signal_reply_markup()
-                            await self.broadcast_to_vip_users(card_macro, app=app, reply_markup=markup)
-                            self._clear_active_trade(deal_key, cooldown=20.0, direction=dir_side)
+                            await self.broadcast_to_vip_users(card_tp3, app=app, reply_markup=markup)
+                            self._clear_active_trade(deal_key, cooldown=30.0, direction=dir_side)
                             continue
-                        except Exception as e_mc:
-                            logger.debug(f"Machine 2 macro harvest note: {e_mc}")
+                        except Exception as e_m2_tp3:
+                            logger.debug(f"Machine 2 TP3 harvest error: {e_m2_tp3}")
 
                 # Check if position stopped out on broker (SL hit or closed)
                 # If stopped out in profit: notify VIP. If stopped out in loss: DO NOT NOTIFY VIP.
