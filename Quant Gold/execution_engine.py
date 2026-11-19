@@ -1719,6 +1719,7 @@ class QuantGoldExecutionEngine:
             if action in ["BUY", "SELL"]:
                 is_reversal_flip = is_reversal_flip_trigger
                 is_pyramid = False
+                target_tranche_label = None
 
                 if has_existing:
                     if action != existing_dir:
@@ -1850,41 +1851,91 @@ class QuantGoldExecutionEngine:
                                 "entry_price": self._active_gold_entry_price
                             }
                     else:
-                        # Same Direction -> Evaluate 5-Tier Gold Fleet Pyramiding
+                        # Same Direction -> Dual-Engine Coordinated Fleet Pyramiding (AQ88 Invariant 129)
+                        # Machine 1 (M1-M5 Scalp) and Machine 2 (M15+ Macro) work in PERFECT SYNCHRONIZATION!
+                        # They trade in the SAME direction as dominant macro trend, NEVER fighting or hedging!
                         pos_count = len(active_gold_trades)
-                        tier_spec = get_gold_position_tier_spec(pos_count)
-                        tier_num = tier_spec["tier"]
-                        min_sep = max(1.50, sl_dist * 0.35)
+                        has_scalp_open = any(is_engine_1_scalp(t.get("tranche_id", ""), int(t.get("scale_tier", 0) or 0)) for t in active_gold_trades)
+                        has_macro_open = any(is_engine_2_macro(t.get("tranche_id", ""), int(t.get("scale_tier", 0) or 0)) for t in active_gold_trades)
 
-                        all_prior_protected = all(
-                            int(t.get("scale_tier", 0) or 0) >= 1
-                            or (
-                                (existing_dir == "BUY" and current_price - float(t.get("entry_price", current_price) or current_price) >= max(2.00, sl_dist * 0.35))
-                                or (existing_dir == "SELL" and float(t.get("entry_price", current_price) or current_price) - current_price >= max(2.00, sl_dist * 0.35))
-                            )
-                            for t in active_gold_trades
-                        )
+                        # Determine which Machine is triggering this order
+                        if not has_macro_open and has_scalp_open:
+                            # Machine 1 Scalp is running -> Machine 2 opens M15+ Macro position!
+                            tier_num = 2
+                            target_tranche_label = "POS2_M15_FVG_RETEST"
+                        elif not has_scalp_open and has_macro_open:
+                            # Machine 2 Macro is running -> Machine 1 opens new M1-M5 Scalp position!
+                            tier_num = 1
+                            target_tranche_label = "POS1_M1_M5_SCALP"
+                        else:
+                            # Both open or scaling -> Subsequent structural tranches
+                            tier_spec = get_gold_position_tier_spec(pos_count)
+                            tier_num = tier_spec["tier"]
+                            target_tranche_label = tier_spec["label"]
+
+                        tier_spec = get_gold_position_tier_spec(tier_num - 1)
+                        # Realistic structural price separation buffer on Gold (18 - 25 pips):
+                        # Eliminates the prohibitive $10.50 wall that previously blocked Machine 2!
+                        spread_val = float(signal_data.get("spread", 0.50) or 0.50)
+                        min_sep = max(1.80, spread_val * 3.0)
+
                         too_close = any(
                             abs(current_price - float(t.get("entry_price", 0.0) or 0.0)) < min_sep
                             for t in active_gold_trades
                         )
 
-                        # Strict prerequisite for Tier 4 (H1 Trend) & Tier 5 (H4 Moonshot):
-                        # Enters ONLY when Pos 1, 2, 3 are in profit & Free Roll!
-                        if tier_num >= 4 and not all_prior_protected:
+                        # High-Confidence Validation for Machine 2 (Tier 2/3):
+                        # Does NOT require Machine 1 to be up +$10.50!
+                        # Allows Machine 2 to enter when M15+ structural confluence is confirmed
+                        # and prior positions are not in catastrophic drawdown (> 30 pips).
+                        prior_not_failing = all(
+                            (
+                                (existing_dir == "BUY" and (current_price - float(t.get("entry_price", current_price) or current_price)) >= -3.00)
+                                or (existing_dir == "SELL" and (float(t.get("entry_price", current_price) or current_price) - current_price) >= -3.00)
+                            )
+                            for t in active_gold_trades
+                        )
+
+                        if pos_count >= 5:
                             can_pyramid = False
+                            pyramid_hold_reason = f"MAX_POSITIONS_REACHED ({pos_count}/5)"
+                        elif too_close:
+                            can_pyramid = False
+                            pyramid_hold_reason = f"TOO_CLOSE_TO_ENTRY (< ${min_sep:.2f} separation)"
+                        elif not prior_not_failing:
+                            can_pyramid = False
+                            pyramid_hold_reason = "PRIOR_POSITION_IN_DRAWDOWN (> 30 pips adverse)"
+                        elif tier_num in [1, 2]:
+                            # Dual-Engine Coexistence: Machine 1 and Machine 2 can open concurrently!
+                            can_pyramid = (confidence >= 65.0 or abs(weighted_score) >= 15.0 or bool(in_memory_limit_setup))
+                            pyramid_hold_reason = f"INSUFFICIENT_CONVICTION ({confidence:.1f}%)" if not can_pyramid else ""
+                        elif tier_num == 3:
+                            # Position 3 (M15 Structural Swing)
+                            can_pyramid = (confidence >= 70.0 or abs(weighted_score) >= 22.0)
+                            pyramid_hold_reason = f"INSUFFICIENT_SWING_SCORE ({weighted_score:+.1f})" if not can_pyramid else ""
                         else:
-                            can_pyramid = all_prior_protected and not too_close and (confidence >= 65.0 or abs(weighted_score) >= 25.0)
+                            # Tier 4 & 5 (H1/H4 Trend Pyramiding): Requires prior positions in profit / Free Roll
+                            all_prior_protected = all(
+                                int(t.get("scale_tier", 0) or 0) >= 1
+                                or (
+                                    (existing_dir == "BUY" and current_price - float(t.get("entry_price", current_price) or current_price) >= 2.50)
+                                    or (existing_dir == "SELL" and float(t.get("entry_price", current_price) or current_price) - current_price >= 2.50)
+                                )
+                                for t in active_gold_trades
+                            )
+                            can_pyramid = all_prior_protected and (confidence >= 72.0 or abs(weighted_score) >= 25.0)
+                            pyramid_hold_reason = "PRIOR_POSITIONS_NOT_FREE_ROLL" if not all_prior_protected else f"INSUFFICIENT_CONVICTION ({confidence:.1f}%)"
 
                         if can_pyramid:
                             is_pyramid = True
+                            eff_setup_type = target_tranche_label
                             logger.info(
-                                f"⚡ [AGILE PYRAMIDING APPROVED] {tier_spec['name']} approved in direction {action} @ ${current_price:.2f} "
-                                f"(Tranche #{tier_num}, Separation: ${min_sep:.2f}, Confidence: {confidence:.1f}%)"
+                                f"⚡ [DUAL-ENGINE FLEET EXPANSION] {target_tranche_label} ({tier_spec['name']}) approved in direction {action} @ ${current_price:.2f} "
+                                f"(Open Trades: {pos_count}, Separation: ${min_sep:.2f}, Confidence: {confidence:.1f}%)"
                             )
                         else:
                             logger.debug(
-                                f"🛡️ [PYRAMIDING HOLD] Protected={all_prior_protected}, TooClose={too_close}, Conf={confidence:.1f}%. "
+                                f"🛡️ [DUAL-ENGINE HOLD] {pyramid_hold_reason}. "
                                 f"Continuing to manage existing {existing_dir} positions ({pos_count})."
                             )
                             return {
@@ -1895,8 +1946,16 @@ class QuantGoldExecutionEngine:
                                 "entry_price": self._active_gold_entry_price
                             }
 
-                active_tier = get_gold_position_tier_spec(len(active_gold_trades))
-                eff_setup_type = "QUANT_GOLD_REVERSAL_FLIP" if is_reversal_flip else (in_memory_limit_setup if in_memory_limit_setup else (active_tier["label"] if is_pyramid else "POS1_M1_M5_SCALP"))
+                if not is_reversal_flip and not in_memory_limit_setup:
+                    if target_tranche_label:
+                        eff_setup_type = target_tranche_label
+                    else:
+                        active_tier = get_gold_position_tier_spec(len(active_gold_trades))
+                        eff_setup_type = active_tier["label"] if is_pyramid else "POS1_M1_M5_SCALP"
+                elif is_reversal_flip:
+                    eff_setup_type = "QUANT_GOLD_REVERSAL_FLIP"
+                elif in_memory_limit_setup:
+                    eff_setup_type = in_memory_limit_setup
 
                 logger.info(f"🥇 [QUANT GOLD EXECUTION] Signal Triggered: {action} @ ${signal_data['current_price']:.2f} (Confidence: {confidence:.1f}%, Reversal={is_reversal_flip}, Pyramid={is_pyramid}, Setup={eff_setup_type})")
 
@@ -2049,7 +2108,12 @@ class QuantGoldExecutionEngine:
 
         sem = asyncio.Semaphore(30)
         sl_dist = abs(current_price - sl)
-        min_separation = max(1.50, sl_dist * 0.35)
+        spread_val = 0.50
+        try:
+            _, _, spread_val = self.get_live_gold_price_quote()
+        except Exception:
+            spread_val = 0.50
+        min_separation = max(1.80, spread_val * 3.0)
 
         async def _dispatch_single_user(user_dict: dict) -> int:
             cid = user_dict.get("chat_id")
@@ -2250,7 +2314,7 @@ class QuantGoldExecutionEngine:
                         self._active_gold_stage = "ACTIVE"
 
                         tier_spec = get_gold_position_tier_spec(len(open_gold_trades))
-                        tranche_label = tier_spec["label"] if is_pyramid else ("REVERSAL_FLIP" if is_reversal_flip else "POS1_M1_M5_SCALP")
+                        tranche_label = setup_type if (setup_type and setup_type != "UNKNOWN") else (tier_spec["label"] if is_pyramid else ("REVERSAL_FLIP" if is_reversal_flip else "POS1_M1_M5_SCALP"))
                         db.record_capital_auto_trade(
                             chat_id=cid,
                             deal_id=str(deal_id),

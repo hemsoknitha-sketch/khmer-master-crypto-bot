@@ -122,7 +122,8 @@ def main():
         sys.executable, "-m", "unittest",
         "test_quant_gold_harvest_and_cash_floor.py",
         "test_quant_gold_reversal_flip.py",
-        "test_quant_gold_dual_engine.py"
+        "test_quant_gold_dual_engine.py",
+        "test_quant_gold_dual_engine_entry.py"
     ]
     code, out, err, d_test = run_cmd(test_cmd, timeout=45)
     if code != 0:
