@@ -147,19 +147,19 @@ def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: floa
     st = str(stage).upper()
 
     # Institutional Sanity Clamping: Prevent runaway/corrupted pip display
-    safe_pips = max(10, min(int(pips), 350))
+    safe_pips = max(10, min(int(pips), 600))
 
     if "SCALP" in st or "POS1" in st:
-        disp_pips = max(40, min(safe_pips, 70))
+        disp_pips = max(50, min(safe_pips, 100))
         stage_desc = f"Machine 1 Scalp Harvested (+{disp_pips} pips) | យកចំណេញលឿនចូលហោប៉ៅ!"
     elif "TP1" in st:
-        disp_pips = max(120, min(safe_pips, 180))
+        disp_pips = max(150, min(safe_pips, 200))
         stage_desc = f"Machine 2 TP1 Hit (+{disp_pips} pips) | Cash Floor Locked!"
     elif "TP2" in st:
-        disp_pips = max(240, min(safe_pips, 300))
+        disp_pips = max(250, min(safe_pips, 350))
         stage_desc = f"Machine 2 TP2 Hit (+{disp_pips} pips) | +$8.00 Cash Floor Locked!"
     elif "TP3" in st:
-        disp_pips = max(300, min(safe_pips, 450))
+        disp_pips = max(350, min(safe_pips, 600))
         stage_desc = f"Machine 2 TP3 Hit (+{disp_pips} pips) | Moonshot Runner Harvested!"
     else:
         stage_desc = f"Profit Locked (+{safe_pips} pips) | Position Harvested!"
@@ -175,6 +175,28 @@ def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: floa
         f"   └ <code>{stage_desc}</code>\n"
         f"{divider}\n"
         f"💡 <i>Auto-Trading for VIP Users active 24/7!</i>"
+    )
+
+
+def format_gold_sl_card(pips: int, direction: str, entry_price: float, exit_price: float, loss_amount: float) -> str:
+    """
+    Renders institutional Angkor Quant Gold Structural Risk Defense Card.
+    Fiduciary Brutal Engineering Honesty: Informs VIP users transparently when risk defense triggers.
+    """
+    is_buy = str(direction).upper() == "BUY"
+    dir_str = "BUY" if is_buy else "SELL"
+    dir_icon = "🟢" if is_buy else "🔴"
+    divider = "───────────────"
+    return (
+        f"<b>Angkor Quant Gold</b>\n"
+        f"{divider}\n"
+        f"🛡️ <b>STRUCTURAL RISK DEFENSE</b> ⚠️\n"
+        f"{dir_icon} <b>Position Closed :</b> <code>{dir_str}</code> (Entry: ${entry_price:.2f} -> Exit: ${exit_price:.2f})\n"
+        f"🎯 <b>Execution Milestone ៖</b>\n"
+        f"   └ <code>Structural Invalidation Defense (-${abs(loss_amount):.2f}) | ដើមទុនត្រូវបានការពារ!</code>\n"
+        f"   └ <code>ប្រព័ន្ធរក្សាទុកទីតាំងក្នុង RAM រង់ចាំ Liquidity Sweep មុនចូលថ្មី!</code>\n"
+        f"{divider}\n"
+        f"💡 <i>Angkor Quant Fiduciary Protection: គ្មានការលាក់បាំង គ្មានការធ្វេសប្រហែស!</i>"
     )
 
 
@@ -212,11 +234,11 @@ def is_engine_2_macro(tranche_id: str, scale_tier: int = 0) -> bool:
 def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
     """
     Returns the exact 5-tier multi-horizon specification:
-    - Pos 1: Machine 1 (M5 Scalp Fast Harvester with M15 Confluence: +$2.00 to +$3.50 / 40 to 70 pips)
-    - Pos 2: Machine 2 (M15-H1 Swing Runner: +$6.00 to +$20.00+ / 120 to 400+ pips)
-    - Pos 3: M15 Structural Swing (+150 pips)
-    - Pos 4: H1 Trend Pyramiding (+200 pips)
-    - Pos 5: H4 Moonshot Super Runner (+350 pips)
+    - Pos 1: Machine 1 (M5 Scalp Fast Harvester with M15 Confluence: +$5.00 to +$10.00 / 100 pips)
+    - Pos 2: Machine 2 (M15-H1 Swing Runner: +$12.00 to +$40.00+ / 240 to 800+ pips)
+    - Pos 3: M15 Structural Swing (+300 pips)
+    - Pos 4: H1 Trend Pyramiding (+400 pips)
+    - Pos 5: H4 Moonshot Super Runner (+600 pips)
     """
     tier_index = min(5, max(1, int(active_trades_count) + 1))
     specs = {
@@ -224,31 +246,31 @@ def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
             "tier": 1,
             "label": "POS1_M1_M5_SCALP",
             "name": "Machine 1: M5 Scalp Fast Harvester (M15 Confluence)",
-            "pips_target": 40,
+            "pips_target": 100,
             "tp_r": 1.50,
-            "desc": "TP: +$2.00 ទៅ +$3.50 (+40 ទៅ +70 pips) | Armor: +$1.00 -> Breakeven (0.00R Free Roll)"
+            "desc": "TP: +$5.00 ទៅ +$10.00 (+100 pips) | Armor: +$3.50 (+7.0 pts) -> Breakeven (0.00R Free Roll)"
         },
         2: {
             "tier": 2,
             "label": "POS2_M15_FVG_RETEST",
             "name": "Machine 2: M15-H1 Swing Runner (Institutional Session Wave)",
-            "pips_target": 120,
+            "pips_target": 240,
             "tp_r": 2.50,
-            "desc": "TP1: +$6.00 (+120 pips) -> Cash Floor | TP2: +$12.00 | Runner: +$15.00 ទៅ +$20.00+"
+            "desc": "TP1: +$7.50 (+15 pts) -> Cash Floor | TP2: +$12.50 (+25 pts) | Runner: +$15.00 ទៅ +$40.00+"
         },
         3: {
             "tier": 3,
             "label": "POS3_M15_STRUCTURAL_SWING",
             "name": "Position 3: M15 Structural Swing",
-            "pips_target": 152,
+            "pips_target": 300,
             "tp_r": 3.50,
-            "desc": "TP2: +3.5R -> ចាក់សោរប្រាក់ចំណេញរឹងមាំ"
+            "desc": "TP2: +30.0 pts -> ចាក់សោរប្រាក់ចំណេញរឹងមាំ"
         },
         4: {
             "tier": 4,
             "label": "POS4_H1_TREND_PYRAMID",
             "name": "Position 4: H1 Trend Pyramiding",
-            "pips_target": 200,
+            "pips_target": 400,
             "tp_r": 4.50,
             "desc": "H1 Trend Pyramiding (Pos 1,2,3 ចំណេញ & Free Roll)"
         },
@@ -256,7 +278,7 @@ def get_gold_position_tier_spec(active_trades_count: int) -> Dict[str, Any]:
             "tier": 5,
             "label": "POS5_H4_MOONSHOT_RUNNER",
             "name": "Position 5: H4 Moonshot Super Runner",
-            "pips_target": 350,
+            "pips_target": 600,
             "tp_r": 8.00,
             "desc": "+5.0R ដល់ +10.0R អូសតាម EMA Confluence"
         }
@@ -376,6 +398,9 @@ class QuantGoldExecutionEngine:
         self._signal_cooldown_seconds: float = 300.0  # Min 5 min between new signals
         self._directional_quarantine_dir: Optional[str] = None  # Quarantines failing direction for 15m after adverse momentum cut
         self._directional_quarantine_until: float = 0.0
+        self._last_stop_out_price: float = 0.0  # Invalidation Anchor Memory in RAM (AQ88 Invariant 137)
+        self._last_stop_out_ts: float = 0.0
+        self._last_stop_out_dir: Optional[str] = None
         self._peak_upl_map: Dict[str, float] = {}  # deal_id -> peak UPL for Flash Shock Harvest
         self._peak_pnl_pts_map: Dict[str, float] = {}  # deal_id -> peak price points (pips) for size-invariant harvest
         self._last_broker_adopt_ts: float = 0.0
@@ -1105,10 +1130,15 @@ class QuantGoldExecutionEngine:
             (bullish_tf_count >= 10 and bearish_tf_count <= 3)
         )
 
-        # Dealing Range Chop Filter Check
-        m15_tf = mtf_data.get("timeframes", {}).get("M15", {})
+        # Dealing Range Chop Filter Check (AQ88 Invariant 137 & Invariant 76)
+        m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
         smc_m15 = m15_tf.get("smc", {})
-        is_chop_zone = smc_m15.get("chop_zone", False)
+        range_pct = float(smc_m15.get("range_pct", 0.50) or 0.50)
+        range_high = float(smc_m15.get("range_high", 0.0) or 0.0)
+        range_low = float(smc_m15.get("range_low", 0.0) or 0.0)
+        range_span = max(0.01, range_high - range_low)
+        is_equilibrium_chop = (0.35 <= range_pct <= 0.65) if (range_span >= 5.0) else bool(smc_m15.get("chop_zone", False))
+        is_chop_zone = is_equilibrium_chop
 
         final_action = "HOLD"
         reason = "Market in consolidation or awaiting higher confluence."
@@ -1143,10 +1173,10 @@ class QuantGoldExecutionEngine:
             elif cand_action == "SELL" and is_macro_bull:
                 final_action = "HOLD"
                 reason = f"H1_H4_MACRO_BULL_VETO: Price ${curr_p:.2f} is in confirmed Macro Uptrend ({bullish_tf_count}/19 Bullish TFs, H1={h1_bias}, H4={h4_bias}). Shorting tops or bull flags is strictly forbidden."
-            # Gate 2: Chop Zone Injunction (Middle 30% Dealing Range is FORBIDDEN unless high conviction breakout)
-            elif is_chop_zone and abs(weighted_score) < 28.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.03:
+            # Gate 2: Equilibrium Chop Zone Injunction (Middle 30% Dealing Range is FORBIDDEN - Invariant 76 & AQ88 Invariant 137)
+            elif is_chop_zone and abs(weighted_score) < 35.0 and abs(kalman.get("latent_velocity", 0.0)) < 0.04:
                 final_action = "HOLD"
-                reason = f"BLOCKED_CHOP_ZONE: Price is in middle dealing range ({smc_m15.get('range_pct', 0.5):.2f}) with low momentum."
+                reason = f"BLOCK_CHOP_ZONE_EQUILIBRIUM: Price ${curr_p:.2f} is in middle dealing range ({range_pct*100:.1f}% between ${range_low:.2f}-${range_high:.2f}). Pure Brownian noise. Orders strictly forbidden until boundary test."
             # Gate 2.5: Anti-Chasing Momentum Overextension & Spread Drag Guard (Invariant 92 Pillar 1 & AQ88 Invariant 132)
             # Chasing an extended impulse candle (> 0.65x ATR from EMA21) forces retail to buy the top wick
             # or sell the bottom wick right before a mean-reverting pullback.
@@ -1224,10 +1254,11 @@ class QuantGoldExecutionEngine:
         if final_action == "HOLD":
             # 1. Trend Pullback Setups (Trading WITH the Dominant Trend):
             # Machine 1: M5 Trigger aligned 100% with M15 Direction (Choch/BOS, EMA Confluence)
+            # Equilibrium Guard: Pullback MUST be in discount (range_pct < 0.45) for BUY, or premium (range_pct > 0.55) for SELL
             if is_intraday_bull and not is_macro_bear:
                 # In an M15 UPTREND: We ONLY BUY M5 PULLBACKS into discount! Selling against the bull trend is 100% FORBIDDEN.
-                # Price MUST have pulled back down near/below M15 EMA21 in Discount (not at the top)!
-                is_m5_dip = (curr_p <= m15_ema21 + (0.35 * m15_atr_gate))
+                # Price MUST have pulled back down near/below M15 EMA21 in Discount (not at the top or equilibrium chop)!
+                is_m5_dip = (curr_p <= m15_ema21 + (0.35 * m15_atr_gate)) and (range_pct <= 0.45 or not is_chop_zone)
                 is_m5_exhausted_bottom = (
                     ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" or
                     ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" or
@@ -1241,8 +1272,8 @@ class QuantGoldExecutionEngine:
                         reason = f"MACHINE_1_M5_PULLBACK_BUY: Dip in M15 Bull trend exhausted sellers on M5 (Buy Force {nof_m5.get('buy_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
             elif is_intraday_bear and not is_macro_bull:
                 # In an M15 DOWNTREND: We ONLY SELL M5 RALLIES into premium! Buying falling knives is 100% FORBIDDEN.
-                # Price MUST have rallied up near/above M15 EMA21 in Premium (not at the bottom)!
-                is_m5_rally = (curr_p >= m15_ema21 - (0.35 * m15_atr_gate))
+                # Price MUST have rallied up near/above M15 EMA21 in Premium (not at the bottom or equilibrium chop)!
+                is_m5_rally = (curr_p >= m15_ema21 - (0.35 * m15_atr_gate)) and (range_pct >= 0.55 or not is_chop_zone)
                 is_m5_exhausted_top = (
                     ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" or
                     ex_state == "BULLS_EXHAUSTED_AT_TOP" or
@@ -1255,23 +1286,37 @@ class QuantGoldExecutionEngine:
                         win_prob = max(win_prob, 85.0)
                         reason = f"MACHINE_1_M5_PULLBACK_SELL: Rally in M15 Bear trend exhausted buyers on M5 (Sell Force {nof_m5.get('sell_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
             else:
-                # 2. Consolidation / Range Boundaries ONLY (Strict Exhaustion Criteria):
-                if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_intraday_bull and weighted_score <= 5.0 and (curr_p >= m15_ema21 - (0.30 * m15_atr_gate)):
-                    rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                    s_f = float(nof_data.get("sell_force_pct", 50.0) or 50.0)
-                    u_w = float(nof_data.get("upper_wick_ratio", 0.0) or 0.0)
-                    if rsi_val >= 58.0 and k_vel <= -0.015 and s_f >= 60.0 and u_w >= 0.35:
-                        final_action = "SELL"
-                        win_prob = max(win_prob, 82.0)
-                        reason = f"RANGE_BOUNDARY_EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Range Top (Sell Force {s_f:.0f}%, Upper Wick {u_w*100:.1f}%, Kalman Vel {k_vel:+.4f})."
-                elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_intraday_bear and weighted_score >= -5.0 and (curr_p <= m15_ema21 + (0.30 * m15_atr_gate)):
-                    rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                    b_f = float(nof_data.get("buy_force_pct", 50.0) or 50.0)
-                    l_w = float(nof_data.get("lower_wick_ratio", 0.0) or 0.0)
-                    if rsi_val <= 42.0 and k_vel >= 0.015 and b_f >= 60.0 and l_w >= 0.35:
-                        final_action = "BUY"
-                        win_prob = max(win_prob, 82.0)
-                        reason = f"RANGE_BOUNDARY_EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Range Bottom (Buy Force {b_f:.0f}%, Lower Wick {l_w*100:.1f}%, Kalman Vel {k_vel:+.4f})."
+                # 2. Consolidation / Range Boundaries ONLY (Strict Exhaustion Criteria at Outer Boundaries):
+                if not is_chop_zone:
+                    if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_intraday_bull and weighted_score <= 5.0 and (curr_p >= m15_ema21 - (0.30 * m15_atr_gate)):
+                        rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
+                        s_f = float(nof_data.get("sell_force_pct", 50.0) or 50.0)
+                        u_w = float(nof_data.get("upper_wick_ratio", 0.0) or 0.0)
+                        if rsi_val >= 58.0 and k_vel <= -0.015 and s_f >= 60.0 and u_w >= 0.35:
+                            final_action = "SELL"
+                            win_prob = max(win_prob, 82.0)
+                            reason = f"RANGE_BOUNDARY_EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Range Top (Sell Force {s_f:.0f}%, Upper Wick {u_w*100:.1f}%, Kalman Vel {k_vel:+.4f})."
+                    elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_intraday_bear and weighted_score >= -5.0 and (curr_p <= m15_ema21 + (0.30 * m15_atr_gate)):
+                        rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
+                        b_f = float(nof_data.get("buy_force_pct", 50.0) or 50.0)
+                        l_w = float(nof_data.get("lower_wick_ratio", 0.0) or 0.0)
+                        if rsi_val <= 42.0 and k_vel >= 0.015 and b_f >= 60.0 and l_w >= 0.35:
+                            final_action = "BUY"
+                            win_prob = max(win_prob, 82.0)
+                            reason = f"RANGE_BOUNDARY_EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Range Bottom (Buy Force {b_f:.0f}%, Lower Wick {l_w*100:.1f}%, Kalman Vel {k_vel:+.4f})."
+
+        # Structural Invalidation Memory Anchor in RAM (AQ88 Invariant 137)
+        # Prevents re-entering the exact same price noise level within 2.50 pts of a recent stop out
+        last_sl_p = getattr(self, "_last_stop_out_price", 0.0)
+        last_sl_ts = getattr(self, "_last_stop_out_ts", 0.0)
+        if final_action in ["BUY", "SELL"] and last_sl_p > 0.0 and (time.time() - last_sl_ts) < 900.0:
+            dist_from_stop = abs(curr_p - last_sl_p)
+            if dist_from_stop < 2.50:
+                sweep_m15 = str(smc_m15.get("sweep", "NONE")).upper()
+                has_boundary_sweep = (sweep_m15 not in ["NONE", ""]) or (float(nof_data.get("upper_wick_ratio", 0.0) or 0.0) >= 0.38) or (float(nof_data.get("lower_wick_ratio", 0.0) or 0.0) >= 0.38)
+                if not has_boundary_sweep:
+                    final_action = "HOLD"
+                    reason = f"STRUCTURAL_INVALIDATION_RAM_HOLD: Price ${curr_p:.2f} is within {dist_from_stop:.2f} pts of recent SL (${last_sl_p:.2f}). Holding in RAM until boundary sweep or structural expansion."
 
         # Directional Quarantine Check (AQ88 Invariant 130):
         # Strictly blocks re-entering in the quarantined direction for 15 minutes after an adverse momentum cut
@@ -3245,15 +3290,15 @@ class QuantGoldExecutionEngine:
                         logger.debug(f"Emergency SL fallback note: {e_cut}")
 
                 # ── MACHINE 1: M5 SCALP FAST HARVESTER (M15 CONFLUENCE) ──
-                # Target: +$2.00 to +$3.50 (+40 to +70 pips) per trade.
-                # Armor: When profit reaches +$1.00 (+20 pips), shift SL to Breakeven Armor (Entry ± Spread Floor) immediately!
+                # Target: +$5.00 to +$10.00 (+100 pips / +10 pts) per trade.
+                # Armor: When profit reaches >= +$3.50 (+7.0 pts / +70 pips), shift SL to Breakeven Armor (Entry ± Spread Floor)!
                 if is_e1 and not is_manual_trade:
-                    # STEP 1: BREAKEVEN ARMOR PROTECTION AT +$1.00 (+20 pips / 2.0 pts)
-                    # "Armor Protection: ពេលឡើងចំណេញបាន +$1.00 រុញ SL មក Breakeven Armor (Entry ± Spread) ភ្លាម ធានា Trade នោះគ្មានថ្ងៃប្រែក្លាយទៅជាខាតវិញឡើយ"
-                    is_dollar_one_armor_hit = (upl >= 1.00 or pnl_pts >= 2.00)
-                    if is_dollar_one_armor_hit and scale_tier < 1 and deal_id not in self._be_armor_locked_deals:
-                        be_buffer = max(0.50, spread * 1.5)
-                        min_breathing_buf = max(1.50, spread * 2.5)
+                    # STEP 1: BREAKEVEN ARMOR PROTECTION AT >= +$3.50 (+7.0 pts / +70 pips)
+                    # Provides healthy breathing distance (>= 3.50 pts) so normal 1-2 pt spread noise CANNOT clip it!
+                    is_dollar_armor_hit = (upl >= 3.50 or pnl_pts >= 7.00)
+                    if is_dollar_armor_hit and scale_tier < 1 and deal_id not in self._be_armor_locked_deals:
+                        be_buffer = max(1.00, spread * 2.0)
+                        min_breathing_buf = max(3.50, spread * 4.0)
                         if dir_side == "BUY":
                             raw_be = entry_p + be_buffer
                             be_level = min(raw_be, curr_p - min_breathing_buf)
@@ -3263,8 +3308,8 @@ class QuantGoldExecutionEngine:
 
                         if abs(sl - be_level) > 0.20:
                             logger.info(
-                                f"🛡️ [SUPER SMART BREAKEVEN ARMOR] Machine 1 Scalp profit +${upl:.2f} reached +$1.00 milestone (+{pips} pips). "
-                                f"Shifted SL to {be_level:.2f} (Entry ± Spread Floor, 0.00R Free Roll)! Trade is 100% loss-immune!"
+                                f"🛡️ [SUPER SMART BREAKEVEN ARMOR] Machine 1 Scalp profit +${upl:.2f} reached +$3.50 milestone (+{pips} pips / {pnl_pts:.2f} pts). "
+                                f"Shifted SL to {be_level:.2f} (Entry ± Spread Floor, 0.00R Free Roll)! Trade is 100% loss-immune with 3.5+ pts breathing room!"
                             )
                             try:
                                 if cid:
@@ -3280,13 +3325,13 @@ class QuantGoldExecutionEngine:
                                 self._active_gold_scale_tier = 1
                                 self._active_gold_sl = round(be_level, 2)
                             except Exception as e_be1:
-                                logger.debug(f"Machine 1 $1.00 breakeven armor note: {e_be1}")
+                                logger.debug(f"Machine 1 $3.50 breakeven armor note: {e_be1}")
                         else:
                             self._be_armor_locked_deals.add(deal_id)
                             scale_tier = 1
                             tr["scale_tier"] = 1
 
-                    # STEP 2: TAKE PROFIT +$2.00 TO +$3.50 (+40 TO +70 PIPS)
+                    # STEP 2: TAKE PROFIT +$5.00 TO +$10.00 (+100 TO +200 PIPS)
                     # Check M5 Net Order Flow for exhaustion
                     candles_m5_scalp = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
                     scalp_exhausted = False
@@ -3327,14 +3372,14 @@ class QuantGoldExecutionEngine:
                         except Exception:
                             scalp_exhausted = False
 
-                    # A. Max Scalp TP Hit (+3.50$ / +70 pips / 7.0 pts):
-                    is_max_tp_hit = (upl >= 3.50 or pnl_pts >= 7.00)
-                    # B. Fast Harvest between +$2.00 and +$3.50 (+40 to +70 pips) upon exhaustion or peak pullback:
+                    # A. Max Scalp TP Hit (+8.00$ / +160 pips / 16.0 pts):
+                    is_max_tp_hit = (upl >= 8.00 or pnl_pts >= 16.00)
+                    # B. Fast Harvest between +$5.00 and +$8.00 (+100 to +160 pips) upon exhaustion or peak pullback:
                     is_fast_harvest_hit = (
-                        (upl >= 2.00 or pnl_pts >= 4.00) and (
+                        (upl >= 5.00 or pnl_pts >= 10.00) and (
                             scalp_exhausted or
-                            (current_peak >= 2.50 and upl <= current_peak * 0.85) or
-                            (current_peak_pts >= 5.00 and pnl_pts <= current_peak_pts * 0.85)
+                            (current_peak >= 6.00 and upl <= current_peak * 0.80) or
+                            (current_peak_pts >= 12.00 and pnl_pts <= current_peak_pts * 0.80)
                         )
                     )
 
@@ -3365,17 +3410,17 @@ class QuantGoldExecutionEngine:
                             logger.debug(f"Machine 1 scalp close error: {e_sc_tp}")
 
                 # ── MACHINE 2: M15-H1 INSTITUTIONAL SWING RUNNER ──
-                # Target: +$6.00 to +$20.00+ (+120 to +400+ pips)
-                # Rides the full macro session waves (London Open / NY Open). Immune to scalp cuts ($0.50 - $3.50)!
+                # Target: +$12.00 to +$40.00+ (+240 to +800+ pips)
+                # Rides the full macro session waves (London Open / NY Open). Immune to scalp cuts!
                 if is_e2 and not is_manual_trade:
-                    # LEVEL 1: TP1 Hit (+6.00$ / +120 pips / 12.0 pts) -> Ratchet SL to Guaranteed Cash Floor (+2.0R / +5.00 pts)
-                    is_m2_tp1 = (upl >= 6.00 or pnl_pts >= 12.00)
+                    # LEVEL 1: TP1 Hit (+7.50$ / +150 pips / 15.0 pts) -> Ratchet SL to Guaranteed Cash Floor (+6.00 pts = +$3.00 cash)
+                    is_m2_tp1 = (upl >= 7.50 or pnl_pts >= 15.00)
                     if is_m2_tp1 and scale_tier < 2:
-                        cash_floor_pts = 5.00  # Guarantee at least +$2.50 cash in pocket
+                        cash_floor_pts = 6.00  # Guarantee at least +$3.00 cash in pocket
                         cash_floor_sl = (entry_p + cash_floor_pts) if dir_side == "BUY" else (entry_p - cash_floor_pts)
                         logger.info(
                             f"💰 [MACHINE 2 TP1 CASH FLOOR] Macro swing trade {deal_id} reached +${upl:.2f} (+{pips} pips / {pnl_pts:.2f} pts). "
-                            f"Ratcheting SL to Guaranteed Cash Floor ${cash_floor_sl:.2f} (+50 pips cash floor)!"
+                            f"Ratcheting SL to Guaranteed Cash Floor ${cash_floor_sl:.2f} (+60 pips cash floor)!"
                         )
                         try:
                             if cid:
@@ -3401,8 +3446,8 @@ class QuantGoldExecutionEngine:
                         except Exception as e_m2_tp1:
                             logger.debug(f"Machine 2 TP1 ratchet note: {e_m2_tp1}")
 
-                    # LEVEL 2: TP2 Hit (+12.00$ / +240 pips / 24.0 pts) -> Ratchet SL to +$8.00 cash floor (+16.0 pts)
-                    is_m2_tp2 = (upl >= 12.00 or pnl_pts >= 24.00)
+                    # LEVEL 2: TP2 Hit (+12.50$ / +250 pips / 25.0 pts) -> Ratchet SL to +$8.00 cash floor (+16.0 pts)
+                    is_m2_tp2 = (upl >= 12.50 or pnl_pts >= 25.00)
                     if is_m2_tp2 and scale_tier < 3:
                         cash_floor_pts2 = 16.00  # Guarantee at least +$8.00 cash in pocket
                         cash_floor_sl2 = (entry_p + cash_floor_pts2) if dir_side == "BUY" else (entry_p - cash_floor_pts2)
@@ -3434,8 +3479,25 @@ class QuantGoldExecutionEngine:
                         except Exception as e_m2_tp2:
                             logger.debug(f"Machine 2 TP2 ratchet note: {e_m2_tp2}")
 
-                    # LEVEL 3: TP3 Moonshot Runner Harvest (+15.00$ to +20.00$+ / +300 to +400+ pips)
-                    is_m2_tp3 = (upl >= 15.00 or pnl_pts >= 30.00)
+                    # LEVEL 3: TP3 Moonshot Runner Dynamic Trailing (+15.00$ to +40.00$+ / +300 to +800+ pips)
+                    candles_m15_macro = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
+                    m15_exhausted = False
+                    if candles_m15_macro is not None and len(candles_m15_macro) >= 2:
+                        try:
+                            from mathematical_engine import compute_net_buy_sell_force
+                            f_m15 = compute_net_buy_sell_force(candles_m15_macro)
+                            if dir_side == "BUY" and f_m15.get("exhaustion_state") == "BULLS_EXHAUSTED_AT_TOP":
+                                m15_exhausted = True
+                            elif dir_side == "SELL" and f_m15.get("exhaustion_state") == "BEARS_EXHAUSTED_AT_BOTTOM":
+                                m15_exhausted = True
+                        except Exception:
+                            m15_exhausted = False
+
+                    is_m2_tp3 = (
+                        (upl >= 20.00 or pnl_pts >= 40.00) or
+                        ((upl >= 15.00 or pnl_pts >= 30.00) and m15_exhausted) or
+                        (current_peak_pts >= 35.00 and pnl_pts <= current_peak_pts * 0.80 and pnl_pts >= 20.00)
+                    )
                     if is_m2_tp3:
                         logger.info(
                             f"🚀 [MACHINE 2 MOONSHOT RUNNER HARVEST] Macro swing trade {deal_id} reached giant milestone "
@@ -3462,7 +3524,7 @@ class QuantGoldExecutionEngine:
                             logger.debug(f"Machine 2 TP3 harvest error: {e_m2_tp3}")
 
                 # Check if position stopped out on broker (SL hit or closed)
-                # If stopped out in profit: notify VIP. If stopped out in loss: DO NOT NOTIFY VIP.
+                # If stopped out in profit: notify VIP. If stopped out in loss: Transparently report risk defense!
                 is_sl_hit = (dir_side == "BUY" and curr_p <= sl and sl >= 3500.0) or (dir_side == "SELL" and curr_p >= sl and sl >= 3500.0)
                 if is_sl_hit:
                     key_close = f"{deal_id}:CLOSED"
@@ -3475,7 +3537,7 @@ class QuantGoldExecutionEngine:
                             # Closed in profit! (e.g. Breakeven Armor or trailing profit floor hit)
                             card_close_win = format_gold_tp_card(
                                 stage="CLOSE",
-                                pips=max(pips, 73 if scale_tier >= 1 else 10),
+                                pips=max(pips, 70 if scale_tier >= 1 else 10),
                                 direction=dir_side,
                                 entry_price=entry_p
                             )
@@ -3483,11 +3545,25 @@ class QuantGoldExecutionEngine:
                             await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
                             self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
                         else:
-                            # Closed at loss: NEVER SEND TO VIP USERS!
-                            logger.info(f"Gold trade {deal_id} hit SL @ ${curr_p:.2f} (Loss: ${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
+                            # Closed at loss: Record in RAM Invalidation Memory & transparently notify!
+                            self._last_stop_out_price = round(curr_p, 2)
+                            self._last_stop_out_ts = time.time()
+                            self._last_stop_out_dir = dir_side
+                            logger.info(
+                                f"🏛️ [BROKER STRUCTURAL STOP-LOSS] Gold trade {deal_id} ({dir_side}) hit SL @ ${curr_p:.2f} (Loss: ${upl:.2f}). "
+                                f"Recorded ${self._last_stop_out_price:.2f} in RAM invalidation memory."
+                            )
                             self._directional_quarantine_dir = dir_side
-                            self._directional_quarantine_until = time.time() + 900.0  # 15 minutes
-                            logger.info(f"🛡️ [DIRECTIONAL QUARANTINE] Quarantined {dir_side} direction for 15 minutes after SL hit to stop revenge churn!")
+                            self._directional_quarantine_until = time.time() + 900.0
+                            card_sl = format_gold_sl_card(
+                                pips=abs(pips),
+                                direction=dir_side,
+                                entry_price=entry_p,
+                                exit_price=curr_p,
+                                loss_amount=upl
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_sl, app=app, reply_markup=markup)
                             self._clear_active_trade(deal_id, cooldown=45.0, direction=dir_side)
                     continue
 
