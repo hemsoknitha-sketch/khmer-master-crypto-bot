@@ -147,19 +147,19 @@ def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: floa
     st = str(stage).upper()
 
     # Institutional Sanity Clamping: Prevent runaway/corrupted pip display
-    safe_pips = max(10, min(int(pips), 600))
+    safe_pips = max(10, min(int(pips), 350))
 
     if "SCALP" in st or "POS1" in st:
         disp_pips = max(50, min(safe_pips, 100))
         stage_desc = f"Machine 1 Scalp Harvested (+{disp_pips} pips) | យកចំណេញលឿនចូលហោប៉ៅ!"
     elif "TP1" in st:
-        disp_pips = max(150, min(safe_pips, 200))
-        stage_desc = f"Machine 2 TP1 Hit (+{disp_pips} pips) | Cash Floor Locked!"
+        disp_pips = safe_pips
+        stage_desc = f"TP1 Hit (+{disp_pips} pips) | Machine 2 Cash Floor Locked!"
     elif "TP2" in st:
-        disp_pips = max(250, min(safe_pips, 350))
-        stage_desc = f"Machine 2 TP2 Hit (+{disp_pips} pips) | +$8.00 Cash Floor Locked!"
+        disp_pips = max(180, min(safe_pips, 280))
+        stage_desc = f"TP2 Hit (+{disp_pips} pips) | +$8.00 Cash Floor Locked!"
     elif "TP3" in st:
-        disp_pips = max(350, min(safe_pips, 600))
+        disp_pips = max(280, min(safe_pips, 350))
         stage_desc = f"Machine 2 TP3 Hit (+{disp_pips} pips) | Moonshot Runner Harvested!"
     else:
         stage_desc = f"Profit Locked (+{safe_pips} pips) | Position Harvested!"
