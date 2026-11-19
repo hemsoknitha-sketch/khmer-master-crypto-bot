@@ -492,7 +492,8 @@ class QuantGoldExecutionEngine:
                 targets.append({"chat_id": cid, "is_demo": bool(u.get("is_demo", False))})
 
         seen_targets = {(t["chat_id"], t["is_demo"]) for t in targets}
-        for vip_cid in [643724109, 1744387717]:
+        # Only genuinely distinct accounts should be audited (e.g. VIP 643724109 with separate sub-account)
+        for vip_cid in [643724109]:
             if (vip_cid, False) not in seen_targets:
                 targets.append({"chat_id": vip_cid, "is_demo": False})
                 seen_targets.add((vip_cid, False))
@@ -1266,7 +1267,13 @@ class QuantGoldExecutionEngine:
         if q_dir and time.time() < q_until:
             if final_action == q_dir:
                 rem_sec = round(q_until - time.time(), 1)
-                logger.info(f"🛡️ [DIRECTIONAL QUARANTINE VETO] {final_action} vetoed! Direction {q_dir} is quarantined for {rem_sec}s after recent adverse momentum micro-cut.")
+                now_ts = time.time()
+                last_q_log = getattr(self, "_last_quarantine_log_ts", 0.0)
+                last_q_logged_dir = getattr(self, "_last_quarantine_logged_dir", None)
+                if (now_ts - last_q_log >= 60.0) or (last_q_logged_dir != q_dir):
+                    self._last_quarantine_log_ts = now_ts
+                    self._last_quarantine_logged_dir = q_dir
+                    logger.info(f"🛡️ [DIRECTIONAL QUARANTINE VETO] {final_action} vetoed! Direction {q_dir} is quarantined for {rem_sec}s after recent adverse momentum micro-cut.")
                 final_action = "HOLD"
                 reason = f"DIRECTIONAL_QUARANTINE_VETO: {q_dir} quarantined ({rem_sec}s remaining)."
 

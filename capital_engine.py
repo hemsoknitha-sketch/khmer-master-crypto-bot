@@ -3553,6 +3553,22 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
                     (os.getenv("CAPITAL_ACCOUNT_ID") or "216890638652757188").strip()
                 )
                 if not target_acc or target_acc == sa_acc:
+                    # Invariant 135: Forbid non-admin users from executing on Super Admin's live broker account!
+                    if int(chat_id) != SUPER_ADMIN_ID and not is_demo:
+                        logger.warning(
+                            f"🚨 [CAPITAL FIDUCIARY GUARD] Non-admin user {chat_id} attempted to bind to Super Admin live account {sa_acc}! "
+                            f"Preventing unauthorized live order execution & capital spillover."
+                        )
+                        engine = CapitalComEngine(
+                            api_key="UNAUTHENTICATED_GUEST",
+                            identifier="",
+                            password="",
+                            is_demo=False,
+                            custom_chat_id=chat_id
+                        )
+                        _user_engine_pool[pool_key] = engine
+                        return engine
+
                     sa_pool_key = f"{SUPER_ADMIN_ID}_{'demo' if is_demo else 'live'}"
                     if sa_pool_key in _user_engine_pool:
                         sa_engine = _user_engine_pool[sa_pool_key]
