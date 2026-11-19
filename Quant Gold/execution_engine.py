@@ -374,6 +374,8 @@ class QuantGoldExecutionEngine:
         self._last_signal_broadcast_ts: float = 0.0
         self._trade_cooldown_seconds: float = 300.0  # 5 min after win, 15 min after loss
         self._signal_cooldown_seconds: float = 300.0  # Min 5 min between new signals
+        self._directional_quarantine_dir: Optional[str] = None  # Quarantines failing direction for 15m after adverse momentum cut
+        self._directional_quarantine_until: float = 0.0
         self._peak_upl_map: Dict[str, float] = {}  # deal_id -> peak UPL for Flash Shock Harvest
         self._peak_pnl_pts_map: Dict[str, float] = {}  # deal_id -> peak price points (pips) for size-invariant harvest
         self._last_broker_adopt_ts: float = 0.0
@@ -1054,7 +1056,10 @@ class QuantGoldExecutionEngine:
                 monte_sup1 = float(monte_rep.get("sup1", curr_p - 15.0))
                 c_long = float(monte_rep.get("client_long_pct", 50.0))
                 # Check A: Extreme Retail Crowd Long Trap at Resistance 1
-                if c_long >= 75.0 and curr_p >= (monte_res1 - 2.50):
+                # ONLY trigger if price is ACTUALLY REJECTING downwards (kalman velocity <= -0.015 and bearish counts > bullish).
+                # If price is actively surging with positive momentum, it's an institutional breakout thrust, NOT a retail trap!
+                k_vel_rep = float(kalman.get("latent_velocity", 0.0) or 0.0)
+                if c_long >= 75.0 and curr_p >= (monte_res1 - 2.50) and k_vel_rep <= -0.015 and counts.get("bearish", 0) > counts.get("bullish", 0):
                     if mtf_action == "BUY" or ai_action == "BUY":
                         # FOMO buy into 80% retail herd trap is prohibited
                         mtf_action = "HOLD"
@@ -1171,8 +1176,9 @@ class QuantGoldExecutionEngine:
                 final_action = cand_action
                 reason = f"HIGH_CONFLUENCE_{final_action}: 19-TF Score {weighted_score:+.1f}, Win Prob {win_prob:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f}."
 
-        # Gate 0.8: Institutional Net Order Flow Force & Climax Exhaustion Trigger (AQ88 Invariant 120 & 123)
-        # Directly catches true exhausted tops to SELL and true exhausted bottoms to BUY for Machine 1 & Machine 2
+        # Gate 0.8: Institutional Net Order Flow Force & Intraday Trend Governor (AQ88 Invariant 130)
+        # Directly aligns Machine 1 (Scalp) & Machine 2 (Macro) WITH the dominant trend!
+        # Counter-trend selling in an uptrend or counter-trend buying in a downtrend is 100% ELIMINATED!
         nof_data = math_data.get("net_order_flow_force", {})
         ex_state = nof_data.get("exhaustion_state", "NEUTRAL_BALANCED")
 
@@ -1187,35 +1193,75 @@ class QuantGoldExecutionEngine:
                 nof_m5 = {}
         ex_state_m5 = nof_m5.get("exhaustion_state", "NEUTRAL_BALANCED")
 
+        # Intraday Trend Directional Governor (AQ88 Invariant 130)
+        m5_tf = mtf_data.get("timeframes", {}).get("M5", {}) if isinstance(mtf_data, dict) else {}
+        m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
+        m5_bias = str(m5_tf.get("bias", "NEUTRAL")).upper()
+        m15_bias = str(m15_tf.get("bias", "NEUTRAL")).upper()
+        k_vel = float(kalman.get("latent_velocity", 0.0) or 0.0)
+
+        is_intraday_bull = (
+            is_macro_bull or
+            (m5_bias == "BULLISH" and m15_bias == "BULLISH") or
+            (m15_bias == "BULLISH" and k_vel > 0.010) or
+            (bullish_tf_count >= 8 and bearish_tf_count <= 4) or
+            weighted_score >= 12.0
+        )
+        is_intraday_bear = (
+            is_macro_bear or
+            (m5_bias == "BEARISH" and m15_bias == "BEARISH") or
+            (m15_bias == "BEARISH" and k_vel < -0.010) or
+            (bearish_tf_count >= 8 and bullish_tf_count <= 4) or
+            weighted_score <= -12.0
+        )
+
         if final_action == "HOLD":
-            # 1. Higher Timeframe M15/H1 Exhaustion (Machine 2 Macro Trigger)
-            if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_macro_bull and weighted_score <= 10.0:
-                rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                m15_bias = str(m15_tf.get("bias", "NEUTRAL")).upper()
-                if rsi_val >= 50.0 and kalman.get("latent_velocity", 0.0) <= 0.005 and m15_bias != "BULLISH":
-                    final_action = "SELL"
-                    win_prob = max(win_prob, 85.0)
-                    reason = f"MACHINE_2_EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Top on M15 (Sell Force {nof_data.get('sell_force_pct', 70)}%, Upper Wick {nof_data.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
-            elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_macro_bear and weighted_score >= -10.0:
-                rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
-                m15_bias = str(m15_tf.get("bias", "NEUTRAL")).upper()
-                if rsi_val <= 50.0 and kalman.get("latent_velocity", 0.0) >= 0.015 and m15_bias != "BEARISH":
-                    final_action = "BUY"
-                    win_prob = max(win_prob, 85.0)
-                    reason = f"MACHINE_2_EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Bottom on M15 (Buy Force {nof_data.get('buy_force_pct', 70)}%, Lower Wick {nof_data.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
-            # 2. Lower Timeframe M1-M5 Climax Exhaustion (Machine 1 Scalp Trigger)
-            elif ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" and not is_macro_bull:
-                m5_rsi = float(mtf_data.get("timeframes", {}).get("M5", {}).get("rsi", 50.0) or 50.0)
-                if m5_rsi >= 60.0 and kalman.get("latent_velocity", 0.0) <= 0.005:
-                    final_action = "SELL"
-                    win_prob = max(win_prob, 82.0)
-                    reason = f"MACHINE_1_SCALP_EXHAUSTED_TOP_SELL: M1-M5 Buyers 100% Exhausted at Top (Sell Force {nof_m5.get('sell_force_pct', 70)}%, Upper Wick {nof_m5.get('upper_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
-            elif ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_macro_bear:
-                m5_rsi = float(mtf_data.get("timeframes", {}).get("M5", {}).get("rsi", 50.0) or 50.0)
-                if m5_rsi <= 40.0 and kalman.get("latent_velocity", 0.0) >= -0.005:
-                    final_action = "BUY"
-                    win_prob = max(win_prob, 82.0)
-                    reason = f"MACHINE_1_SCALP_EXHAUSTED_BOTTOM_BUY: M1-M5 Sellers 100% Exhausted at Bottom (Buy Force {nof_m5.get('buy_force_pct', 70)}%, Lower Wick {nof_m5.get('lower_wick_ratio', 0)*100:.1f}%, Kalman Vel {kalman.get('latent_velocity', 0):+.4f})."
+            # 1. Trend Pullback Setups (Trading WITH the Dominant Trend):
+            if is_intraday_bull and not is_macro_bear:
+                # In an UPTREND: We ONLY BUY PULLBACKS! Selling against the bull trend is 100% FORBIDDEN.
+                if ex_state_m5 == "BEARS_EXHAUSTED_AT_BOTTOM" or ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                    m5_rsi = float(m5_tf.get("rsi", 50.0) or 50.0)
+                    if m5_rsi <= 55.0 and k_vel >= -0.015:
+                        final_action = "BUY"
+                        win_prob = max(win_prob, 85.0)
+                        reason = f"MACHINE_1_TREND_PULLBACK_BUY: Dip in Bull trend exhausted sellers at bottom (Buy Force {nof_m5.get('buy_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
+            elif is_intraday_bear and not is_macro_bull:
+                # In a DOWNTREND: We ONLY SELL RALLIES! Buying falling knives is 100% FORBIDDEN.
+                if ex_state_m5 == "BULLS_EXHAUSTED_AT_TOP" or ex_state == "BULLS_EXHAUSTED_AT_TOP":
+                    m5_rsi = float(m5_tf.get("rsi", 50.0) or 50.0)
+                    if m5_rsi >= 45.0 and k_vel <= 0.015:
+                        final_action = "SELL"
+                        win_prob = max(win_prob, 85.0)
+                        reason = f"MACHINE_1_TREND_PULLBACK_SELL: Rally in Bear trend exhausted buyers at top (Sell Force {nof_m5.get('sell_force_pct', 70)}%, M5 RSI {m5_rsi:.1f}, Kalman Vel {k_vel:+.4f})."
+            else:
+                # 2. Consolidation / Range Boundaries ONLY (Strict Exhaustion Criteria):
+                if ex_state == "BULLS_EXHAUSTED_AT_TOP" and not is_intraday_bull and weighted_score <= 5.0:
+                    rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
+                    s_f = float(nof_data.get("sell_force_pct", 50.0) or 50.0)
+                    u_w = float(nof_data.get("upper_wick_ratio", 0.0) or 0.0)
+                    if rsi_val >= 58.0 and k_vel <= -0.015 and s_f >= 60.0 and u_w >= 0.35:
+                        final_action = "SELL"
+                        win_prob = max(win_prob, 82.0)
+                        reason = f"RANGE_BOUNDARY_EXHAUSTED_TOP_SELL: Net Order Flow Bulls Exhausted at Range Top (Sell Force {s_f:.0f}%, Upper Wick {u_w*100:.1f}%, Kalman Vel {k_vel:+.4f})."
+                elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM" and not is_intraday_bear and weighted_score >= -5.0:
+                    rsi_val = float(m15_tf.get("rsi", 50.0) or 50.0)
+                    b_f = float(nof_data.get("buy_force_pct", 50.0) or 50.0)
+                    l_w = float(nof_data.get("lower_wick_ratio", 0.0) or 0.0)
+                    if rsi_val <= 42.0 and k_vel >= 0.015 and b_f >= 60.0 and l_w >= 0.35:
+                        final_action = "BUY"
+                        win_prob = max(win_prob, 82.0)
+                        reason = f"RANGE_BOUNDARY_EXHAUSTED_BOTTOM_BUY: Net Order Flow Bears Exhausted at Range Bottom (Buy Force {b_f:.0f}%, Lower Wick {l_w*100:.1f}%, Kalman Vel {k_vel:+.4f})."
+
+        # Directional Quarantine Check (AQ88 Invariant 130):
+        # Strictly blocks re-entering in the quarantined direction for 15 minutes after an adverse momentum cut
+        q_dir = getattr(self, "_directional_quarantine_dir", None)
+        q_until = getattr(self, "_directional_quarantine_until", 0.0)
+        if q_dir and time.time() < q_until:
+            if final_action == q_dir:
+                rem_sec = round(q_until - time.time(), 1)
+                logger.info(f"🛡️ [DIRECTIONAL QUARANTINE VETO] {final_action} vetoed! Direction {q_dir} is quarantined for {rem_sec}s after recent adverse momentum micro-cut.")
+                final_action = "HOLD"
+                reason = f"DIRECTIONAL_QUARANTINE_VETO: {q_dir} quarantined ({rem_sec}s remaining)."
 
         # Dynamic Breathing Stop Loss & H1/H4 Institutional Structural Invalidation Anchor (Invariant 35 & 98):
         # Strict Standard: SL Distance >= max(1.80 * H1_ATR, 1.15 * H4_ATR, 3.60 * ATR_15m, spread * 5.0, 0.0065 * Price)
@@ -3136,7 +3182,13 @@ class QuantGoldExecutionEngine:
                             await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
                         if hasattr(db, "update_capital_auto_trade_close"):
                             db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
-                        self._clear_active_trade(deal_key, cooldown=30.0, direction=dir_side)
+                        
+                        # Engage 15-Minute Directional Quarantine against revenge counter-trend chasing (AQ88 Invariant 130)
+                        self._directional_quarantine_dir = dir_side
+                        self._directional_quarantine_until = time.time() + 900.0  # 15 minutes
+                        logger.info(f"🛡️ [DIRECTIONAL QUARANTINE] Quarantined {dir_side} direction for 15 minutes to stop revenge chasing!")
+
+                        self._clear_active_trade(deal_key, cooldown=45.0, direction=dir_side)
                         continue
                     except Exception as e_cut:
                         logger.debug(f"Adaptive invalidation micro-cut note: {e_cut}")
@@ -3164,7 +3216,7 @@ class QuantGoldExecutionEngine:
                             rng_v = max(0.25, h_v - l_v)
                             if dir_side == "BUY":
                                 u_wick = (h_v - max(o_v, c_v)) / rng_v
-                                if u_wick >= 0.35 and s_f >= 55.0:
+                                if u_wick >= 0.38 and s_f >= 55.0:
                                     scalp_exhausted = True
                                     exhaustion_reason = f"UPPER_WICK_{u_wick*100:.0f}%_SELL_FORCE_{s_f:.0f}%"
                                 elif ex_state == "BULLS_EXHAUSTED_AT_TOP":
@@ -3175,7 +3227,7 @@ class QuantGoldExecutionEngine:
                                     exhaustion_reason = f"BUY_FORCE_COLLAPSE_{b_f:.0f}%"
                             else:
                                 l_wick = (min(o_v, c_v) - l_v) / rng_v
-                                if l_wick >= 0.35 and b_f >= 55.0:
+                                if l_wick >= 0.38 and b_f >= 55.0:
                                     scalp_exhausted = True
                                     exhaustion_reason = f"LOWER_WICK_{l_wick*100:.0f}%_BUY_FORCE_{b_f:.0f}%"
                                 elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
@@ -3189,10 +3241,11 @@ class QuantGoldExecutionEngine:
 
                     # Super Fast Profit Taking (RAM Climax Peak Harvester):
                     # Banks cash profit immediately when target is hit or momentum exhausts at the peak!
+                    # Minimum move of at least +2.80 pts (+28 pips) to prevent banking tiny pennies (+0.12, +0.25)!
                     should_fast_harvest = (
-                        (pnl_pts >= 2.20 or pips >= tier_pips_target or upl >= 2.00) or
-                        ((pnl_pts >= 1.50 or upl >= 1.25) and scalp_exhausted) or
-                        (current_peak_pts >= 2.00 and pnl_pts <= current_peak_pts * 0.72 and pnl_pts >= 1.20)
+                        (pnl_pts >= 3.20 or pips >= max(25, tier_pips_target) or upl >= 2.50) or
+                        ((pnl_pts >= 2.50 or upl >= 1.80) and scalp_exhausted and current_peak_pts >= 2.80) or
+                        (current_peak_pts >= 3.50 and pnl_pts <= current_peak_pts * 0.65 and pnl_pts >= 2.00)
                     )
 
                     if should_fast_harvest:
@@ -3221,11 +3274,12 @@ class QuantGoldExecutionEngine:
                             logger.debug(f"Machine 1 scalp fast harvest note: {e_sc}")
 
                     # Breakeven Armor (Loss Immunity Guarantee):
-                    # If profit >= +2.80 pts (+28 pips) or UPL >= $2.00, shift SL to Entry ± max(1.20, spread * 2.2)
-                    # Provides min breathing buffer of max(1.80, spread * 2.8) so tick noise does not clip it!
-                    elif (pnl_pts >= 2.80 or upl >= 2.00) and deal_id not in self._be_armor_locked_deals:
-                        be_buffer = max(1.20, spread * 2.2)
-                        min_breathing_buf = max(1.80, spread * 2.8)
+                    # Require minimum move of +3.80 pts (+38 pips) or UPL >= $2.50 before shifting SL.
+                    # Provides min breathing buffer of max(2.50, spread * 3.5) so tick noise does not clip it!
+                    # Sets guaranteed floor at Entry ± max(0.80, spread * 1.8) to guarantee net profit after spread.
+                    elif (pnl_pts >= 3.80 or upl >= 2.50) and deal_id not in self._be_armor_locked_deals:
+                        be_buffer = max(0.80, spread * 1.8)
+                        min_breathing_buf = max(2.50, spread * 3.5)
                         if dir_side == "BUY":
                             raw_be = entry_p + be_buffer
                             be_level = min(raw_be, curr_p - min_breathing_buf)
@@ -3447,6 +3501,9 @@ class QuantGoldExecutionEngine:
                         else:
                             # Closed at loss: NEVER SEND TO VIP USERS!
                             logger.info(f"Gold trade {deal_id} hit SL @ ${curr_p:.2f} (Loss: ${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
+                            self._directional_quarantine_dir = dir_side
+                            self._directional_quarantine_until = time.time() + 900.0  # 15 minutes
+                            logger.info(f"🛡️ [DIRECTIONAL QUARANTINE] Quarantined {dir_side} direction for 15 minutes after SL hit to stop revenge churn!")
                             self._clear_active_trade(deal_id, cooldown=45.0, direction=dir_side)
                     continue
 
