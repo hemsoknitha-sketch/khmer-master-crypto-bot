@@ -1930,14 +1930,15 @@ class QuantGoldExecutionEngine:
                             for t in active_gold_trades
                         )
 
-                        # High-Confidence Validation for Machine 2 (Tier 2/3):
-                        # Does NOT require Machine 1 to be up +$10.50!
-                        # Allows Machine 2 to enter when M15+ structural confluence is confirmed
-                        # and prior positions are not in catastrophic drawdown (> 30 pips).
-                        prior_not_failing = all(
-                            (
-                                (existing_dir == "BUY" and (current_price - float(t.get("entry_price", current_price) or current_price)) >= -3.00)
-                                or (existing_dir == "SELL" and (float(t.get("entry_price", current_price) or current_price) - current_price) >= -3.00)
+                        # Institutional Free-Roll Pyramiding Lock (AQ88 Invariant 131):
+                        # Adding ANY additional position (Tier 2, 3, 4, 5) requires all existing positions
+                        # to be in SOLID PROFIT (>= +2.00 pts / 20 pips) and/or protected by Breakeven Armor (scale_tier >= 1)!
+                        # Adding positions while prior trades are floating in the red is 100% FORBIDDEN.
+                        all_prior_protected = all(
+                            int(t.get("scale_tier", 0) or 0) >= 1
+                            or (
+                                (existing_dir == "BUY" and (current_price - float(t.get("entry_price", current_price) or current_price)) >= 2.00)
+                                or (existing_dir == "SELL" and (float(t.get("entry_price", current_price) or current_price) - current_price) >= 2.00)
                             )
                             for t in active_gold_trades
                         )
@@ -1948,29 +1949,18 @@ class QuantGoldExecutionEngine:
                         elif too_close:
                             can_pyramid = False
                             pyramid_hold_reason = f"TOO_CLOSE_TO_ENTRY (< ${min_sep:.2f} separation)"
-                        elif not prior_not_failing:
+                        elif not all_prior_protected:
                             can_pyramid = False
-                            pyramid_hold_reason = "PRIOR_POSITION_IN_DRAWDOWN (> 30 pips adverse)"
+                            pyramid_hold_reason = "PRIOR_POSITIONS_NOT_FREE_ROLL (requires profit >= +20 pips or Breakeven Armor)"
                         elif tier_num in [1, 2]:
-                            # Dual-Engine Coexistence: Machine 1 and Machine 2 can open concurrently!
-                            can_pyramid = (confidence >= 65.0 or abs(weighted_score) >= 15.0 or bool(in_memory_limit_setup))
+                            can_pyramid = (confidence >= 68.0 or abs(weighted_score) >= 18.0 or bool(in_memory_limit_setup))
                             pyramid_hold_reason = f"INSUFFICIENT_CONVICTION ({confidence:.1f}%)" if not can_pyramid else ""
                         elif tier_num == 3:
-                            # Position 3 (M15 Structural Swing)
-                            can_pyramid = (confidence >= 70.0 or abs(weighted_score) >= 22.0)
+                            can_pyramid = (confidence >= 72.0 or abs(weighted_score) >= 25.0)
                             pyramid_hold_reason = f"INSUFFICIENT_SWING_SCORE ({weighted_score:+.1f})" if not can_pyramid else ""
                         else:
-                            # Tier 4 & 5 (H1/H4 Trend Pyramiding): Requires prior positions in profit / Free Roll
-                            all_prior_protected = all(
-                                int(t.get("scale_tier", 0) or 0) >= 1
-                                or (
-                                    (existing_dir == "BUY" and current_price - float(t.get("entry_price", current_price) or current_price) >= 2.50)
-                                    or (existing_dir == "SELL" and float(t.get("entry_price", current_price) or current_price) - current_price >= 2.50)
-                                )
-                                for t in active_gold_trades
-                            )
-                            can_pyramid = all_prior_protected and (confidence >= 72.0 or abs(weighted_score) >= 25.0)
-                            pyramid_hold_reason = "PRIOR_POSITIONS_NOT_FREE_ROLL" if not all_prior_protected else f"INSUFFICIENT_CONVICTION ({confidence:.1f}%)"
+                            can_pyramid = (confidence >= 75.0 or abs(weighted_score) >= 28.0)
+                            pyramid_hold_reason = f"INSUFFICIENT_CONVICTION ({confidence:.1f}%)" if not can_pyramid else ""
 
                         if can_pyramid:
                             is_pyramid = True
@@ -2249,6 +2239,21 @@ class QuantGoldExecutionEngine:
                                     f"New entry ${current_price:.2f} within ${min_separation:.2f} buffer. Skipping cluster duplicate."
                                 )
                                 return {"chat_id": cid, "success": False, "reason": f"Price separation buffer (${min_separation:.2f}) - already held"}
+
+                    # Strict Free-Roll Pyramiding Lock (AQ88 Invariant 131):
+                    # Never open a second or third position if existing positions are not yet in profit (Free Roll)!
+                    if len(open_gold_trades) >= 1 and not is_reversal_flip:
+                        for ot in open_gold_trades:
+                            ot_scale = int(ot.get("scale_tier", 0) or 0)
+                            ot_entry = float(ot.get("entry_price", current_price) or current_price)
+                            ot_pnl = (current_price - ot_entry) if action == "BUY" else (ot_entry - current_price)
+                            if ot_scale < 1 and ot_pnl < 2.00:
+                                logger.info(
+                                    f"🛡️ [FREE-ROLL PYRAMID VETO] User {cid} holds open trade at ${ot_entry:.2f} "
+                                    f"not yet protected (PnL: {ot_pnl:+.2f} pts, Tier: {ot_scale}). "
+                                    f"Stacking multiple positions in drawdown is strictly forbidden under Invariant 131."
+                                )
+                                return {"chat_id": cid, "success": False, "reason": "Existing position not yet protected by Breakeven Armor (0.00R Free Roll required)"}
 
                     # ── STEP C: DAILY CAPITAL GOVERNOR CHECK ──
                     if not is_admin:
