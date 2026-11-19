@@ -1046,6 +1046,7 @@ class QuantGoldExecutionEngine:
         kalman = math_data.get("kalman", {})
         hurst = math_data.get("hurst_surface", {})
         regime = hurst.get("regime", "RANDOM_WALK")
+        m15_tf = mtf_data.get("timeframes", {}).get("M15", {}) if isinstance(mtf_data, dict) else {}
 
         # 4.1 Monte Safieddine Daily Market Report Benchmark Confluence & Contrarian Traps (Invariant 99)
         monte_rep = {}
@@ -2154,6 +2155,8 @@ class QuantGoldExecutionEngine:
                 return {"success": True, "dispatched_count": 0, "reason": "NO_ACTIVE_USERS"}
 
         sem = asyncio.Semaphore(30)
+        acc_lock = asyncio.Lock()
+        dispatched_broker_accounts: set = set()
         sl_dist = abs(current_price - sl)
         spread_val = 0.50
         try:
@@ -2191,6 +2194,28 @@ class QuantGoldExecutionEngine:
                             effective_is_demo = True
 
                     u_eng = capital_engine.get_user_capital_engine(cid, is_demo=effective_is_demo)
+
+                    # Broker Account Deduplication Lock (AQ88 Invariant 135):
+                    # Strictly prevent multiple VIP user records from executing duplicate orders on the same underlying Capital.com account!
+                    target_broker_acc = str(
+                        getattr(u_eng, "active_account_id", "")
+                        or getattr(u_eng, "desired_account_id", "")
+                        or getattr(u_eng, "account_id", "")
+                        or ""
+                    ).strip()
+                    if not target_broker_acc:
+                        target_broker_acc = f"user_{cid}_{effective_is_demo}"
+                    else:
+                        target_broker_acc = f"{target_broker_acc}_{effective_is_demo}"
+
+                    async with acc_lock:
+                        if target_broker_acc in dispatched_broker_accounts:
+                            logger.warning(
+                                f"🛡️ [MULTI-USER BROKER DEDUPLICATION] Broker account {target_broker_acc} "
+                                f"already executed an order in this cycle! Skipping duplicate order for user {cid}."
+                            )
+                            return {"chat_id": cid, "success": False, "reason": f"Broker account {target_broker_acc} already received order"}
+                        dispatched_broker_accounts.add(target_broker_acc)
 
                     # ── STEP A: TREND REVERSAL FLIP HARVEST ──
                     if is_reversal_flip:

@@ -2994,6 +2994,20 @@ class CapitalComEngine:
                 "error": "LOCKED: Please connect your personal Capital.com API key via /capital API <Key> <Email> <Password>."
             }
 
+        # Multi-Account Isolation & Failed Switch Shield (AQ88 Invariant 135)
+        # If this engine has a specified desired_account_id, it MUST match the active session account!
+        # If switching failed, placing an order on whatever default account is active is 100% FORBIDDEN.
+        if self.desired_account_id and self.active_account_id:
+            if str(self.active_account_id).strip() != str(self.desired_account_id).strip():
+                logger.error(
+                    f"🚨 [CROSS-ACCOUNT COLLISION BLOCKED] Engine session account {self.active_account_id} "
+                    f"does not match requested user account {self.desired_account_id}! Order rejected to protect account capital."
+                )
+                return {
+                    "success": False,
+                    "error": f"CROSS_ACCOUNT_COLLISION_BLOCKED: Session account {self.active_account_id} != desired {self.desired_account_id}."
+                }
+
         if not self.is_demo and user_cid and not db.is_capital_user_authorized(user_cid):
             return {
                 "success": False,

@@ -4757,8 +4757,8 @@ def ensure_capital_super_admin_defaults():
         """)
         cursor.execute("""
             INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
-            VALUES (1744387717, 1, 35.19, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
-            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, is_demo = 0, updated_at = CURRENT_TIMESTAMP
+            VALUES (1744387717, 0, 35.19, 5, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+            ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 0, is_demo = 0, updated_at = CURRENT_TIMESTAMP
         """)
         cursor.execute("""
             INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)

@@ -3647,8 +3647,7 @@ class QuantGoldBot:
         )
         try:
             import gold_daily_self_training_engine
-            res = await asyncio.to_thread(
-                gold_daily_self_training_engine.execute_daily_gold_self_training,
+            res = await gold_daily_self_training_engine.execute_daily_gold_self_training(
                 app=self.app,
                 force_telegram=False
             )
