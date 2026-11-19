@@ -116,21 +116,19 @@ def main():
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         commit_msg = f"feat(quant-gold): lightning update [{ts}]"
 
-    # 2. Scoped Gold Verification (< 2.5s)
+    # 2. Scoped Gold Verification
     print("\n🔍 [STEP 1/4] Running Scoped Quant Gold Verification...")
-    code, out, err, d_test = run_cmd([sys.executable, "-m", "unittest", "test_quant_gold_harvest_and_cash_floor.py"], timeout=10)
+    test_cmd = [
+        sys.executable, "-m", "unittest",
+        "test_quant_gold_harvest_and_cash_floor.py",
+        "test_quant_gold_reversal_flip.py",
+        "test_quant_gold_dual_engine.py"
+    ]
+    code, out, err, d_test = run_cmd(test_cmd, timeout=45)
     if code != 0:
         print(f"❌ [TEST FAILED] {err or out}")
         sys.exit(1)
-    code2, out2, err2, d_test2 = run_cmd([sys.executable, "-m", "unittest", "test_quant_gold_reversal_flip.py"], timeout=10)
-    if code2 != 0:
-        print(f"❌ [TEST FAILED] {err2 or out2}")
-        sys.exit(1)
-    code3, out3, err3, d_test3 = run_cmd([sys.executable, "-m", "unittest", "test_quant_gold_dual_engine.py"], timeout=10)
-    if code3 != 0:
-        print(f"❌ [TEST FAILED] {err3 or out3}")
-        sys.exit(1)
-    print(f"✅ [TEST PASSED] Quant Gold verified in {d_test + d_test2 + d_test3:.2f}s!")
+    print(f"✅ [TEST PASSED] Quant Gold verified in {d_test:.2f}s!")
 
     # 3. Stage changes
     print("\n📦 [STEP 2/4] Staging files (git add -A)...")

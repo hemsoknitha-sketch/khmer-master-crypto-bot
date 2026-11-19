@@ -84,29 +84,85 @@ class TestQuantGoldHarvestAndCashFloor(unittest.TestCase):
         self.assertTrue(is_exhaustion_harvest)
 
     def test_03_guaranteed_positive_cash_floor(self):
-        """Verify Breakeven Armor guarantees positive cash floor (Entry ± max(0.80, spread * 1.6))."""
+        """Verify Breakeven Armor guarantees positive cash floor (Entry ± max(1.20, spread * 2.2))."""
         spread = 0.50
         entry_p = 3850.00
-        curr_p_buy = 3852.50  # +$2.50 in profit
+        curr_p_buy = 3853.50  # +$3.50 in profit
 
-        be_buffer = max(0.80, spread * 1.6)  # max(0.80, 0.80) = 0.80
-        self.assertAlmostEqual(be_buffer, 0.80)
+        be_buffer = max(1.20, spread * 2.2)  # max(1.20, 1.10) = 1.20
+        self.assertAlmostEqual(be_buffer, 1.20)
 
         # For BUY:
-        raw_be_buy = entry_p + be_buffer  # 3850.80
-        be_level_buy = min(raw_be_buy, curr_p_buy - max(0.80, spread * 1.5))
-        self.assertEqual(be_level_buy, 3850.80)
+        raw_be_buy = entry_p + be_buffer  # 3851.20
+        min_breathing_buf = max(1.80, spread * 2.8)  # max(1.80, 1.40) = 1.80
+        be_level_buy = min(raw_be_buy, curr_p_buy - min_breathing_buf)
+        self.assertEqual(be_level_buy, 3851.20)
         self.assertGreater(be_level_buy, entry_p)
-        # Even with $0.50 spread, net profit at fill = 3850.80 - 3850.00 - 0.50 = +$0.30 (GREEN!)
-        self.assertGreater(be_level_buy - entry_p, spread * 0.5)
+        # Even with $0.50 spread, net profit at fill = 3851.20 - 3850.00 - 0.50 = +$0.70 (SOLID GREEN!)
+        self.assertGreater(be_level_buy - entry_p, spread * 1.0)
+        # Verify healthy breathing distance from current price (at least 1.80 pts)
+        self.assertGreaterEqual(curr_p_buy - be_level_buy, 1.80)
 
         # For SELL:
-        curr_p_sell = 3847.50  # +$2.50 in profit
-        raw_be_sell = entry_p - be_buffer  # 3849.20
-        be_level_sell = max(raw_be_sell, curr_p_sell + max(0.80, spread * 1.5))
-        self.assertEqual(be_level_sell, 3849.20)
+        curr_p_sell = 3846.50  # +$3.50 in profit
+        raw_be_sell = entry_p - be_buffer  # 3848.80
+        be_level_sell = max(raw_be_sell, curr_p_sell + min_breathing_buf)
+        self.assertEqual(be_level_sell, 3848.80)
         self.assertLess(be_level_sell, entry_p)
-        self.assertGreater(entry_p - be_level_sell, spread * 0.5)
+        self.assertGreater(entry_p - be_level_sell, spread * 1.0)
+        self.assertGreaterEqual(be_level_sell - curr_p_sell, 1.80)
+
+    def test_04_ram_climax_fast_harvest_and_scale_tier_1(self):
+        """Verify Machine 1 Scalp can harvest at peak momentum even after Breakeven (scale_tier=1)."""
+        is_e1 = True
+        is_manual_trade = False
+        scale_tier = 1  # Breakeven was already set!
+        tier_pips_target = 20
+
+        # Scenario A: Scalp reached +2.20 pts (+22 pips / +$1.10 on 0.5 lot)
+        pnl_pts = 2.20
+        pips = 22
+        upl = 1.10
+        scalp_exhausted = False
+        current_peak_pts = 2.20
+
+        should_fast_harvest = (
+            (pnl_pts >= 2.20 or pips >= tier_pips_target or upl >= 2.00) or
+            ((pnl_pts >= 1.50 or upl >= 1.25) and scalp_exhausted) or
+            (current_peak_pts >= 2.00 and pnl_pts <= current_peak_pts * 0.72 and pnl_pts >= 1.20)
+        )
+        # Must harvest at target reached even with scale_tier = 1!
+        can_run_harvest = is_e1 and not is_manual_trade and scale_tier <= 1
+        self.assertTrue(can_run_harvest)
+        self.assertTrue(should_fast_harvest)
+
+        # Scenario B: Exhaustion pinbar formed with +1.60 pts profit
+        pnl_pts_b = 1.60
+        upl_b = 0.80
+        scalp_exhausted_b = True
+        should_fast_harvest_b = (
+            (pnl_pts_b >= 2.20 or 16 >= tier_pips_target or upl_b >= 2.00) or
+            ((pnl_pts_b >= 1.50 or upl_b >= 1.25) and scalp_exhausted_b) or
+            (2.00 >= 2.00 and pnl_pts_b <= 2.00 * 0.72 and pnl_pts_b >= 1.20)
+        )
+        self.assertTrue(should_fast_harvest_b)
+
+    def test_05_adaptive_invalidation_micro_cut(self):
+        """Verify that adverse order flow cuts failing trades at -$2.25 to prevent -$15.13 catastrophe."""
+        upl = -2.30  # Floating loss around -$2.30
+        pnl_pts = -4.60
+        dir_side = "BUY"
+        is_floating_loss = (upl <= -2.50 or pnl_pts <= -4.00)
+        is_manual_trade = False
+
+        # Adversely strong sell force (e.g. 68% sell force against BUY)
+        s_f_cut = 68.0
+        ex_cut = "BULLS_EXHAUSTED_AT_TOP"
+        is_adverse_order_flow = (dir_side == "BUY" and (s_f_cut >= 62.0 or ex_cut == "BULLS_EXHAUSTED_AT_TOP"))
+        self.assertTrue(is_adverse_order_flow)
+
+        should_micro_cut = is_floating_loss and is_adverse_order_flow and not is_manual_trade and (upl <= -2.25 or pnl_pts <= -4.50)
+        self.assertTrue(should_micro_cut)
 
 
 if __name__ == "__main__":

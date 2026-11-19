@@ -2146,13 +2146,24 @@ class QuantGoldExecutionEngine:
                             from portfolio_circuit_breaker import is_capital_daily_locked
                             chk_bal_gov = live_avail if not effective_is_demo else 10000.0
                             if chk_bal_gov > 0:
-                                is_locked, lock_reason, _ = is_capital_daily_locked(cid, current_balance=chk_bal_gov, is_demo=effective_is_demo)
+                                is_locked, lock_reason, tel_gov = is_capital_daily_locked(cid, current_balance=chk_bal_gov, is_demo=effective_is_demo)
                                 if is_locked:
-                                    logger.info(
-                                        f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
-                                        f"Capital strictly preserved under Invariant 52."
-                                    )
-                                    return {"chat_id": cid, "success": False, "reason": f"Daily Governor paused ({lock_reason})"}
+                                    # Quant Gold 24/5 Continuous Mode (Invariant 128):
+                                    # When +5% daily target is reached ("TARGET_5PCT_LOCKED" or "TARGET_LOCKED"),
+                                    # Quant Gold continues trading 24/5 with trailing high-water mark compounding!
+                                    # BUT if locked due to Daily Loss Floor ("FLOOR_HIT" / -2.5% loss),
+                                    # strictly halt new entries to preserve capital against disaster regimes (Invariant 1.1).
+                                    if "TARGET" in str(lock_reason).upper() or (tel_gov and tel_gov.get("is_target_locked")):
+                                        logger.info(
+                                            f"🏆 [QUANT GOLD 24/5 TRAILING COMPOUND] User {cid} daily target reached ({lock_reason}). "
+                                            f"Quant Gold trailing high-water mark active for 24/5 continuous compounding!"
+                                        )
+                                    else:
+                                        logger.info(
+                                            f"👑 [DAILY GOVERNOR ACTIVE] User {cid} trading paused today: {lock_reason}. "
+                                            f"Capital strictly preserved under Invariant 52."
+                                        )
+                                        return {"chat_id": cid, "success": False, "reason": f"Daily Governor paused ({lock_reason})"}
                         except Exception as e_gov:
                             logger.debug(f"Daily Governor check note for user {cid}: {e_gov}")
 
@@ -2882,40 +2893,35 @@ class QuantGoldExecutionEngine:
                     str(tr.get("source", "")).upper() == "MANUAL"
                 )
 
-                # Flash Shock & Micro-Exhaustion Peak Protective Harvest (Invariants 35, 104 & 121):
+                # Flash Shock & Micro-Exhaustion Peak Protective Harvest (Invariants 35, 104, 121 & 128):
                 # 100% Size-Invariant: Governed strictly by Price Points / Pips, NOT fixed dollar thresholds!
-                # Institutional Rule: Never choke trades that are already protected by Breakeven Armor!
-                # When a position has Breakeven Armor (Risk = 0.00R Free Roll), the Stop-Loss is already locking a profit floor.
-                # Prematurely cutting at +$0.80 prevents the trade from capturing institutional +50 to +150 pip repricing waves!
+                # Responsive Climax Harvest: Protects real profits from evaporating back to scratch!
                 is_be_protected = (deal_id in self._be_armor_locked_deals or scale_tier >= 1)
-                min_fee_upl = max(0.50, spread * sz * 2.0)
-                min_profit_pts = max(2.50, spread * 3.0)  # At least +25 pips ($2.50)
+                min_fee_upl = max(0.50, spread * sz * 1.5)
+                min_profit_pts = max(1.20, spread * 2.0)  # At least +12 pips ($1.20)
 
-                # Flash Shock Harvest: Requires substantial peak (>= +5.00 pts / +50 pips, or UPL >= $4.00)
-                # and retraces >= 50% from that significant peak, while NOT in Breakeven Armor:
+                # Flash Shock Harvest: Requires peak (>= +2.50 pts / +25 pips, or UPL >= $2.50)
+                # and retraces >= 45% from that peak, protecting banked profits:
                 is_shock_pts = (
                     not is_manual_trade and
-                    not is_be_protected and
-                    current_peak_pts >= 5.00 and
+                    current_peak_pts >= 2.50 and
                     current_peak_pts <= 150.0 and
-                    pnl_pts <= (current_peak_pts * 0.50) and  # retraced >= 50% from significant peak
-                    pnl_pts >= min_profit_pts and
-                    upl >= min_fee_upl
+                    pnl_pts <= (current_peak_pts * 0.55) and  # retraced >= 45% from peak
+                    pnl_pts >= 1.20 and
+                    upl >= max(1.00, spread * 1.5)
                 )
                 is_shock_upl = (
                     not is_manual_trade and
-                    not is_be_protected and
-                    current_peak >= 4.00 and
+                    current_peak >= 2.50 and
                     current_peak <= 150.0 and
-                    upl <= (current_peak * 0.50) and          # retraced >= 50% from peak UPL
-                    upl >= max(2.00, min_fee_upl)
+                    upl <= (current_peak * 0.55) and          # retraced >= 45% from peak UPL
+                    upl >= max(1.00, spread * 1.5)
                 )
 
                 # M5 Micro-Exhaustion Peak Harvester:
-                # Strictly requires a significant peak (current_peak_pts >= 6.50 / +65 pips)
-                # and confirmed reversal pinbar on M5 (NOT M1 noise), and only if NOT in Breakeven Armor!
+                # Triggers when peak >= 2.50 pts / $2.50, retraces >= 30% from peak, and confirmed reversal pinbar/exhaustion on M5!
                 is_exhaustion_harvest = False
-                if not is_manual_trade and not is_be_protected and (current_peak_pts >= 6.50 or current_peak >= 5.00) and pnl_pts >= min_profit_pts and upl >= min_fee_upl:
+                if not is_manual_trade and (current_peak_pts >= 2.50 or current_peak >= 2.50) and upl >= max(1.20, spread * 1.6):
                     if (pnl_pts <= current_peak_pts * 0.70) or (current_peak > 0 and upl <= current_peak * 0.70):  # Retraced >= 30% from +65 pips peak
                         try:
                             candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
@@ -3033,44 +3039,102 @@ class QuantGoldExecutionEngine:
                     except Exception as e_rev_cut:
                         logger.debug(f"360 reversal check note: {e_rev_cut}")
 
+                # Adaptive Invalidation Micro-Cut Guard (AQ88 Invariant 128):
+                # Never allow a losing trade to bleed out to a full -30.0 pt (-$15.13) stop loss!
+                # If loss reaches -$2.25 to -$2.50 (or pnl_pts <= -4.50) and adverse order flow confirms failure,
+                # immediately micro-cut the trade to preserve capital!
+                is_adverse_order_flow = False
+                if is_floating_loss and not is_manual_trade:
+                    try:
+                        candles_m5_cut = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
+                        if candles_m5_cut is not None and len(candles_m5_cut) >= 2:
+                            from mathematical_engine import compute_net_buy_sell_force
+                            f_cut = compute_net_buy_sell_force(candles_m5_cut)
+                            b_f_cut = float(f_cut.get("buy_force_pct", 50.0))
+                            s_f_cut = float(f_cut.get("sell_force_pct", 50.0))
+                            ex_cut = f_cut.get("exhaustion_state", "NEUTRAL_BALANCED")
+                            if dir_side == "BUY" and (s_f_cut >= 62.0 or ex_cut == "BULLS_EXHAUSTED_AT_TOP"):
+                                is_adverse_order_flow = True
+                            elif dir_side == "SELL" and (b_f_cut >= 62.0 or ex_cut == "BEARS_EXHAUSTED_AT_BOTTOM"):
+                                is_adverse_order_flow = True
+                    except Exception:
+                        is_adverse_order_flow = False
+
+                if is_floating_loss and is_adverse_order_flow and not is_manual_trade and (upl <= -2.25 or pnl_pts <= -4.50):
+                    logger.info(
+                        f"🛡️ [ADAPTIVE INVALIDATION MICRO-CUT] Gold trade {deal_id} ({dir_side}) "
+                        f"adverse order flow confirmed at ${curr_p:.2f} (Loss: ${upl:.2f} / {pnl_pts:.2f} pts). "
+                        f"Micro-cutting trade immediately to prevent -$15.00 catastrophe!"
+                    )
+                    try:
+                        if cid:
+                            u_eng = capital_engine.get_user_capital_engine(cid, is_demo=is_demo)
+                            await asyncio.to_thread(u_eng.close_position, deal_id=deal_id)
+                        if hasattr(db, "update_capital_auto_trade_close"):
+                            db.update_capital_auto_trade_close(deal_id, exit_price=curr_p, pnl=upl)
+                        self._clear_active_trade(deal_key, cooldown=30.0, direction=dir_side)
+                        continue
+                    except Exception as e_cut:
+                        logger.debug(f"Adaptive invalidation micro-cut note: {e_cut}")
+
                 # ── MACHINE 1: M1 - M5 SCALP FAST HARVESTER ──
                 # "ម៉ាស៊ីនទី១ ធ្វើការ Scalping M1-M5 បើក Position Buy នៅបាតដែលអស់កម្លាំងលក់ទាំងស្រុង
                 # កើបចំណេញធំនៅចុងកម្លាំង Buy ដែលខ្សោយ Super Fast ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ។"
-                if is_e1 and not is_manual_trade and scale_tier == 0:
+                if is_e1 and not is_manual_trade and scale_tier <= 1:
                     tier_pips_target = int(get_gold_position_tier_spec(0).get("pips_target", 20))
 
-                    # Net Order Flow Check on M5 for impulse exhaustion
+                    # Net Order Flow Check on M5 for impulse exhaustion (Pillar 1 RAM Climax)
                     candles_m5_scalp = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
                     scalp_exhausted = False
+                    exhaustion_reason = ""
+                    b_f, s_f = 50.0, 50.0
                     if candles_m5_scalp is not None and len(candles_m5_scalp) >= 2:
                         try:
                             from mathematical_engine import compute_net_buy_sell_force
                             f_m5 = compute_net_buy_sell_force(candles_m5_scalp)
                             b_f = float(f_m5.get("buy_force_pct", 50.0))
                             s_f = float(f_m5.get("sell_force_pct", 50.0))
+                            ex_state = f_m5.get("exhaustion_state", "NEUTRAL_BALANCED")
                             c_last = candles_m5_scalp.iloc[-1]
                             o_v, h_v, l_v, c_v = float(c_last['open']), float(c_last['high']), float(c_last['low']), float(c_last['close'])
                             rng_v = max(0.25, h_v - l_v)
                             if dir_side == "BUY":
                                 u_wick = (h_v - max(o_v, c_v)) / rng_v
-                                scalp_exhausted = (u_wick >= 0.35 and s_f >= 55.0) or (f_m5.get("exhaustion_state") == "BULLS_EXHAUSTED_AT_TOP")
+                                if u_wick >= 0.35 and s_f >= 55.0:
+                                    scalp_exhausted = True
+                                    exhaustion_reason = f"UPPER_WICK_{u_wick*100:.0f}%_SELL_FORCE_{s_f:.0f}%"
+                                elif ex_state == "BULLS_EXHAUSTED_AT_TOP":
+                                    scalp_exhausted = True
+                                    exhaustion_reason = "M5_BULLS_EXHAUSTED_AT_TOP"
+                                elif b_f <= 35.0 and s_f >= 60.0:
+                                    scalp_exhausted = True
+                                    exhaustion_reason = f"BUY_FORCE_COLLAPSE_{b_f:.0f}%"
                             else:
                                 l_wick = (min(o_v, c_v) - l_v) / rng_v
-                                scalp_exhausted = (l_wick >= 0.35 and b_f >= 55.0) or (f_m5.get("exhaustion_state") == "BEARS_EXHAUSTED_AT_BOTTOM")
+                                if l_wick >= 0.35 and b_f >= 55.0:
+                                    scalp_exhausted = True
+                                    exhaustion_reason = f"LOWER_WICK_{l_wick*100:.0f}%_BUY_FORCE_{b_f:.0f}%"
+                                elif ex_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                                    scalp_exhausted = True
+                                    exhaustion_reason = "M5_BEARS_EXHAUSTED_AT_BOTTOM"
+                                elif s_f <= 35.0 and b_f >= 60.0:
+                                    scalp_exhausted = True
+                                    exhaustion_reason = f"SELL_FORCE_COLLAPSE_{s_f:.0f}%"
                         except Exception:
                             scalp_exhausted = False
 
-                    # Super Fast Profit Taking: Target reached OR momentum exhausted at impulse end
+                    # Super Fast Profit Taking (RAM Climax Peak Harvester):
+                    # Banks cash profit immediately when target is hit or momentum exhausts at the peak!
                     should_fast_harvest = (
-                        (pnl_pts >= 2.00 or pips >= tier_pips_target) or
-                        (pnl_pts >= 1.50 and scalp_exhausted) or
-                        (current_peak_pts >= 2.00 and pnl_pts <= current_peak_pts * 0.75 and pnl_pts >= 1.20)
+                        (pnl_pts >= 2.20 or pips >= tier_pips_target or upl >= 2.00) or
+                        ((pnl_pts >= 1.50 or upl >= 1.25) and scalp_exhausted) or
+                        (current_peak_pts >= 2.00 and pnl_pts <= current_peak_pts * 0.72 and pnl_pts >= 1.20)
                     )
 
                     if should_fast_harvest:
                         logger.info(
-                            f"⚡ [MACHINE 1 SCALP FAST HARVEST] Gold scalp trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f}) "
-                            f"(Exhausted={scalp_exhausted}). Banking Scalp cash profit immediately!"
+                            f"⚡ [MACHINE 1 SCALP FAST HARVEST] Gold scalp trade {deal_id} reached +{pips} pips (+${pnl_pts:.2f} / ${upl:.2f}) "
+                            f"(Exhausted={scalp_exhausted}: {exhaustion_reason}). Banking Scalp cash profit immediately!"
                         )
                         try:
                             if cid:
@@ -3093,11 +3157,11 @@ class QuantGoldExecutionEngine:
                             logger.debug(f"Machine 1 scalp fast harvest note: {e_sc}")
 
                     # Breakeven Armor (Loss Immunity Guarantee):
-                    # If profit >= +1.20 pts (+12 pips), shift SL to Entry ± 0.80 Net Floor
-                    # "ដាច់ខាតមិនឱ្យបកក្បាលមកវិញខាតចំណេញធំទាន់ឡើយ"
-                    elif pnl_pts >= 1.20 and deal_id not in self._be_armor_locked_deals:
-                        be_buffer = max(0.80, spread * 1.6)
-                        min_breathing_buf = max(1.20, spread * 2.0)
+                    # If profit >= +2.80 pts (+28 pips) or UPL >= $2.00, shift SL to Entry ± max(1.20, spread * 2.2)
+                    # Provides min breathing buffer of max(1.80, spread * 2.8) so tick noise does not clip it!
+                    elif (pnl_pts >= 2.80 or upl >= 2.00) and deal_id not in self._be_armor_locked_deals:
+                        be_buffer = max(1.20, spread * 2.2)
+                        min_breathing_buf = max(1.80, spread * 2.8)
                         if dir_side == "BUY":
                             raw_be = entry_p + be_buffer
                             be_level = min(raw_be, curr_p - min_breathing_buf)
