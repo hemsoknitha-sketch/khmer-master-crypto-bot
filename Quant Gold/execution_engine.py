@@ -692,6 +692,17 @@ class QuantGoldExecutionEngine:
             self._peak_upl_map.pop(str(deal_id), None)
             self._peak_pnl_pts_map.pop(str(deal_id), None)
 
+    def clear_quarantine_and_cooldown(self):
+        """Super Admin command to clear all directional quarantines, stop memory, and cooldowns."""
+        self._directional_quarantine_dir = None
+        self._directional_quarantine_until = 0.0
+        self._last_stop_out_price = 0.0
+        self._last_stop_out_ts = 0.0
+        self._last_stop_out_dir = None
+        self._trade_cooldown_seconds = 0.0
+        self._last_trade_closed_ts = 0.0
+        logger.info("🟢 [QUARANTINE CLEARED] All directional quarantines, stop-loss memories, and cooldowns purged from RAM.")
+
     def get_cached_gold_signal(self) -> Optional[Dict[str, Any]]:
         """Returns the most recent calculated Gold signal from RAM cache without re-computing (<0.0001ms)."""
         if self._last_signal_data and (time.time() - self._last_signal_ts) < 120.0:

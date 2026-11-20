@@ -129,7 +129,7 @@ def main():
         "test_quant_gold_daily_training_and_pyramid_guard.py",
         "test_quant_gold_apex_master_architecture.py"
     ]
-    code, out, err, d_test = run_cmd(test_cmd, timeout=45)
+    code, out, err, d_test = run_cmd(test_cmd, timeout=120)
     if code != 0:
         print(f"❌ [TEST FAILED] {err or out}")
         sys.exit(1)

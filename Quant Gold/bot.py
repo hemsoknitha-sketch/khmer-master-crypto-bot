@@ -371,20 +371,43 @@ class QuantGoldBot:
         await self.safe_reply(update, msg)
 
     async def handle_unlock(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Super Admin 1-tap Release of Trading Lockdown (Invariant 41 & 75)."""
+        """Super Admin 1-tap Release of Trading Lockdown across all users (Invariant 41 & 75)."""
         chat_id = update.effective_chat.id if update.effective_chat else None
         if not self.citadel.is_super_admin(chat_id):
             return await self.safe_reply(update, "⛔ <i>សិទ្ធិបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។</i>")
 
+        args = context.args if context and context.args else []
+        re_enabled_cnt = 0
+        if args and any(x.lower() in ["all", "fleet", "force"] for x in args):
+            re_enabled_cnt = db.enable_all_capital_users(engine="AUTO")
+
         self.citadel.release_emergency_lockdown(chat_id)
         db.set_capital_global_trading_switch(True, "ALL")
+
+        # Clear any in-memory directional quarantines and cooldowns on Execution Engine
+        try:
+            from execution_engine import get_quant_gold_execution_engine
+            eng = get_quant_gold_execution_engine()
+            eng.clear_quarantine_and_cooldown()
+        except Exception as e_unl:
+            logger.debug(f"Execution engine quarantine clear note: {e_unl}")
+
+        active_users = db.get_active_capital_auto_users() or []
+        active_cnt = len(active_users)
+
+        fleet_note = f"\n• Users កំពុងដំណើរការ ៖ <code>{active_cnt} គណនី (Fleet Active)</code>"
+        if re_enabled_cnt > 0:
+            fleet_note += f"\n• បានបើកដំណើរការឡើងវិញ ៖ <code>+{re_enabled_cnt} គណនី</code>"
+
         msg = (
             f"🟢 <b>[CIRCUIT BREAKER RELEASED]</b> ✅\n"
             f"══════════════════════════════════════\n"
             f"• ដោះសោរដោយ ៖ <code>Super Admin #{chat_id}</code>\n"
             f"• Global Trading Switch ៖ <code>🟢 ON</code>\n"
             f"• ស្ថានភាព ៖ <b>ARMED & SECURE (Trading Active)</b>\n"
-            f"• ប្រព័ន្ធជួញដូរ Quant Gold ដំណើរការប្រក្រតីឡើងវិញ។"
+            f"• RAM Invalidation & Cooldown ៖ <code>CLEARED (0.0s Delay)</code>"
+            f"{fleet_note}\n"
+            f"• ប្រព័ន្ធជួញដូរ Quant Gold ដំណើរការប្រក្រតីឡើងវិញសម្រាប់គ្រប់ Users ទាំងអស់។"
         )
         await self.safe_reply(update, msg)
 
