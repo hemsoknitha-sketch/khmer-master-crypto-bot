@@ -974,10 +974,16 @@ class TradingViewConfluenceMatrix:
         vp = compute_volume_profile(df_m15, n_bins=20)
         avwap = compute_anchored_vwap(df_m15, anchor_idx=max(0, n - 30))
 
-        # 3. Fibonacci Retracement & Golden Pocket
-        p_min = float(np.min(lows[-min(30, n):]))
-        p_max = float(np.max(highs[-min(30, n):]))
-        fib_matrix = compute_fibonacci_matrix(p_min, p_max)
+        # 3. Fibonacci Retracement & Golden Pocket (Directionally-Aware Institutional OTE)
+        lookback_fib = min(35, n)
+        p_min_idx = int(np.argmin(lows[-lookback_fib:]))
+        p_max_idx = int(np.argmax(highs[-lookback_fib:]))
+        t_min = float(n - lookback_fib + p_min_idx)
+        t_max = float(n - lookback_fib + p_max_idx)
+        p_min = float(lows[-lookback_fib + p_min_idx])
+        p_max = float(highs[-lookback_fib + p_max_idx])
+        is_bull_swing = t_max > t_min
+        fib_matrix = compute_fibonacci_matrix(p_min, p_max, direction="BULLISH" if is_bull_swing else "BEARISH")
 
         # 4. Andrews' Pitchfork on last 3 prominent pivots
         p1 = float(lows[-min(30, n)])
@@ -1030,12 +1036,44 @@ class TradingViewConfluenceMatrix:
                 score -= 20.0
                 confluence_reasons.append("AT_VALUE_AREA_HIGH_DISTRIBUTION")
 
-        # D. Fibonacci Golden Pocket (0.618 - 0.705)
+        # D. Fibonacci Golden Pocket (Directionally-Aware Institutional OTE)
         gp_low = fib_matrix["golden_pocket_low"]
         gp_high = fib_matrix["golden_pocket_high"]
         if gp_low <= current_price <= gp_high:
-            score += 25.0
-            confluence_reasons.append(f"IN_FIB_GOLDEN_POCKET (${gp_low:.2f}-${gp_high:.2f})")
+            if is_bull_swing:
+                score += 25.0
+                confluence_reasons.append(f"IN_BULLISH_FIB_GOLDEN_POCKET_SUPPORT (${gp_low:.2f}-${gp_high:.2f})")
+            else:
+                score -= 25.0
+                confluence_reasons.append(f"IN_BEARISH_FIB_GOLDEN_POCKET_RESISTANCE (${gp_low:.2f}-${gp_high:.2f})")
+
+        # D.1 Institutional Top/Bottom Climax Exhaustion Reversals (In RAM)
+        c_last = df_m15.iloc[-1]
+        c_open = float(c_last['open'])
+        c_high = float(c_last['high'])
+        c_low = float(c_last['low'])
+        c_close = float(c_last['close'])
+        c_rng = max(0.20, c_high - c_low)
+        u_wick = max(0.0, c_high - max(c_open, c_close)) / c_rng
+        l_wick = max(0.0, min(c_open, c_close) - c_low) / c_rng
+
+        # Top Climax Exhaustion Rejection (Upper wick >= 35% at OLS Upper Band or VAH)
+        if (current_price >= ols["upper"] - 1.50 or current_price >= vp.get("vah", 9999.0) - 1.50 or z >= 1.65) and u_wick >= 0.35:
+            score -= 30.0
+            confluence_reasons.append(f"TOP_CLIMAX_EXHAUSTION_REVERSAL_SELL (Upper Wick {u_wick*100:.1f}%, z={z:.2f})")
+
+        # Bottom Climax Exhaustion Absorption (Lower wick >= 35% at OLS Lower Band or VAL)
+        if (current_price <= ols["lower"] + 1.50 or current_price <= vp.get("val", 0.0) + 1.50 or z <= -1.65) and l_wick >= 0.35:
+            score += 30.0
+            confluence_reasons.append(f"BOTTOM_CLIMAX_EXHAUSTION_REVERSAL_BUY (Lower Wick {l_wick*100:.1f}%, z={z:.2f})")
+
+        # D.2 Anti-Climax Chasing Vetoes (Never Buy the top wick or Sell the bottom plunge)
+        if z >= 2.20 and u_wick < 0.15 and score > 0:
+            score = min(score, 10.0)
+            confluence_reasons.append("ANTI_CHASING_PARABOLIC_TOP_VETO")
+        elif z <= -2.20 and l_wick < 0.15 and score < 0:
+            score = max(score, -10.0)
+            confluence_reasons.append("ANTI_CHASING_FREEFALL_BOTTOM_VETO")
 
         # E. Pitchfork Median Line Pull
         med_p = pitchfork["median_line"]

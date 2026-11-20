@@ -157,7 +157,7 @@ def format_gold_tp_card(stage: str, pips: int, direction: str, entry_price: floa
         stage_desc = f"TP1 Hit (+{disp_pips} pips) | Machine 2 Cash Floor Locked!"
     elif "TP2" in st:
         disp_pips = max(180, min(safe_pips, 280))
-        stage_desc = f"TP2 Hit (+{disp_pips} pips) | +$8.00 Cash Floor Locked!"
+        stage_desc = f"Machine 2 TP2 Hit (+{disp_pips} pips) | +$8.00 Cash Floor Locked!"
     elif "TP3" in st:
         disp_pips = max(280, min(safe_pips, 350))
         stage_desc = f"Machine 2 TP3 Hit (+{disp_pips} pips) | Moonshot Runner Harvested!"
@@ -1857,7 +1857,8 @@ class QuantGoldExecutionEngine:
                             except Exception:
                                 existing_entry_p = current_price
                         existing_pnl_pts = (current_price - existing_entry_p) if existing_dir == "BUY" else (existing_entry_p - current_price)
-                        is_existing_losing = (existing_pnl_pts <= -2.50)
+                        is_existing_profitable = (existing_pnl_pts >= 1.20)
+                        is_existing_losing = (existing_pnl_pts <= -0.50)
 
                         # Dynamic anti-whipsaw cooldown: 180s (3 minutes) to prevent chop churn
                         rev_cooldown_left = 180.0 - (now_ts - last_rev_ts)
@@ -1888,8 +1889,10 @@ class QuantGoldExecutionEngine:
                         flip_veto_reason = ""
 
                         # 1. FIDUCIARY PROFIT PROTECTION: Never flip an existing healthy/winning trade!
-                        if not is_existing_losing:
-                            flip_veto_reason = f"PROFIT_RUNNER_PROTECTED (Existing {existing_dir} healthy/profitable with {existing_pnl_pts:+.2f} pts PnL. Protected by TP/SL, flipping forbidden!)"
+                        if is_existing_profitable:
+                            flip_veto_reason = f"PROFIT_RUNNER_PROTECTED (Existing {existing_dir} in solid profit with {existing_pnl_pts:+.2f} pts PnL. Protected by TP/SL, flipping forbidden!)"
+                        elif not is_existing_losing:
+                            flip_veto_reason = f"SCRATCH_ZONE_HOLD (Existing {existing_dir} in neutral scratch zone {existing_pnl_pts:+.2f} pts. Awaiting structural invalidation or profit target.)"
                         elif rev_cooldown_left > 0:
                             flip_veto_reason = f"COOLDOWN_ACTIVE ({rev_cooldown_left:.0f}s left of 180s)"
                         elif time_in_pos < min_hold_req:
@@ -3070,8 +3073,26 @@ class QuantGoldExecutionEngine:
                                 await self.broadcast_to_vip_users(card_close_win, app=app, reply_markup=markup)
                             self._clear_active_trade(deal_id, cooldown=20.0, direction=dir_side)
                         else:
-                            logger.info(f"Gold trade {deal_id} closed at loss (${upl:.2f}). VIP alert suppressed as per Fiduciary Profit-Only policy.")
-                            self._clear_active_trade(deal_id, cooldown=45.0, direction=dir_side)
+                            # Closed at loss on broker natively: record in RAM & activate directional quarantine!
+                            self._last_stop_out_price = round(curr_p, 2)
+                            self._last_stop_out_ts = time.time()
+                            self._last_stop_out_dir = dir_side
+                            self._directional_quarantine_dir = dir_side
+                            self._directional_quarantine_until = time.time() + 900.0  # 15 minutes quarantine
+                            logger.info(
+                                f"🏛️ [BROKER STRUCTURAL STOP-LOSS SYNC] Gold trade {deal_id} ({dir_side}) hit SL @ ${curr_p:.2f} (Loss: ${upl:.2f}). "
+                                f"Recorded ${self._last_stop_out_price:.2f} in RAM invalidation memory. Quarantining {dir_side} for 15 minutes."
+                            )
+                            card_sl = format_gold_sl_card(
+                                pips=abs(pips),
+                                direction=dir_side,
+                                entry_price=entry_p,
+                                exit_price=curr_p,
+                                loss_amount=upl
+                            )
+                            markup = get_gold_signal_reply_markup()
+                            await self.broadcast_to_vip_users(card_sl, app=app, reply_markup=markup)
+                            self._clear_active_trade(deal_id, cooldown=120.0, direction=dir_side)
                         continue
 
                 # Step 2: Entry price sanity & price jump anomaly guard
@@ -3123,28 +3144,30 @@ class QuantGoldExecutionEngine:
                 min_profit_pts = max(1.20, spread * 2.0)  # At least +12 pips ($1.20)
 
                 # Flash Shock Harvest: Requires peak (>= +2.50 pts / +25 pips, or UPL >= $2.50)
-                # and retraces >= 45% from that peak, protecting banked profits:
+                # and retraces from that peak, protecting banked profits with High-Watermark Retaining Ratchet:
+                shock_pts_threshold = max(current_peak_pts - 1.20, current_peak_pts * 0.78)
+                shock_upl_threshold = max(current_peak - 1.20, current_peak * 0.78)
                 is_shock_pts = (
                     not is_manual_trade and
                     current_peak_pts >= 2.50 and
                     current_peak_pts <= 150.0 and
-                    pnl_pts <= (current_peak_pts * 0.55) and  # retraced >= 45% from peak
+                    pnl_pts <= shock_pts_threshold and
                     pnl_pts >= 1.20 and
-                    upl >= max(1.00, spread * 1.5)
+                    upl >= max(0.80, spread * 1.5)
                 )
                 is_shock_upl = (
                     not is_manual_trade and
                     current_peak >= 2.50 and
                     current_peak <= 150.0 and
-                    upl <= (current_peak * 0.55) and          # retraced >= 45% from peak UPL
-                    upl >= max(1.00, spread * 1.5)
+                    upl <= shock_upl_threshold and
+                    upl >= max(0.80, spread * 1.5)
                 )
 
-                # M5 Micro-Exhaustion Peak Harvester:
-                # Triggers when peak >= 2.50 pts / $2.50, retraces >= 30% from peak, and confirmed reversal pinbar/exhaustion on M5!
+                # M5 Micro-Exhaustion & Climax Peak Harvester:
+                # Triggers when peak >= 2.00 pts / $1.00, and confirmed reversal pinbar/exhaustion on M5!
                 is_exhaustion_harvest = False
-                if not is_manual_trade and (current_peak_pts >= 2.50 or current_peak >= 2.50) and upl >= max(1.20, spread * 1.6):
-                    if (pnl_pts <= current_peak_pts * 0.70) or (current_peak > 0 and upl <= current_peak * 0.70):  # Retraced >= 30% from +65 pips peak
+                if not is_manual_trade and (current_peak_pts >= 2.00 or current_peak >= 1.00) and upl >= max(0.80, spread * 1.5):
+                    if (pnl_pts <= current_peak_pts * 0.78) or (current_peak > 0 and upl <= current_peak * 0.78):
                         try:
                             candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
                             if candles_m5 is not None and len(candles_m5) >= 2:
@@ -3165,11 +3188,11 @@ class QuantGoldExecutionEngine:
 
                                 if dir_side == "BUY":
                                     upper_wick = (h_val - max(o_val, c_val)) / c_range
-                                    if (upper_wick >= 0.45 and s_force >= 65.0) or exh_state == "BULLS_EXHAUSTED_AT_TOP":
+                                    if (upper_wick >= 0.38 and s_force >= 60.0) or exh_state == "BULLS_EXHAUSTED_AT_TOP":
                                         is_exhaustion_harvest = True
                                 else:
                                     lower_wick = (min(o_val, c_val) - l_val) / c_range
-                                    if (lower_wick >= 0.45 and b_force >= 65.0) or exh_state == "BEARS_EXHAUSTED_AT_BOTTOM":
+                                    if (lower_wick >= 0.38 and b_force >= 60.0) or exh_state == "BEARS_EXHAUSTED_AT_BOTTOM":
                                         is_exhaustion_harvest = True
                         except Exception as e_exh:
                             logger.debug(f"Exhaustion check note: {e_exh}")
@@ -3217,46 +3240,78 @@ class QuantGoldExecutionEngine:
                 tranche_lbl = str(tr.get("tranche_id", "") or "")
                 trade_setup = str(tr.get("setup_type", "") or "")
                 trade_open_ts = float(tr.get("created_at_ts", 0.0) or 0.0)
+                is_adverse_drawdown = (upl <= -0.60 or pnl_pts <= -1.20)
                 is_floating_loss = (upl <= -2.50 or pnl_pts <= -4.00)
-                is_held_enough = (trade_open_ts <= 0.0) or ((now_curr - trade_open_ts) >= (45.0 if is_floating_loss else 90.0))
+                is_held_enough = (trade_open_ts <= 0.0) or ((now_curr - trade_open_ts) >= (15.0 if is_adverse_drawdown else 45.0))
                 is_already_flipped = (
                     "REVERSAL" in tranche_lbl or
                     "REVERSAL" in trade_setup or
-                    (now_curr - getattr(self, "_last_reversal_flip_ts", 0.0)) < 180.0  # 3-min anti-whipsaw cooldown (was 1800s / 30m)
+                    (now_curr - getattr(self, "_last_reversal_flip_ts", 0.0)) < 180.0  # 3-min anti-whipsaw cooldown
                 )
-                if is_floating_loss and not is_manual_trade and not is_already_flipped and is_held_enough:
+                if (is_adverse_drawdown or is_floating_loss) and not is_manual_trade and is_held_enough:
                     try:
                         from quant_gold_security import get_quant_gold_security_citadel
                         mtf_snap = self.mtf_engine.analyze_all_19_timeframes(current_price=curr_p)
                         candles_m1 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M1")
+                        candles_m5 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M5")
                         candles_m15 = getattr(self.mtf_engine, "get_timeframe_df", lambda x: None)("M15")
                         math_snap = self.math_core.analyze_mathematical_edge(
                             current_price=curr_p,
                             candles_m1=candles_m1,
                             candles_m15=candles_m15
                         )
+
+                        # Check M5 Net Order Flow & Candle Structure directly in RAM
+                        adverse_m5_force = False
+                        if candles_m5 is not None and len(candles_m5) >= 2:
+                            try:
+                                from mathematical_engine import compute_net_buy_sell_force
+                                k_v = float(math_snap.get("kalman", {}).get("latent_velocity", 0.0) or 0.0)
+                                m5_f = compute_net_buy_sell_force(candles_m5, kalman_velocity=k_v)
+                                b_f5 = float(m5_f.get("buy_force_pct", 50.0))
+                                s_f5 = float(m5_f.get("sell_force_pct", 50.0))
+                                exh_m5 = m5_f.get("exhaustion_state", "")
+                                if dir_side == "BUY" and (s_f5 >= 68.0 or exh_m5 == "BEAR_MOMENTUM_PLUNGING" or k_v <= -0.025):
+                                    adverse_m5_force = True
+                                elif dir_side == "SELL" and (b_f5 >= 68.0 or exh_m5 == "BULL_MOMENTUM_EXPANDING" or k_v >= 0.025):
+                                    adverse_m5_force = True
+                            except Exception:
+                                adverse_m5_force = False
+
                         inv_check = get_quant_gold_security_citadel().evaluate_360_market_invalidation(
                             current_price=curr_p,
                             position_direction=dir_side,
                             mtf_data=mtf_snap,
                             math_data=math_snap
                         )
-                        if inv_check.get("is_invalidated") and inv_check.get("reversal_direction"):
-                            opp_dir = inv_check["reversal_direction"]
+                        if (inv_check.get("is_invalidated") and inv_check.get("reversal_direction")) or (adverse_m5_force and pnl_pts <= -1.40):
+                            opp_dir = inv_check.get("reversal_direction") or ("SELL" if dir_side == "BUY" else "BUY")
+                            cut_reason = inv_check.get("reason") if inv_check.get("is_invalidated") else "M5_ADVERSE_MOMENTUM_SURGE"
                             logger.info(
-                                f"🔄 [360° EARLY MICRO-CUT & REVERSAL] Gold trade {deal_id} ({dir_side}) "
-                                f"severely invalidated by {inv_check.get('reason')}. "
-                                f"Triggering Universal Fleet-Wide Close @ ${curr_p:.2f} (Loss: ${upl:.2f}) to Flip into {opp_dir} immediately!"
+                                f"🛡️ [PREEMPTIVE ADVERSE MICRO-CUT] Gold trade {deal_id} ({dir_side}) "
+                                f"pre-emptively cut @ ${curr_p:.2f} (Loss: ${upl:.2f} / {pnl_pts:.2f} pts) by {cut_reason}! "
+                                f"Saved capital from full broker SL (-$2.80+). Quarantining {dir_side} for 15 minutes."
                             )
-                            self._last_reversal_flip_ts = now_curr
-                            self._pending_reversal_action = opp_dir
+                            # Record in RAM invalidation memory
+                            self._last_stop_out_price = round(curr_p, 2)
+                            self._last_stop_out_ts = now_curr
+                            self._last_stop_out_dir = dir_side
+                            self._directional_quarantine_dir = dir_side
+                            self._directional_quarantine_until = now_curr + 900.0
+
+                            can_flip_now = not is_already_flipped and inv_check.get("is_invalidated") and inv_check.get("reversal_direction")
+                            if can_flip_now:
+                                self._last_reversal_flip_ts = now_curr
+                                self._pending_reversal_action = opp_dir
+
                             await self._close_all_fleet_open_gold_positions(
                                 direction=dir_side,
-                                reason="360_MARKET_INVALIDATION_FLIP",
+                                reason="PREEMPTIVE_ADVERSE_MICRO_CUT",
                                 exit_price=curr_p,
                                 current_pnl_pts=pnl_pts,
                                 app=app
                             )
+                            self._clear_active_trade(deal_key, cooldown=90.0, direction=dir_side)
                             break
                     except Exception as e_rev_cut:
                         logger.debug(f"360 reversal check note: {e_rev_cut}")

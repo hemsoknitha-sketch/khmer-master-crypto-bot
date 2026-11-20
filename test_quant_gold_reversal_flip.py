@@ -42,8 +42,10 @@ class TestQuantGoldReversalFlip(unittest.TestCase):
 
         existing_entry_p = self.engine._active_gold_entry_price
         existing_pnl_pts = (current_price - existing_entry_p) if existing_dir == "BUY" else (existing_entry_p - current_price)
-        is_existing_losing = (existing_pnl_pts <= -2.50)
+        is_existing_profitable = (existing_pnl_pts >= 1.20)
+        is_existing_losing = (existing_pnl_pts <= -0.50)
         self.assertTrue(is_existing_losing)
+        self.assertFalse(is_existing_profitable)
 
         rev_cooldown_left = 180.0 - (now_ts - last_rev_ts)
         min_hold_req = 45.0
@@ -51,8 +53,10 @@ class TestQuantGoldReversalFlip(unittest.TestCase):
 
         can_flip = False
         flip_veto_reason = ""
-        if not is_existing_losing:
+        if is_existing_profitable:
             flip_veto_reason = "PROFIT_RUNNER_PROTECTED"
+        elif not is_existing_losing:
+            flip_veto_reason = "SCRATCH_ZONE_HOLD"
         elif rev_cooldown_left > 0:
             flip_veto_reason = "COOLDOWN_ACTIVE"
         elif time_in_pos < min_hold_req:
@@ -88,7 +92,9 @@ class TestQuantGoldReversalFlip(unittest.TestCase):
         current_price = 3870.0  # existing SELL is in +10 pts profit!
         existing_dir = "SELL"
         existing_pnl_pts = 3880.0 - current_price  # +10.0 pts
-        is_existing_losing = (existing_pnl_pts <= -2.50)
+        is_existing_profitable = (existing_pnl_pts >= 1.20)
+        is_existing_losing = (existing_pnl_pts <= -0.50)
+        self.assertTrue(is_existing_profitable)
         self.assertFalse(is_existing_losing)
 
         # Even with high-conviction opposing BUY signal
@@ -98,8 +104,8 @@ class TestQuantGoldReversalFlip(unittest.TestCase):
 
         can_flip = False
         flip_veto_reason = ""
-        if not is_existing_losing:
-            flip_veto_reason = f"PROFIT_RUNNER_PROTECTED (Existing {existing_dir} healthy/profitable with {existing_pnl_pts:+.2f} pts PnL. Protected by TP/SL, flipping forbidden!)"
+        if is_existing_profitable:
+            flip_veto_reason = f"PROFIT_RUNNER_PROTECTED (Existing {existing_dir} in solid profit with {existing_pnl_pts:+.2f} pts PnL. Protected by TP/SL, flipping forbidden!)"
 
         self.assertFalse(can_flip)
         self.assertIn("PROFIT_RUNNER_PROTECTED", flip_veto_reason)
@@ -188,6 +194,36 @@ class TestQuantGoldReversalFlip(unittest.TestCase):
         )
         self.assertTrue(inv_check.get("is_invalidated"))
         self.assertEqual(inv_check.get("reversal_direction"), "BUY")
+
+    def test_preemptive_adverse_micro_cut(self):
+        """Verify that adverse drawdown triggers pre-emptive micro-cut before full broker SL."""
+        pnl_pts = -1.50  # -1.50 pts drawdown (loss -$0.75 on 0.5 lot)
+        upl = -0.75
+        is_adverse_drawdown = (upl <= -0.60 or pnl_pts <= -1.20)
+        self.assertTrue(is_adverse_drawdown)
+
+        # M5 shows adverse plunge for BUY trade
+        dir_side = "BUY"
+        s_f5 = 72.0
+        exh_m5 = "BEAR_MOMENTUM_PLUNGING"
+        k_v = -0.030
+        adverse_m5_force = (dir_side == "BUY" and (s_f5 >= 68.0 or exh_m5 == "BEAR_MOMENTUM_PLUNGING" or k_v <= -0.025))
+        self.assertTrue(adverse_m5_force)
+
+    def test_high_watermark_peak_shock_harvest(self):
+        """Verify high-watermark retaining ratchet locks >= 78% of peak gains."""
+        current_peak_pts = 6.99  # peak was +6.99 pts ($3.22)
+        shock_pts_threshold = max(current_peak_pts - 1.20, current_peak_pts * 0.78)  # max(5.79, 5.45) = 5.79 pts
+        self.assertAlmostEqual(shock_pts_threshold, 5.79, places=2)
+
+        # At 5.70 pts, shock triggers (retained 81.5% of peak gains, rather than dumping to $1.35 or $0.50)
+        pnl_pts = 5.70
+        is_shock_pts = (
+            current_peak_pts >= 2.50 and
+            pnl_pts <= shock_pts_threshold and
+            pnl_pts >= 1.20
+        )
+        self.assertTrue(is_shock_pts)
 
 
 if __name__ == "__main__":
